@@ -1,32 +1,19 @@
-import { FlatCompat } from "@eslint/eslintrc";
-import prettierPlugin from "eslint-plugin-prettier";
-import { defineConfig } from "eslint/config";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { FlatCompat } from '@eslint/eslintrc'
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
+  // import.meta.dirname is available after Node.js v20.11.0
+  baseDirectory: import.meta.dirname,
+})
 
-export default defineConfig([
-  {
-    plugins: {
-      prettier: prettierPlugin,
-    },
-    extends: compat.extends("next/core-web-vitals", "next/typescript", "prettier"),
-
+const eslintConfig = [
+  ...compat.config({
+    extends: ['next'],
     rules: {
-      "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/ban-ts-comment": "off",
-
-      "prettier/prettier": [
-        "warn",
-        {
-          endOfLine: "auto",
-        },
-      ],
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/ban-ts-comment': 'off'
     },
-  },
-]);
+  }),
+]
+
+export default eslintConfig
