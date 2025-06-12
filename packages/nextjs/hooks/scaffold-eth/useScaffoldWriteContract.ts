@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { MutateOptions } from "@tanstack/react-query";
 import { Abi, ExtractAbiFunctionNames } from "abitype";
 import { Config, UseWriteContractParameters, useAccount, useConfig, useWriteContract } from "wagmi";
@@ -73,8 +73,6 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
 
   const { chain: accountChain } = useAccount();
   const writeTx = useTransactor();
-  const [isMining, setIsMining] = useState(false);
-
   const wagmiContractWrite = useWriteContract(finalWriteContractParams);
 
   const selectedNetwork = useSelectedNetwork(chainId);
@@ -106,7 +104,6 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
     }
 
     try {
-      setIsMining(true);
       const { blockConfirmations, onBlockConfirmation, ...mutateOptions } = options || {};
 
       const writeContractObject = {
@@ -136,8 +133,6 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
       return writeTxResult;
     } catch (e: any) {
       throw e;
-    } finally {
-      setIsMining(false);
     }
   };
 
@@ -181,7 +176,7 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
 
   return {
     ...wagmiContractWrite,
-    isMining,
+    isMining: wagmiContractWrite.isPending,
     // Overwrite wagmi's writeContactAsync
     writeContractAsync: sendContractWriteAsyncTx,
     // Overwrite wagmi's writeContract
