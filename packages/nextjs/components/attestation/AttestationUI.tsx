@@ -5,35 +5,42 @@ import { notification } from "~~/utils/scaffold-eth";
 import { TransactionReceipt } from "viem";
 import { ContractName } from "~~/utils/scaffold-eth/contract";
 
+interface AttestationData {
+  from: string;
+  to: string;
+  message: string;
+  timestamp: bigint;
+}
+
 export const AttestationUI = () => {
   const [toAddress, setToAddress] = useState("");
-  const [weight, setWeight] = useState("");
+  const [message, setMessage] = useState("");
   const [lookupAddress, setLookupAddress] = useState("");
 
-  const contractName = "YourContract" as ContractName;
+  const contractName = "Attestation" as ContractName;
 
   // Read attestations for a specific address
   const { data: receivedAttestations } = useScaffoldReadContract({
     contractName, 
-    functionName: "getAttestations",
+    functionName: "getReceivedAttestations",
     args: [lookupAddress || "0x0000000000000000000000000000000000000000"],
   });
 
-  const { writeContractAsync: recordAttestation } = useScaffoldWriteContract("YourContract");
+  const { writeContractAsync: createAttestation } = useScaffoldWriteContract(contractName);
 
-  const handleRecordAttestation = async () => {
-    if (!toAddress || !weight) return;
+  const handleCreateAttestation = async () => {
+    if (!toAddress || !message) return;
     try {
-      notification.info("Recording attestation...");
-      await recordAttestation({
-        functionName: "recordAttestation", 
-        args: [toAddress, BigInt(weight || "0")],
+      notification.info("Creating attestation...");
+      await createAttestation({
+        functionName: "createAttestation",
+        args: [toAddress, message],
       });
-      setWeight("");
-      notification.success("Attestation recorded successfully!");
+      setMessage("");
+      notification.success("Attestation created successfully!");
     } catch (error) {
-      console.error("Error recording attestation:", error);
-      notification.error("Error recording attestation");
+      console.error("Error creating attestation:", error);
+      notification.error("Error creating attestation");
     }
   };
 
@@ -49,29 +56,22 @@ export const AttestationUI = () => {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Weight (0-1e18):</label>
-          <input
-            type="number"
-            value={weight}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (!val || (Number(val) >= 0 && Number(val) <= 1e18)) {
-                setWeight(val);
-              }
-            }}
-            className="input input-bordered w-full"
-            placeholder="Enter attestation weight"
-            min="0"
-            max="1000000000000000000"
+          <label className="block text-sm font-medium mb-1">Message:</label>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            className="textarea textarea-bordered w-full"
+            placeholder="Enter your attestation message"
+            rows={3}
           />
         </div>
         <button
-  className="btn btn-primary"
-  onClick={handleRecordAttestation}
-  disabled={!toAddress || !weight}
->
-  Record Attestation
-</button>
+          className="btn btn-primary"
+          onClick={handleCreateAttestation}
+          disabled={!toAddress || !message}
+        >
+          Create Attestation
+        </button>
       </div>
 
       <div className="flex flex-col gap-2 mt-4">
@@ -84,14 +84,14 @@ export const AttestationUI = () => {
           />
         </div>
 
-        {receivedAttestations && (receivedAttestations as any[]).length > 0 ? (
+        {receivedAttestations && Array.isArray(receivedAttestations) && receivedAttestations.length > 0 ? (
           <div className="mt-2">
             <h3 className="text-lg font-semibold">Received Attestations:</h3>
             <div className="space-y-2">
-              {(receivedAttestations as any[]).map((attestation: any, index: number) => (
+              {(receivedAttestations as AttestationData[]).map((attestation, index) => (
                 <div key={index} className="card bg-base-200 p-4">
-                  <p>From: <Address address={attestation.attester} /></p>
-                  <p>Weight: {attestation.weight.toString()}</p>
+                  <p>From: <Address address={attestation.from} /></p>
+                  <p>Message: {attestation.message}</p>
                   <p>Time: {new Date(Number(attestation.timestamp) * 1000).toLocaleString()}</p>
                 </div>
               ))}
