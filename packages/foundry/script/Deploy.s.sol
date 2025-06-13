@@ -12,8 +12,15 @@ import {Attestation} from "../src/Attestation.sol";
  */
 contract DeployScript is Script {
     function run() external {
-        // Get the private key from the environment variable
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        // Debug: Print the current working directory
+        console.logString(string.concat("Current working directory: ", vm.projectRoot()));
+        
+        // Debug: Print the sender address
+        console.logString(string.concat("Sender address: ", vm.toString(msg.sender)));
+        
+        // Use the default Anvil account for local deployment
+        uint256 deployerPrivateKey = 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6;
+        console.logString("Using default Anvil account");
         
         // Start broadcasting transactions
         vm.startBroadcast(deployerPrivateKey);
