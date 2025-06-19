@@ -6,92 +6,94 @@ import { TransactionReceipt } from "viem";
 import { ContractName } from "~~/utils/scaffold-eth/contract";
 
 interface AttestationData {
-  from: string;
-  to: string;
-  message: string;
+  attester: string;
+  weight: bigint;
   timestamp: bigint;
 }
 
 export const AttestationUI = () => {
   const [toAddress, setToAddress] = useState("");
-  const [message, setMessage] = useState("");
+  const [weight, setWeight] = useState("");
   const [lookupAddress, setLookupAddress] = useState("");
 
-  const contractName = "Attestation" as ContractName;
+  const contractName = "YourContract" as ContractName;
 
   // Read attestations for a specific address
-  const { data: receivedAttestations } = useScaffoldReadContract({
+  const { data: attestations } = useScaffoldReadContract({
     contractName, 
-    functionName: "getReceivedAttestations",
+    functionName: "getAttestations",
     args: [lookupAddress || "0x0000000000000000000000000000000000000000"],
   });
 
-  const { writeContractAsync: createAttestation } = useScaffoldWriteContract(contractName);
+  const { writeContractAsync: recordAttestation } = useScaffoldWriteContract(contractName);
 
-  const handleCreateAttestation = async () => {
-    if (!toAddress || !message) return;
+  const handleRecordAttestation = async () => {
+    if (!toAddress || !weight) return;
     try {
-      notification.info("Creating attestation...");
-      await createAttestation({
-        functionName: "createAttestation",
-        args: [toAddress, message],
+      const weightValue = BigInt(weight);
+      notification.info("Recording attestation...");
+      await recordAttestation({
+        functionName: "recordAttestation",
+        args: [toAddress, weightValue],
       });
-      setMessage("");
-      notification.success("Attestation created successfully!");
+      setWeight("");
+      notification.success("Attestation recorded successfully!");
     } catch (error) {
-      console.error("Error creating attestation:", error);
-      notification.error("Error creating attestation");
+      console.error("Error recording attestation:", error);
+      notification.error("Error recording attestation");
     }
   };
 
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="flex flex-col gap-2">
-        <h2 className="text-2xl font-bold">Create Attestation</h2>
+        <h2 className="text-2xl font-bold">Record Attestation</h2>
         <div>
-          <label className="block text-sm font-medium mb-1">To Address:</label>
+          <label className="block text-sm font-medium mb-1">Borrower Address:</label>
           <AddressInput
             value={toAddress}
             onChange={setToAddress}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Message:</label>
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            className="textarea textarea-bordered w-full"
-            placeholder="Enter your attestation message"
-            rows={3}
+          <label className="block text-sm font-medium mb-1">Weight (0-1000000):</label>
+          <input
+            type="number"
+            value={weight}
+            onChange={(e) => setWeight(e.target.value)}
+            className="input input-bordered w-full"
+            placeholder="Enter weight (0-1000000)"
+            min="0"
+            max="1000000"
           />
         </div>
         <button
           className="btn btn-primary"
-          onClick={handleCreateAttestation}
-          disabled={!toAddress || !message}
+          onClick={handleRecordAttestation}
+          disabled={!toAddress || !weight}
         >
-          Create Attestation
+          Record Attestation
         </button>
       </div>
 
       <div className="flex flex-col gap-2 mt-4">
         <h2 className="text-2xl font-bold">View Attestations</h2>
         <div>
-          <label className="block text-sm font-medium mb-1">Lookup Address:</label>
+          <label className="block text-sm font-medium mb-1">Borrower Address:</label>
           <AddressInput
             value={lookupAddress}
             onChange={setLookupAddress}
           />
         </div>
 
-        {receivedAttestations && Array.isArray(receivedAttestations) && receivedAttestations.length > 0 ? (
+        {attestations && Array.isArray(attestations) && attestations.length > 0 ? (
           <div className="mt-2">
-            <h3 className="text-lg font-semibold">Received Attestations:</h3>
+            <h3 className="text-lg font-semibold">Attestations:</h3>
             <div className="space-y-2">
-              {(receivedAttestations as AttestationData[]).map((attestation, index) => (
+              {(attestations as AttestationData[]).map((attestation, index) => (
                 <div key={index} className="card bg-base-200 p-4">
-                  <p>From: <Address address={attestation.from} /></p>
-                  <p>Message: {attestation.message}</p>
+                  <p>Attester: <Address address={attestation.attester} /></p>
+                  <p>Weight: {Number(attestation.weight)}</p>
                   <p>Time: {new Date(Number(attestation.timestamp) * 1000).toLocaleString()}</p>
                 </div>
               ))}
