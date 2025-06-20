@@ -100,4 +100,78 @@ contract YourContractTest is Test {
         uint256 afterBal = usdc.balanceOf(borrower);
         assertEq(afterBal - before, 100 ether);
     }
+
+    function testAttestationsAffectReputation() public {
+        // Initial credit score
+        vm.prank(oracle);
+        contractInstance.updateCreditScore(borrower, 300);
+        
+        uint256 initialScore = contractInstance.getCreditScore(borrower);
+        assertEq(initialScore, 300);
+
+        // Record multiple attestations with different weights
+        vm.prank(attester1);
+        contractInstance.recordAttestation(borrower, 200000); // 20% weight
+
+        vm.prank(attester2);
+        contractInstance.recordAttestation(borrower, 800000); // 80% weight
+
+        // Oracle updates credit score based on attestations
+        // Higher attestation weights should lead to better credit scores
+        vm.prank(oracle);
+        contractInstance.updateCreditScore(borrower, 700); // Improved score
+
+        uint256 newScore = contractInstance.getCreditScore(borrower);
+        assertEq(newScore, 700);
+        assertGt(newScore, initialScore, "Credit score should improve with attestations");
+
+        // Test that higher attestation weights lead to better loan terms
+        (uint256 interestRate1,) = contractInstance.previewLoanTerms(borrower, 100 ether, 365 days);
+        
+        // Compare with a borrower who has no attestations
+        address borrower2 = address(0x6);
+        vm.prank(oracle);
+        contractInstance.updateCreditScore(borrower2, 300); // Same initial score
+        
+        (uint256 interestRate2,) = contractInstance.previewLoanTerms(borrower2, 100 ether, 365 days);
+        
+        // Borrower with attestations should get better interest rate
+        assertLt(interestRate1, interestRate2, "Borrower with attestations should get better interest rate");
+    }
+
+    function testAttestationWeightImpact() public {
+        // Set initial credit score
+        vm.prank(oracle);
+        contractInstance.updateCreditScore(borrower, 400);
+
+        // Record attestations with different weights
+        vm.prank(attester1);
+        contractInstance.recordAttestation(borrower, 100000); // 10% weight
+
+        vm.prank(attester2);
+        contractInstance.recordAttestation(borrower, 900000); // 90% weight
+
+        // Request a loan to test reward distribution
+        vm.startPrank(borrower);
+        usdc.approve(address(contractInstance), 1_000 ether);
+        uint256 loanId = contractInstance.requestLoan(100 ether);
+        vm.stopPrank();
+
+        // Fund contract for disbursement
+        vm.startPrank(owner);
+        usdc.mint(address(contractInstance), 100 ether);
+        vm.stopPrank();
+
+        // Disburse loan
+        vm.prank(owner);
+        contractInstance.disburseLoan(loanId);
+
+        // Test reward distribution based on attestation weights
+        uint256 reward1 = contractInstance.computeAttesterReward(loanId, attester1);
+        uint256 reward2 = contractInstance.computeAttesterReward(loanId, attester2);
+        
+        // Attester2 should get 9x more reward than attester1 (90% vs 10%)
+        assertGt(reward2, reward1, "Higher weight attestation should get more reward");
+        assertEq(reward2, reward1 * 9, "Reward should be proportional to attestation weight");
+    }
 }
