@@ -7,16 +7,11 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     YourContract: {
-      address: "0x700b6a60ce7eaaea56f065753d8dcb9653dbad35",
+      address: "0xa15bb66138824a1c7167f5e85b957d04dd34e468",
       abi: [
         {
           type: "constructor",
           inputs: [
-            {
-              name: "initialOwner",
-              type: "address",
-              internalType: "address",
-            },
             {
               name: "_rMin",
               type: "uint256",
@@ -55,20 +50,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "SECONDS_PER_MONTH",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "USDC_DECIMALS",
+          name: "SECONDS_PER_YEAR",
           inputs: [],
           outputs: [
             {
@@ -131,42 +113,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getAttestations",
-          inputs: [
-            {
-              name: "borrower",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "tuple[]",
-              internalType: "struct YourContract.Attestation[]",
-              components: [
-                {
-                  name: "attester",
-                  type: "address",
-                  internalType: "address",
-                },
-                {
-                  name: "weight",
-                  type: "uint256",
-                  internalType: "uint256",
-                },
-                {
-                  name: "timestamp",
-                  type: "uint256",
-                  internalType: "uint256",
-                },
-              ],
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "getCreditScore",
           inputs: [
             {
@@ -219,25 +165,6 @@ const deployedContracts = {
               name: "isActive",
               type: "bool",
               internalType: "bool",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "lenderBalances",
-          inputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
             },
           ],
           stateMutability: "view",
@@ -511,25 +438,6 @@ const deployedContracts = {
         },
         {
           type: "event",
-          name: "FundsDeposited",
-          inputs: [
-            {
-              name: "lender",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
           name: "LoanDisbursed",
           inputs: [
             {
@@ -651,7 +559,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1750374778.json",
+      deploymentFile: "run-1750377429.json",
       deploymentScript: "Deploy.s.sol",
     },
   },

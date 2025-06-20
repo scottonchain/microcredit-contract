@@ -27,11 +27,10 @@ contract DeployScript is Script {
         
         // Deploy the main contract
         YourContract yourContract = new YourContract(
-            msg.sender, // initialOwner
             50000,      // rMin (5%)
             200000,     // rMax (20%)
             msg.sender, // _usdc (using sender address as placeholder)
-            msg.sender  // _oracle
+            msg.sender  // _oracle  
         );
         
         // Log the deployment
