@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "forge-std/console2.sol";
 
 /**
  * @title DecentralizedMicrocredit
@@ -107,6 +108,11 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
     function repayLoan(uint256 loanId, uint256 amount) external {
         Loan storage loan = loans[loanId];
         require(loan.isActive, "Inactive loan");
+        
+        // Debug: Log the addresses
+        console2.log("repayLoan - msg.sender:", msg.sender);
+        console2.log("repayLoan - loan.borrower:", loan.borrower);
+        
         require(msg.sender == loan.borrower, "Not borrower");
         require(amount > 0, "Zero repayment");
 
@@ -176,7 +182,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
     // Internal
     function _calculateInterest(uint256 score) internal view returns (uint256 rate) {
-        uint256 x = (score * SCALE) / 1000;
+        require(score <= SCALE, "Score exceeds scale");
+        uint256 x = score; // score is already on SCALE basis
         return rMin + ((rMax - rMin) * (SCALE - x)) / SCALE;
     }
 }
