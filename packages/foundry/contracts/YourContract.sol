@@ -108,11 +108,6 @@ import "forge-std/console2.sol";
     function repayLoan(uint256 loanId, uint256 amount) external {
         Loan storage loan = loans[loanId];
         require(loan.isActive, "Inactive loan");
-        
-        // Debug: Log the addresses
-        console2.log("repayLoan - msg.sender:", msg.sender);
-        console2.log("repayLoan - loan.borrower:", loan.borrower);
-        
         require(msg.sender == loan.borrower, "Not borrower");
         require(amount > 0, "Zero repayment");
 
