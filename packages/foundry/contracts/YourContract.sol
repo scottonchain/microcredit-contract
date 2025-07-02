@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "forge-std/console2.sol";
+import "./NetworkXPageRank.sol";
 
 /**
  * @title DecentralizedMicrocredit
@@ -14,9 +15,9 @@ contract YourContract is Ownable, ReentrancyGuard {
 
     uint256 public constant SCALE = 1e6;
     uint256 public constant SECONDS_PER_YEAR = 365 days;
-    uint256 public constant DAMPING_FACTOR = 85e4; // 0.85 in basis points
+    uint256 public constant DAMPING_FACTOR = 70e4; // 0.70 in basis points
     uint256 public constant MAX_ITERATIONS = 100;
-    uint256 public constant CONVERGENCE_THRESHOLD = 1e3; // 0.001 in basis points
+    uint256 public constant CONVERGENCE_THRESHOLD = 1; // Much lower threshold for more sensitivity
     uint256 public constant BACKPROPAGATION_FACTOR = 50e4; // 0.5 in basis points
 
     uint256 public rMin;
@@ -45,6 +46,7 @@ contract YourContract is Ownable, ReentrancyGuard {
         mapping(address => uint256) creditScores;
         address[] allParticipants;
         bool initialized;
+        NetworkXPageRank.Graph graph;
     }
 
     mapping(uint256 => Loan) private loans;
@@ -158,10 +160,27 @@ contract YourContract is Ownable, ReentrancyGuard {
         _addParticipant(msg.sender);
         _addParticipant(borrower);
         
-        borrowerAttestations[borrower].push(Attestation(msg.sender, weight));
+        // Check if attester already has an attestation for this borrower
+        Attestation[] storage attests = borrowerAttestations[borrower];
+        bool found = false;
+        
+        for (uint256 i = 0; i < attests.length; i++) {
+            if (attests[i].attester == msg.sender) {
+                // Update existing attestation
+                attests[i].weight = weight;
+                found = true;
+                break;
+            }
+        }
+        
+        if (!found) {
+            // Add new attestation
+            attests.push(Attestation(msg.sender, weight));
+        }
+        
         emit AttestationRecorded(msg.sender, borrower, weight);
         
-        // Trigger PageRank update due to new attestation
+        // Trigger PageRank update due to attestation change
         _updatePageRankScores();
     }
 
@@ -170,6 +189,27 @@ contract YourContract is Ownable, ReentrancyGuard {
         _addParticipant(user);
         pageRankData.creditScores[user] = newScore;
         emit CreditScoreUpdated(user, newScore);
+    }
+
+    // External function for oracle to update credit scores
+    function updateCreditScore(address user, uint256 newScore) external onlyOracle {
+        require(newScore <= SCALE, "Score exceeds scale");
+        _updateCreditScore(user, newScore);
+    }
+
+    // Batch update function for oracle to update multiple scores at once
+    function updateCreditScores(address[] calldata users, uint256[] calldata scores) external onlyOracle {
+        require(users.length == scores.length, "Array length mismatch");
+        
+        for (uint256 i = 0; i < users.length; i++) {
+            require(scores[i] <= SCALE, "Score exceeds scale");
+            _updateCreditScore(users[i], scores[i]);
+        }
+    }
+
+    // Function to trigger PageRank computation (for local development)
+    function computePageRankScores() external {
+        _updatePageRankScores();
     }
 
     function getCreditScore(address user) external view returns (uint256 score) {
@@ -217,124 +257,81 @@ contract YourContract is Ownable, ReentrancyGuard {
         oracle = _oracle;
     }
 
-    // PageRank-based credit scoring functions
-    function _addParticipant(address participant) internal {
-        if (participantIndex[participant] == 0 && participant != address(0)) {
-            pageRankData.allParticipants.push(participant);
-            participantIndex[participant] = pageRankData.allParticipants.length;
-            
-            // Initialize personalization vector for new participant
-            if (!pageRankData.initialized) {
-                pageRankData.personalizationVector[participant] = SCALE;
-            } else {
-                // Add to existing personalization vector and renormalize
-                pageRankData.personalizationVector[participant] = SCALE;
-                _normalizePersonalizationVector();
-            }
-        }
-    }
+function _addParticipant(address participant) internal {
+    if (participantIndex[participant] == 0 && participant != address(0)) {
+        pageRankData.allParticipants.push(participant);
+        participantIndex[participant] = pageRankData.allParticipants.length;
 
-    function _normalizePersonalizationVector() internal {
-        uint256 total = 0;
-        for (uint256 i = 0; i < pageRankData.allParticipants.length; i++) {
-            total += pageRankData.personalizationVector[pageRankData.allParticipants[i]];
-        }
-        
-        if (total > 0) {
-            for (uint256 i = 0; i < pageRankData.allParticipants.length; i++) {
-                address participant = pageRankData.allParticipants[i];
-                pageRankData.personalizationVector[participant] = 
-                    (pageRankData.personalizationVector[participant] * SCALE) / total;
-            }
-        }
+        // Assign initial personalization weight without normalizing
+        pageRankData.personalizationVector[participant] = SCALE;
     }
+}
+
+
+    // function _normalizePersonalizationVector() internal {
+    //     uint256 total = 0;
+    //     for (uint256 i = 0; i < pageRankData.allParticipants.length; i++) {
+    //         total += pageRankData.personalizationVector[pageRankData.allParticipants[i]];
+    //     }
+        
+    //     if (total > 0) {
+    //         for (uint256 i = 0; i < pageRankData.allParticipants.length; i++) {
+    //             address participant = pageRankData.allParticipants[i];
+    //             pageRankData.personalizationVector[participant] = 
+    //                 (pageRankData.personalizationVector[participant] * SCALE) / total;
+    //         }
+    //     }
+    // }
 
     function _updatePageRankScores() internal {
         if (pageRankData.allParticipants.length == 0) return;
         
-        // Initialize if first time
-        if (!pageRankData.initialized) {
-            _normalizePersonalizationVector();
-            pageRankData.initialized = true;
-        }
+        // Always reinitialize graph with current participants
+        NetworkXPageRank.initializeGraph(pageRankData.graph, pageRankData.allParticipants);
+        pageRankData.initialized = true;
         
-        // Initialize credit scores with personalization vector
-        for (uint256 i = 0; i < pageRankData.allParticipants.length; i++) {
-            address participant = pageRankData.allParticipants[i];
-            pageRankData.creditScores[participant] = pageRankData.personalizationVector[participant];
-        }
+        // Clear existing edges and rebuild graph from attestations
+        _rebuildGraph();
         
-        // Run PageRank iterations
-        uint256 totalDelta = 0;
-        for (uint256 iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-            totalDelta = 0;
-            
-            // Create temporary storage for new scores
-            mapping(address => uint256) storage newScores = pageRankData.creditScores;
-            
-            for (uint256 i = 0; i < pageRankData.allParticipants.length; i++) {
-                address participant = pageRankData.allParticipants[i];
-                uint256 oldScore = pageRankData.creditScores[participant];
-                
-                // Calculate new score using PageRank formula
-                uint256 newScore = _calculatePageRankScore(participant);
-                newScores[participant] = newScore;
-                
-                // Track convergence
-                uint256 delta = oldScore > newScore ? oldScore - newScore : newScore - oldScore;
-                totalDelta += delta;
-            }
-            
-            emit PageRankComputed(iteration, totalDelta);
-            
-            // Check for convergence
-            if (totalDelta < CONVERGENCE_THRESHOLD) {
-                break;
-            }
-        }
+        // Compute PageRank using NetworkX algorithm
+        NetworkXPageRank.PageRankResult memory result = NetworkXPageRank.pagerank(
+            pageRankData.graph,
+            NetworkXPageRank.DEFAULT_ALPHA,
+            pageRankData.personalizationVector,
+            NetworkXPageRank.DEFAULT_MAX_ITER,
+            NetworkXPageRank.DEFAULT_TOL,
+            pageRankData.creditScores
+        );
+        
+        emit PageRankComputed(result.iterations, pageRankData.allParticipants.length);
     }
 
-    function _calculatePageRankScore(address participant) internal view returns (uint256) {
-        uint256 personalization = pageRankData.personalizationVector[participant];
-        uint256 incomingScore = 0;
-        
-        // Calculate weighted sum of incoming attestations
+    function _rebuildGraph() internal {
+        // Clear existing edges by resetting outDegree and edges
         for (uint256 i = 0; i < pageRankData.allParticipants.length; i++) {
-            address attester = pageRankData.allParticipants[i];
-            if (attester == participant) continue;
+            address participant = pageRankData.allParticipants[i];
+            pageRankData.graph.outDegree[participant] = 0;
             
-            Attestation[] storage attests = borrowerAttestations[participant];
-            for (uint256 j = 0; j < attests.length; j++) {
-                if (attests[j].attester == attester) {
-                    uint256 attesterScore = pageRankData.creditScores[attester];
-                    uint256 attestationWeight = attests[j].weight;
-                    
-                    // Calculate total outgoing weight from attester
-                    uint256 totalOutgoingWeight = 0;
-                    for (uint256 k = 0; k < pageRankData.allParticipants.length; k++) {
-                        address outgoingBorrower = pageRankData.allParticipants[k];
-                        if (outgoingBorrower == attester) continue;
-                        
-                        Attestation[] storage outgoingAttests = borrowerAttestations[outgoingBorrower];
-                        for (uint256 l = 0; l < outgoingAttests.length; l++) {
-                            if (outgoingAttests[l].attester == attester) {
-                                totalOutgoingWeight += outgoingAttests[l].weight;
-                            }
-                        }
-                    }
-                    
-                    if (totalOutgoingWeight > 0) {
-                        incomingScore += (attesterScore * attestationWeight) / totalOutgoingWeight;
-                    }
-                }
+            // Clear all edges from this participant
+            for (uint256 j = 0; j < pageRankData.allParticipants.length; j++) {
+                address target = pageRankData.allParticipants[j];
+                pageRankData.graph.edges[participant][target] = 0;
             }
         }
         
-        // Apply PageRank formula: C(i) = (1-d)*P(i) + d*incomingScore
-        uint256 dampingPart = (DAMPING_FACTOR * incomingScore) / SCALE;
-        uint256 personalizationPart = ((SCALE - DAMPING_FACTOR) * personalization) / SCALE;
-        
-        return personalizationPart + dampingPart;
+        // Add edges from attestations
+        for (uint256 i = 0; i < pageRankData.allParticipants.length; i++) {
+            address borrower = pageRankData.allParticipants[i];
+            Attestation[] storage attests = borrowerAttestations[borrower];
+            
+            for (uint256 j = 0; j < attests.length; j++) {
+                address attester = attests[j].attester;
+                uint256 weight = attests[j].weight;
+                
+                // Add edge from attester to borrower with weight
+                NetworkXPageRank.addEdge(pageRankData.graph, attester, borrower, weight);
+            }
+        }
     }
 
     function _handleSuccessfulRepayment(address borrower, uint256 loanAmount) internal {
@@ -395,4 +392,48 @@ contract YourContract is Ownable, ReentrancyGuard {
     function getAttestations(address borrower) external view returns (Attestation[] memory) {
         return borrowerAttestations[borrower];
     }
+
+    // Export all attestation data for external NetworkX processing
+    function exportAttestationData() external view returns (
+        address[] memory borrowers,
+        address[][] memory attesters,
+        uint256[][] memory weights
+    ) {
+        uint256 totalAttestations = 0;
+        
+        // First pass: count total attestations
+        for (uint256 i = 0; i < pageRankData.allParticipants.length; i++) {
+            address participant = pageRankData.allParticipants[i];
+            totalAttestations += borrowerAttestations[participant].length;
+        }
+        
+        // Initialize arrays
+        borrowers = new address[](totalAttestations);
+        attesters = new address[][](totalAttestations);
+        weights = new uint256[][](totalAttestations);
+        
+        uint256 index = 0;
+        for (uint256 i = 0; i < pageRankData.allParticipants.length; i++) {
+            address borrower = pageRankData.allParticipants[i];
+            Attestation[] storage attests = borrowerAttestations[borrower];
+            
+            if (attests.length > 0) {
+                borrowers[index] = borrower;
+                
+                address[] memory borrowerAttesters = new address[](attests.length);
+                uint256[] memory borrowerWeights = new uint256[](attests.length);
+                
+                for (uint256 j = 0; j < attests.length; j++) {
+                    borrowerAttesters[j] = attests[j].attester;
+                    borrowerWeights[j] = attests[j].weight;
+                }
+                
+                attesters[index] = borrowerAttesters;
+                weights[index] = borrowerWeights;
+                index++;
+            }
+        }
+    }
+
+
 }
