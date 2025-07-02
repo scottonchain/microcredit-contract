@@ -37,6 +37,58 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "BACKPROPAGATION_FACTOR",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "CONVERGENCE_THRESHOLD",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "DAMPING_FACTOR",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "MAX_ITERATIONS",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "SCALE",
           inputs: [],
           outputs: [
@@ -87,6 +139,45 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "debugPageRankCalculation",
+          inputs: [
+            {
+              name: "participant",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "personalization",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "incomingScore",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "dampingPart",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "personalizationPart",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "finalScore",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "depositFunds",
           inputs: [
             {
@@ -110,6 +201,50 @@ const deployedContracts = {
           ],
           outputs: [],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "getAllParticipants",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address[]",
+              internalType: "address[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getAttestations",
+          inputs: [
+            {
+              name: "borrower",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "tuple[]",
+              internalType: "struct YourContract.Attestation[]",
+              components: [
+                {
+                  name: "attester",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "weight",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+              ],
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -165,6 +300,25 @@ const deployedContracts = {
               name: "isActive",
               type: "bool",
               internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getPersonalizationVector",
+          inputs: [
+            {
+              name: "participant",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
             },
           ],
           stateMutability: "view",
@@ -363,24 +517,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "updateCreditScore",
-          inputs: [
-            {
-              name: "user",
-              type: "address",
-              internalType: "address",
-            },
-            {
-              name: "newScore",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
           name: "usdc",
           inputs: [],
           outputs: [
@@ -531,6 +667,25 @@ const deployedContracts = {
           anonymous: false,
         },
         {
+          type: "event",
+          name: "PageRankComputed",
+          inputs: [
+            {
+              name: "iteration",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "totalDelta",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
           type: "error",
           name: "OwnableInvalidOwner",
           inputs: [
@@ -559,7 +714,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1751230991.json",
+      deploymentFile: "run-1751385680.json",
       deploymentScript: "Deploy.s.sol",
     },
   },
