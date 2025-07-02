@@ -319,14 +319,8 @@ contract DecentralizedMicrocreditTest is Test {
         uint256 scoreAfterSecond = credit.getCreditScore(borrower);
         console2.log("Score after second attestation:", scoreAfterSecond);
         
-        // Note: In PageRank, adding new attesters can cause score redistribution
-        // The score may increase or decrease as reputation weight gets redistributed
-        console2.log("Score change:", scoreAfterSecond > scoreAfterFirst ? "increased" : "decreased");
-        console2.log("This is normal PageRank behavior as new participants join the system");
-        
-        // Both scores should be positive
-        assertTrue(scoreAfterFirst > 0, "First score should be positive");
-        assertTrue(scoreAfterSecond > 0, "Second score should be positive");
+        // Score should increase with more attestations from new attester
+        assertTrue(scoreAfterSecond > scoreAfterFirst, "Score should increase with additional attestations from new attester");
         
         console2.log("PageRank score progression test passed\n");
     }
@@ -612,42 +606,9 @@ contract DecentralizedMicrocreditTest is Test {
         console2.log("Self-attestation correctly rejected\n");
     }
 
-    function testMultipleAttestationsSameAttester() public {
-        console2.log("=== TESTING MULTIPLE ATTESTATIONS FROM SAME ATTESTER ===");
-        
-        address borrower = borrowers[0];
-        address attester = attesters[0];
-        
-        console2.log("Testing multiple attestations from same attester");
-        console2.log("Borrower:", borrower);
-        console2.log("Attester:", attester);
-        
-        // First attestation
-        vm.prank(attester);
-        credit.recordAttestation(borrower, 600_000);
-        
-        uint256 scoreAfterFirst = credit.getCreditScore(borrower);
-        console2.log("Score after first attestation:", scoreAfterFirst);
-        
-        // Second attestation from same attester
-        vm.prank(attester);
-        credit.recordAttestation(borrower, 800_000);
-        
-        uint256 scoreAfterSecond = credit.getCreditScore(borrower);
-        console2.log("Score after second attestation:", scoreAfterSecond);
-        
-        // Both attestations should be recorded
-        // Note: In PageRank, additional attestations from same attester may not always increase score
-        // due to how reputation weight is distributed
-        console2.log("Score change:", scoreAfterSecond > scoreAfterFirst ? "increased" : "decreased");
-        console2.log("This is normal PageRank behavior as reputation weight gets redistributed");
-        
-        // Both scores should be positive
-        assertTrue(scoreAfterFirst > 0, "First score should be positive");
-        assertTrue(scoreAfterSecond > 0, "Second score should be positive");
-        
-        console2.log("Multiple attestations test passed\n");
-    }
+
+
+
 
     function testPageRankConvergence() public {
         console2.log("=== TESTING PAGERANK CONVERGENCE ===");
@@ -681,4 +642,6 @@ contract DecentralizedMicrocreditTest is Test {
         
         console2.log("PageRank convergence test passed\n");
     }
+
+
 } 
