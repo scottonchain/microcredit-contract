@@ -139,42 +139,10 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "debugPageRankCalculation",
-          inputs: [
-            {
-              name: "participant",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "personalization",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "incomingScore",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "dampingPart",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "personalizationPart",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "finalScore",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
+          name: "computePageRankScores",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -201,6 +169,29 @@ const deployedContracts = {
           ],
           outputs: [],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "exportAttestationData",
+          inputs: [],
+          outputs: [
+            {
+              name: "borrowers",
+              type: "address[]",
+              internalType: "address[]",
+            },
+            {
+              name: "attesters",
+              type: "address[][]",
+              internalType: "address[][]",
+            },
+            {
+              name: "weights",
+              type: "uint256[][]",
+              internalType: "uint256[][]",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -517,6 +508,42 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "updateCreditScore",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "newScore",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "updateCreditScores",
+          inputs: [
+            {
+              name: "users",
+              type: "address[]",
+              internalType: "address[]",
+            },
+            {
+              name: "scores",
+              type: "uint256[]",
+              internalType: "uint256[]",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "usdc",
           inputs: [],
           outputs: [
@@ -714,7 +741,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1751385680.json",
+      deploymentFile: "run-1751664535.json",
       deploymentScript: "Deploy.s.sol",
     },
   },
