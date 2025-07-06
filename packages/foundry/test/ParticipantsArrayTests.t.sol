@@ -357,12 +357,12 @@ contract ParticipantsArrayTests is Test {
         
         // Complete loan lifecycle
         vm.prank(borrowers[0]);
-        uint256 loanId = credit.requestLoan(100_000_000); // 100 USDC
+        uint256 loanId = credit.requestLoan(100_000_000, 365 days); // 100 USDC
         
-        credit.disburseLoan(loanId);
+        credit.fundLoan(loanId);
         
         // Simulate repayment
-        (,,, uint256 outstanding,) = credit.getLoan(loanId);
+        (uint256 principal, uint256 outstanding, address borrower, uint256 interestRate, uint256 repaymentPeriod, uint256 dueDate, bool isActive, bool isFunded) = credit.getLoan(loanId);
         vm.prank(owner);
         usdc.mint(borrowers[0], outstanding);
         

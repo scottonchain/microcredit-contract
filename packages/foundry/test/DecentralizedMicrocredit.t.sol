@@ -132,9 +132,9 @@ contract DecentralizedMicrocreditTest is Test {
         console2.log("  - Requested amount:", loanAmount);
         
         vm.prank(borrower);
-        uint256 loanId = credit.requestLoan(loanAmount);
+        uint256 loanId = credit.requestLoan(loanAmount, 365 days);
         
-        (uint256 principal, uint256 outstanding, address loanBorrower, uint256 interestRate, bool isActive) = credit.getLoan(loanId);
+        (uint256 principal, uint256 outstanding, address loanBorrower, uint256 interestRate, uint256 repaymentPeriod, uint256 dueDate, bool isActive, bool isFunded) = credit.getLoan(loanId);
         
         console2.log("After loan request:");
         console2.log("  - Loan ID:", loanId);
@@ -163,7 +163,7 @@ contract DecentralizedMicrocreditTest is Test {
         credit.recordAttestation(borrower, 800_000);
         
         vm.prank(borrower);
-        uint256 loanId = credit.requestLoan(loanAmount);
+        uint256 loanId = credit.requestLoan(loanAmount, 365 days);
         
         // Ensure contract has funds by having a lender deposit
         vm.prank(lenders[0]);
@@ -178,7 +178,7 @@ contract DecentralizedMicrocreditTest is Test {
         console2.log("  - Contract balance:", initialContractBalance);
         console2.log("  - Disbursement amount:", loanAmount);
         
-        credit.disburseLoan(loanId);
+        credit.fundLoan(loanId);
         
         uint256 finalBorrowerBalance = usdc.balanceOf(borrower);
         uint256 finalContractBalance = usdc.balanceOf(address(credit));
@@ -205,16 +205,16 @@ contract DecentralizedMicrocreditTest is Test {
         credit.recordAttestation(borrower, 800_000);
         
         vm.prank(borrower);
-        uint256 loanId = credit.requestLoan(loanAmount);
+        uint256 loanId = credit.requestLoan(loanAmount, 365 days);
         
         // Ensure contract has funds
         vm.prank(lenders[0]);
         credit.depositFunds(100_000_000);
         
-        credit.disburseLoan(loanId);
+        credit.fundLoan(loanId);
         
         // Get loan details before repayment
-        (uint256 principal, uint256 outstanding, , uint256 interestRate, bool isActiveBefore) = credit.getLoan(loanId);
+        (uint256 principal, uint256 outstanding,,,,,,) = credit.getLoan(loanId);
         uint256 initialBorrowerBalance = usdc.balanceOf(borrower);
         uint256 initialContractBalance = usdc.balanceOf(address(credit));
         
@@ -222,37 +222,32 @@ contract DecentralizedMicrocreditTest is Test {
         console2.log("  - Loan ID:", loanId);
         console2.log("  - Principal:", principal);
         console2.log("  - Outstanding (includes interest):", outstanding);
-        console2.log("  - Interest rate:", interestRate, "basis points");
         console2.log("  - Borrower balance:", initialBorrowerBalance);
         console2.log("  - Contract balance:", initialContractBalance);
-        console2.log("  - Is active:", isActiveBefore);
         
         // Outstanding amount already includes principal + interest
-        uint256 totalRepayment = outstanding;
         
         // Simulate borrower having funds to repay
         vm.prank(owner);
-        usdc.mint(borrower, totalRepayment);
+        usdc.mint(borrower, outstanding);
         
         vm.startPrank(borrower);
-        usdc.approve(address(credit), totalRepayment);
-        credit.repayLoan(loanId, totalRepayment);
+        usdc.approve(address(credit), outstanding);
+        credit.repayLoan(loanId, outstanding);
         vm.stopPrank();
         
-        uint256 finalBorrowerBalance = usdc.balanceOf(borrower);
-        uint256 finalContractBalance = usdc.balanceOf(address(credit));
-        (, uint256 finalOutstanding, , , bool finalActive) = credit.getLoan(loanId);
+        (, uint256 finalOutstanding,,,,, bool finalActive,) = credit.getLoan(loanId);
         
         console2.log("After repayment:");
         console2.log("  - Outstanding:", finalOutstanding);
-        console2.log("  - Borrower balance:", finalBorrowerBalance);
-        console2.log("  - Contract balance:", finalContractBalance);
+        console2.log("  - Borrower balance:", usdc.balanceOf(borrower));
+        console2.log("  - Contract balance:", usdc.balanceOf(address(credit)));
         console2.log("  - Is active:", finalActive);
         
         // Loan should be fully repaid and inactive
         assertTrue(finalOutstanding <= 2000, "Outstanding amount should be very small or zero (allowing for rounding)");
         assertTrue(!finalActive, "Loan should be inactive after full repayment");
-        assertEq(finalContractBalance, initialContractBalance + totalRepayment, "Contract should receive repayment");
+        assertEq(usdc.balanceOf(address(credit)), initialContractBalance + outstanding, "Contract should receive repayment");
         
         console2.log("Atomic loan repayment test passed\n");
     }
@@ -330,24 +325,22 @@ contract DecentralizedMicrocreditTest is Test {
         
         address borrower = borrowers[0];
         address attester = attesters[0];
-        uint256 loanAmount = 100_000_000; // 100 USDC
         
         console2.log("Testing PageRank backpropagation on successful loan repayment");
         console2.log("Borrower:", borrower);
         console2.log("Attester:", attester);
-        console2.log("Loan amount:", loanAmount);
         
         // Setup: Record attestation and complete loan
         vm.prank(attester);
         credit.recordAttestation(borrower, 800_000);
         
         vm.prank(borrower);
-        uint256 loanId = credit.requestLoan(loanAmount);
+        uint256 loanId = credit.requestLoan(100_000_000, 365 days);
         
         vm.prank(lenders[0]);
         credit.depositFunds(200_000_000);
         
-        credit.disburseLoan(loanId);
+        credit.fundLoan(loanId);
         
         // Get scores before repayment
         uint256 borrowerScoreBefore = credit.getCreditScore(borrower);
@@ -357,10 +350,9 @@ contract DecentralizedMicrocreditTest is Test {
         console2.log("  - Borrower score:", borrowerScoreBefore);
         console2.log("  - Attester score:", attesterScoreBefore);
         
-        // Repay loan
-        (,,, uint256 interestRate,) = credit.getLoan(loanId);
-        (, uint256 outstanding,,,) = credit.getLoan(loanId);
-        uint256 totalRepayment = outstanding; // Outstanding already includes principal + interest
+        // Repay loan - get outstanding amount and repay
+        (,,, uint256 interestRate,,,,) = credit.getLoan(loanId);
+        uint256 totalRepayment = 100_000_000 + (100_000_000 * interestRate * 365 days) / (1e6 * 365 days);
         
         vm.prank(owner);
         usdc.mint(borrower, totalRepayment);
@@ -392,10 +384,8 @@ contract DecentralizedMicrocreditTest is Test {
         address borrower2 = borrowers[1];
         address attester1 = attesters[0];
         address attester2 = attesters[1];
-        uint256 loanAmount = 100_000_000; // 100 USDC
         
         console2.log("Testing how PageRank scores affect interest rates");
-        console2.log("Loan amount:", loanAmount);
         
         // Setup: Different attestation weights for different borrowers
         vm.prank(attester1);
@@ -406,14 +396,14 @@ contract DecentralizedMicrocreditTest is Test {
         
         // Request loans
         vm.prank(borrower1);
-        uint256 loanId1 = credit.requestLoan(loanAmount);
+        uint256 loanId1 = credit.requestLoan(100_000_000, 365 days);
         
         vm.prank(borrower2);
-        uint256 loanId2 = credit.requestLoan(loanAmount);
+        uint256 loanId2 = credit.requestLoan(100_000_000, 365 days);
         
-        // Get interest rates
-        (,,, uint256 interestRate1,) = credit.getLoan(loanId1);
-        (,,, uint256 interestRate2,) = credit.getLoan(loanId2);
+        // Get interest rates - only extract what we need
+        (,,, uint256 interestRate1,,,,) = credit.getLoan(loanId1);
+        (,,, uint256 interestRate2,,,,) = credit.getLoan(loanId2);
         
         console2.log("Interest rates:");
         console2.log("  - Borrower 1 (60% attestation):", interestRate1, "basis points");
@@ -433,32 +423,29 @@ contract DecentralizedMicrocreditTest is Test {
         address lender = lenders[0];
         address borrower = borrowers[0];
         address attester = attesters[0];
-        uint256 depositAmount = 200_000_000; // 200 USDC
-        uint256 loanAmount = 100_000_000; // 100 USDC
-        uint256 attestationWeight = 800_000; // 80% confidence
         
         console2.log("Starting complete PageRank loan lifecycle test:");
         console2.log("  - Lender:", lender);
         console2.log("  - Borrower:", borrower);
         console2.log("  - Attester:", attester);
-        console2.log("  - Deposit amount:", depositAmount);
-        console2.log("  - Loan amount:", loanAmount);
-        console2.log("  - Attestation weight:", attestationWeight);
+        console2.log("  - Deposit amount: 200 USDC");
+        console2.log("  - Loan amount: 100 USDC");
+        console2.log("  - Attestation weight: 80%");
         
         // Step 1: Lender deposits funds (triggers PageRank initialization)
-        _testLenderDeposit(lender, depositAmount);
+        _testLenderDeposit(lender, 200_000_000);
         
         // Step 2: Attester provides attestation (triggers PageRank update)
-        _testAttestation(attester, borrower, attestationWeight);
+        _testAttestation(attester, borrower, 800_000);
         
         // Step 3: Check initial credit scores
         _testInitialCreditScores(borrower, attester);
         
         // Step 4: Borrower requests loan
-        uint256 loanId = _testLoanRequest(borrower, loanAmount);
+        uint256 loanId = _testLoanRequest(borrower, 100_000_000);
         
         // Step 5: Loan is disbursed
-        _testLoanDisbursement(borrower, loanId, loanAmount);
+        _testLoanDisbursement(borrower, loanId, 100_000_000);
         
         // Step 6: Borrower repays loan (triggers PageRank backpropagation)
         _testLoanRepayment(borrower, loanId);
@@ -499,8 +486,8 @@ contract DecentralizedMicrocreditTest is Test {
     function _testLoanRequest(address borrower, uint256 amount) internal returns (uint256) {
         console2.log("\nStep 4: Borrower requests loan");
         vm.prank(borrower);
-        uint256 loanId = credit.requestLoan(amount);
-        (uint256 principal, uint256 outstanding, address loanBorrower, uint256 interestRate, bool isActive) = credit.getLoan(loanId);
+        uint256 loanId = credit.requestLoan(amount, 365 days);
+        (uint256 principal,,, uint256 interestRate,,, bool isActive,) = credit.getLoan(loanId);
         console2.log("  - Loan ID:", loanId);
         console2.log("  - Principal:", principal);
         console2.log("  - Interest rate:", interestRate, "basis points");
@@ -511,34 +498,31 @@ contract DecentralizedMicrocreditTest is Test {
     function _testLoanDisbursement(address borrower, uint256 loanId, uint256 amount) internal {
         console2.log("\nStep 5: Loan is disbursed");
         uint256 preDisbursementBalance = usdc.balanceOf(borrower);
-        credit.disburseLoan(loanId);
+        credit.fundLoan(loanId);
         uint256 postDisbursementBalance = usdc.balanceOf(borrower);
         console2.log("  - Borrower received:", postDisbursementBalance - preDisbursementBalance);
     }
 
     function _testLoanRepayment(address borrower, uint256 loanId) internal {
         console2.log("\nStep 6: Borrower repays loan");
-        (uint256 principal, uint256 outstanding, , uint256 finalInterestRate, bool isActiveBefore) = credit.getLoan(loanId);
+        (uint256 principal, uint256 outstanding,,,,,,) = credit.getLoan(loanId);
         
         console2.log("  - Principal:", principal);
         console2.log("  - Outstanding (includes interest):", outstanding);
-        console2.log("  - Interest rate:", finalInterestRate, "basis points");
         
         // Outstanding amount already includes principal + interest
-        uint256 totalRepayment = outstanding;
-        
-        console2.log("  - Total repayment needed:", totalRepayment);
+        console2.log("  - Total repayment needed:", outstanding);
         
         // Simulate borrower having funds
         vm.prank(owner);
-        usdc.mint(borrower, totalRepayment);
+        usdc.mint(borrower, outstanding);
         
         vm.startPrank(borrower);
-        usdc.approve(address(credit), totalRepayment);
-        credit.repayLoan(loanId, totalRepayment);
+        usdc.approve(address(credit), outstanding);
+        credit.repayLoan(loanId, outstanding);
         vm.stopPrank();
         
-        (,,, uint256 finalOutstanding, bool finalActive) = credit.getLoan(loanId);
+        (, uint256 finalOutstanding,,,,, bool finalActive,) = credit.getLoan(loanId);
         console2.log("  - Final outstanding after payment:", finalOutstanding);
         console2.log("  - Loan active after payment:", finalActive);
         
@@ -561,7 +545,7 @@ contract DecentralizedMicrocreditTest is Test {
         console2.log("  - Attester:", attester);
         
         // Check loan status before computing reward
-        (,,, uint256 outstanding, bool isActive) = credit.getLoan(loanId);
+        (, uint256 outstanding,,,,, bool isActive,) = credit.getLoan(loanId);
         console2.log("  - Loan outstanding:", outstanding);
         console2.log("  - Loan active:", isActive);
         
@@ -586,7 +570,7 @@ contract DecentralizedMicrocreditTest is Test {
         
         vm.prank(borrower);
         vm.expectRevert("No credit score");
-        credit.requestLoan(loanAmount);
+        credit.requestLoan(loanAmount, 365 days);
         
         console2.log("Loan request correctly rejected due to zero credit score\n");
     }
@@ -605,10 +589,6 @@ contract DecentralizedMicrocreditTest is Test {
         
         console2.log("Self-attestation correctly rejected\n");
     }
-
-
-
-
 
     function testPageRankConvergence() public {
         console2.log("=== TESTING PAGERANK CONVERGENCE ===");
@@ -642,6 +622,4 @@ contract DecentralizedMicrocreditTest is Test {
         
         console2.log("PageRank convergence test passed\n");
     }
-
-
 } 

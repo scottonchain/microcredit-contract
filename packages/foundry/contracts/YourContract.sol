@@ -33,12 +33,24 @@ contract YourContract is Ownable, ReentrancyGuard {
         uint256 outstanding;
         address borrower;
         uint256 interestRate;
+        uint256 repaymentPeriod;
+        uint256 dueDate;
         bool isActive;
+        bool isFunded;
+        address[] lenders;
+        mapping(address => uint256) lenderShares;
     }
 
     struct Attestation {
         address attester;
         uint256 weight;
+    }
+
+    struct LenderDeposit {
+        uint256 deposited;
+        uint256 available;
+        uint256 earned;
+        uint256 lastUpdateTime;
     }
 
     struct PageRankData {
@@ -53,11 +65,24 @@ contract YourContract is Ownable, ReentrancyGuard {
     mapping(address => Attestation[]) private borrowerAttestations;
     mapping(address => uint256) private participantIndex; // For efficient lookups
     
+    // Lending pool tracking
+    mapping(address => LenderDeposit) private lenderDeposits;
+    address[] private lenders;
+    uint256 private totalDeposited;
+    uint256 private totalAvailable;
+    uint256 private totalEarned;
+    uint256 private platformFeeRate = 2000; // 2% platform fee in basis points
+    
     PageRankData private pageRankData;
 
-    event LoanRequested(uint256 indexed loanId, address indexed borrower, uint256 amount);
+    event LoanRequested(uint256 indexed loanId, address indexed borrower, uint256 amount, uint256 repaymentPeriod);
     event LoanDisbursed(uint256 indexed loanId, address indexed borrower, uint256 amount);
     event LoanRepaid(uint256 indexed loanId, address indexed borrower, uint256 amount);
+    event LoanOverdue(uint256 indexed loanId, address indexed borrower, uint256 daysOverdue);
+    event LoanFunded(uint256 indexed loanId, address[] lenders, uint256[] shares);
+    event FundsDeposited(address indexed lender, uint256 amount);
+    event FundsWithdrawn(address indexed lender, uint256 amount);
+    event YieldDistributed(address indexed lender, uint256 amount);
     event AttestationRecorded(address indexed attester, address indexed borrower, uint256 weight);
     event CreditScoreUpdated(address indexed user, uint256 newScore);
     event PageRankComputed(uint256 iteration, uint256 totalDelta);
@@ -87,11 +112,54 @@ contract YourContract is Ownable, ReentrancyGuard {
         require(amount > 0, "Zero amount");
         require(usdc.transferFrom(msg.sender, address(this), amount), "Transfer failed");
         
+        // Update lender deposit tracking
+        LenderDeposit storage deposit = lenderDeposits[msg.sender];
+        
+        // If this is a new lender, add to lenders array
+        if (deposit.deposited == 0) {
+            lenders.push(msg.sender);
+        }
+        
+        // Update deposit amounts
+        deposit.deposited += amount;
+        deposit.available += amount;
+        deposit.lastUpdateTime = block.timestamp;
+        
+        // Update global totals
+        totalDeposited += amount;
+        totalAvailable += amount;
+        
         // Add lender to participants if not already present
         _addParticipant(msg.sender);
         
         // Trigger PageRank update due to new participant
         _updatePageRankScores();
+        
+        emit FundsDeposited(msg.sender, amount);
+    }
+
+    function withdrawFunds(uint256 amount) external {
+        require(amount > 0, "Zero amount");
+        
+        LenderDeposit storage deposit = lenderDeposits[msg.sender];
+        require(deposit.available >= amount, "Insufficient available funds");
+        
+        // Update deposit amounts
+        deposit.available -= amount;
+        deposit.deposited -= amount;
+        
+        // Update global totals
+        totalAvailable -= amount;
+        totalDeposited -= amount;
+        
+        // Remove lender from array if no more deposits
+        if (deposit.deposited == 0) {
+            _removeLender(msg.sender);
+        }
+        
+        require(usdc.transfer(msg.sender, amount), "Transfer failed");
+        
+        emit FundsWithdrawn(msg.sender, amount);
     }
 
     function previewLoanTerms(
@@ -105,30 +173,75 @@ contract YourContract is Ownable, ReentrancyGuard {
         payment = (principal + interest) / (repaymentPeriod / 30 days);
     }
 
-    function requestLoan(uint256 amount) external returns (uint256 loanId) {
+    function requestLoan(uint256 amount, uint256 repaymentPeriod) external returns (uint256 loanId) {
         require(amount > 0, "Invalid amount");
+        require(repaymentPeriod > 0, "Invalid repayment period");
+        require(repaymentPeriod <= 5 * SECONDS_PER_YEAR, "Repayment period too long"); // Max 5 years
+        
         uint256 score = _getCreditScore(msg.sender);
         require(score > 0, "No credit score");
 
         loanId = nextLoanId++;
         uint256 rate = _calculateInterest(score);
         
-        // Calculate total amount owed (principal + interest)
-        // For simplicity, we'll assume a 1-year repayment period
-        uint256 interest = (amount * rate) / SCALE; // Interest rate is in basis points
+        // Calculate total amount owed (principal + interest) using same formula as previewLoanTerms
+        uint256 interest = (amount * rate * repaymentPeriod) / (SCALE * SECONDS_PER_YEAR);
         uint256 totalOwed = amount + interest;
         
-        loans[loanId] = Loan(amount, totalOwed, msg.sender, rate, true);
+        // Assign each field individually due to mapping in struct
+        Loan storage loan = loans[loanId];
+        loan.principal = amount;
+        loan.outstanding = totalOwed;
+        loan.borrower = msg.sender;
+        loan.interestRate = rate;
+        loan.repaymentPeriod = repaymentPeriod;
+        loan.dueDate = block.timestamp + repaymentPeriod;
+        loan.isActive = true;
+        // Do not assign mapping or array fields here
 
-        emit LoanRequested(loanId, msg.sender, amount);
+        emit LoanRequested(loanId, msg.sender, amount, repaymentPeriod);
     }
 
-    function disburseLoan(uint256 loanId) external {
+    function fundLoan(uint256 loanId) external {
         Loan storage loan = loans[loanId];
         require(loan.isActive, "Inactive loan");
-        require(loan.borrower != address(0), "Invalid loan");
+        require(!loan.isFunded, "Loan already funded");
+        require(totalAvailable >= loan.principal, "Insufficient pool funds");
+        
+        // Calculate lender shares based on their available funds
+        address[] memory participatingLenders = new address[](lenders.length);
+        uint256[] memory shares = new uint256[](lenders.length);
+        uint256 shareIndex = 0;
+        
+        for (uint256 i = 0; i < lenders.length; i++) {
+            address lender = lenders[i];
+            LenderDeposit storage deposit = lenderDeposits[lender];
+            
+            if (deposit.available > 0) {
+                uint256 share = (loan.principal * deposit.available) / totalAvailable;
+                if (share > 0) {
+                    participatingLenders[shareIndex] = lender;
+                    shares[shareIndex] = share;
+                    
+                    // Update lender's available funds and loan shares
+                    deposit.available -= share;
+                    loan.lenderShares[lender] = share;
+                    
+                    shareIndex++;
+                }
+            }
+        }
+        
+        // Update global available funds
+        totalAvailable -= loan.principal;
+        
+        // Mark loan as funded
+        loan.isFunded = true;
+        
+        // Transfer funds to borrower
         require(usdc.transfer(loan.borrower, loan.principal), "Disbursement failed");
-
+        
+        emit LoanFunded(loanId, participatingLenders, shares);
         emit LoanDisbursed(loanId, loan.borrower, loan.principal);
     }
 
@@ -138,16 +251,48 @@ contract YourContract is Ownable, ReentrancyGuard {
         require(msg.sender == loan.borrower, "Not borrower");
         require(amount > 0, "Zero repayment");
 
+        // Calculate late fees if loan is overdue
+        uint256 lateFees = 0;
+        if (block.timestamp > loan.dueDate && loan.outstanding > 0) {
+            uint256 daysOverdue = (block.timestamp - loan.dueDate) / 1 days;
+            uint256 dailyLateFeeRate = 1000; // 0.1% per day late fee
+            lateFees = (loan.outstanding * dailyLateFeeRate * daysOverdue) / (SCALE * 100);
+            
+            if (daysOverdue > 0) {
+                emit LoanOverdue(loanId, msg.sender, daysOverdue);
+            }
+        }
+
+        uint256 totalAmountDue = loan.outstanding + lateFees;
+        require(amount >= totalAmountDue, "Insufficient repayment amount");
+
         require(usdc.transferFrom(msg.sender, address(this), amount), "Transfer failed");
 
         uint256 previousOutstanding = loan.outstanding;
-        loan.outstanding = amount >= loan.outstanding ? 0 : loan.outstanding - amount;
+        loan.outstanding = 0; // Full repayment
         
-        if (loan.outstanding == 0 && previousOutstanding > 0) {
-            // Loan fully repaid - update credit scores and mark as inactive
-            loan.isActive = false;
-            _handleSuccessfulRepayment(loan.borrower, loan.principal);
+        // Distribute yield to lenders if loan was funded
+        if (loan.isFunded) {
+            _distributeYieldToLenders(loanId, amount);
         }
+        
+        // Loan fully repaid - update credit scores and mark as inactive
+        loan.isActive = false;
+        _handleSuccessfulRepayment(loan.borrower, loan.principal);
+
+        emit LoanRepaid(loanId, msg.sender, amount);
+    }
+
+    function partialRepayLoan(uint256 loanId, uint256 amount) external {
+        Loan storage loan = loans[loanId];
+        require(loan.isActive, "Inactive loan");
+        require(msg.sender == loan.borrower, "Not borrower");
+        require(amount > 0, "Zero repayment");
+        require(amount < loan.outstanding, "Use repayLoan for full repayment");
+
+        require(usdc.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+
+        loan.outstanding = loan.outstanding - amount;
 
         emit LoanRepaid(loanId, msg.sender, amount);
     }
@@ -224,11 +369,31 @@ contract YourContract is Ownable, ReentrancyGuard {
             uint256 outstanding,
             address borrower,
             uint256 interestRate,
-            bool isActive
+            uint256 repaymentPeriod,
+            uint256 dueDate,
+            bool isActive,
+            bool isFunded
         )
     {
-        Loan memory loan = loans[loanId];
-        return (loan.principal, loan.outstanding, loan.borrower, loan.interestRate, loan.isActive);
+        Loan storage loan = loans[loanId];
+        return (loan.principal, loan.outstanding, loan.borrower, loan.interestRate, loan.repaymentPeriod, loan.dueDate, loan.isActive, loan.isFunded);
+    }
+
+    function isLoanOverdue(uint256 loanId) external view returns (bool) {
+        Loan storage loan = loans[loanId];
+        return loan.isActive && block.timestamp > loan.dueDate && loan.outstanding > 0;
+    }
+
+    function calculateLateFees(uint256 loanId) external view returns (uint256) {
+        Loan storage loan = loans[loanId];
+        if (!loan.isActive || block.timestamp <= loan.dueDate || loan.outstanding == 0) {
+            return 0;
+        }
+        
+        uint256 daysOverdue = (block.timestamp - loan.dueDate) / 1 days;
+        // 0.1% per day late fee
+        uint256 dailyLateFeeRate = 1000; // 0.1% in basis points
+        return (loan.outstanding * dailyLateFeeRate * daysOverdue) / (SCALE * 100);
     }
 
     function computeAttesterReward(uint256 loanId, address attester) external view returns (uint256 reward) {
@@ -255,6 +420,11 @@ contract YourContract is Ownable, ReentrancyGuard {
     function setOracle(address _oracle) external onlyOwner {
         require(_oracle != address(0), "Invalid oracle");
         oracle = _oracle;
+    }
+
+    function setPlatformFeeRate(uint256 _platformFeeRate) external onlyOwner {
+        require(_platformFeeRate <= 10000, "Fee rate too high"); // Max 10%
+        platformFeeRate = _platformFeeRate;
     }
 
 function _addParticipant(address participant) internal {
@@ -373,6 +543,41 @@ function _addParticipant(address participant) internal {
         return pageRankData.creditScores[user];
     }
 
+    function _distributeYieldToLenders(uint256 loanId, uint256 repaymentAmount) internal {
+        Loan storage loan = loans[loanId];
+        uint256 principal = loan.principal;
+        uint256 interest = repaymentAmount - principal;
+        
+        // Calculate platform fee
+        uint256 platformFee = (interest * platformFeeRate) / SCALE;
+        uint256 lenderInterest = interest - platformFee;
+        
+        // Distribute interest to lenders based on their shares
+        for (uint256 i = 0; i < lenders.length; i++) {
+            address lender = lenders[i];
+            uint256 share = loan.lenderShares[lender];
+            
+            if (share > 0) {
+                uint256 lenderYield = (lenderInterest * share) / principal;
+                lenderDeposits[lender].earned += lenderYield;
+                totalEarned += lenderYield;
+                
+                emit YieldDistributed(lender, lenderYield);
+            }
+        }
+    }
+
+    function _removeLender(address lender) internal {
+        for (uint256 i = 0; i < lenders.length; i++) {
+            if (lenders[i] == lender) {
+                // Move last element to current position and pop
+                lenders[i] = lenders[lenders.length - 1];
+                lenders.pop();
+                break;
+            }
+        }
+    }
+
     // Internal
     function _calculateInterest(uint256 score) internal view returns (uint256 rate) {
         require(score <= SCALE, "Score exceeds scale");
@@ -394,6 +599,42 @@ function _addParticipant(address participant) internal {
     }
 
     // Export all attestation data for external NetworkX processing
+    function claimYield() external {
+        LenderDeposit storage deposit = lenderDeposits[msg.sender];
+        require(deposit.earned > 0, "No yield to claim");
+        
+        uint256 yieldAmount = deposit.earned;
+        deposit.earned = 0;
+        totalEarned -= yieldAmount;
+        
+        require(usdc.transfer(msg.sender, yieldAmount), "Yield transfer failed");
+        
+        emit YieldDistributed(msg.sender, yieldAmount);
+    }
+
+    function getLenderInfo(address lender) external view returns (
+        uint256 deposited,
+        uint256 available,
+        uint256 earned,
+        uint256 lastUpdateTime
+    ) {
+        LenderDeposit memory deposit = lenderDeposits[lender];
+        return (deposit.deposited, deposit.available, deposit.earned, deposit.lastUpdateTime);
+    }
+
+    function getPoolInfo() external view returns (
+        uint256 totalDeposits,
+        uint256 totalAvailableFunds,
+        uint256 totalEarnedYield,
+        uint256 lenderCount
+    ) {
+        return (totalDeposited, totalAvailable, totalEarned, lenders.length);
+    }
+
+    function getLenders() external view returns (address[] memory) {
+        return lenders;
+    }
+
     function exportAttestationData() external view returns (
         address[] memory borrowers,
         address[][] memory attesters,
