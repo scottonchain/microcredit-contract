@@ -1,5 +1,7 @@
 # 🏦 Decentralized Microcredit System
 
+![Frontend Vision](front_end_vision.png)
+
 A decentralized microcredit platform built on Ethereum using social attestations and PageRank-based reputation scoring. This system enables peer-to-peer lending with credit scores calculated through social network analysis.
 
 ## 🌟 Features
