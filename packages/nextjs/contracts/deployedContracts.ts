@@ -6,7 +6,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 
 const deployedContracts = {
   31337: {
-    YourContract: {
+    DecentralizedMicrocredit: {
       address: "0x700b6a60ce7eaaea56f065753d8dcb9653dbad35",
       abi: [
         {
@@ -50,45 +50,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "CONVERGENCE_THRESHOLD",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "DAMPING_FACTOR",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "MAX_ITERATIONS",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "SCALE",
           inputs: [],
           outputs: [
@@ -112,6 +73,13 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "clearPageRankState",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -139,9 +107,15 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "computePageRankScores",
+          name: "computePageRank",
           inputs: [],
-          outputs: [],
+          outputs: [
+            {
+              name: "iterations",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
           stateMutability: "nonpayable",
         },
         {
@@ -172,67 +146,18 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "exportAttestationData",
+          name: "getAllPageRankScores",
           inputs: [],
           outputs: [
             {
-              name: "borrowers",
+              name: "nodes",
               type: "address[]",
               internalType: "address[]",
             },
             {
-              name: "attesters",
-              type: "address[][]",
-              internalType: "address[][]",
-            },
-            {
-              name: "weights",
-              type: "uint256[][]",
-              internalType: "uint256[][]",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "getAllParticipants",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "address[]",
-              internalType: "address[]",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "getAttestations",
-          inputs: [
-            {
-              name: "borrower",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "tuple[]",
-              internalType: "struct YourContract.Attestation[]",
-              components: [
-                {
-                  name: "attester",
-                  type: "address",
-                  internalType: "address",
-                },
-                {
-                  name: "weight",
-                  type: "uint256",
-                  internalType: "uint256",
-                },
-              ],
+              name: "scores",
+              type: "uint256[]",
+              internalType: "uint256[]",
             },
           ],
           stateMutability: "view",
@@ -297,10 +222,10 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getPersonalizationVector",
+          name: "getPageRankScore",
           inputs: [
             {
-              name: "participant",
+              name: "node",
               type: "address",
               internalType: "address",
             },
@@ -420,13 +345,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "renounceOwnership",
-          inputs: [],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
           name: "repayLoan",
           inputs: [
             {
@@ -495,19 +413,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "transferOwnership",
-          inputs: [
-            {
-              name: "newOwner",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
           name: "updateCreditScore",
           inputs: [
             {
@@ -526,24 +431,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "updateCreditScores",
-          inputs: [
-            {
-              name: "users",
-              type: "address[]",
-              internalType: "address[]",
-            },
-            {
-              name: "scores",
-              type: "uint256[]",
-              internalType: "uint256[]",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
           name: "usdc",
           inputs: [],
           outputs: [
@@ -555,193 +442,9 @@ const deployedContracts = {
           ],
           stateMutability: "view",
         },
-        {
-          type: "event",
-          name: "AttestationRecorded",
-          inputs: [
-            {
-              name: "attester",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "borrower",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "weight",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "CreditScoreUpdated",
-          inputs: [
-            {
-              name: "user",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "newScore",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "LoanDisbursed",
-          inputs: [
-            {
-              name: "loanId",
-              type: "uint256",
-              indexed: true,
-              internalType: "uint256",
-            },
-            {
-              name: "borrower",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "LoanRepaid",
-          inputs: [
-            {
-              name: "loanId",
-              type: "uint256",
-              indexed: true,
-              internalType: "uint256",
-            },
-            {
-              name: "borrower",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "LoanRequested",
-          inputs: [
-            {
-              name: "loanId",
-              type: "uint256",
-              indexed: true,
-              internalType: "uint256",
-            },
-            {
-              name: "borrower",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "OwnershipTransferred",
-          inputs: [
-            {
-              name: "previousOwner",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "newOwner",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "PageRankComputed",
-          inputs: [
-            {
-              name: "iteration",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-            {
-              name: "totalDelta",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "error",
-          name: "OwnableInvalidOwner",
-          inputs: [
-            {
-              name: "owner",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-        },
-        {
-          type: "error",
-          name: "OwnableUnauthorizedAccount",
-          inputs: [
-            {
-              name: "account",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-        },
-        {
-          type: "error",
-          name: "ReentrancyGuardReentrantCall",
-          inputs: [],
-        },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1751664535.json",
+      deploymentFile: "run-1752016720.json",
       deploymentScript: "Deploy.s.sol",
     },
   },

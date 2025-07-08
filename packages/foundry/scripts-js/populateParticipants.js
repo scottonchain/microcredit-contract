@@ -10,16 +10,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, "..", ".env") });
 
-// YourContract ABI - we'll need the essential functions
+// DecentralizedMicrocredit ABI - only including methods that actually exist in the contract
 const YOUR_CONTRACT_ABI = [
-  "function getAllParticipants() external view returns (address[] memory)",
   "function depositFunds(uint256 amount) external",
   "function recordAttestation(address borrower, uint256 weight) external",
   "function updateCreditScore(address user, uint256 newScore) external",
-  "function updateCreditScores(address[] calldata users, uint256[] calldata scores) external",
   "function getCreditScore(address user) external view returns (uint256 score)",
-  "function getPersonalizationVector(address participant) external view returns (uint256)",
-  "function getAttestations(address borrower) external view returns (tuple(address attester, uint256 weight)[] memory)",
+  "function getPageRankScore(address node) external view returns (uint256)",
+  "function getAllPageRankScores() external view returns (address[] memory nodes, uint256[] memory scores)",
+  "function computePageRank() external returns (uint256 iterations)",
   "function oracle() external view returns (address)",
   "function owner() external view returns (address)"
 ];
@@ -40,8 +39,8 @@ async function populateParticipants() {
     const deploymentPath = join(__dirname, "..", "deployment.json");
     const deploymentData = JSON.parse(readFileSync(deploymentPath, "utf-8"));
     
-    const creditAddress = deploymentData.YourContract;
-    console.log("📄 YourContract address:", creditAddress);
+    const creditAddress = deploymentData.DecentralizedMicrocredit;
+    console.log("📄 DecentralizedMicrocredit address:", creditAddress);
     
     // Create contract instance
     const credit = new ethers.Contract(creditAddress, YOUR_CONTRACT_ABI, provider);
@@ -90,9 +89,9 @@ async function populateParticipants() {
     console.log(`   - ${borrowers.length} borrowers`);
     console.log(`   - ${attesters.length} attesters`);
     
-    // Check initial participants
-    const initialParticipants = await credit.getAllParticipants();
-    console.log(`📊 Initial participants in contract: ${initialParticipants.length}`);
+    // Check initial PageRank scores (instead of getAllParticipants which doesn't exist)
+    const initialPageRankScores = await credit.getAllPageRankScores();
+    console.log(`📊 Initial PageRank nodes in contract: ${initialPageRankScores.nodes.length}`);
     
     // Create signer for transactions
     const signer = provider.getSigner(deployerAddress);
@@ -148,12 +147,12 @@ async function populateParticipants() {
       
       console.log(`   Recording attestation ${i + 1}: ${attester} -> ${borrower} (weight: ${attestationWeight})`);
       
-              try {
-          // Fund the attester account first
-          await provider.send("anvil_setBalance", [attester, "0x1000000000000000000"]); // 1 ETH
-          
-          // Impersonate attester
-          await provider.send("anvil_impersonateAccount", [attester]);
+      try {
+        // Fund the attester account first
+        await provider.send("anvil_setBalance", [attester, "0x1000000000000000000"]); // 1 ETH
+        
+        // Impersonate attester
+        await provider.send("anvil_impersonateAccount", [attester]);
         const attesterSigner = provider.getSigner(attester);
         const creditWithAttesterSigner = credit.connect(attesterSigner);
         
@@ -174,30 +173,39 @@ async function populateParticipants() {
       }
     }
     
-    // Step 3: Add lenders through deposits (if MockUSDC was deployed)
-    console.log("\n💰 Step 3: Attempting to add lenders via deposits...");
+    // Step 3: Compute PageRank scores
+    console.log("\n🧮 Step 3: Computing PageRank scores...");
+    try {
+      const iterations = await creditWithSigner.computePageRank();
+      console.log(`   ✅ PageRank computed in ${iterations} iterations`);
+    } catch (error) {
+      console.log(`   ⚠️  Error computing PageRank: ${error.message}`);
+    }
+    
+    // Step 4: Add lenders through deposits (if MockUSDC was deployed)
+    console.log("\n💰 Step 4: Attempting to add lenders via deposits...");
     console.log("   ⚠️  Note: This step requires MockUSDC to be deployed");
     console.log("   💡 Run 'yarn deploy' first to deploy MockUSDC if needed");
     
-    // Check final participants
-    const finalParticipants = await credit.getAllParticipants();
-    console.log(`\n📊 Final participants in contract: ${finalParticipants.length}`);
+    // Check final PageRank scores
+    const finalPageRankScores = await credit.getAllPageRankScores();
+    console.log(`\n📊 Final PageRank nodes in contract: ${finalPageRankScores.nodes.length}`);
     
-    if (finalParticipants.length > 0) {
-      console.log("\n📋 Participant addresses:");
-      for (let i = 0; i < finalParticipants.length; i++) {
-        const participant = finalParticipants[i];
+    if (finalPageRankScores.nodes.length > 0) {
+      console.log("\n📋 Participant addresses with PageRank scores:");
+      for (let i = 0; i < finalPageRankScores.nodes.length; i++) {
+        const participant = finalPageRankScores.nodes[i];
+        const pageRankScore = finalPageRankScores.scores[i];
         const creditScore = await credit.getCreditScore(participant);
-        const personalization = await credit.getPersonalizationVector(participant);
         
         console.log(`   ${i + 1}. ${participant}`);
         console.log(`      - Credit Score: ${creditScore}`);
-        console.log(`      - Personalization Vector: ${personalization}`);
+        console.log(`      - PageRank Score: ${pageRankScore}`);
       }
     }
     
     console.log("\n✅ Participant population completed!");
-    console.log(`📈 Total participants added: ${finalParticipants.length - initialParticipants.length}`);
+    console.log(`📈 Total PageRank nodes added: ${finalPageRankScores.nodes.length - initialPageRankScores.nodes.length}`);
     
   } catch (error) {
     console.error("❌ Error:", error);

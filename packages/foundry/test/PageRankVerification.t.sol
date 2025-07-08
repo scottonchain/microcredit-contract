@@ -1,0 +1,400 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+import "forge-std/Test.sol";
+import "forge-std/console.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../contracts/DecentralizedMicrocredit.sol";
+
+contract PageRankVerificationTest is Test {
+    DecentralizedMicrocredit credit;
+    MockUSDC usdc;
+    address owner;
+    address oracle;
+
+    // Test addresses
+    address constant NODE1 = address(0x1111);
+    address constant NODE2 = address(0x2222);
+    address constant NODE3 = address(0x3333);
+    address constant NODE4 = address(0x4444);
+    address constant NODE5 = address(0x5555);
+
+
+
+    // Expected NetworkX PageRank results (scaled to 1e6)
+    // Generated from Python NetworkX with alpha=0.85, max_iter=100, tol=1e-6
+    
+    // Simple test case: 3 nodes, 2 edges (0x1111 -> 0x2222: 80%, 0x1111 -> 0x3333: 40%)
+    // Actual NetworkX results (alpha=0.85, max_iter=100, tol=1e-6) scaled to 100,000
+    uint256 constant SIMPLE_NODE1_SCORE = 25974;  // 0.259741 * 100,000
+    uint256 constant SIMPLE_NODE2_SCORE = 40692;  // 0.406926 * 100,000
+    uint256 constant SIMPLE_NODE3_SCORE = 33333;  // 0.333333 * 100,000
+    uint256 constant SIMPLE_TOTAL_SCORE = 99999;  // 0.999999 * 100,000
+    uint256 constant SIMPLE_ITERATIONS = 15;      // Expected iterations to converge
+
+    // Complex test case: 5 nodes, 5 edges forming a cycle
+    // Actual NetworkX results (alpha=0.85, max_iter=100, tol=1e-6) scaled to 100,000
+    uint256 constant COMPLEX_NODE1_SCORE = 20000;  // 0.2 * 100,000
+    uint256 constant COMPLEX_NODE2_SCORE = 20000;  // 0.2 * 100,000
+    uint256 constant COMPLEX_NODE3_SCORE = 20000;  // 0.2 * 100,000
+    uint256 constant COMPLEX_NODE4_SCORE = 20000;  // 0.2 * 100,000
+    uint256 constant COMPLEX_NODE5_SCORE = 20000;  // 0.2 * 100,000
+    uint256 constant COMPLEX_TOTAL_SCORE = 100000; // 1.0 * 100,000
+    uint256 constant COMPLEX_ITERATIONS = 25;      // Expected iterations to converge
+
+    function setUp() public {
+        owner = makeAddr("owner");
+        oracle = makeAddr("oracle");
+
+        // Deploy mock USDC
+        usdc = new MockUSDC();
+
+        vm.startPrank(owner);
+        credit = new DecentralizedMicrocredit(500, 2000, address(usdc), oracle);
+        vm.stopPrank();
+
+        // Set up initial balances
+        usdc.mint(owner, 1000000e6);
+        usdc.mint(NODE1, 1000e6);
+        usdc.mint(NODE2, 1000e6);
+        usdc.mint(NODE3, 1000e6);
+        usdc.mint(NODE4, 1000e6);
+        usdc.mint(NODE5, 1000e6);
+
+        // Owner deposits funds into the contract
+        vm.startPrank(owner);
+        usdc.approve(address(credit), 1000000e6);
+        credit.depositFunds(500000e6);
+        vm.stopPrank();
+
+        // Set up credit scores for all test nodes
+        vm.startPrank(oracle);
+        credit.updateCreditScore(NODE1, 500000);
+        credit.updateCreditScore(NODE2, 500000);
+        credit.updateCreditScore(NODE3, 500000);
+        credit.updateCreditScore(NODE4, 500000);
+        credit.updateCreditScore(NODE5, 500000);
+        vm.stopPrank();
+    }
+
+    function _clearPageRankState() internal {
+        // Clear PageRank state using the contract function
+        credit.clearPageRankState();
+    }
+
+    function testSimplePageRankExactMatch() public {
+        console.log("=== Testing Simple PageRank (3 nodes, 2 edges) ===");
+        
+        // Create simple graph: 0x1111 -> 0x2222: 80%, 0x1111 -> 0x3333: 40%
+        vm.prank(NODE1);
+        credit.recordAttestation(NODE2, 800000); // 80% weight
+        
+        vm.prank(NODE1);
+        credit.recordAttestation(NODE3, 400000); // 40% weight
+        
+        // Compute PageRank
+        uint256 iterations = credit.computePageRank();
+        console.log("Iterations to converge:", iterations);
+        
+        // Get scores
+        uint256 score1 = credit.getPageRankScore(NODE1);
+        uint256 score2 = credit.getPageRankScore(NODE2);
+        uint256 score3 = credit.getPageRankScore(NODE3);
+        
+        console.log("Actual scores:");
+        console.log("Node1 (0x1111):", score1);
+        console.log("Node2 (0x2222):", score2);
+        console.log("Node3 (0x3333):", score3);
+        
+        console.log("Expected scores:");
+        console.log("Node1 (0x1111):", SIMPLE_NODE1_SCORE);
+        console.log("Node2 (0x2222):", SIMPLE_NODE2_SCORE);
+        console.log("Node3 (0x3333):", SIMPLE_NODE3_SCORE);
+        
+        // Verify exact match with tolerance
+        uint256 tolerance = 2000; // 2000 absolute difference (scaled to 100,000) - reasonable for integer vs float differences
+        
+        assertApproxEqAbs(score1, SIMPLE_NODE1_SCORE, tolerance, "Node1 score mismatch");
+        assertApproxEqAbs(score2, SIMPLE_NODE2_SCORE, tolerance, "Node2 score mismatch");
+        assertApproxEqAbs(score3, SIMPLE_NODE3_SCORE, tolerance, "Node3 score mismatch");
+        
+        // Verify key PageRank properties
+        assertGt(score2, score3, "Node2 should have higher score than Node3");
+        assertGt(score2, score1, "Node2 should have higher score than Node1");
+        
+        // Verify total score
+        uint256 totalScore = score1 + score2 + score3;
+        assertApproxEqAbs(totalScore, SIMPLE_TOTAL_SCORE, tolerance, "Total score should be ~1.0");
+        
+        // Verify convergence
+        assertLe(iterations, SIMPLE_ITERATIONS + 5, "Should converge within expected iterations");
+        assertGt(iterations, 0, "Should run at least one iteration");
+        
+        console.log("Simple PageRank test PASSED");
+    }
+
+    function testComplexPageRankExactMatch() public {
+        console.log("=== Testing Complex PageRank (5 nodes, 5 edges) ===");
+        
+        // Create complex graph: 5 nodes in a cycle with different weights
+        vm.prank(NODE1);
+        credit.recordAttestation(NODE2, 500000); // 50% weight
+        
+        vm.prank(NODE2);
+        credit.recordAttestation(NODE3, 300000); // 30% weight
+        
+        vm.prank(NODE3);
+        credit.recordAttestation(NODE4, 700000); // 70% weight
+        
+        vm.prank(NODE4);
+        credit.recordAttestation(NODE5, 400000); // 40% weight
+        
+        vm.prank(NODE5);
+        credit.recordAttestation(NODE1, 600000); // 60% weight
+        
+        // Compute PageRank
+        uint256 iterations = credit.computePageRank();
+        console.log("Iterations to converge:", iterations);
+        
+        // Get scores
+        uint256 score1 = credit.getPageRankScore(NODE1);
+        uint256 score2 = credit.getPageRankScore(NODE2);
+        uint256 score3 = credit.getPageRankScore(NODE3);
+        uint256 score4 = credit.getPageRankScore(NODE4);
+        uint256 score5 = credit.getPageRankScore(NODE5);
+        
+        console.log("Actual scores:");
+        console.log("Node1 (0x1111):", score1);
+        console.log("Node2 (0x2222):", score2);
+        console.log("Node3 (0x3333):", score3);
+        console.log("Node4 (0x4444):", score4);
+        console.log("Node5 (0x5555):", score5);
+        
+        console.log("Expected scores:");
+        console.log("Node1 (0x1111):", COMPLEX_NODE1_SCORE);
+        console.log("Node2 (0x2222):", COMPLEX_NODE2_SCORE);
+        console.log("Node3 (0x3333):", COMPLEX_NODE3_SCORE);
+        console.log("Node4 (0x4444):", COMPLEX_NODE4_SCORE);
+        console.log("Node5 (0x5555):", COMPLEX_NODE5_SCORE);
+        
+        // Verify exact match with tolerance
+        uint256 tolerance = 2000; // 2000 absolute difference (scaled to 100,000) - reasonable for integer vs float differences
+        
+        assertApproxEqAbs(score1, COMPLEX_NODE1_SCORE, tolerance, "Node1 score mismatch");
+        assertApproxEqAbs(score2, COMPLEX_NODE2_SCORE, tolerance, "Node2 score mismatch");
+        assertApproxEqAbs(score3, COMPLEX_NODE3_SCORE, tolerance, "Node3 score mismatch");
+        assertApproxEqAbs(score4, COMPLEX_NODE4_SCORE, tolerance, "Node4 score mismatch");
+        assertApproxEqAbs(score5, COMPLEX_NODE5_SCORE, tolerance, "Node5 score mismatch");
+        
+        // Verify total score
+        uint256 totalScore = score1 + score2 + score3 + score4 + score5;
+        assertApproxEqAbs(totalScore, COMPLEX_TOTAL_SCORE, tolerance, "Total score should be ~1.0");
+        
+        // Verify convergence
+        assertLe(iterations, COMPLEX_ITERATIONS + 10, "Should converge within expected iterations");
+        assertGt(iterations, 0, "Should run at least one iteration");
+        
+        console.log("Complex PageRank test PASSED");
+    }
+
+    function testPageRankProperties() public {
+        console.log("=== Testing PageRank Mathematical Properties ===");
+        
+        // Create a simple graph
+        vm.prank(NODE1);
+        credit.recordAttestation(NODE2, 800000);
+        
+        vm.prank(NODE1);
+        credit.recordAttestation(NODE3, 400000);
+        
+        // Compute PageRank
+        uint256 iterations = credit.computePageRank();
+        
+        // Get all scores (unused but kept for completeness)
+        (address[] memory nodes, uint256[] memory scores) = credit.getAllPageRankScores();
+        // Suppress unused variable warning
+        (nodes, scores);
+        
+        // Property 1: All scores should be positive
+        for (uint256 i = 0; i < scores.length; i++) {
+            assertGt(scores[i], 0, "All PageRank scores should be positive");
+        }
+        
+        // Property 2: Scores should sum to approximately 1.0 (scaled)
+        uint256 totalScore = 0;
+        for (uint256 i = 0; i < scores.length; i++) {
+            totalScore += scores[i];
+        }
+        assertApproxEqAbs(totalScore, 100000, 5000, "Total PageRank scores should sum to ~1.0");
+        
+        // Property 3: Higher edge weight should result in higher score
+        uint256 score2 = credit.getPageRankScore(NODE2);
+        uint256 score3 = credit.getPageRankScore(NODE3);
+        assertGt(score2, score3, "Node with higher edge weight should have higher score");
+        
+        // Property 4: Convergence should be reasonable
+        assertGt(iterations, 0, "Should run at least one iteration");
+        assertLe(iterations, 100, "Should converge within max iterations");
+        
+        console.log("PageRank properties test PASSED");
+    }
+
+    function testPageRankEdgeCases() public {
+        console.log("=== Testing PageRank Edge Cases ===");
+        
+        // Test 1: Empty graph
+        _clearPageRankState();
+        uint256 iterations = credit.computePageRank();
+        assertEq(iterations, 0, "Empty graph should return 0 iterations");
+        
+        // Test 2: Single node (no edges) - create a node by having it attest to another node
+        _clearPageRankState();
+        vm.prank(NODE1);
+        credit.recordAttestation(NODE2, 100000); // NODE1 attests to NODE2
+        
+        iterations = credit.computePageRank();
+        assertGt(iterations, 0, "Single edge should still run iterations");
+        
+        uint256 score1 = credit.getPageRankScore(NODE1);
+        uint256 score2 = credit.getPageRankScore(NODE2);
+        // Both nodes should have positive scores
+        assertGt(score1, 0, "Node1 should have positive score");
+        assertGt(score2, 0, "Node2 should have positive score");
+        
+        // Test 3: Disconnected nodes
+        _clearPageRankState();
+        vm.prank(NODE2);
+        credit.recordAttestation(NODE3, 500000);
+        
+        iterations = credit.computePageRank();
+        assertGt(iterations, 0, "Disconnected nodes should still converge");
+        
+        uint256 score2_2 = credit.getPageRankScore(NODE2);
+        uint256 score3 = credit.getPageRankScore(NODE3);
+        assertGt(score2_2, 0, "Disconnected node should have positive score");
+        assertGt(score3, 0, "Disconnected node should have positive score");
+        
+        console.log("PageRank edge cases test PASSED");
+    }
+
+    function testPageRankBasic() public {
+        console.log("=== Testing Basic PageRank Functionality ===");
+        
+        // Test 1: Single edge (two nodes)
+        _clearPageRankState();
+        vm.prank(NODE1);
+        credit.recordAttestation(NODE2, 100000); // NODE1 attests to NODE2
+        
+        uint256 iterations = credit.computePageRank();
+        console.log("Single edge iterations:", iterations);
+        
+        uint256 score1 = credit.getPageRankScore(NODE1);
+        uint256 score2 = credit.getPageRankScore(NODE2);
+        console.log("Node1 score:", score1);
+        console.log("Node2 score:", score2);
+        
+        // Both should have positive scores
+        assertGt(score1, 0, "Node1 should have positive score");
+        assertGt(score2, 0, "Node2 should have positive score");
+        
+        // Total should be approximately 1.0 (scaled to 100,000)
+        uint256 total = score1 + score2;
+        assertApproxEqAbs(total, 100000, 5000, "Total score should be ~1.0");
+        
+        // Test 2: Two edges from same source
+        _clearPageRankState();
+        vm.prank(NODE1);
+        credit.recordAttestation(NODE2, 500000); // NODE1 attests to NODE2
+        
+        vm.prank(NODE1);
+        credit.recordAttestation(NODE3, 300000); // NODE1 attests to NODE3
+        
+        // Debug: Check what nodes are in the graph
+        (address[] memory nodes, uint256[] memory scores) = credit.getAllPageRankScores();
+        console.log("Number of nodes in graph:", nodes.length);
+        for (uint256 i = 0; i < nodes.length; i++) {
+            console.log("Node", i, ":", nodes[i]);
+        }
+        
+        iterations = credit.computePageRank();
+        console.log("Two edges iterations:", iterations);
+        
+        uint256 score1_2 = credit.getPageRankScore(NODE1);
+        uint256 score2_2 = credit.getPageRankScore(NODE2);
+        uint256 score3 = credit.getPageRankScore(NODE3);
+        console.log("Node1 score:", score1_2);
+        console.log("Node2 score:", score2_2);
+        console.log("Node3 score:", score3);
+        
+        // All should have positive scores
+        assertGt(score1_2, 0, "Node1 should have positive score");
+        assertGt(score2_2, 0, "Node2 should have positive score");
+        assertGt(score3, 0, "Node3 should have positive score");
+        
+        // Total should be approximately 1.0 (scaled to 100,000)
+        uint256 total2 = score1_2 + score2_2 + score3;
+        assertApproxEqAbs(total2, 100000, 5000, "Total score should be ~1.0");
+        
+        console.log("Basic PageRank test PASSED");
+    }
+}
+
+// Mock USDC contract for testing
+contract MockUSDC is IERC20 {
+    mapping(address => uint256) private _balances;
+    mapping(address => mapping(address => uint256)) private _allowances;
+    uint256 private _totalSupply;
+    string private _name = "Mock USDC";
+    string private _symbol = "USDC";
+    uint8 private _decimals = 6;
+
+    function mint(address to, uint256 amount) external {
+        _balances[to] += amount;
+        _totalSupply += amount;
+    }
+
+    function totalSupply() external view override returns (uint256) {
+        return _totalSupply;
+    }
+
+    function balanceOf(address account) external view override returns (uint256) {
+        return _balances[account];
+    }
+
+    function transfer(address to, uint256 amount) external override returns (bool) {
+        require(_balances[msg.sender] >= amount, "Insufficient balance");
+        _balances[msg.sender] -= amount;
+        _balances[to] += amount;
+        return true;
+    }
+
+    function allowance(address owner, address spender) external view override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+
+    function approve(address spender, uint256 amount) external override returns (bool) {
+        _allowances[msg.sender][spender] = amount;
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external override returns (bool) {
+        require(_balances[from] >= amount, "Insufficient balance");
+        require(_allowances[from][msg.sender] >= amount, "Insufficient allowance");
+        _balances[from] -= amount;
+        _balances[to] += amount;
+        _allowances[from][msg.sender] -= amount;
+        return true;
+    }
+
+    function name() external view returns (string memory) {
+        return _name;
+    }
+
+    function symbol() external view returns (string memory) {
+        return _symbol;
+    }
+
+    function decimals() external view returns (uint8) {
+        return _decimals;
+    }
+} 

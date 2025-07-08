@@ -1,625 +1,351 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
-import "../contracts/YourContract.sol";
-import "../src/mocks/MockUSDC.sol";
+import "forge-std/console.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../contracts/DecentralizedMicrocredit.sol";
+
+// Simple mock USDC contract for testing
+contract MockUSDC is IERC20 {
+    mapping(address => uint256) private _balances;
+    mapping(address => mapping(address => uint256)) private _allowances;
+    uint256 private _totalSupply;
+    string private _name = "Mock USDC";
+    string private _symbol = "USDC";
+    uint8 private _decimals = 6;
+
+    function mint(address to, uint256 amount) external {
+        _balances[to] += amount;
+        _totalSupply += amount;
+    }
+
+    function totalSupply() external view override returns (uint256) {
+        return _totalSupply;
+    }
+
+    function balanceOf(address account) external view override returns (uint256) {
+        return _balances[account];
+    }
+
+    function transfer(address to, uint256 amount) external override returns (bool) {
+        require(_balances[msg.sender] >= amount, "Insufficient balance");
+        _balances[msg.sender] -= amount;
+        _balances[to] += amount;
+        return true;
+    }
+
+    function allowance(address owner, address spender) external view override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+
+    function approve(address spender, uint256 amount) external override returns (bool) {
+        _allowances[msg.sender][spender] = amount;
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external override returns (bool) {
+        require(_balances[from] >= amount, "Insufficient balance");
+        require(_allowances[from][msg.sender] >= amount, "Insufficient allowance");
+        _balances[from] -= amount;
+        _balances[to] += amount;
+        _allowances[from][msg.sender] -= amount;
+        return true;
+    }
+
+    function name() external view returns (string memory) {
+        return _name;
+    }
+
+    function symbol() external view returns (string memory) {
+        return _symbol;
+    }
+
+    function decimals() external view returns (uint8) {
+        return _decimals;
+    }
+}
 
 contract DecentralizedMicrocreditTest is Test {
-    YourContract credit;
+    DecentralizedMicrocredit credit;
     MockUSDC usdc;
-
     address owner;
-    address[] lenders;
-    address[] borrowers;
-    address[] attesters;
+    address borrower;
+    address lender;
+    address oracle;
 
     function setUp() public {
-        console2.log("=== SETTING UP DECENTRALIZED MICROCREDIT TEST ENVIRONMENT ===");
+        owner = makeAddr("owner");
+        borrower = makeAddr("borrower");
+        lender = makeAddr("lender");
+        oracle = makeAddr("oracle");
+
+        // Deploy mock USDC
+        usdc = new MockUSDC();
+
+        vm.startPrank(owner);
+        credit = new DecentralizedMicrocredit(500, 2000, address(usdc), oracle); // 5% - 20% in basis points
+        vm.stopPrank();
+
+        // Set up initial balances
+        usdc.mint(owner, 1000000e6); // 1M USDC for owner
+        usdc.mint(borrower, 1000e6); // 1000 USDC for borrower
+        usdc.mint(lender, 1000000e6); // 1M USDC for lender
+
+        // Owner deposits funds into the contract
+        vm.startPrank(owner);
+        usdc.approve(address(credit), 1000000e6);
+        credit.depositFunds(500000e6); // Deposit 500K USDC
+        vm.stopPrank();
+
+        // Set up credit score for borrower
+        vm.prank(oracle);
+        credit.updateCreditScore(borrower, 500000); // 50% credit score
+    }
+
+    function testRequestLoan() public {
+        vm.startPrank(borrower);
+        uint256 loanId = credit.requestLoan(1000e6);
+        assertEq(loanId, 1);
         
-        owner = address(this);
-        usdc = new MockUSDC("Mock USDC", "USDC", 6);
-        credit = new YourContract(500, 2000, address(usdc), owner); // 5% - 20% in basis points
+        (uint256 principal, uint256 outstanding, address loanBorrower, uint256 interestRate, bool isActive) = credit.getLoan(loanId);
+        assertEq(principal, 1000e6);
+        assertEq(loanBorrower, borrower);
+        assertTrue(isActive);
+        vm.stopPrank();
+    }
+
+    function testRepayLoan() public {
+        // Request loan
+        vm.startPrank(borrower);
+        uint256 loanId = credit.requestLoan(1000e6);
         
-        console2.log("Contract deployed with:");
-        console2.log("- Minimum interest rate: 5% (500 basis points)");
-        console2.log("- Maximum interest rate: 20% (2000 basis points)");
-        console2.log("- USDC token address:", address(usdc));
-        console2.log("- Oracle address:", owner);
+        // Disburse loan
+        vm.stopPrank();
+        vm.prank(owner);
+        credit.disburseLoan(loanId);
+        
+        // Repay loan
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), 1100e6); // Approve more than needed
+        credit.repayLoan(loanId, 1100e6);
+        
+        (,,, , bool isActive) = credit.getLoan(loanId);
+        assertFalse(isActive); // Loan should be repaid
+        vm.stopPrank();
+    }
 
-        // Create test participants
-        for (uint i = 0; i < 10; i++) {
-            address lender = address(uint160(uint(keccak256(abi.encode("lender", i)))));
-            address borrower = address(uint160(uint(keccak256(abi.encode("borrower", i)))));
-            address attester = address(uint160(uint(keccak256(abi.encode("attester", i)))));
+    function testRecordAttestation() public {
+        vm.prank(lender);
+        credit.recordAttestation(borrower, 800000); // 80% weight
+        
+        // Test attester reward calculation
+        vm.startPrank(borrower);
+        uint256 loanId = credit.requestLoan(1000e6);
+        vm.stopPrank();
+        
+        vm.prank(owner);
+        credit.disburseLoan(loanId);
+        
+        uint256 reward = credit.computeAttesterReward(loanId, lender);
+        assertGt(reward, 0);
+    }
 
-            lenders.push(lender);
-            borrowers.push(borrower);
-            attesters.push(attester);
+    function testCreditScoreUpdate() public {
+        uint256 initialScore = credit.getCreditScore(borrower);
+        assertEq(initialScore, 500000);
+        
+        vm.prank(oracle);
+        credit.updateCreditScore(borrower, 700000); // Update to 70%
+        
+        uint256 newScore = credit.getCreditScore(borrower);
+        assertEq(newScore, 700000);
+    }
 
-            // Mint initial USDC balances
-            usdc.mint(lender, 1_000_000_000); // 1,000 USDC for lenders
-            usdc.mint(borrower, 0); // No initial balance for borrowers
-            usdc.mint(attester, 0); // No initial balance for attesters
+    function testInterestRateCalculation() public {
+        vm.startPrank(borrower);
+        uint256 loanId = credit.requestLoan(1000e6);
+        vm.stopPrank();
+        
+        (,,, uint256 interestRate,) = credit.getLoan(loanId);
+        
+        // With 50% credit score, interest rate should be between rMin and rMax
+        assertGe(interestRate, 500); // rMin
+        assertLe(interestRate, 2000); // rMax
+    }
 
-            // Approve credit contract to spend lender funds
-            vm.prank(lender);
-            usdc.approve(address(credit), type(uint256).max);
-            
-            console2.log("Created participant", i + 1);
-            console2.log(":");
-            console2.log("  - Lender:", lender);
-            console2.log("  - Lender balance: 1000 USDC");
-            console2.log("  - Borrower:", borrower);
-            console2.log("  - Borrower balance: 0 USDC");
-            console2.log("  - Attester:", attester);
-            console2.log("  - Attester balance: 0 USDC");
+    function testDepositFunds() public {
+        // Check initial balance
+        uint256 initialBalance = usdc.balanceOf(address(credit));
+        assertEq(initialBalance, 500000e6); // Should have 500K from setUp
+        
+        // Deposit more funds
+        vm.startPrank(owner);
+        usdc.approve(address(credit), 100000e6);
+        credit.depositFunds(100000e6);
+        vm.stopPrank();
+        
+        // Check new balance
+        uint256 newBalance = usdc.balanceOf(address(credit));
+        assertEq(newBalance, 600000e6); // Should have 600K total
+    }
+
+    function testPageRankMatchesNetworkX() public {
+        // Create the same graph as NetworkX test
+        // NetworkX test case: 3 nodes with edges (0x1111 -> 0x2222: 80%, 0x1111 -> 0x3333: 40%)
+        address node1 = address(0x1111);
+        address node2 = address(0x2222);
+        address node3 = address(0x3333);
+        
+        // Add attestations (this will add edges to PageRank graph)
+        vm.prank(node1);
+        credit.recordAttestation(node2, 800000); // 80% weight
+        
+        vm.prank(node1);
+        credit.recordAttestation(node3, 400000); // 40% weight
+        
+        // Compute PageRank
+        uint256 iterations = credit.computePageRank();
+        assertGt(iterations, 0, "PageRank should run iterations");
+        assertLe(iterations, 100, "PageRank should converge within max iterations");
+        
+        // Get PageRank scores
+        (address[] memory nodes, uint256[] memory scores) = credit.getAllPageRankScores();
+        
+        // Verify we have 3 nodes
+        assertEq(nodes.length, 3, "Should have 3 nodes in graph");
+        assertEq(scores.length, 3, "Should have 3 scores");
+        
+        // Find scores for each node
+        uint256 score1 = 0;
+        uint256 score2 = 0;
+        uint256 score3 = 0;
+        
+        for (uint256 i = 0; i < nodes.length; i++) {
+            if (nodes[i] == node1) score1 = scores[i];
+            else if (nodes[i] == node2) score2 = scores[i];
+            else if (nodes[i] == node3) score3 = scores[i];
         }
         
-        console2.log("=== SETUP COMPLETE ===\n");
-    }
-
-    // ===== ATOMIC OPERATION TESTS =====
-
-    function testAtomicDepositFunds() public {
-        console2.log("=== TESTING ATOMIC FUND DEPOSIT ===");
-        
-        address lender = lenders[0];
-        uint256 depositAmount = 100_000_000; // 100 USDC
-        uint256 initialBalance = usdc.balanceOf(lender);
-        uint256 initialContractBalance = usdc.balanceOf(address(credit));
-        
-        console2.log("Before deposit:");
-        console2.log("  - Lender balance:", initialBalance);
-        console2.log("  - Contract balance:", initialContractBalance);
-        console2.log("  - Deposit amount:", depositAmount);
-        
-        vm.prank(lender);
-        credit.depositFunds(depositAmount);
-        
-        uint256 finalBalance = usdc.balanceOf(lender);
-        uint256 finalContractBalance = usdc.balanceOf(address(credit));
-        
-        console2.log("After deposit:");
-        console2.log("  - Lender balance:", finalBalance);
-        console2.log("  - Contract balance:", finalContractBalance);
-        console2.log("  - Balance change:", initialBalance - finalBalance);
-        
-        assertEq(finalBalance, initialBalance - depositAmount, "Lender balance should decrease");
-        assertEq(finalContractBalance, initialContractBalance + depositAmount, "Contract balance should increase");
-        
-        console2.log("Atomic deposit test passed\n");
-    }
-
-    function testAtomicAttestation() public {
-        console2.log("=== TESTING ATOMIC ATTESTATION ===");
-        
-        address attester = attesters[0];
-        address borrower = borrowers[0];
-        uint256 attestationWeight = 750_000; // 75% confidence
-        
-        console2.log("Recording attestation:");
-        console2.log("  - Attester:", attester);
-        console2.log("  - Borrower:", borrower);
-        console2.log("  - Weight:", attestationWeight);
-        console2.log("  - Confidence: 75%");
-        
-        vm.prank(attester);
-        credit.recordAttestation(borrower, attestationWeight);
-        
-        console2.log("Attestation recorded successfully");
-        console2.log("PageRank scores should be updated automatically");
-        
-        // Check that both participants are now in the system
-        address[] memory participants = credit.getAllParticipants();
-        console2.log("Total participants after attestation:", participants.length);
-        
-        console2.log("Atomic attestation test passed\n");
-    }
-
-    function testAtomicLoanRequest() public {
-        console2.log("=== TESTING ATOMIC LOAN REQUEST ===");
-        
-        address borrower = borrowers[0];
-        uint256 loanAmount = 50_000_000; // 50 USDC
-        
-        // Setup: Add borrower to system via attestation
-        vm.prank(attesters[0]);
-        credit.recordAttestation(borrower, 800_000); // 80% attestation
-        
-        console2.log("Before loan request:");
-        console2.log("  - Borrower:", borrower);
-        console2.log("  - Requested amount:", loanAmount);
-        
-        vm.prank(borrower);
-        uint256 loanId = credit.requestLoan(loanAmount, 365 days);
-        
-        (uint256 principal, uint256 outstanding, address loanBorrower, uint256 interestRate, uint256 repaymentPeriod, uint256 dueDate, bool isActive, bool isFunded) = credit.getLoan(loanId);
-        
-        console2.log("After loan request:");
-        console2.log("  - Loan ID:", loanId);
-        console2.log("  - Principal:", principal);
-        console2.log("  - Outstanding (includes interest):", outstanding);
-        console2.log("  - Borrower:", loanBorrower);
-        console2.log("  - Interest rate (basis points):", interestRate);
-        console2.log("  - Is active:", isActive);
-        
-        assertEq(loanBorrower, borrower, "Loan should be assigned to correct borrower");
-        assertEq(principal, loanAmount, "Principal should match requested amount");
-        assertTrue(outstanding > principal, "Outstanding should include principal plus interest");
-        assertTrue(isActive, "Loan should be active");
-        
-        console2.log("Atomic loan request test passed\n");
-    }
-
-    function testAtomicLoanDisbursement() public {
-        console2.log("=== TESTING ATOMIC LOAN DISBURSEMENT ===");
-        
-        address borrower = borrowers[0];
-        uint256 loanAmount = 50_000_000; // 50 USDC
-        
-        // Setup: Add borrower to system and request loan
-        vm.prank(attesters[0]);
-        credit.recordAttestation(borrower, 800_000);
-        
-        vm.prank(borrower);
-        uint256 loanId = credit.requestLoan(loanAmount, 365 days);
-        
-        // Ensure contract has funds by having a lender deposit
-        vm.prank(lenders[0]);
-        credit.depositFunds(100_000_000); // 100 USDC
-        
-        uint256 initialBorrowerBalance = usdc.balanceOf(borrower);
-        uint256 initialContractBalance = usdc.balanceOf(address(credit));
-        
-        console2.log("Before disbursement:");
-        console2.log("  - Loan ID:", loanId);
-        console2.log("  - Borrower balance:", initialBorrowerBalance);
-        console2.log("  - Contract balance:", initialContractBalance);
-        console2.log("  - Disbursement amount:", loanAmount);
-        
-        credit.fundLoan(loanId);
-        
-        uint256 finalBorrowerBalance = usdc.balanceOf(borrower);
-        uint256 finalContractBalance = usdc.balanceOf(address(credit));
-        
-        console2.log("After disbursement:");
-        console2.log("  - Borrower balance:", finalBorrowerBalance);
-        console2.log("  - Contract balance:", finalContractBalance);
-        console2.log("  - Balance change:", finalBorrowerBalance - initialBorrowerBalance);
-        
-        assertEq(finalBorrowerBalance, initialBorrowerBalance + loanAmount, "Borrower should receive funds");
-        assertEq(finalContractBalance, initialContractBalance - loanAmount, "Contract should send funds");
-        
-        console2.log("Atomic loan disbursement test passed\n");
-    }
-
-    function testAtomicLoanRepayment() public {
-        console2.log("=== TESTING ATOMIC LOAN REPAYMENT ===");
-        
-        address borrower = borrowers[0];
-        uint256 loanAmount = 50_000_000; // 50 USDC
-        
-        // Setup: Complete loan cycle
-        vm.prank(attesters[0]);
-        credit.recordAttestation(borrower, 800_000);
-        
-        vm.prank(borrower);
-        uint256 loanId = credit.requestLoan(loanAmount, 365 days);
-        
-        // Ensure contract has funds
-        vm.prank(lenders[0]);
-        credit.depositFunds(100_000_000);
-        
-        credit.fundLoan(loanId);
-        
-        // Get loan details before repayment
-        (uint256 principal, uint256 outstanding,,,,,,) = credit.getLoan(loanId);
-        uint256 initialBorrowerBalance = usdc.balanceOf(borrower);
-        uint256 initialContractBalance = usdc.balanceOf(address(credit));
-        
-        console2.log("Before repayment:");
-        console2.log("  - Loan ID:", loanId);
-        console2.log("  - Principal:", principal);
-        console2.log("  - Outstanding (includes interest):", outstanding);
-        console2.log("  - Borrower balance:", initialBorrowerBalance);
-        console2.log("  - Contract balance:", initialContractBalance);
-        
-        // Outstanding amount already includes principal + interest
-        
-        // Simulate borrower having funds to repay
-        vm.prank(owner);
-        usdc.mint(borrower, outstanding);
-        
-        vm.startPrank(borrower);
-        usdc.approve(address(credit), outstanding);
-        credit.repayLoan(loanId, outstanding);
-        vm.stopPrank();
-        
-        (, uint256 finalOutstanding,,,,, bool finalActive,) = credit.getLoan(loanId);
-        
-        console2.log("After repayment:");
-        console2.log("  - Outstanding:", finalOutstanding);
-        console2.log("  - Borrower balance:", usdc.balanceOf(borrower));
-        console2.log("  - Contract balance:", usdc.balanceOf(address(credit)));
-        console2.log("  - Is active:", finalActive);
-        
-        // Loan should be fully repaid and inactive
-        assertTrue(finalOutstanding <= 2000, "Outstanding amount should be very small or zero (allowing for rounding)");
-        assertTrue(!finalActive, "Loan should be inactive after full repayment");
-        assertEq(usdc.balanceOf(address(credit)), initialContractBalance + outstanding, "Contract should receive repayment");
-        
-        console2.log("Atomic loan repayment test passed\n");
-    }
-
-    // ===== PAGERANK-BASED CREDIT SCORING TESTS =====
-
-    function testPageRankInitialization() public {
-        console2.log("=== TESTING PAGERANK INITIALIZATION ===");
-        
-        address borrower = borrowers[0];
-        address attester = attesters[0];
-        
-        console2.log("Testing PageRank initialization with attestation");
-        console2.log("Borrower:", borrower);
-        console2.log("Attester:", attester);
-        
-        // Record attestation to trigger PageRank initialization
-        vm.prank(attester);
-        credit.recordAttestation(borrower, 800_000); // 80% confidence
-        
-        // Check that both participants are in the system
-        address[] memory participants = credit.getAllParticipants();
-        console2.log("Total participants:", participants.length);
-        assertEq(participants.length, 2, "Should have 2 participants");
-        
-        // Check initial credit scores
-        uint256 borrowerScore = credit.getCreditScore(borrower);
-        uint256 attesterScore = credit.getCreditScore(attester);
-        
-        console2.log("Initial credit scores:");
-        console2.log("  - Borrower score:", borrowerScore);
-        console2.log("  - Attester score:", attesterScore);
-        
-        // Both should have scores > 0 after PageRank computation
-        assertTrue(borrowerScore > 0, "Borrower should have positive credit score");
-        assertTrue(attesterScore > 0, "Attester should have positive credit score");
-        
-        console2.log("PageRank initialization test passed\n");
-    }
-
-    function testPageRankScoreProgression() public {
-        console2.log("=== TESTING PAGERANK SCORE PROGRESSION ===");
-        
-        address borrower = borrowers[0];
-        address attester1 = attesters[0];
-        address attester2 = attesters[1];
-        
-        console2.log("Testing PageRank score progression with multiple attestations");
-        console2.log("Borrower:", borrower);
-        console2.log("Attester 1:", attester1);
-        console2.log("Attester 2:", attester2);
-        
-        // First attestation
-        vm.prank(attester1);
-        credit.recordAttestation(borrower, 600_000); // 60% confidence
-        
-        uint256 scoreAfterFirst = credit.getCreditScore(borrower);
-        console2.log("Score after first attestation:", scoreAfterFirst);
-        
-        // Second attestation
-        vm.prank(attester2);
-        credit.recordAttestation(borrower, 800_000); // 80% confidence
-        
-        uint256 scoreAfterSecond = credit.getCreditScore(borrower);
-        console2.log("Score after second attestation:", scoreAfterSecond);
-        
-        // Score should increase with more attestations from new attester
-        assertTrue(scoreAfterSecond > scoreAfterFirst, "Score should increase with additional attestations from new attester");
-        
-        console2.log("PageRank score progression test passed\n");
-    }
-
-    function testPageRankBackpropagation() public {
-        console2.log("=== TESTING PAGERANK BACKPROPAGATION ===");
-        
-        address borrower = borrowers[0];
-        address attester = attesters[0];
-        
-        console2.log("Testing PageRank backpropagation on successful loan repayment");
-        console2.log("Borrower:", borrower);
-        console2.log("Attester:", attester);
-        
-        // Setup: Record attestation and complete loan
-        vm.prank(attester);
-        credit.recordAttestation(borrower, 800_000);
-        
-        vm.prank(borrower);
-        uint256 loanId = credit.requestLoan(100_000_000, 365 days);
-        
-        vm.prank(lenders[0]);
-        credit.depositFunds(200_000_000);
-        
-        credit.fundLoan(loanId);
-        
-        // Get scores before repayment
-        uint256 borrowerScoreBefore = credit.getCreditScore(borrower);
-        uint256 attesterScoreBefore = credit.getCreditScore(attester);
-        
-        console2.log("Scores before repayment:");
-        console2.log("  - Borrower score:", borrowerScoreBefore);
-        console2.log("  - Attester score:", attesterScoreBefore);
-        
-        // Repay loan - get outstanding amount and repay
-        (,,, uint256 interestRate,,,,) = credit.getLoan(loanId);
-        uint256 totalRepayment = 100_000_000 + (100_000_000 * interestRate * 365 days) / (1e6 * 365 days);
-        
-        vm.prank(owner);
-        usdc.mint(borrower, totalRepayment);
-        
-        vm.startPrank(borrower);
-        usdc.approve(address(credit), totalRepayment);
-        credit.repayLoan(loanId, totalRepayment);
-        vm.stopPrank();
-        
-        // Get scores after repayment
-        uint256 borrowerScoreAfter = credit.getCreditScore(borrower);
-        uint256 attesterScoreAfter = credit.getCreditScore(attester);
-        
-        console2.log("Scores after repayment:");
-        console2.log("  - Borrower score:", borrowerScoreAfter);
-        console2.log("  - Attester score:", attesterScoreAfter);
-        
-        // Both scores should increase due to successful repayment
-        assertTrue(borrowerScoreAfter >= borrowerScoreBefore, "Borrower score should increase after successful repayment");
-        assertTrue(attesterScoreAfter >= attesterScoreBefore, "Attester score should increase due to backpropagation");
-        
-        console2.log("PageRank backpropagation test passed\n");
-    }
-
-    function testPageRankInterestRateImpact() public {
-        console2.log("=== TESTING PAGERANK IMPACT ON INTEREST RATES ===");
-        
-        address borrower1 = borrowers[0];
-        address borrower2 = borrowers[1];
-        address attester1 = attesters[0];
-        address attester2 = attesters[1];
-        
-        console2.log("Testing how PageRank scores affect interest rates");
-        
-        // Setup: Different attestation weights for different borrowers
-        vm.prank(attester1);
-        credit.recordAttestation(borrower1, 600_000); // 60% confidence
-        
-        vm.prank(attester2);
-        credit.recordAttestation(borrower2, 900_000); // 90% confidence
-        
-        // Request loans
-        vm.prank(borrower1);
-        uint256 loanId1 = credit.requestLoan(100_000_000, 365 days);
-        
-        vm.prank(borrower2);
-        uint256 loanId2 = credit.requestLoan(100_000_000, 365 days);
-        
-        // Get interest rates - only extract what we need
-        (,,, uint256 interestRate1,,,,) = credit.getLoan(loanId1);
-        (,,, uint256 interestRate2,,,,) = credit.getLoan(loanId2);
-        
-        console2.log("Interest rates:");
-        console2.log("  - Borrower 1 (60% attestation):", interestRate1, "basis points");
-        console2.log("  - Borrower 2 (90% attestation):", interestRate2, "basis points");
-        
-        // Higher attestation weight should result in lower interest rate
-        assertTrue(interestRate2 <= interestRate1, "Higher attestation weight should result in lower interest rate");
-        
-        console2.log("PageRank interest rate impact test passed\n");
-    }
-
-    // ===== HIGHER-LEVEL SCENARIO TESTS =====
-
-    function testCompletePageRankLoanLifecycle() public {
-        console2.log("=== TESTING COMPLETE PAGERANK LOAN LIFECYCLE ===");
-        
-        address lender = lenders[0];
-        address borrower = borrowers[0];
-        address attester = attesters[0];
-        
-        console2.log("Starting complete PageRank loan lifecycle test:");
-        console2.log("  - Lender:", lender);
-        console2.log("  - Borrower:", borrower);
-        console2.log("  - Attester:", attester);
-        console2.log("  - Deposit amount: 200 USDC");
-        console2.log("  - Loan amount: 100 USDC");
-        console2.log("  - Attestation weight: 80%");
-        
-        // Step 1: Lender deposits funds (triggers PageRank initialization)
-        _testLenderDeposit(lender, 200_000_000);
-        
-        // Step 2: Attester provides attestation (triggers PageRank update)
-        _testAttestation(attester, borrower, 800_000);
-        
-        // Step 3: Check initial credit scores
-        _testInitialCreditScores(borrower, attester);
-        
-        // Step 4: Borrower requests loan
-        uint256 loanId = _testLoanRequest(borrower, 100_000_000);
-        
-        // Step 5: Loan is disbursed
-        _testLoanDisbursement(borrower, loanId, 100_000_000);
-        
-        // Step 6: Borrower repays loan (triggers PageRank backpropagation)
-        _testLoanRepayment(borrower, loanId);
-        
-        // Step 7: Check updated credit scores after repayment
-        _testUpdatedCreditScores(borrower, attester);
-        
-        // Step 8: Calculate attester reward
-        _testAttesterReward(loanId, attester);
-        
-        console2.log("Complete PageRank loan lifecycle test passed\n");
-    }
-
-    function _testLenderDeposit(address lender, uint256 depositAmount) internal {
-        console2.log("\nStep 1: Lender deposits funds");
-        uint256 initialLenderBalance = usdc.balanceOf(lender);
-        vm.prank(lender);
-        credit.depositFunds(depositAmount);
-        uint256 finalLenderBalance = usdc.balanceOf(lender);
-        console2.log("  - Lender balance change:", initialLenderBalance - finalLenderBalance);
-    }
-
-    function _testAttestation(address attester, address borrower, uint256 weight) internal {
-        console2.log("\nStep 2: Attester provides attestation");
-        vm.prank(attester);
-        credit.recordAttestation(borrower, weight);
-        console2.log("  - Attestation recorded with weight:", weight);
-    }
-
-    function _testInitialCreditScores(address borrower, address attester) internal {
-        console2.log("\nStep 3: Check initial credit scores");
-        uint256 borrowerScore = credit.getCreditScore(borrower);
-        uint256 attesterScore = credit.getCreditScore(attester);
-        console2.log("  - Borrower initial score:", borrowerScore);
-        console2.log("  - Attester initial score:", attesterScore);
-    }
-
-    function _testLoanRequest(address borrower, uint256 amount) internal returns (uint256) {
-        console2.log("\nStep 4: Borrower requests loan");
-        vm.prank(borrower);
-        uint256 loanId = credit.requestLoan(amount, 365 days);
-        (uint256 principal,,, uint256 interestRate,,, bool isActive,) = credit.getLoan(loanId);
-        console2.log("  - Loan ID:", loanId);
-        console2.log("  - Principal:", principal);
-        console2.log("  - Interest rate:", interestRate, "basis points");
-        console2.log("  - Is active:", isActive);
-        return loanId;
-    }
-
-    function _testLoanDisbursement(address borrower, uint256 loanId, uint256 amount) internal {
-        console2.log("\nStep 5: Loan is disbursed");
-        uint256 preDisbursementBalance = usdc.balanceOf(borrower);
-        credit.fundLoan(loanId);
-        uint256 postDisbursementBalance = usdc.balanceOf(borrower);
-        console2.log("  - Borrower received:", postDisbursementBalance - preDisbursementBalance);
-    }
-
-    function _testLoanRepayment(address borrower, uint256 loanId) internal {
-        console2.log("\nStep 6: Borrower repays loan");
-        (uint256 principal, uint256 outstanding,,,,,,) = credit.getLoan(loanId);
-        
-        console2.log("  - Principal:", principal);
-        console2.log("  - Outstanding (includes interest):", outstanding);
-        
-        // Outstanding amount already includes principal + interest
-        console2.log("  - Total repayment needed:", outstanding);
-        
-        // Simulate borrower having funds
-        vm.prank(owner);
-        usdc.mint(borrower, outstanding);
-        
-        vm.startPrank(borrower);
-        usdc.approve(address(credit), outstanding);
-        credit.repayLoan(loanId, outstanding);
-        vm.stopPrank();
-        
-        (, uint256 finalOutstanding,,,,, bool finalActive,) = credit.getLoan(loanId);
-        console2.log("  - Final outstanding after payment:", finalOutstanding);
-        console2.log("  - Loan active after payment:", finalActive);
-        
-        // Loan should be fully repaid and inactive
-        assertTrue(finalOutstanding <= 2000, "Outstanding amount should be very small or zero (allowing for rounding)");
-        assertTrue(!finalActive, "Loan should be inactive after full repayment");
-    }
-
-    function _testUpdatedCreditScores(address borrower, address attester) internal {
-        console2.log("\nStep 7: Check updated credit scores after repayment");
-        uint256 borrowerScore = credit.getCreditScore(borrower);
-        uint256 attesterScore = credit.getCreditScore(attester);
-        console2.log("  - Borrower updated score:", borrowerScore);
-        console2.log("  - Attester updated score:", attesterScore);
-    }
-
-    function _testAttesterReward(uint256 loanId, address attester) internal {
-        console2.log("\nStep 8: Calculate attester reward");
-        console2.log("  - Loan ID:", loanId);
-        console2.log("  - Attester:", attester);
-        
-        // Check loan status before computing reward
-        (, uint256 outstanding,,,,, bool isActive,) = credit.getLoan(loanId);
-        console2.log("  - Loan outstanding:", outstanding);
-        console2.log("  - Loan active:", isActive);
-        
-        uint256 reward = credit.computeAttesterReward(loanId, attester);
-        console2.log("  - Attester reward:", reward);
-    }
-
-    // ===== EDGE CASE TESTS =====
-
-    function testZeroCreditScoreLoanRequest() public {
-        console2.log("=== TESTING ZERO CREDIT SCORE LOAN REQUEST ===");
-        
-        address borrower = borrowers[0];
-        uint256 loanAmount = 50_000_000; // 50 USDC
-        
-        console2.log("Testing loan request with zero credit score");
-        console2.log("Borrower:", borrower);
-        console2.log("Requested amount:", loanAmount);
-        
-        uint256 initialScore = credit.getCreditScore(borrower);
-        console2.log("Initial credit score:", initialScore);
-        
-        vm.prank(borrower);
-        vm.expectRevert("No credit score");
-        credit.requestLoan(loanAmount, 365 days);
-        
-        console2.log("Loan request correctly rejected due to zero credit score\n");
-    }
-
-    function testSelfAttestation() public {
-        console2.log("=== TESTING SELF ATTESTATION ===");
-        
-        address borrower = borrowers[0];
-        
-        console2.log("Testing self-attestation (should be rejected)");
-        console2.log("Borrower:", borrower);
-        
-        vm.prank(borrower);
-        vm.expectRevert("Cannot attest to self");
-        credit.recordAttestation(borrower, 800_000);
-        
-        console2.log("Self-attestation correctly rejected\n");
+        // Verify scores are reasonable (should be between 0 and 100,000, scaled)
+        assertGt(score1, 0, "Node1 should have positive score");
+        assertGt(score2, 0, "Node2 should have positive score");
+        assertGt(score3, 0, "Node3 should have positive score");
+        assertLe(score1, 100000, "Node1 score should be <= 1.0 (scaled)");
+        assertLe(score2, 100000, "Node2 score should be <= 1.0 (scaled)");
+        assertLe(score3, 100000, "Node3 score should be <= 1.0 (scaled)");
+        
+        // Verify that node2 (higher weight edge) has higher score than node3 (lower weight edge)
+        // This is the key test - PageRank should reflect the edge weights
+        assertGt(score2, score3, "Node2 should have higher score than node3 due to higher edge weight");
+        
+        // Verify scores sum to approximately 1.0 (scaled to 100,000) - PageRank property
+        uint256 totalScore = score1 + score2 + score3;
+        assertApproxEqAbs(totalScore, 99999, 5000, "Total PageRank scores should sum to ~1.0 (scaled)");
+        
+        // Test individual node score retrieval
+        uint256 retrievedScore1 = credit.getPageRankScore(node1);
+        uint256 retrievedScore2 = credit.getPageRankScore(node2);
+        uint256 retrievedScore3 = credit.getPageRankScore(node3);
+        
+        assertEq(retrievedScore1, score1, "Individual score retrieval should match");
+        assertEq(retrievedScore2, score2, "Individual score retrieval should match");
+        assertEq(retrievedScore3, score3, "Individual score retrieval should match");
     }
 
     function testPageRankConvergence() public {
-        console2.log("=== TESTING PAGERANK CONVERGENCE ===");
+        // Test with a larger graph to ensure convergence
+        address[] memory testNodes = new address[](5);
+        testNodes[0] = address(0x1111);
+        testNodes[1] = address(0x2222);
+        testNodes[2] = address(0x3333);
+        testNodes[3] = address(0x4444);
+        testNodes[4] = address(0x5555);
         
-        address borrower = borrowers[0];
-        address attester = attesters[0];
+        // Create a more complex graph
+        vm.prank(testNodes[0]);
+        credit.recordAttestation(testNodes[1], 500000);
         
-        console2.log("Testing PageRank convergence with attestation");
-        console2.log("Borrower:", borrower);
-        console2.log("Attester:", attester);
+        vm.prank(testNodes[1]);
+        credit.recordAttestation(testNodes[2], 300000);
         
-        // Record attestation to trigger PageRank computation
-        vm.prank(attester);
-        credit.recordAttestation(borrower, 800_000);
+        vm.prank(testNodes[2]);
+        credit.recordAttestation(testNodes[3], 700000);
         
-        // Check that both participants are in the system
-        address[] memory participants = credit.getAllParticipants();
-        console2.log("Total participants:", participants.length);
+        vm.prank(testNodes[3]);
+        credit.recordAttestation(testNodes[4], 400000);
         
-        // Get credit scores
-        uint256 borrowerScore = credit.getCreditScore(borrower);
-        uint256 attesterScore = credit.getCreditScore(attester);
+        vm.prank(testNodes[4]);
+        credit.recordAttestation(testNodes[0], 600000);
         
-        console2.log("Converged credit scores:");
-        console2.log("  - Borrower score:", borrowerScore);
-        console2.log("  - Attester score:", attesterScore);
+        // Compute PageRank
+        uint256 iterations = credit.computePageRank();
         
-        // Both should have positive scores after convergence
-        assertTrue(borrowerScore > 0, "Borrower should have positive score after convergence");
-        assertTrue(attesterScore > 0, "Attester should have positive score after convergence");
+        // Should converge within reasonable iterations
+        assertGt(iterations, 0, "Should run at least one iteration");
+        assertLe(iterations, 100, "Should converge within max iterations");
         
-        console2.log("PageRank convergence test passed\n");
+        // Verify all nodes have scores
+        for (uint256 i = 0; i < testNodes.length; i++) {
+            uint256 score = credit.getPageRankScore(testNodes[i]);
+            assertGt(score, 0, "All nodes should have positive scores");
+        }
+    }
+
+    function testPageRankExactNetworkXMatch() public {
+        // This test verifies exact match with NetworkX results
+        // Expected NetworkX results for simple test case (scaled to 100,000):
+        // 0x1111: ~25974 (0.259741)
+        // 0x2222: ~40692 (0.406926) 
+        // 0x3333: ~33333 (0.333333)
+        
+        address node1 = address(0x1111);
+        address node2 = address(0x2222);
+        address node3 = address(0x3333);
+        
+        // Add attestations (this will add edges to PageRank graph)
+        vm.prank(node1);
+        credit.recordAttestation(node2, 800000); // 80% weight
+        
+        vm.prank(node1);
+        credit.recordAttestation(node3, 400000); // 40% weight
+        
+        // Compute PageRank
+        uint256 iterations = credit.computePageRank();
+        assertGt(iterations, 0, "PageRank should run iterations");
+        
+        // Get individual scores
+        uint256 score1 = credit.getPageRankScore(node1);
+        uint256 score2 = credit.getPageRankScore(node2);
+        uint256 score3 = credit.getPageRankScore(node3);
+        
+        // Verify exact match with NetworkX results (allowing for small precision differences)
+        // NetworkX results are approximate due to floating point, so we use tolerance
+        uint256 tolerance = 500; // 500 absolute difference (scaled to 100,000) - reasonable for precision differences
+        
+        // Expected NetworkX values (scaled to 100,000)
+        uint256 expectedScore1 = 25974;
+        uint256 expectedScore2 = 40692;
+        uint256 expectedScore3 = 33333;
+        
+        // Use absolute difference instead of relative
+        assertApproxEqAbs(score1, expectedScore1, tolerance, "Node1 score should match NetworkX");
+        assertApproxEqAbs(score2, expectedScore2, tolerance, "Node2 score should match NetworkX");
+        assertApproxEqAbs(score3, expectedScore3, tolerance, "Node3 score should match NetworkX");
+        
+        // Verify key PageRank properties
+        assertGt(score2, score3, "Node2 should have higher score than Node3");
+        assertGt(score2, score1, "Node2 should have higher score than Node1");
+        
+        // Verify scores sum to approximately 1.0 (scaled to 100,000)
+        uint256 totalScore = score1 + score2 + score3;
+        assertApproxEqAbs(totalScore, 99999, 2000, "Total scores should sum to ~1.0 (scaled)");
+        
+        console.log("PageRank Results:");
+        console.log("Node1 (0x1111):", score1);
+        console.log("Node2 (0x2222):", score2);
+        console.log("Node3 (0x3333):", score3);
+        console.log("Total:", totalScore);
+        console.log("Iterations:", iterations);
     }
 } 

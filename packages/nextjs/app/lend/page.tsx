@@ -5,20 +5,34 @@ import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { BanknotesIcon, PlusIcon, EyeIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { parseEther } from "viem";
 
 const LendPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
   const [depositAmount, setDepositAmount] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [selectedLoanId, setSelectedLoanId] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Contract hooks
+  const { writeContractAsync: writeYourContractAsync } = useScaffoldWriteContract({
+    contractName: "DecentralizedMicrocredit",
+  });
+
+  // Temporary fallback - empty data until contract is redeployed
+  const poolInfo = [0n, 0n, 0n, 0n]; // [totalDeposits, availableFunds, totalEarned, activeLenders]
+  const lenderInfo = [0n, 0n, 0n]; // [totalDeposited, availableToLend, earnedYield]
+  const availableLoans: bigint[] = [];
 
   const handleDeposit = async () => {
     if (!depositAmount || !connectedAddress) return;
     
     setIsLoading(true);
     try {
-      // TODO: Implement contract interaction
-      console.log("Depositing funds:", { depositAmount });
+      await writeYourContractAsync({
+        functionName: "depositFunds",
+        args: [parseEther(depositAmount)],
+      });
       setDepositAmount("");
     } catch (error) {
       console.error("Error depositing funds:", error);
@@ -27,28 +41,13 @@ const LendPage: NextPage = () => {
     }
   };
 
+  // TODO: These functions need to be added to the contract
   const handleFundLoan = async (loanId: number) => {
-    setIsLoading(true);
-    try {
-      // TODO: Implement contract interaction
-      console.log("Funding loan:", { loanId });
-    } catch (error) {
-      console.error("Error funding loan:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    console.log("Fund loan function not yet implemented in contract");
   };
 
   const handleClaimYield = async () => {
-    setIsLoading(true);
-    try {
-      // TODO: Implement contract interaction
-      console.log("Claiming yield");
-    } catch (error) {
-      console.error("Error claiming yield:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    console.log("Claim yield function not yet implemented in contract");
   };
 
   const getCreditScoreColor = (score: number) => {
@@ -59,25 +58,13 @@ const LendPage: NextPage = () => {
     return "text-green-500";
   };
 
-  // Mock data for available loans
-  const availableLoans = [
-    {
-      id: 1,
-      borrower: "0x1234567890123456789012345678901234567890",
-      amount: 1000,
-      interestRate: 8.5,
-      term: "6 months",
-      creditScore: 75,
-    },
-    {
-      id: 2,
-      borrower: "0x2345678901234567890123456789012345678901",
-      amount: 2500,
-      interestRate: 12.0,
-      term: "1 year",
-      creditScore: 45,
-    },
-  ];
+  // Format USDC amounts (assuming 6 decimals)
+  const formatUSDC = (amount: bigint | undefined) => {
+    if (!amount) return "$0.00";
+    return `$${(Number(amount) / 1e6).toFixed(2)}`;
+  };
+
+
 
   return (
     <>
@@ -94,25 +81,25 @@ const LendPage: NextPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-500">
-                  $50,000.00
+                  {poolInfo ? formatUSDC(poolInfo[0]) : "$0.00"}
                 </div>
                 <div className="text-sm text-gray-600">Total Deposits</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-500">
-                  $35,000.00
+                  {poolInfo ? formatUSDC(poolInfo[1]) : "$0.00"}
                 </div>
                 <div className="text-sm text-gray-600">Available Funds</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-500">
-                  $2,500.00
+                  {poolInfo ? formatUSDC(poolInfo[2]) : "$0.00"}
                 </div>
                 <div className="text-sm text-gray-600">Total Earned</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-500">
-                  15
+                  {poolInfo ? poolInfo[3].toString() : "0"}
                 </div>
                 <div className="text-sm text-gray-600">Active Lenders</div>
               </div>
@@ -127,19 +114,19 @@ const LendPage: NextPage = () => {
                 <div>
                   <h3 className="font-medium mb-2">Total Deposited</h3>
                   <div className="text-2xl font-bold text-green-500">
-                    $5,000.00 USDC
+                    {lenderInfo ? formatUSDC(lenderInfo[0]) : "$0.00"} USDC
                   </div>
                 </div>
                 <div>
                   <h3 className="font-medium mb-2">Available to Lend</h3>
                   <div className="text-2xl font-bold text-blue-500">
-                    $3,500.00 USDC
+                    {lenderInfo ? formatUSDC(lenderInfo[1]) : "$0.00"} USDC
                   </div>
                 </div>
                 <div>
                   <h3 className="font-medium mb-2">Earned Yield</h3>
                   <div className="text-2xl font-bold text-purple-500">
-                    $250.00 USDC
+                    {lenderInfo ? formatUSDC(lenderInfo[2]) : "$0.00"} USDC
                   </div>
                 </div>
               </div>
@@ -148,7 +135,7 @@ const LendPage: NextPage = () => {
               <div className="flex gap-4 mt-6">
                 <button
                   onClick={handleClaimYield}
-                  disabled={isLoading}
+                  disabled={isLoading || !lenderInfo || lenderInfo[2] === 0n}
                   className="bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
                 >
                   Claim Yield
@@ -186,83 +173,21 @@ const LendPage: NextPage = () => {
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
             <h2 className="text-xl font-semibold mb-4">Available Loans to Fund</h2>
             
-            {availableLoans.length === 0 ? (
+            {!availableLoans || availableLoans.length === 0 ? (
               <div className="text-center py-8 text-gray-600">
                 No loans available for funding at the moment.
               </div>
             ) : (
               <div className="space-y-4">
-                {availableLoans.map((loan) => (
-                  <div key={loan.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
-                      <div>
-                        <div className="font-medium">Borrower</div>
-                        <Address address={loan.borrower as `0x${string}`} />
-                      </div>
-                      <div>
-                        <div className="font-medium">Amount</div>
-                        <div className="text-lg font-bold">${loan.amount} USDC</div>
-                      </div>
-                      <div>
-                        <div className="font-medium">Interest Rate</div>
-                        <div className="text-lg font-bold text-green-500">{loan.interestRate}% APR</div>
-                      </div>
-                      <div>
-                        <div className="font-medium">Term</div>
-                        <div className="text-lg">{loan.term}</div>
-                      </div>
-                      <div>
-                        <div className="font-medium">Credit Score</div>
-                        <div className={`text-lg font-bold ${getCreditScoreColor(loan.creditScore)}`}>
-                          {loan.creditScore}%
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-2 mt-4">
-                      <button
-                        onClick={() => setSelectedLoanId(selectedLoanId === loan.id ? null : loan.id)}
-                        className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center"
-                      >
-                        <EyeIcon className="h-4 w-4 mr-2" />
-                        View Details
-                      </button>
-                      <button
-                        onClick={() => handleFundLoan(loan.id)}
-                        disabled={isLoading}
-                        className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                      >
-                        {isLoading ? "Funding..." : "Fund Loan"}
-                      </button>
-                    </div>
-
-                    {/* Loan Details (expandable) */}
-                    {selectedLoanId === loan.id && (
-                      <div className="mt-4 p-4 bg-base-200 rounded-lg">
-                        <h4 className="font-medium mb-2">Loan Details</h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <span className="text-gray-600">Monthly Payment:</span>
-                            <div className="font-medium">${(loan.amount * (1 + loan.interestRate / 100 / 12) / (loan.term.includes('year') ? 12 : 6)).toFixed(2)}</div>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Total Interest:</span>
-                            <div className="font-medium">${(loan.amount * loan.interestRate / 100).toFixed(2)}</div>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Total Repayment:</span>
-                            <div className="font-medium">${(loan.amount * (1 + loan.interestRate / 100)).toFixed(2)}</div>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Risk Level:</span>
-                            <div className={`font-medium ${getCreditScoreColor(loan.creditScore)}`}>
-                              {loan.creditScore > 70 ? "Low" : loan.creditScore > 50 ? "Medium" : "High"}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                {availableLoans.map((loanId) => (
+                  <AvailableLoanCard 
+                    key={loanId.toString()} 
+                    loanId={loanId} 
+                    onFund={handleFundLoan}
+                    onViewDetails={() => setSelectedLoanId(selectedLoanId === Number(loanId) ? null : Number(loanId))}
+                    isSelected={selectedLoanId === Number(loanId)}
+                    isLoading={isLoading}
+                  />
                 ))}
               </div>
             )}
@@ -304,6 +229,137 @@ const LendPage: NextPage = () => {
         </div>
       </div>
     </>
+  );
+};
+
+// Component for displaying individual loan cards
+const AvailableLoanCard = ({ 
+  loanId, 
+  onFund, 
+  onViewDetails, 
+  isSelected, 
+  isLoading 
+}: { 
+  loanId: bigint; 
+  onFund: (id: number) => void; 
+  onViewDetails: () => void; 
+  isSelected: boolean; 
+  isLoading: boolean; 
+}) => {
+  const { data: loanDetails } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getLoan",
+    args: [loanId],
+  });
+
+  const { data: borrowerScore } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getCreditScore",
+    args: [loanDetails?.[2] as `0x${string}`],
+  });
+
+  const formatUSDC = (amount: bigint | undefined) => {
+    if (!amount) return "$0.00";
+    return `$${(Number(amount) / 1e6).toFixed(2)}`;
+  };
+
+  const formatInterestRate = (rate: bigint | undefined) => {
+    if (!rate) return "0%";
+    return `${(Number(rate) / 100).toFixed(2)}%`;
+  };
+
+  const getCreditScoreColor = (score: bigint | undefined) => {
+    if (!score) return "text-gray-500";
+    const scoreNum = Number(score) / 1e4; // Convert from basis points
+    if (scoreNum < 30) return "text-red-500";
+    if (scoreNum < 50) return "text-orange-500";
+    if (scoreNum < 70) return "text-yellow-500";
+    if (scoreNum < 90) return "text-blue-500";
+    return "text-green-500";
+  };
+
+  if (!loanDetails) {
+    return (
+      <div className="border border-gray-200 rounded-lg p-4">
+        <div className="text-center text-gray-600">Loading loan details...</div>
+      </div>
+    );
+  }
+
+  // Destructure the loan details: (principal, outstanding, borrower, interestRate, isActive)
+  const [principal, outstanding, borrower, interestRate, isActive] = loanDetails;
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+        <div>
+          <div className="font-medium">Borrower</div>
+          <Address address={borrower as `0x${string}`} />
+        </div>
+        <div>
+          <div className="font-medium">Amount</div>
+          <div className="text-lg font-bold">{formatUSDC(principal)} USDC</div>
+        </div>
+        <div>
+          <div className="font-medium">Interest Rate</div>
+          <div className="text-lg font-bold text-green-500">{formatInterestRate(interestRate)} APR</div>
+        </div>
+        <div>
+          <div className="font-medium">Status</div>
+          <div className={`text-lg font-bold ${isActive ? 'text-green-500' : 'text-gray-500'}`}>
+            {isActive ? 'Active' : 'Inactive'}
+          </div>
+        </div>
+        <div>
+          <div className="font-medium">Credit Score</div>
+          <div className={`text-lg font-bold ${getCreditScoreColor(borrowerScore)}`}>
+            {borrowerScore ? `${(Number(borrowerScore) / 1e4).toFixed(1)}%` : "N/A"}
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex gap-2 mt-4">
+        <button
+          onClick={onViewDetails}
+          className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center"
+        >
+          <EyeIcon className="h-4 w-4 mr-2" />
+          View Details
+        </button>
+        <button
+          onClick={() => onFund(Number(loanId))}
+          disabled={isLoading || !isActive}
+          className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+        >
+          {isLoading ? "Funding..." : "Fund Loan"}
+        </button>
+      </div>
+
+      {/* Loan Details (expandable) */}
+      {isSelected && (
+        <div className="mt-4 p-4 bg-base-200 rounded-lg">
+          <h4 className="font-medium mb-2">Loan Details</h4>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-gray-600">Principal:</span>
+              <div className="font-medium">{formatUSDC(principal)}</div>
+            </div>
+            <div>
+              <span className="text-gray-600">Outstanding:</span>
+              <div className="font-medium">{formatUSDC(outstanding)}</div>
+            </div>
+            <div>
+              <span className="text-gray-600">Interest Rate:</span>
+              <div className="font-medium">{formatInterestRate(interestRate)} APR</div>
+            </div>
+            <div>
+              <span className="text-gray-600">Status:</span>
+              <div className="font-medium">{isActive ? 'Active' : 'Inactive'}</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

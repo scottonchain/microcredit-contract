@@ -1,8 +1,3 @@
----
-description: 
-globs: 
-alwaysApply: true
----
 
 This codebase contains Scaffold-ETH 2 (SE-2), everything you need to build dApps on Ethereum. Its tech stack is NextJS, RainbowKit, Wagmi and Typescript. Supports Hardhat and Foundry.
 
@@ -37,7 +32,7 @@ Use the `useScaffoldReadContract` (`packages/nextjs/hooks/scaffold-eth/useScaffo
 Example:
 ```typescript
 const { data: someData } = useScaffoldReadContract({
-  contractName: "YourContract",
+  contractName: "DecentralizedMicrocredit",
   functionName: "functionName",
   args: [arg1, arg2], // optional
 });
@@ -50,8 +45,8 @@ Use the `useScaffoldWriteContract` (`packages/nextjs/hooks/scaffold-eth/useScaff
 
 Example:
 ```typescript
-const { writeContractAsync: writeYourContractAsync } = useScaffoldWriteContract(
-  { contractName: "YourContract" }
+const { writeContractAsync: writeDecentralizedMicrocreditAsync } = useScaffoldWriteContract(
+  { contractName: "DecentralizedMicrocredit" }
 );
 // Usage (this will send a write transaction to the contract)
 await writeContractAsync({
@@ -72,6 +67,11 @@ SE-2 provides a set of pre-built React components for common Ethereum use cases:
 - `Address`: Always use this when displaying an ETH address
 - `AddressInput`: Always use this when users need to input an ETH address
 - `Balance`: Display the ETH/USDC balance of a given address
+- `EtherInput`: An extended number input with ETH/USD conversion.
+
+They live under `packages/nextjs/components/scaffold-eth`.
+
+Find the relevant information from the documentation and the codebase. Think step by step before answering the question.
 - `EtherInput`: An extended number input with ETH/USD conversion.
 
 They live under `packages/nextjs/components/scaffold-eth`.

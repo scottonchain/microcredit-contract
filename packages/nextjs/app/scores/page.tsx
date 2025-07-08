@@ -1,15 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { ChartBarIcon } from "@heroicons/react/24/outline";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
 const ScoresPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
   const [searchAddress, setSearchAddress] = useState("");
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
+
+  // Read contract data for connected user
+  const { data: userCreditScore } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getCreditScore",
+    args: [connectedAddress],
+  });
+
+  // Read contract data for searched address
+  const { data: searchedCreditScore } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getCreditScore",
+    args: [selectedAddress as `0x${string}` | undefined],
+  });
 
   const getCreditScoreColor = (score: number) => {
     if (score < 30) return "text-red-500";
@@ -40,26 +55,6 @@ const ScoresPage: NextPage = () => {
       setSelectedAddress(searchAddress);
     }
   };
-
-  // Mock data for credit scores
-  const mockCreditScore = 75.5;
-  const mockAttestations = [
-    {
-      attester: "0x1234567890123456789012345678901234567890",
-      weight: 80,
-      date: "2024-01-15",
-    },
-    {
-      attester: "0x2345678901234567890123456789012345678901",
-      weight: 65,
-      date: "2024-01-10",
-    },
-    {
-      attester: "0x3456789012345678901234567890123456789012",
-      weight: 90,
-      date: "2024-01-05",
-    },
-  ];
 
   return (
     <>
@@ -97,23 +92,25 @@ const ScoresPage: NextPage = () => {
               <h2 className="text-xl font-semibold mb-4">Your Credit Profile</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="text-center">
-                  <div className={`text-5xl font-bold ${getCreditScoreColor(mockCreditScore)}`}>
-                    {mockCreditScore}%
+                  <div className={`text-5xl font-bold ${getCreditScoreColor(userCreditScore ? Number(userCreditScore) / 10000 : 0)}`}>
+                    {userCreditScore ? `${(Number(userCreditScore) / 10000).toFixed(2)}%` : "0.00%"}
                   </div>
                   <div className="text-sm text-gray-600">Credit Score</div>
                   <div className="text-lg font-medium mt-1">
-                    {getCreditScoreLabel(mockCreditScore)}
+                    {getCreditScoreLabel(userCreditScore ? Number(userCreditScore) / 10000 : 0)}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-500">
-                    {mockAttestations.length}
+                    {/* Placeholder for total attestations */}
+                    0
                   </div>
                   <div className="text-sm text-gray-600">Total Attestations</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-500">
-                    {(mockAttestations.reduce((sum, a) => sum + a.weight, 0) / mockAttestations.length).toFixed(1)}%
+                    {/* Placeholder for average confidence */}
+                    0.0%
                   </div>
                   <div className="text-sm text-gray-600">Average Confidence</div>
                 </div>
@@ -122,7 +119,7 @@ const ScoresPage: NextPage = () => {
               <div className="mt-6">
                 <h3 className="font-medium mb-2">Score Description</h3>
                 <p className="text-gray-600">
-                  {getCreditScoreDescription(mockCreditScore)}
+                  {getCreditScoreDescription(userCreditScore ? Number(userCreditScore) / 10000 : 0)}
                 </p>
               </div>
             </div>
@@ -138,23 +135,25 @@ const ScoresPage: NextPage = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div className="text-center">
-                  <div className={`text-5xl font-bold ${getCreditScoreColor(mockCreditScore)}`}>
-                    {mockCreditScore}%
+                  <div className={`text-5xl font-bold ${getCreditScoreColor(searchedCreditScore ? Number(searchedCreditScore) / 10000 : 0)}`}>
+                    {searchedCreditScore ? `${(Number(searchedCreditScore) / 10000).toFixed(2)}%` : "0.00%"}
                   </div>
                   <div className="text-sm text-gray-600">Credit Score</div>
                   <div className="text-lg font-medium mt-1">
-                    {getCreditScoreLabel(mockCreditScore)}
+                    {getCreditScoreLabel(searchedCreditScore ? Number(searchedCreditScore) / 10000 : 0)}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-500">
-                    {mockAttestations.length}
+                    {/* Placeholder for total attestations */}
+                    0
                   </div>
                   <div className="text-sm text-gray-600">Total Attestations</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-500">
-                    {(mockAttestations.reduce((sum, a) => sum + a.weight, 0) / mockAttestations.length).toFixed(1)}%
+                    {/* Placeholder for average confidence */}
+                    0.0%
                   </div>
                   <div className="text-sm text-gray-600">Average Confidence</div>
                 </div>
@@ -164,17 +163,8 @@ const ScoresPage: NextPage = () => {
               <div>
                 <h3 className="font-medium mb-3">Attestations</h3>
                 <div className="space-y-2">
-                  {mockAttestations.map((attestation, index) => (
-                    <div key={index} className="flex justify-between items-center bg-base-200 p-3 rounded">
-                      <div className="flex items-center space-x-3">
-                        <Address address={attestation.attester as `0x${string}`} />
-                        <span className="text-sm text-gray-600">{attestation.date}</span>
-                      </div>
-                      <span className={`font-medium ${getCreditScoreColor(attestation.weight)}`}>
-                        {attestation.weight}% confidence
-                      </span>
-                    </div>
-                  ))}
+                  {/* Placeholder for attestations */}
+                  <div className="text-center text-gray-500 py-4">No attestations found</div>
                 </div>
               </div>
             </div>
