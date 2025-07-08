@@ -40,8 +40,8 @@ A decentralized microcredit platform built on Ethereum using social attestations
 - **Icons**: Heroicons
 
 ### Key Components
-- **YourContract.sol**: Main microcredit smart contract
-- **NetworkXPageRank.sol**: PageRank algorithm implementation
+- **DecentralizedMicrocredit.sol**: Main microcredit smart contract
+
 - **Frontend Pages**: React components for all user interactions
 - **Scaffold-ETH Hooks**: Custom hooks for contract interactions
 

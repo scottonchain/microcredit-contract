@@ -3,93 +3,70 @@
 import { useState } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import { CogIcon, ShieldCheckIcon, ChartBarIcon } from "@heroicons/react/24/outline";
+import { CogIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 const AdminPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
-  const [newOracle, setNewOracle] = useState("");
-  const [newFeeRate, setNewFeeRate] = useState("");
   const [userAddress, setUserAddress] = useState("");
   const [newScore, setNewScore] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSetOracle = async () => {
-    if (!newOracle) return;
-    
-    setIsLoading(true);
-    try {
-      // TODO: Implement contract interaction
-      console.log("Setting oracle:", newOracle);
-      setNewOracle("");
-    } catch (error) {
-      console.error("Error setting oracle:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Read contract data - only use functions that exist
+  const { data: oracle } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "oracle",
+  });
 
-  const handleSetFeeRate = async () => {
-    if (!newFeeRate) return;
-    
-    setIsLoading(true);
-    try {
-      // TODO: Implement contract interaction
-      console.log("Setting fee rate:", newFeeRate);
-      setNewFeeRate("");
-    } catch (error) {
-      console.error("Error setting fee rate:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { data: owner } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "owner",
+  });
+
+  // Write contract functions - only use functions that exist
+  const { writeContractAsync: writeYourContractAsync } = useScaffoldWriteContract({
+    contractName: "DecentralizedMicrocredit",
+  });
 
   const handleUpdateScore = async () => {
     if (!userAddress || !newScore) return;
     
     setIsLoading(true);
     try {
-      // TODO: Implement contract interaction
-      console.log("Updating score:", { userAddress, newScore });
+      const scoreValue = Math.round(parseFloat(newScore) * 10000); // Convert to basis points
+      await writeYourContractAsync({
+        functionName: "updateCreditScore",
+        args: [userAddress as `0x${string}`, BigInt(scoreValue)],
+      });
       setUserAddress("");
       setNewScore("");
     } catch (error) {
-      console.error("Error updating score:", error);
+      console.error("Error updating credit score:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleComputePageRank = async () => {
-    setIsLoading(true);
-    try {
-      // TODO: Implement contract interaction
-      console.log("Computing PageRank scores");
-    } catch (error) {
-      console.error("Error computing PageRank:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Check permissions
+  const isOwner = connectedAddress && owner && connectedAddress.toLowerCase() === owner.toLowerCase();
+  const isOracle = oracle && connectedAddress && connectedAddress.toLowerCase() === oracle.toLowerCase();
+  const hasAccess = isOwner || isOracle;
 
-  // Mock data
-  const isAdmin = connectedAddress === "0x1234567890123456789012345678901234567890"; // Mock admin address
-  const currentOracle = "0x1234567890123456789012345678901234567890";
-  const currentFeeRate = "2.0%";
-  const totalParticipants = 150;
-  const totalLoans = 45;
-  const totalVolume = "$125,000";
-
-  if (!isAdmin) {
+  // Show access denied if user doesn't have permissions
+  if (!hasAccess) {
     return (
-      <div className="flex items-center flex-col grow pt-10">
-        <div className="px-5 w-full max-w-4xl">
-          <div className="bg-red-100 border border-red-300 rounded-lg p-6 text-center">
-            <ShieldCheckIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-red-800 mb-2">Access Denied</h2>
-            <p className="text-red-600">
-              You don&apos;t have permission to access the admin panel. Only contract owners and authorized oracles can access this page.
-            </p>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <ShieldCheckIcon className="h-16 w-16 mx-auto text-red-500 mb-4" />
+          <h1 className="text-2xl font-bold text-red-500 mb-2">Access Denied</h1>
+          <p className="text-gray-600 mb-4">
+            You need to be the contract owner or oracle to access this page.
+          </p>
+          <div className="space-y-2 text-sm text-gray-500">
+            <p>Current Oracle: {oracle ? <Address address={oracle as `0x${string}`} /> : "Loading..."}</p>
+            <p>Contract Owner: {owner ? <Address address={owner as `0x${string}`} /> : "Loading..."}</p>
+            <p>Your Address: {connectedAddress ? <Address address={connectedAddress} /> : "Not connected"}</p>
           </div>
         </div>
       </div>
@@ -105,95 +82,25 @@ const AdminPage: NextPage = () => {
             <h1 className="text-3xl font-bold">Admin Panel</h1>
           </div>
 
-          {/* System Overview */}
-          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">System Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-500">
-                  {totalParticipants}
-                </div>
-                <div className="text-sm text-gray-600">Total Participants</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-500">
-                  {totalLoans}
-                </div>
-                <div className="text-sm text-gray-600">Active Loans</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-500">
-                  {totalVolume}
-                </div>
-                <div className="text-sm text-gray-600">Total Volume</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-500">
-                  {currentFeeRate}
-                </div>
-                <div className="text-sm text-gray-600">Platform Fee</div>
-              </div>
-            </div>
-          </div>
-
           {/* Oracle Management */}
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
             <h2 className="text-xl font-semibold mb-4">Oracle Management</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-medium mb-2">Current Oracle</h3>
-                <Address address={currentOracle as `0x${string}`} />
+                {oracle ? (
+                  <Address address={oracle as `0x${string}`} />
+                ) : (
+                  <div className="text-gray-500">Loading...</div>
+                )}
               </div>
               <div>
-                <h3 className="font-medium mb-2">Set New Oracle</h3>
-                <div className="flex gap-2">
-                  <AddressInput
-                    value={newOracle}
-                    onChange={setNewOracle}
-                    placeholder="Enter new oracle address"
-                  />
-                  <button
-                    onClick={handleSetOracle}
-                    disabled={!newOracle || isLoading}
-                    className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition-colors"
-                  >
-                    {isLoading ? "..." : "Set"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Fee Management */}
-          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">Fee Management</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="font-medium mb-2">Current Platform Fee</h3>
-                <div className="text-2xl font-bold text-green-500">{currentFeeRate}</div>
-              </div>
-              <div>
-                <h3 className="font-medium mb-2">Set New Fee Rate</h3>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={newFeeRate}
-                    onChange={(e) => setNewFeeRate(e.target.value)}
-                    placeholder="Enter fee rate (0-10)"
-                    className="flex-1 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    min="0"
-                    max="10"
-                    step="0.1"
-                  />
-                  <button
-                    onClick={handleSetFeeRate}
-                    disabled={!newFeeRate || isLoading}
-                    className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition-colors"
-                  >
-                    {isLoading ? "..." : "Set"}
-                  </button>
-                </div>
-                <div className="text-sm text-gray-600 mt-1">Fee rate in percentage (0-10%)</div>
+                <h3 className="font-medium mb-2">Contract Owner</h3>
+                {owner ? (
+                  <Address address={owner as `0x${string}`} />
+                ) : (
+                  <div className="text-gray-500">Loading...</div>
+                )}
               </div>
             </div>
           </div>
@@ -240,63 +147,59 @@ const AdminPage: NextPage = () => {
             <h2 className="text-xl font-semibold mb-4">System Actions</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h3 className="font-medium mb-2">PageRank Computation</h3>
-                <p className="text-sm text-gray-600 mb-3">
-                  Manually trigger PageRank score computation for all participants
-                </p>
-                <button
-                  onClick={handleComputePageRank}
-                  disabled={isLoading}
-                  className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition-colors"
-                >
-                  {isLoading ? "Computing..." : "Compute PageRank"}
-                </button>
-              </div>
-              <div>
                 <h3 className="font-medium mb-2">System Health</h3>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Contract Status:</span>
-                    <span className="text-green-500 font-medium">Healthy</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span>Contract: Active</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Oracle Status:</span>
-                    <span className="text-green-500 font-medium">Connected</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span>Oracle: {oracle ? "Set" : "Not Set"}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Last Update:</span>
-                    <span>2 minutes ago</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span>PageRank: Available</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h3 className="font-medium mb-2">Admin Status</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span>Access: {hasAccess ? "Granted" : "Denied"}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span>Role: {isOwner ? "Owner" : isOracle ? "Oracle" : "None"}</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Admin Information */}
+          {/* Instructions */}
           <div className="bg-base-300 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Admin Information</h2>
+            <h2 className="text-xl font-semibold mb-4">Admin Functions</h2>
             <div className="space-y-4">
               <div>
-                <h3 className="font-medium mb-2">Current Admin</h3>
-                <Address address={connectedAddress as `0x${string}`} />
+                <h3 className="font-medium">Credit Score Management</h3>
+                <p className="text-sm text-gray-600">
+                  Update credit scores for users. Scores should be between 0-100 (percentage).
+                </p>
               </div>
               <div>
-                <h3 className="font-medium mb-2">Permissions</h3>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  <li>• Set and update oracle addresses</li>
-                  <li>• Modify platform fee rates</li>
-                  <li>• Update credit scores manually</li>
-                  <li>• Trigger PageRank computations</li>
-                  <li>• Access system statistics</li>
-                </ul>
+                <h3 className="font-medium">Oracle Setup</h3>
+                <p className="text-sm text-gray-600">
+                  Use the <a href="/oracle-setup" className="text-blue-500 underline">Oracle Setup page</a> to manage oracle permissions.
+                </p>
               </div>
               <div>
-                <h3 className="font-medium mb-2">Security Notes</h3>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <p>• Admin actions are irreversible and affect the entire system</p>
-                  <p>• Always verify addresses and values before confirming changes</p>
-                  <p>• Monitor system health after making changes</p>
-                </div>
+                <h3 className="font-medium">Debug Interface</h3>
+                <p className="text-sm text-gray-600">
+                  Use the <a href="/debug" className="text-blue-500 underline">Debug page</a> to test contract functions and view contract state.
+                </p>
               </div>
             </div>
           </div>

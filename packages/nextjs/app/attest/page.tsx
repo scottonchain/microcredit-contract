@@ -5,6 +5,7 @@ import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { HandThumbUpIcon } from "@heroicons/react/24/outline";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 const AttestPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -12,13 +13,28 @@ const AttestPage: NextPage = () => {
   const [weight, setWeight] = useState(50); // Default 50% confidence
   const [isLoading, setIsLoading] = useState(false);
 
+  // Read contract data for borrower
+  const { data: borrowerCreditScore } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getCreditScore",
+    args: [borrowerAddress as `0x${string}` | undefined],
+  });
+
+  // Write contract functions
+  const { writeContractAsync: writeYourContractAsync } = useScaffoldWriteContract({
+    contractName: "DecentralizedMicrocredit",
+  });
+
   const handleAttest = async () => {
     if (!borrowerAddress || !connectedAddress) return;
     
     setIsLoading(true);
     try {
-      // TODO: Implement contract interaction
-      console.log("Recording attestation:", { borrowerAddress, weight });
+      const weightBasisPoints = BigInt(weight * 10000); // Convert percentage to basis points
+      await writeYourContractAsync({
+        functionName: "recordAttestation",
+        args: [borrowerAddress as `0x${string}`, weightBasisPoints],
+      });
       setBorrowerAddress("");
       setWeight(50);
     } catch (error) {
@@ -117,7 +133,7 @@ const AttestPage: NextPage = () => {
                 <div>
                   <h3 className="font-medium mb-2">Credit Score</h3>
                   <div className="text-lg font-bold text-green-500">
-                    Not available (demo mode)
+                    {borrowerCreditScore ? `${(Number(borrowerCreditScore) / 10000).toFixed(2)}%` : "No score yet"}
                   </div>
                 </div>
               </div>

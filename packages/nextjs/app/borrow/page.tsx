@@ -1,23 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { CreditCardIcon, CalculatorIcon } from "@heroicons/react/24/outline";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 const BorrowPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
   const [amount, setAmount] = useState("");
   const [repaymentPeriod, setRepaymentPeriod] = useState(365); // Default 1 year
   const [isLoading, setIsLoading] = useState(false);
+  const [previewTerms, setPreviewTerms] = useState<{ interestRate: number; payment: number } | null>(null);
+
+  // Read contract data
+  const { data: creditScore } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getCreditScore",
+    args: [connectedAddress],
+  });
+
+  // Write contract functions
+  const { writeContractAsync: writeYourContractAsync } = useScaffoldWriteContract({
+    contractName: "DecentralizedMicrocredit",
+  });
+
+  // Preview loan terms when amount or repayment period changes
+  const { data: previewTermsData } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "previewLoanTerms",
+    args: [connectedAddress as `0x${string}` | undefined, connectedAddress && amount ? BigInt(amount) : undefined, connectedAddress && amount ? BigInt(repaymentPeriod * 24 * 60 * 60) : undefined],
+  });
 
   const handleRequestLoan = async () => {
     if (!amount || !connectedAddress) return;
     
     setIsLoading(true);
     try {
-      // TODO: Implement contract interaction
-      console.log("Requesting loan:", { amount, repaymentPeriod });
+      await writeYourContractAsync({
+        functionName: "requestLoan",
+        args: [BigInt(amount)], // Remove the repayment period argument as it's not part of the function signature
+      });
       setAmount("");
     } catch (error) {
       console.error("Error requesting loan:", error);
@@ -51,21 +74,26 @@ const BorrowPage: NextPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="text-center">
                   <div className="text-4xl font-bold text-green-500">
-                    75.50%
+                    {creditScore ? `${(Number(creditScore) / 10000).toFixed(2)}%` : "0.00%"}
                   </div>
                   <div className="text-sm text-gray-600">Credit Score</div>
                   <div className="text-lg font-medium mt-1">
-                    Good
+                    {creditScore ? (Number(creditScore) / 10000 < 30 ? "Poor" : 
+                                   Number(creditScore) / 10000 < 50 ? "Fair" : 
+                                   Number(creditScore) / 10000 < 70 ? "Good" : 
+                                   Number(creditScore) / 10000 < 90 ? "Very Good" : "Excellent") : "No Score"}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-500">
+                    {/* Placeholder for total participants */}
                     0
                   </div>
                   <div className="text-sm text-gray-600">Total Participants</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-500">
+                    {/* Placeholder for attestations */}
                     0
                   </div>
                   <div className="text-sm text-gray-600">Your Attestations</div>
@@ -113,7 +141,7 @@ const BorrowPage: NextPage = () => {
               </div>
 
               {/* Loan Terms Preview */}
-              {amount && (
+              {amount && previewTermsData && (
                 <div className="bg-base-200 rounded-lg p-4">
                   <h3 className="font-medium mb-3 flex items-center">
                     <CalculatorIcon className="h-5 w-5 mr-2" />
@@ -123,25 +151,25 @@ const BorrowPage: NextPage = () => {
                     <div>
                       <span className="text-sm text-gray-600">Interest Rate:</span>
                       <div className="text-lg font-bold text-blue-500">
-                        8.50% APR
+                        {(Number(previewTermsData[0]) / 10000).toFixed(2)}% APR
                       </div>
                     </div>
                     <div>
                       <span className="text-sm text-gray-600">Monthly Payment:</span>
                       <div className="text-lg font-bold text-green-500">
-                        ${(Number(amount) * 1.085 / (repaymentPeriod / 30)).toFixed(2)} USDC
+                        ${(Number(previewTermsData[1]) / 1000000).toFixed(2)} USDC
                       </div>
                     </div>
                     <div>
                       <span className="text-sm text-gray-600">Total Interest:</span>
                       <div className="text-lg font-bold text-orange-500">
-                        ${(Number(amount) * 0.085).toFixed(2)} USDC
+                        ${(Number(amount) * Number(previewTermsData[0]) / 1000000).toFixed(2)} USDC
                       </div>
                     </div>
                     <div>
                       <span className="text-sm text-gray-600">Total Repayment:</span>
                       <div className="text-lg font-bold text-purple-500">
-                        ${(Number(amount) * 1.085).toFixed(2)} USDC
+                        ${(Number(amount) * (1 + Number(previewTermsData[0]) / 1000000)).toFixed(2)} USDC
                       </div>
                     </div>
                   </div>

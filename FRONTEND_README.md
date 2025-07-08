@@ -130,137 +130,14 @@ The frontend uses Scaffold-ETH 2 hooks for seamless contract interaction:
 ```typescript
 // Reading contract data
 const { data: creditScore } = useScaffoldReadContract({
-  contractName: "YourContract",
+  contractName: "DecentralizedMicrocredit",
   functionName: "getCreditScore",
   args: [address],
 });
 
 // Writing to contracts
 const { writeAsync: recordAttestation } = useScaffoldContractWrite({
-  contractName: "YourContract",
+  contractName: "DecentralizedMicrocredit",
   functionName: "recordAttestation",
 });
 ```
-
-## 🎨 UI Components
-
-### Scaffold-ETH Components
-- `<Address />`: Display Ethereum addresses
-- `<AddressInput />`: Input field for addresses
-- `<Balance />`: Display token balances
-- `<RainbowKitCustomConnectButton />`: Wallet connection
-
-### Custom Components
-- Credit score displays with color coding
-- Loan management forms
-- Attestation interfaces
-- Admin panels
-
-## 🧪 Testing
-
-### Run Frontend Tests
-
-```bash
-# Run Next.js tests
-cd packages/nextjs
-yarn test
-```
-
-### Run Contract Tests
-
-```bash
-# Run Foundry tests
-cd packages/foundry
-forge test
-```
-
-## 🚀 Deployment
-
-### Deploy to Vercel
-
-```bash
-# Deploy frontend
-yarn vercel
-```
-
-### Deploy to IPFS
-
-```bash
-# Build and deploy to IPFS
-yarn ipfs
-```
-
-## 🔧 Development
-
-### Project Structure
-
-```
-packages/nextjs/
-├── app/                    # Next.js App Router pages
-│   ├── page.tsx           # Dashboard
-│   ├── attest/            # Attestation page
-│   ├── borrow/            # Loan request page
-│   ├── lend/              # Lending page
-│   ├── repay/             # Repayment page
-│   ├── scores/            # Credit scores page
-│   └── admin/             # Admin panel
-├── components/            # React components
-│   ├── scaffold-eth/      # Scaffold-ETH components
-│   └── Header.tsx         # Navigation header
-├── hooks/                 # Custom React hooks
-└── contracts/             # Contract ABIs and addresses
-```
-
-### Adding New Features
-
-1. **Create Page**: Add new page in `packages/nextjs/app/`
-2. **Add Navigation**: Update `Header.tsx` menu links
-3. **Contract Integration**: Use Scaffold-ETH hooks
-4. **Styling**: Use Tailwind CSS classes
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **Contract Not Found**: Ensure contracts are deployed and addresses are correct
-2. **Wallet Connection**: Check if MetaMask is installed and connected
-3. **Network Issues**: Verify you're on the correct network (localhost for development)
-4. **Build Errors**: Clear `.next` cache and reinstall dependencies
-
-### Debug Mode
-
-Access the debug page at `/debug` to:
-- View contract state
-- Test contract functions
-- Monitor transactions
-- Debug contract interactions
-
-## 📚 Additional Resources
-
-- [Scaffold-ETH 2 Documentation](https://docs.scaffoldeth.io/)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
-- [Wagmi Documentation](https://wagmi.sh/)
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🆘 Support
-
-For support and questions:
-- Open an issue on GitHub
-- Check the documentation
-- Join our community discussions
-
----
-
-**Happy Building! 🚀** 

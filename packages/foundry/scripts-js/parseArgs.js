@@ -25,9 +25,9 @@ Options:
   --keystore <name>     Specify the keystore account to use (bypasses selection prompt)
   --help, -h           Show this help message
 Examples:
-  yarn deploy --file DeployYourContract.s.sol --network sepolia
+  yarn deploy --file DeployDecentralizedMicrocredit.s.sol --network sepolia
   yarn deploy --network sepolia --keystore my-account
-  yarn deploy --file DeployYourContract.s.sol
+  yarn deploy --file DeployDecentralizedMicrocredit.s.sol
   yarn deploy
   `);
   process.exit(0);
@@ -71,7 +71,7 @@ try {
   if (!parsedToml.rpc_endpoints[network]) {
     console.log(
       `\n❌ Error: Network '${network}' not found in foundry.toml!`,
-      "\nPlease check `foundry.toml` for available networks in the [rpc_endpoints] section or add a new network."
+      "\nPlease check \`foundry.toml\` for available networks in the [rpc_endpoints] section or add a new network."
     );
     process.exit(1);
   }
@@ -81,7 +81,7 @@ try {
 }
 
 if (
-  process.env.LOCALHOST_KEYSTORE_ACCOUNT !== "scaffold-eth-default" &&
+  (process.env.LOCALHOST_KEYSTORE_ACCOUNT || "scaffold-eth-default") !== "scaffold-eth-default" &&
   network === "localhost"
 ) {
   console.log(`
@@ -95,7 +95,7 @@ You can either:
 `);
 }
 
-let selectedKeystore = process.env.LOCALHOST_KEYSTORE_ACCOUNT;
+let selectedKeystore = process.env.LOCALHOST_KEYSTORE_ACCOUNT || "scaffold-eth-default";
 if (network !== "localhost") {
   if (keystoreArg) {
     // Use the keystore provided via command line argument

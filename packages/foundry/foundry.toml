@@ -1,9 +1,14 @@
 [profile.default]
 src = 'contracts'
 out = 'out'
-libs = ['lib']
+libs = ['../../lib']
 fs_permissions = [{ access = "read-write", path = "./"}]
+via_ir = true
 
+remappings = [
+    '@openzeppelin/=../../lib/openzeppelin-contracts/',
+    'forge-std/=../../lib/forge-std/',
+]
 
 [rpc_endpoints]
 default_network = "http://127.0.0.1:8545"
@@ -27,7 +32,6 @@ scroll = "https://rpc.scroll.io"
 pgn = "https://rpc.publicgoods.network"
 pgnTestnet = "https://sepolia.publicgoods.network"
 
-
 localhost = "http://127.0.0.1:8545"
 
 [etherscan]
@@ -35,16 +39,9 @@ localhost = { url = "http://127.0.0.1:8545", key = "" }
 polygonMumbai = { key = "${ETHERSCAN_API_KEY}" }
 sepolia = { key = "${ETHERSCAN_API_KEY}" }
 
-
-
 [fmt]
 line_length = 120
 tab_width = 4
 quote_style = "double"
 bracket_spacing = true
 int_types = "long"
-
-
-
-
-# See more config options https://book.getfoundry.sh/reference/config/overview

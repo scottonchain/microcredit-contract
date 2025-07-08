@@ -2,7 +2,7 @@
 pragma solidity ^0.8.30;
 
 import "forge-std/Script.sol";
-import "../contracts/YourContract.sol";
+import "../contracts/DecentralizedMicrocredit.sol";
 
 /**
  * @notice Main deployment script for all contracts
@@ -26,7 +26,7 @@ contract DeployScript is Script {
         vm.startBroadcast(deployerPrivateKey);
         
         // Deploy the main contract
-        YourContract yourContract = new YourContract(
+        DecentralizedMicrocredit microcreditContract = new DecentralizedMicrocredit(
             50000,      // rMin (5%)
             200000,     // rMax (20%)
             msg.sender, // _usdc (using sender address as placeholder)
@@ -34,14 +34,14 @@ contract DeployScript is Script {
         );
         
         // Log the deployment
-        console.logString(string.concat("YourContract deployed at: ", vm.toString(address(yourContract))));
+        console.logString(string.concat("DecentralizedMicrocredit deployed at: ", vm.toString(address(microcreditContract))));
         
         // Stop broadcasting transactions
         vm.stopBroadcast();
 
         // Save deployment information
         string memory json = "{}";
-        json = vm.serializeAddress(json, "YourContract", address(yourContract));
+        json = vm.serializeAddress(json, "DecentralizedMicrocredit", address(microcreditContract));
         vm.writeFile("deployment.json", json);
     }
 
