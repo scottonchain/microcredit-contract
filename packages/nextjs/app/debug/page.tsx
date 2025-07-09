@@ -1,6 +1,7 @@
 import { DebugContracts } from "./_components/DebugContracts";
 import type { NextPage } from "next";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
+import Link from "next/link";
 
 export const metadata = getMetadata({
   title: "Debug Contracts",
@@ -11,7 +12,7 @@ const Debug: NextPage = () => {
   return (
     <>
       <DebugContracts />
-      <div className="text-center mt-8 bg-secondary p-10">
+      <div className="text-center mt-8 bg-secondary p-10 space-y-2">
         <h1 className="text-4xl my-0">Debug Contracts</h1>
         <p className="text-neutral">
           You can debug & interact with your deployed contracts here.
@@ -20,6 +21,9 @@ const Debug: NextPage = () => {
             packages / nextjs / app / debug / page.tsx
           </code>{" "}
         </p>
+        <Link href="/blockexplorer" className="btn btn-primary">
+          Open Local Block Explorer ↗
+        </Link>
       </div>
     </>
   );

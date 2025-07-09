@@ -14,6 +14,8 @@ import {
 import HowItWorks from "~~/components/HowItWorks";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import BorrowWizard from "~~/components/BorrowWizard";
+import LendWizard from "~~/components/LendWizard";
 
 const Home: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -71,60 +73,67 @@ const Home: NextPage = () => {
           </p>
 
           {connectedAddress ? (
-            <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg">
-              <h2 className="text-xl font-semibold mb-4">Your Profile</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center space-x-2">
-                  <UserIcon className="h-5 w-5" />
-                  <span className="font-medium">Address:</span>
-                  <Address address={connectedAddress} />
-                </div>
-                {Number(pageRankScore ?? 0) > 0 ? (
+            <>
+              <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg">
+                <h2 className="text-xl font-semibold mb-4">Your Profile</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="flex items-center space-x-2">
-                    <ChartBarIcon className="h-5 w-5" />
-                    <span className="font-medium">Credit Score:</span>
-                    <span className={`text-lg font-bold ${getScoreColor(Number(percentScore))}`}>
-                      {percentScore}%
-                    </span>
+                    <UserIcon className="h-5 w-5" />
+                    <span className="font-medium">Address:</span>
+                    <Address address={connectedAddress} />
                   </div>
-                ) : (
-                  <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 text-sm rounded-md p-3 col-span-2 flex flex-col md:flex-row md:items-center md:space-x-3">
-                    <span className="font-medium">No attestations yet.</span>
-                    <span>Share this link with trusted peers so they can attest to you.</span>
-                    <button
-                      onClick={() => {
-                        if (!connectedAddress) return;
-                        const url = `${window.location.origin}/attest?borrower=${connectedAddress}&weight=80`;
-                        navigator.clipboard.writeText(url);
-                        alert("Attestation link copied!");
-                      }}
-                      className="btn btn-secondary btn-xs mt-2 md:mt-0"
-                    >
-                      Copy Attestation Link
-                    </button>
+                  {Number(pageRankScore ?? 0) > 0 ? (
+                    <div className="flex items-center space-x-2">
+                      <ChartBarIcon className="h-5 w-5" />
+                      <span className="font-medium">Credit Score:</span>
+                      <span className={`text-lg font-bold ${getScoreColor(Number(percentScore))}`}>
+                        {percentScore}%
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 text-sm rounded-md p-3 col-span-2 flex flex-col md:flex-row md:items-center md:space-x-3">
+                      <span className="font-medium">No attestations yet.</span>
+                      <span>Share this link with trusted peers so they can attest to you.</span>
+                      <button
+                        onClick={() => {
+                          if (!connectedAddress) return;
+                          const url = `${window.location.origin}/attest?borrower=${connectedAddress}&weight=80`;
+                          navigator.clipboard.writeText(url);
+                          alert("Attestation link copied!");
+                        }}
+                        className="btn btn-secondary btn-xs mt-2 md:mt-0"
+                      >
+                        Copy Attestation Link
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-2">
+                    <BanknotesIcon className="h-5 w-5" />
+                    <span className="font-medium">Status:</span>
+                    {Number(pageRankScore ?? 0) > 0 ? (
+                      <span className="text-lg font-bold text-green-600">Eligible for loans</span>
+                    ) : (
+                      <span className="text-lg font-bold text-red-600">Not eligible yet</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Borrow CTA */}
+                {Number(pageRankScore ?? 0) > 0 && (
+                  <div className="mt-6 text-center">
+                    <Link href="/borrower" className="btn btn-primary btn-lg">
+                      Borrow Now &nbsp;
+                      {rMinPct && rMaxPct && <span className="text-xs">({rMinPct}% – {rMaxPct}% APR)</span>}
+                    </Link>
                   </div>
                 )}
-                <div className="flex items-center space-x-2">
-                  <BanknotesIcon className="h-5 w-5" />
-                  <span className="font-medium">Status:</span>
-                  {Number(pageRankScore ?? 0) > 0 ? (
-                    <span className="text-lg font-bold text-green-600">Eligible for loans</span>
-                  ) : (
-                    <span className="text-lg font-bold text-red-600">Not eligible yet</span>
-                  )}
-                </div>
               </div>
-
-              {/* Borrow CTA */}
-              {Number(pageRankScore ?? 0) > 0 && (
-                <div className="mt-6 text-center">
-                  <Link href="/borrow" className="btn btn-primary btn-lg">
-                    Borrow Now &nbsp;
-                    {rMinPct && rMaxPct && <span className="text-xs">({rMinPct}% – {rMaxPct}% APR)</span>}
-                  </Link>
-                </div>
-              )}
-            </div>
+              {/* NEW: Wizards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <BorrowWizard connectedAddress={connectedAddress as `0x${string}`} />
+                <LendWizard connectedAddress={connectedAddress as `0x${string}`} />
+              </div>
+            </>
           ) : (
             // Anonymous visitor card
             <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg text-center">
@@ -137,40 +146,6 @@ const Home: NextPage = () => {
                 After connecting, you can request loans, lend funds to earn interest, or attest to friends’ creditworthiness.
               </p>
               <p className="text-gray-700 font-medium">Use the “Connect Wallet” button in the top-right to begin.</p>
-            </div>
-          )}
-
-          {/* Pool Statistics */}
-          <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">Lending Pool Statistics</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-500">
-                  ${totalDeposits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-sm text-gray-600">Total Deposits</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-500">
-                  ${availableFunds.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-sm text-gray-600">Available Funds</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-500">
-                  {activeLenders}
-                </div>
-                <div className="text-sm text-gray-600">Active Lenders</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Action buttons for logged-in users */}
-          {connectedAddress && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-              <Link href="/attest" className="btn btn-secondary w-full">Make Attestation</Link>
-              <Link href="/borrow" className="btn btn-primary w-full">Request Loan</Link>
-              <Link href="/lend" className="btn btn-accent w-full">Lend Funds</Link>
             </div>
           )}
 
@@ -197,48 +172,30 @@ const Home: NextPage = () => {
                 badgeColor: "bg-purple-500",
               },
             ]}
-            className="mt-16"
+            className="mt-8"
           />
 
-          {/* Key Features */}
-          <div className="mt-16">
-            <h2 className="text-2xl font-bold text-center mb-8">Key Features</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="bg-base-100 p-6 rounded-lg shadow-lg">
-                <h3 className="text-lg font-semibold mb-3 flex items-center">
-                  <ChartBarIcon className="h-6 w-6 mr-2 text-blue-500" />
-                  PageRank Credit Scoring
-                </h3>
-                <p className="text-gray-600">
-                  Uses Google&apos;s PageRank algorithm to calculate credit scores based on social attestations and network relationships.
-                </p>
+          {/* Pool Statistics */}
+          <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg mt-8">
+            <h2 className="text-xl font-semibold mb-4">Lending Pool Statistics</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-500">
+                  ${totalDeposits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="text-sm text-gray-600">Total Deposits</div>
               </div>
-              <div className="bg-base-100 p-6 rounded-lg shadow-lg">
-                <h3 className="text-lg font-semibold mb-3 flex items-center">
-                  <UserGroupIcon className="h-6 w-6 mr-2 text-green-500" />
-                  Social Attestations
-                </h3>
-                <p className="text-gray-600">
-                  Community members can attest to each other&apos;s creditworthiness with confidence levels.
-                </p>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-500">
+                  ${availableFunds.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="text-sm text-gray-600">Available Funds</div>
               </div>
-              <div className="bg-base-100 p-6 rounded-lg shadow-lg">
-                <h3 className="text-lg font-semibold mb-3 flex items-center">
-                  <BanknotesIcon className="h-6 w-6 mr-2 text-purple-500" />
-                  Decentralized Lending
-                </h3>
-                <p className="text-gray-600">
-                  Peer-to-peer lending with automatic fund allocation and interest distribution.
-                </p>
-              </div>
-              <div className="bg-base-100 p-6 rounded-lg shadow-lg">
-                <h3 className="text-lg font-semibold mb-3 flex items-center">
-                  <CogIcon className="h-6 w-6 mr-2 text-orange-500" />
-                  Oracle Management
-                </h3>
-                <p className="text-gray-600">
-                  Admin panel for managing oracles, fee rates, and system parameters.
-                </p>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-500">
+                  {activeLenders}
+                </div>
+                <div className="text-sm text-gray-600">Active Lenders</div>
               </div>
             </div>
           </div>
@@ -249,14 +206,6 @@ const Home: NextPage = () => {
             <p className="text-gray-600 mb-6">
               Connect your wallet and start building your credit reputation today.
             </p>
-            <div className="flex justify-center space-x-4">
-              <Link href="/attest" className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-colors">
-                Make Attestation
-              </Link>
-              <Link href="/borrow" className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg transition-colors">
-                Request Loan
-              </Link>
-            </div>
           </div>
         </div>
       </div>
