@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CreditCardIcon, CalculatorIcon } from "@heroicons/react/24/outline";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { formatUSDC } from "~~/utils/format";
+import QRCodeDisplay from "./QRCodeDisplay";
 
 interface BorrowWizardProps {
   connectedAddress?: `0x${string}`;
@@ -46,12 +47,18 @@ const BorrowWizard: React.FC<BorrowWizardProps> = ({ connectedAddress }) => {
     ],
   });
 
+  const attestationUrl = connectedAddress
+    ? `${window.location.origin}/attest?borrower=${connectedAddress}&weight=80`
+    : "";
+
   const copyLink = () => {
-    if (!connectedAddress) return;
-    const url = `${window.location.origin}/attest?borrower=${connectedAddress}&weight=80`;
-    navigator.clipboard.writeText(url);
+    if (!attestationUrl) return;
+    navigator.clipboard.writeText(attestationUrl);
     alert("Attestation link copied!");
   };
+
+  const { writeContractAsync } = useScaffoldReadContract as any;
+  // wait need import useScaffoldWriteContract
 
   return (
     <div className="bg-base-100 rounded-lg p-6 shadow-lg">
@@ -66,9 +73,12 @@ const BorrowWizard: React.FC<BorrowWizardProps> = ({ connectedAddress }) => {
             You currently have <span className="font-semibold">no attestations</span>. To become eligible for a loan (rates
             typically range between {rMinPct}% and {rMaxPct}% APR) share your attestation link with trusted peers.
           </p>
-          <button onClick={copyLink} className="btn btn-secondary btn-sm">
-            Copy Attestation Link
-          </button>
+          <div className="flex flex-col items-center space-y-3">
+            <QRCodeDisplay value={attestationUrl} size={128} />
+            <button onClick={copyLink} className="btn btn-secondary btn-sm">
+              Copy Attestation Link
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-6">

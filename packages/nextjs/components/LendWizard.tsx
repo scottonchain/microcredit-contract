@@ -5,6 +5,7 @@ import { formatUSDC } from "~~/utils/format";
 import { useReadContract, useWriteContract } from "wagmi";
 import { Address, erc20Abi } from "viem";
 import deployedContracts from "~~/contracts/deployedContracts";
+import { notification } from "~~/utils/scaffold-eth";
 
 interface LendWizardProps {
   connectedAddress?: `0x${string}`;
@@ -65,6 +66,7 @@ const LendWizard: React.FC<LendWizardProps> = ({ connectedAddress }) => {
         abi: erc20Abi,
         functionName: "approve",
         args: [microcreditAddress as Address, amountInt],
+        gas: 100000n,
       });
       await refetchAllowance();
     }
@@ -72,9 +74,38 @@ const LendWizard: React.FC<LendWizardProps> = ({ connectedAddress }) => {
     await writeContractAsync({ functionName: "depositFunds", args: [amountInt] });
   };
 
+  // Read USDC balance
+  const { data: usdcBalance } = useReadContract({
+    address: usdcAddress as Address | undefined,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: [connectedAddress as Address],
+    query: {
+      enabled: Boolean(usdcAddress && connectedAddress),
+    },
+  });
+
+  const hasSufficientBalance = () => {
+    if (!usdcBalance) return false;
+    const amountInt = BigInt(Math.floor(parseFloat(depositAmount || "0") * 1e6));
+    return amountInt > 0n && amountInt <= (usdcBalance as bigint);
+  };
+
   const handleDeposit = async () => {
     setIsLoading(true);
-    try { await ensureAllowanceAndDeposit(); setHasFunded(true); setDepositAmount(""); } catch(e){ console.error(e);} finally{ setIsLoading(false);} }
+    try {
+      if (!hasSufficientBalance()) {
+        notification.error("Insufficient USDC balance for this deposit.");
+        setIsLoading(false);
+        return;
+      }
+      await ensureAllowanceAndDeposit();
+      setHasFunded(true);
+      setDepositAmount("");
+    } catch(e){
+      console.error(e);
+      notification.error("Transaction failed. Check console for details.");
+    } finally{ setIsLoading(false);} }
 
   return (
     <div className="bg-base-100 rounded-lg p-6 shadow-lg">
@@ -101,7 +132,7 @@ const LendWizard: React.FC<LendWizardProps> = ({ connectedAddress }) => {
             />
             <button
               className="btn btn-primary flex items-center"
-              disabled={!depositAmount || isLoading}
+              disabled={!depositAmount || isLoading || !hasSufficientBalance()}
               onClick={handleDeposit}
             >
               <PlusIcon className="h-4 w-4 mr-1" />

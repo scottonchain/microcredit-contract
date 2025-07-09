@@ -49,10 +49,16 @@ const AdminPage: NextPage = () => {
     }
   };
 
+  // Additional whitelisted admin addresses
+  const ADDITIONAL_ADMINS = [
+    "0x8b45296027564EF1e472EEa87B4D03BBF9DAD149".toLowerCase(),
+  ];
+
   // Check permissions
   const isOwner = connectedAddress && owner && connectedAddress.toLowerCase() === owner.toLowerCase();
   const isOracle = oracle && connectedAddress && connectedAddress.toLowerCase() === oracle.toLowerCase();
-  const hasAccess = isOwner || isOracle;
+  const isWhitelisted = connectedAddress ? ADDITIONAL_ADMINS.includes(connectedAddress.toLowerCase()) : false;
+  const hasAccess = isOwner || isOracle || isWhitelisted;
 
   // Credit score lookup
   const [lookupAddress, setLookupAddress] = useState<string>("");
@@ -70,7 +76,7 @@ const AdminPage: NextPage = () => {
           <ShieldCheckIcon className="h-16 w-16 mx-auto text-red-500 mb-4" />
           <h1 className="text-2xl font-bold text-red-500 mb-2">Access Denied</h1>
           <p className="text-gray-600 mb-4">
-            You need to be the contract owner or oracle to access this page.
+            You need to be the contract owner, oracle, or whitelisted to access this page.
           </p>
           <div className="space-y-2 text-sm text-gray-500">
             <p>Current Oracle: {oracle ? <Address address={oracle as `0x${string}`} /> : "Loading..."}</p>
@@ -195,7 +201,7 @@ const AdminPage: NextPage = () => {
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span>Role: {isOwner ? "Owner" : isOracle ? "Oracle" : "None"}</span>
+                    <span>Role: {isOwner ? "Owner" : isOracle ? "Oracle" : isWhitelisted ? "Whitelisted" : "None"}</span>
                   </div>
                 </div>
               </div>
