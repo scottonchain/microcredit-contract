@@ -8,10 +8,8 @@ import { hardhat } from "viem/chains";
 import { 
   Bars3Icon, 
   BugAntIcon, 
-  HandThumbUpIcon, 
   CreditCardIcon, 
   BanknotesIcon, 
-  CurrencyDollarIcon, 
   CogIcon,
   WrenchScrewdriverIcon
 } from "@heroicons/react/24/outline";
@@ -30,24 +28,14 @@ export const menuLinks: HeaderMenuLink[] = [
     href: "/",
   },
   {
-    label: "Attest",
-    href: "/attest",
-    icon: <HandThumbUpIcon className="h-4 w-4" />,
-  },
-  {
-    label: "Borrow",
-    href: "/borrow",
+    label: "Borrower",
+    href: "/borrower",
     icon: <CreditCardIcon className="h-4 w-4" />,
   },
   {
-    label: "Lend",
-    href: "/lend",
+    label: "Lender",
+    href: "/lender",
     icon: <BanknotesIcon className="h-4 w-4" />,
-  },
-  {
-    label: "Repay",
-    href: "/repay",
-    icon: <CurrencyDollarIcon className="h-4 w-4" />,
   },
   {
     label: "Admin",

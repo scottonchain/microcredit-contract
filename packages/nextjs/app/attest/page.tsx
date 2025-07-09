@@ -8,6 +8,7 @@ import { HandThumbUpIcon } from "@heroicons/react/24/outline";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
 import { getCreditScoreColor, formatPercent } from "~~/utils/format";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import QRCodeDisplay from "~~/components/QRCodeDisplay";
 
 const AttestPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -18,6 +19,7 @@ const AttestPage: NextPage = () => {
   const defaultWeight = Number(searchParams.get("weight") ?? "") || 50;
 
   const [borrowerAddress, setBorrowerAddress] = useState<string>(defaultBorrower);
+  const borrowerReadOnly = !!defaultBorrower;
   const [weight, setWeight] = useState<number>(defaultWeight);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -115,6 +117,7 @@ const AttestPage: NextPage = () => {
                   value={borrowerAddress}
                   onChange={setBorrowerAddress}
                   placeholder="Enter borrower's address"
+                  disabled={borrowerReadOnly}
                 />
               </div>
 
