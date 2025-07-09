@@ -3,9 +3,11 @@
 import { useState } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
+import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
 import { BanknotesIcon, PlusIcon, EyeIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import HowItWorks from "~~/components/HowItWorks";
 // removed parseEther import because USDC uses 6 decimals
 
 const LendPage: NextPage = () => {
@@ -15,7 +17,7 @@ const LendPage: NextPage = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Contract hooks
-  const { writeContractAsync: writeYourContractAsync } = useScaffoldWriteContract({
+  const { writeContractAsync } = useScaffoldWriteContract({
     contractName: "DecentralizedMicrocredit",
   });
 
@@ -40,7 +42,7 @@ const LendPage: NextPage = () => {
     try {
       // Convert USDC (6-decimals) string amount to integer with 6 decimals
       const amountInt = BigInt(Math.floor(parseFloat(depositAmount) * 1e6));
-      await writeYourContractAsync({
+      await writeContractAsync({
         functionName: "depositFunds",
         args: [amountInt],
       });
@@ -60,20 +62,7 @@ const LendPage: NextPage = () => {
     // TODO: Implement claim yield functionality when contract is updated
   };
 
-  const getCreditScoreColor = (score: number) => {
-    if (score < 30) return "text-red-500";
-    if (score < 50) return "text-orange-500";
-    if (score < 70) return "text-yellow-500";
-    if (score < 90) return "text-blue-500";
-    return "text-green-500";
-  };
-
-  // Format USDC amounts (assuming 6 decimals)
-  const formatUSDC = (amount: bigint | undefined) => {
-    if (!amount) return "$0.00";
-    return `$${(Number(amount) / 1e6).toFixed(2)}`;
-  };
-
+  // imported helpers handle color & formatting
 
 
   return (
@@ -162,38 +151,14 @@ const LendPage: NextPage = () => {
           </div>
 
           {/* How Lending Works */}
-          <div className="bg-base-300 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">How Lending Works</h2>
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
-                  1
-                </div>
-                <div>
-                  <h3 className="font-medium">Deposit Funds</h3>
-                  <p className="text-gray-600">Add USDC to the lending pool to start earning yield</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
-                  2
-                </div>
-                <div>
-                  <h3 className="font-medium">Fund Loans</h3>
-                  <p className="text-gray-600">Your funds are automatically allocated to loan requests</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
-                  3
-                </div>
-                <div>
-                  <h3 className="font-medium">Earn Interest</h3>
-                  <p className="text-gray-600">Receive interest payments when borrowers repay their loans</p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <HowItWorks
+            title="How Lending Works"
+            steps={[
+              { icon: null, title: "Deposit Funds", description: "Add USDC to the lending pool to start earning yield" },
+              { icon: null, title: "Fund Loans", description: "Your funds are automatically allocated to loan requests" },
+              { icon: null, title: "Earn Interest", description: "Receive interest payments when borrowers repay their loans" },
+            ]}
+          />
         </div>
       </div>
     </>
@@ -226,24 +191,14 @@ const AvailableLoanCard = ({
     args: [loanDetails?.[2] as `0x${string}`],
   });
 
-  const formatUSDC = (amount: bigint | undefined) => {
-    if (!amount) return "$0.00";
-    return `$${(Number(amount) / 1e6).toFixed(2)}`;
-  };
-
   const formatInterestRate = (rate: bigint | undefined) => {
     if (!rate) return "0%";
     return `${(Number(rate) / 100).toFixed(2)}%`;
   };
 
-  const getCreditScoreColor = (score: bigint | undefined) => {
+  const getCreditScoreColorStyle = (score: bigint | undefined) => {
     if (!score) return "text-gray-500";
-    const scoreNum = Number(score) / 1e4; // Convert from basis points
-    if (scoreNum < 30) return "text-red-500";
-    if (scoreNum < 50) return "text-orange-500";
-    if (scoreNum < 70) return "text-yellow-500";
-    if (scoreNum < 90) return "text-blue-500";
-    return "text-green-500";
+    return getCreditScoreColor(Number(score) / 1e4);
   };
 
   if (!loanDetails) {
@@ -280,7 +235,7 @@ const AvailableLoanCard = ({
         </div>
         <div>
           <div className="font-medium">Credit Score</div>
-          <div className={`text-lg font-bold ${getCreditScoreColor(borrowerScore)}`}>
+          <div className={`text-lg font-bold ${getCreditScoreColorStyle(borrowerScore)}`}>
             {borrowerScore ? `${(Number(borrowerScore) / 1e4).toFixed(1)}%` : "N/A"}
           </div>
         </div>

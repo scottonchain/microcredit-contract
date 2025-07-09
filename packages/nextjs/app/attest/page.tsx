@@ -6,6 +6,7 @@ import { useAccount } from "wagmi";
 import { useSearchParams, useRouter } from "next/navigation";
 import { HandThumbUpIcon } from "@heroicons/react/24/outline";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
+import { getCreditScoreColor, formatPercent } from "~~/utils/format";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 const AttestPage: NextPage = () => {
@@ -28,7 +29,7 @@ const AttestPage: NextPage = () => {
   });
 
   // Write contract functions
-  const { writeContractAsync: writeYourContractAsync } = useScaffoldWriteContract({
+  const { writeContractAsync } = useScaffoldWriteContract({
     contractName: "DecentralizedMicrocredit",
   });
 
@@ -38,7 +39,7 @@ const AttestPage: NextPage = () => {
     setIsLoading(true);
     try {
       const weightBasisPoints = BigInt(weight * 10000); // Convert percentage to basis points
-      await writeYourContractAsync({
+      await writeContractAsync({
         functionName: "recordAttestation",
         args: [borrowerAddress as `0x${string}`, weightBasisPoints],
       });
@@ -164,8 +165,8 @@ const AttestPage: NextPage = () => {
                 
                 <div>
                   <h3 className="font-medium mb-2">Credit Score</h3>
-                  <div className="text-lg font-bold text-green-500">
-                    {borrowerCreditScore ? `${(Number(borrowerCreditScore) / 10000).toFixed(2)}%` : "No score yet"}
+                  <div className={`text-lg font-bold ${borrowerCreditScore ? getCreditScoreColor(Number(borrowerCreditScore)/1000) : 'text-gray-500'}`}> 
+                    {borrowerCreditScore ? formatPercent(Number(borrowerCreditScore)/10000) : "No score yet"}
                   </div>
                 </div>
               </div>

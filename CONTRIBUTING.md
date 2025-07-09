@@ -84,3 +84,17 @@ Once you submit your PR:
 - As you update your PR and apply changes, mark each conversation resolved.
 
 Once the PR is approved, we'll "squash-and-merge" to keep the git commit history clean.
+
+## Local Demo vs Production – Important Notes 🛑
+
+This repository ships with a heavily-scripted local demo environment so new contributors can spin up a fully-seeded lending ecosystem in seconds. **The demo helpers are NOT meant for production deployments.**
+
+• `packages/foundry/script/Deploy.s.sol` contains _hard-coded private keys_ and funds those accounts with ETH/USDC. They exist **only** for Anvil / Hardhat dev chains. Never run this script on a public network.
+
+• Running `forge clean` is recommended before you compile if you see warnings about stale artifacts (for example, after large refactors).
+
+• Front-end pages share formatting helpers from `packages/nextjs/utils/format.ts`; please use these instead of duplicating number/percent helpers.
+
+• Reusable visual blocks (such as the "How It Works" section) live in `packages/nextjs/components/HowItWorks.tsx`. Re-use instead of copying markup.
+
+Feel free to expand this section with any other conventions that keep the codebase tidy and DRY.

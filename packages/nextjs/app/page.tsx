@@ -11,6 +11,7 @@ import {
   UserIcon,
   CogIcon,
 } from "@heroicons/react/24/outline";
+import HowItWorks from "~~/components/HowItWorks";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
@@ -174,38 +175,30 @@ const Home: NextPage = () => {
           )}
 
           {/* How it works section */}
-          <div className="mt-16 bg-base-300 rounded-lg p-8">
-            <h2 className="text-2xl font-bold text-center mb-8">How It Works</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="text-center">
-                <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <UserGroupIcon className="h-8 w-8 text-blue-600" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">1. Build Reputation</h3>
-                <p className="text-gray-600">
-                  Get attested by others in your community to build your credit score
-                </p>
-              </div>
-              <div className="text-center">
-                <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CreditCardIcon className="h-8 w-8 text-green-600" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">2. Request Loan</h3>
-                <p className="text-gray-600">
-                  Submit loan requests based on your PageRank-based credit score
-                </p>
-              </div>
-              <div className="text-center">
-                <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <BanknotesIcon className="h-8 w-8 text-purple-600" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">3. Earn Interest</h3>
-                <p className="text-gray-600">
-                  Lend funds to borrowers and earn interest on your deposits
-                </p>
-              </div>
-            </div>
-          </div>
+          <HowItWorks
+            title="How It Works"
+            steps={[
+              {
+                icon: <UserGroupIcon className="h-8 w-8 text-blue-600" />,
+                title: "Build Reputation",
+                description: "Get attested by others in your community to build your credit score",
+                badgeColor: "bg-blue-500",
+              },
+              {
+                icon: <CreditCardIcon className="h-8 w-8 text-green-600" />,
+                title: "Request Loan",
+                description: "Submit loan requests based on your PageRank-based credit score",
+                badgeColor: "bg-green-500",
+              },
+              {
+                icon: <BanknotesIcon className="h-8 w-8 text-purple-600" />,
+                title: "Earn Interest",
+                description: "Lend funds to borrowers and earn interest on your deposits",
+                badgeColor: "bg-purple-500",
+              },
+            ]}
+            className="mt-16"
+          />
 
           {/* Key Features */}
           <div className="mt-16">

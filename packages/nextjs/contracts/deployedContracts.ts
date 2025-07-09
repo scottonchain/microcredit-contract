@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     DecentralizedMicrocredit: {
-      address: "0xbf3cd410aa5a3e9da22fd9109add5d3655fcb1c5",
+      address: "0x2fb5e98f1efe95ae50f9becafce660701ad8d9be",
       abi: [
         {
           type: "constructor",
@@ -480,7 +480,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1752032762.json",
+      deploymentFile: "run-1752033912.json",
       deploymentScript: "Deploy.s.sol",
     },
   },
