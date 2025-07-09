@@ -45,7 +45,7 @@ A decentralized microcredit platform built on Ethereum using social attestations
 - **Frontend Pages**: React components for all user interactions
 - **Scaffold-ETH Hooks**: Custom hooks for contract interactions
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Node.js (>= v20.18.3)
@@ -108,7 +108,7 @@ yarn start
 2. **Batch Updates**: Update multiple credit scores at once
 3. **Monitor System**: View system statistics and loan status
 
-## 🔧 Development
+## Development
 
 ### Smart Contract Development
 - **Contracts**: Located in `packages/foundry/contracts/`
@@ -196,7 +196,7 @@ Interest rates are calculated based on credit scores:
 - **Overflow Protection**: Uses SafeMath patterns and proper bounds checking
 - **Emergency Controls**: Owner can update critical parameters if needed
 
-## 📈 Future Enhancements
+## Future Enhancements
 
 - **Credit Score History**: Track credit score changes over time
 - **Advanced Analytics**: Dashboard with lending/borrowing analytics
