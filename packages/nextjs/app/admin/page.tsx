@@ -53,6 +53,14 @@ const AdminPage: NextPage = () => {
   const isOracle = oracle && connectedAddress && connectedAddress.toLowerCase() === oracle.toLowerCase();
   const hasAccess = isOwner || isOracle;
 
+  // Credit score lookup
+  const [lookupAddress, setLookupAddress] = useState<string>("");
+  const { data: lookupScore } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getPageRankScore",
+    args: [lookupAddress as `0x${string}` | undefined],
+  });
+
   // Show access denied if user doesn't have permissions
   if (!hasAccess) {
     return (
@@ -80,6 +88,20 @@ const AdminPage: NextPage = () => {
           <div className="flex items-center justify-center mb-8">
             <CogIcon className="h-8 w-8 mr-3" />
             <h1 className="text-3xl font-bold">Admin Panel</h1>
+          </div>
+
+          {/* Credit Score Lookup */}
+          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+            <h2 className="text-xl font-semibold mb-4">Credit Score Lookup</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Address</label>
+                <AddressInput value={lookupAddress} onChange={setLookupAddress} placeholder="0x..." />
+              </div>
+              <div className="flex items-end text-lg font-bold">
+                {lookupScore ? `${(Number(lookupScore) / 1000).toFixed(2)}%` : "-"}
+              </div>
+            </div>
           </div>
 
           {/* Oracle Management */}

@@ -12,7 +12,6 @@ import {
   CreditCardIcon, 
   BanknotesIcon, 
   CurrencyDollarIcon, 
-  ChartBarIcon, 
   CogIcon,
   WrenchScrewdriverIcon
 } from "@heroicons/react/24/outline";
@@ -51,11 +50,6 @@ export const menuLinks: HeaderMenuLink[] = [
     icon: <CurrencyDollarIcon className="h-4 w-4" />,
   },
   {
-    label: "Scores",
-    href: "/scores",
-    icon: <ChartBarIcon className="h-4 w-4" />,
-  },
-  {
     label: "Admin",
     href: "/admin",
     icon: <CogIcon className="h-4 w-4" />,
@@ -72,12 +66,16 @@ export const menuLinks: HeaderMenuLink[] = [
   },
 ];
 
-export const HeaderMenuLinks = () => {
+type HeaderMenuLinksProps = {
+  links: HeaderMenuLink[];
+};
+
+export const HeaderMenuLinks = ({ links }: HeaderMenuLinksProps) => {
   const pathname = usePathname();
 
   return (
     <>
-      {menuLinks.map(({ label, href, icon }) => {
+      {links.map(({ label, href, icon }) => {
         const isActive = pathname === href;
         return (
           <li key={href}>
@@ -114,7 +112,7 @@ export const Header = () => {
     <div className="sticky lg:static top-0 navbar bg-base-100 min-h-0 shrink-0 justify-between z-20 shadow-md shadow-secondary px-0 sm:px-2">
       <div className="navbar-start w-auto lg:w-1/2">
         <details className="dropdown" ref={burgerMenuRef}>
-          <summary className="ml-1 btn btn-ghost lg:hidden hover:bg-transparent">
+          <summary className="ml-1 btn btn-ghost hover:bg-transparent">
             <Bars3Icon className="h-1/2" />
           </summary>
           <ul
@@ -123,7 +121,7 @@ export const Header = () => {
               burgerMenuRef?.current?.removeAttribute("open");
             }}
           >
-            <HeaderMenuLinks />
+            <HeaderMenuLinks links={menuLinks} />
           </ul>
         </details>
         <Link href="/" passHref className="hidden lg:flex items-center gap-2 ml-4 mr-6 shrink-0">
@@ -135,9 +133,15 @@ export const Header = () => {
             <span className="text-xs">Social lending platform</span>
           </div>
         </Link>
-        <ul className="hidden lg:flex lg:flex-nowrap menu menu-horizontal px-1 gap-2">
-          <HeaderMenuLinks />
-        </ul>
+        {(() => {
+          const advanced = ["Admin", "Oracle Setup", "Debug"];
+          const userLinks = menuLinks.filter(l => !advanced.includes(l.label));
+          return (
+            <ul className="hidden lg:flex lg:flex-nowrap menu menu-horizontal px-1 gap-2">
+              <HeaderMenuLinks links={userLinks} />
+            </ul>
+          );
+        })()}
       </div>
       <div className="navbar-end grow mr-4">
         <RainbowKitCustomConnectButton />

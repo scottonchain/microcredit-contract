@@ -1,4 +1,5 @@
-// cd packages/foundry && node scripts-js/populateParticipants.js
+// cd packages/foundry/scripts-js 
+// node scripts-js/populateParticipants.js
 import { ethers } from "ethers";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
