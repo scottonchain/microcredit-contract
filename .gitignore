@@ -25,3 +25,5 @@ node_modules
 # cli
 dist
 git-credential-manager
+
+lib/solidity-bytes-utils/

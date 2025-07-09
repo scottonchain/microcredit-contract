@@ -11,7 +11,6 @@ contract DecentralizedMicrocredit {
     address public oracle;
     uint256 public constant SCALE = 1e6;
     uint256 public constant SECONDS_PER_YEAR = 365 days;
-    uint256 public constant BACKPROPAGATION_FACTOR = 50e4;
     uint256 private nextLoanId = 1;
     
     // PageRank constants (using smaller scale to avoid overflow)
@@ -30,11 +29,9 @@ contract DecentralizedMicrocredit {
     mapping(uint256 => Loan) private loans;
     mapping(address => Attestation[]) private borrowerAttestations;
     mapping(address => uint256) private creditScores;
-    mapping(address => uint256) private personalizationVector;
     
     // PageRank storage
     address[] private pagerankNodes;
-    mapping(address => uint256) private pagerankNodeIndex;
     mapping(address => bool) private pagerankNodeExists;
     mapping(address => mapping(address => uint256)) private pagerankEdges;
     mapping(address => uint256) private pagerankOutDegree;
@@ -96,19 +93,6 @@ contract DecentralizedMicrocredit {
             loan.isActive = false;
         } else {
             loan.outstanding -= amount;
-        }
-        // Update personalization vector and attester rewards (simplified)
-        personalizationVector[loan.borrower] += (loan.principal * 10000) / SCALE;
-        Attestation[] storage attests = borrowerAttestations[loan.borrower];
-        uint256 totalWeight = 0;
-        for (uint256 i = 0; i < attests.length; i++) { totalWeight += attests[i].weight; }
-        if (totalWeight > 0) {
-            for (uint256 i = 0; i < attests.length; i++) {
-                address attester = attests[i].attester;
-                uint256 attesterWeight = attests[i].weight;
-                uint256 attesterBonus = ((loan.principal * 10000) / SCALE * BACKPROPAGATION_FACTOR * attesterWeight) / (SCALE * totalWeight);
-                personalizationVector[attester] += attesterBonus;
-            }
         }
     }
     function recordAttestation(address borrower, uint256 weight) external {
@@ -176,7 +160,6 @@ contract DecentralizedMicrocredit {
         for (uint256 i = 0; i < pagerankNodes.length; i++) {
             address node = pagerankNodes[i];
             pagerankNodeExists[node] = false;
-            pagerankNodeIndex[node] = 0;
             pagerankScores[node] = 0;
             pagerankOutDegree[node] = 0;
             
@@ -194,7 +177,6 @@ contract DecentralizedMicrocredit {
     
     function _addPagerankNode(address node) internal {
         if (!pagerankNodeExists[node]) {
-            pagerankNodeIndex[node] = pagerankNodes.length;
             pagerankNodes.push(node);
             pagerankNodeExists[node] = true;
         }

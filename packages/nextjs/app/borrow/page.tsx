@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { CreditCardIcon, CalculatorIcon } from "@heroicons/react/24/outline";
@@ -11,7 +11,6 @@ const BorrowPage: NextPage = () => {
   const [amount, setAmount] = useState("");
   const [repaymentPeriod, setRepaymentPeriod] = useState(365); // Default 1 year
   const [isLoading, setIsLoading] = useState(false);
-  const [previewTerms, setPreviewTerms] = useState<{ interestRate: number; payment: number } | null>(null);
 
   // Read contract data
   const { data: creditScore } = useScaffoldReadContract({

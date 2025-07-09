@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
 PageRank Oracle for Smart Contract Integration
-This script acts as an oracle that computes PageRank scores and can be called by the smart contract
+
+This script is used to generate the PageRank baseline results for the Solidity test
+`PageRankVerification.t.sol` in `packages/foundry/test`. The expected values in the Solidity
+test are derived from the output of this script (using NetworkX). If you change the PageRank
+algorithm or want to update the expected results, run this script with the appropriate attestation
+data to regenerate the baseline values. See the README_PageRank.md for more details.
 """
 
 import networkx as nx

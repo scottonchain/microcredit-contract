@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
 PageRank Calculator for Decentralized Microcredit System
-Uses NetworkX to compute PageRank scores based on attestation weights
+
+This module is used by `pagerank_oracle.py` to compute PageRank scores using NetworkX.
+The results are used as the baseline for the Solidity test `PageRankVerification.t.sol`.
+If you update the PageRank logic, ensure the expected values in the Solidity test are updated
+using the output from this script (via pagerank_oracle.py).
 """
 
 import networkx as nx

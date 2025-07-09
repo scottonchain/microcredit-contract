@@ -41,13 +41,12 @@ const LendPage: NextPage = () => {
     }
   };
 
-  // TODO: These functions need to be added to the contract
   const handleFundLoan = async (loanId: number) => {
-    console.log("Fund loan function not yet implemented in contract");
+    // TODO: Implement fund loan functionality when contract is updated
   };
 
   const handleClaimYield = async () => {
-    console.log("Claim yield function not yet implemented in contract");
+    // TODO: Implement claim yield functionality when contract is updated
   };
 
   const getCreditScoreColor = (score: number) => {
