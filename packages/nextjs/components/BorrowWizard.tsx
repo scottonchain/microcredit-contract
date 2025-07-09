@@ -1,9 +1,9 @@
-import { useState } from "react";
+import React from "react";
 import Link from "next/link";
-import { CreditCardIcon, CalculatorIcon } from "@heroicons/react/24/outline";
+import { CreditCardIcon } from "@heroicons/react/24/outline";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { formatUSDC } from "~~/utils/format";
-import QRCodeDisplay from "./QRCodeDisplay";
+import { useBalance } from "wagmi";
+// Removed loan preview utilities
 
 interface BorrowWizardProps {
   connectedAddress?: `0x${string}`;
@@ -20,6 +20,20 @@ const BorrowWizard: React.FC<BorrowWizardProps> = ({ connectedAddress }) => {
   const scoreNumeric = creditScore ? Number(creditScore) : 0;
   const hasAttestations = scoreNumeric > 0;
 
+  // Balances
+  const { data: ethBalance } = useBalance({ address: connectedAddress });
+
+  const { data: usdcAddress } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "usdc",
+  });
+
+  const { data: usdcBalance } = useBalance({
+    address: connectedAddress,
+    token: (usdcAddress as `0x${string}`) || undefined,
+    query: { enabled: Boolean(usdcAddress) },
+  });
+
   // Interest rate bounds (for explanatory copy only)
   const { data: rMin } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
@@ -33,112 +47,47 @@ const BorrowWizard: React.FC<BorrowWizardProps> = ({ connectedAddress }) => {
   const rMinPct = rMin ? (Number(rMin) / 10000).toFixed(2) : "-";
   const rMaxPct = rMax ? (Number(rMax) / 10000).toFixed(2) : "-";
 
-  // Loan simulation state (shown once user has attestations)
-  const [amount, setAmount] = useState("");
-  const [repaymentDays, setRepaymentDays] = useState(365); // default 1yr
+  // No loan form here; only summary
 
-  const { data: previewTerms } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "previewLoanTerms",
-    args: [
-      connectedAddress,
-      connectedAddress && amount ? BigInt(Math.floor(parseFloat(amount) * 1e6)) : undefined,
-      connectedAddress && amount ? BigInt(repaymentDays * 24 * 60 * 60) : undefined,
-    ],
-  });
-
-  const attestationUrl = connectedAddress
-    ? `${window.location.origin}/attest?borrower=${connectedAddress}&weight=80`
-    : "";
-
-  const copyLink = () => {
-    if (!attestationUrl) return;
-    navigator.clipboard.writeText(attestationUrl);
-    alert("Attestation link copied!");
-  };
-
-  const { writeContractAsync } = useScaffoldReadContract as any;
-  // wait need import useScaffoldWriteContract
+  const attestationUrl = connectedAddress ? `${window.location.origin}/attest?borrower=${connectedAddress}&weight=80` : "";
 
   return (
     <div className="bg-base-100 rounded-lg p-6 shadow-lg">
       <h3 className="text-lg font-semibold mb-4 flex items-center">
         <CreditCardIcon className="h-5 w-5 mr-2" />
-        Request a Loan
+        Borrower Overview
       </h3>
 
       {!hasAttestations ? (
-        <div className="text-sm text-gray-700 space-y-4">
-          <p>
-            You currently have <span className="font-semibold">no attestations</span>. To become eligible for a loan (rates
-            typically range between {rMinPct}% and {rMaxPct}% APR) share your attestation link with trusted peers.
-          </p>
-          <div className="flex flex-col items-center space-y-3">
-            <QRCodeDisplay value={attestationUrl} size={128} />
-            <button onClick={copyLink} className="btn btn-secondary btn-sm">
-              Copy Attestation Link
-            </button>
-          </div>
+        <div className="text-sm text-gray-700 space-y-3">
+          <p>You don&apos;t have any attestations yet. Share your attestation link with trusted peers to build your reputation and unlock loans.</p>
+          <Link href="/borrower" className="btn btn-primary w-full">Get Started</Link>
         </div>
       ) : (
-        <div className="space-y-6">
-          {/* Amount */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Amount (USDC)</label>
-            <input
-              type="number"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              placeholder="e.g. 1000"
-              className="w-full p-2 border border-gray-300 rounded-lg"
-              min="1"
-            />
-          </div>
-
-          {/* Repayment period */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Repayment Period</label>
-            <select
-              value={repaymentDays}
-              onChange={e => setRepaymentDays(Number(e.target.value))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            >
-              <option value={30}>1 Month</option>
-              <option value={90}>3 Months</option>
-              <option value={180}>6 Months</option>
-              <option value={365}>1 Year</option>
-              <option value={730}>2 Years</option>
-            </select>
-          </div>
-
-          {/* Preview */}
-          {amount && previewTerms && (
-            <div className="bg-base-200 p-4 rounded-lg text-sm">
-              <h4 className="font-medium mb-2 flex items-center">
-                <CalculatorIcon className="h-4 w-4 mr-1" /> Loan Preview
-              </h4>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <span className="text-gray-600">Interest Rate:</span>
-                  <div className="font-semibold">{(Number(previewTerms[0]) / 10000).toFixed(2)}% APR</div>
-                </div>
-                <div>
-                  <span className="text-gray-600">Monthly Payment:</span>
-                  <div className="font-semibold">
-                    {formatUSDC(previewTerms[1])} USDC
-                  </div>
-                </div>
-              </div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-center">
+            <div>
+              <div className="text-3xl font-bold">{(Number(creditScore) / 1000).toFixed(2)}%</div>
+              <p className="text-xs text-gray-600">Credit Score</p>
             </div>
-          )}
-
-          {/* Proceed */}
-          <Link
-            href={`/borrower${amount ? `?amount=${amount}&period=${repaymentDays}` : ""}`}
-            className="btn btn-primary w-full"
-          >
-            Go to Borrow Page
-          </Link>
+            <div>
+              <div className="text-2xl font-bold">{ethBalance ? Number(ethBalance.formatted).toFixed(3) : "-"}</div>
+              <p className="text-xs text-gray-600">ETH Balance</p>
+            </div>
+            <div>
+              <div className="text-2xl font-bold">{usdcBalance ? Number(usdcBalance.formatted).toFixed(2) : "-"}</div>
+              <p className="text-xs text-gray-600">USDC Balance</p>
+            </div>
+            <div>
+              <div className="text-2xl font-bold">{0}</div>
+              <p className="text-xs text-gray-600">Total Participants</p>
+            </div>
+            <div>
+              <div className="text-2xl font-bold">{0}</div>
+              <p className="text-xs text-gray-600">Your Attestations</p>
+            </div>
+          </div>
+          <Link href="/borrower" className="btn btn-primary w-full">Open Borrower Dashboard</Link>
         </div>
       )}
     </div>

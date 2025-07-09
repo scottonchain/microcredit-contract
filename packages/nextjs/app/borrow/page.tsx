@@ -3,9 +3,11 @@
 import { useState } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import { CreditCardIcon, CalculatorIcon } from "@heroicons/react/24/outline";
+import { CreditCardIcon, CalculatorIcon, InformationCircleIcon } from "@heroicons/react/24/outline";
+import Link from "next/link";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
+import QRCodeDisplay from "~~/components/QRCodeDisplay";
 
 const BorrowPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -58,6 +60,10 @@ const BorrowPage: NextPage = () => {
     return `${Math.round(days / 365)} Years`;
   };
 
+  const hasCredit = creditScore && Number(creditScore) > 0;
+  const [showInfo, setShowInfo] = useState(false);
+  const attestationUrl = connectedAddress ? `${window.location.origin}/attest?borrower=${connectedAddress}&weight=80` : "";
+
   return (
     <>
       <div className="flex items-center flex-col grow pt-10">
@@ -66,6 +72,57 @@ const BorrowPage: NextPage = () => {
             <CreditCardIcon className="h-8 w-8 mr-3" />
             <h1 className="text-3xl font-bold">Request Loan</h1>
           </div>
+
+          {/* Attestation Call-to-Action (shown first if no credit yet) */}
+          {!hasCredit && (
+            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8 flex flex-col items-center">
+              <div className="flex items-center justify-center mb-4 gap-2">
+                <h2 className="text-xl font-semibold text-center">Build Your Credit – Get Attestations</h2>
+                <button
+                  onClick={() => setShowInfo(true)}
+                  className="text-info hover:text-info/80"
+                  aria-label="What does this mean?"
+                >
+                  <InformationCircleIcon className="h-5 w-5" />
+                </button>
+              </div>
+              <QRCodeDisplay value={attestationUrl} size={180} />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(attestationUrl);
+                  alert("Attestation link copied! Share it with your community.");
+                }}
+                className="btn btn-primary mt-4"
+              >
+                Copy Attestation Link
+              </button>
+              <p
+                className="text-xs text-gray-500 mt-2 truncate max-w-full text-center"
+                title={attestationUrl}
+              >
+                {attestationUrl}
+              </p>
+            </div>
+          )}
+
+          {showInfo && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+              <div className="bg-base-100 rounded-lg p-6 max-w-md w-11/12 shadow-lg">
+                <h3 className="text-lg font-semibold mb-3">How PeerLend attestations work</h3>
+                <p className="text-sm mb-3">
+                  PeerLend builds your credit score from trust attestations your friends and community members give you. Share the link or QR code on this page with people who know you. Each attestation lifts your score.
+                </p>
+                <p className="text-sm mb-3">
+                  Once your score is above zero, the loan request form unlocks and you can apply for your first loan.
+                </p>
+                <p className="text-sm mb-5">
+                  Need a deeper dive?&nbsp;
+                  <Link href="/help/borrow" className="link">Read the Borrower guide</Link>.
+                </p>
+                <button onClick={() => setShowInfo(false)} className="btn btn-primary w-full">Got it</button>
+              </div>
+            </div>
+          )}
 
           {/* Your Credit Score */}
           {connectedAddress && (
@@ -88,7 +145,7 @@ const BorrowPage: NextPage = () => {
                     </>
                   ) : (
                     <div className="text-yellow-600 text-sm">
-                      No attestations yet. Share your attestation link below to build your score.
+                      No attestations yet. Share your attestation link above to build your score.
                     </div>
                   )}
                 </div>
@@ -110,25 +167,10 @@ const BorrowPage: NextPage = () => {
             </div>
           )}
 
-          {/* Quick share link for attestations */}
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => {
-                if (!connectedAddress) return;
-                const url = `${window.location.origin}/attest?borrower=${connectedAddress}&weight=80`;
-                navigator.clipboard.writeText(url);
-                alert("Attestation link copied! Share it with your community.");
-              }}
-              className="btn btn-secondary btn-sm"
-            >
-              Copy Attestation Link
-            </button>
-          </div>
-
-          {/* Loan Request Form */}
+          {/* Loan Request Section */}
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">Request New Loan</h2>
-            
+            <h2 className="text-xl font-semibold mb-4">{hasCredit ? "Request New Loan" : "How to Become Eligible"}</h2>
+            {hasCredit ? (
             <div className="space-y-6">
               {/* Loan Amount */}
               <div>
@@ -202,12 +244,17 @@ const BorrowPage: NextPage = () => {
               {/* Request Button */}
               <button
                 onClick={handleRequestLoan}
-                disabled={!amount || !connectedAddress || isLoading}
+                disabled={!amount || !connectedAddress || isLoading || !hasCredit}
                 className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-colors"
               >
                 {isLoading ? "Requesting Loan..." : "Request Loan"}
               </button>
             </div>
+            ) : (
+              <div className="text-sm text-gray-700 space-y-3">
+                <p>You need at least one attestation to request a loan. Share your attestation link with trusted peers and build your credit score.</p>
+              </div>
+            )}
           </div>
 
           {/* How Credit Scores Work */}
