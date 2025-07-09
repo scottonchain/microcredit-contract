@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { ChartBarIcon } from "@heroicons/react/24/outline";
@@ -12,19 +12,21 @@ const ScoresPage: NextPage = () => {
   const [searchAddress, setSearchAddress] = useState("");
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
 
-  // Read contract data for connected user
-  const { data: userCreditScore } = useScaffoldReadContract({
+  // Fetch PageRank score for connected user
+  const { data: userPageRankScore } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "getCreditScore",
+    functionName: "getPageRankScore",
     args: [connectedAddress],
   });
 
-  // Read contract data for searched address
-  const { data: searchedCreditScore } = useScaffoldReadContract({
+  // PageRank score for searched address
+  const { data: searchedPageRankScore } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "getCreditScore",
+    functionName: "getPageRankScore",
     args: [selectedAddress as `0x${string}` | undefined],
   });
+
+  const toPercent = (score: bigint | undefined) => Number(score ?? 0) / 1000; // PR_SCALE=100000 => /1000 -> percent
 
   const getCreditScoreColor = (score: number) => {
     if (score < 30) return "text-red-500";
@@ -92,12 +94,12 @@ const ScoresPage: NextPage = () => {
               <h2 className="text-xl font-semibold mb-4">Your Credit Profile</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="text-center">
-                  <div className={`text-5xl font-bold ${getCreditScoreColor(userCreditScore ? Number(userCreditScore) / 10000 : 0)}`}>
-                    {userCreditScore ? `${(Number(userCreditScore) / 10000).toFixed(2)}%` : "0.00%"}
+                  <div className={`text-5xl font-bold ${getCreditScoreColor(toPercent(userPageRankScore))}`}>
+                    {toPercent(userPageRankScore).toFixed(2)}%
                   </div>
                   <div className="text-sm text-gray-600">Credit Score</div>
                   <div className="text-lg font-medium mt-1">
-                    {getCreditScoreLabel(userCreditScore ? Number(userCreditScore) / 10000 : 0)}
+                    {getCreditScoreLabel(toPercent(userPageRankScore))}
                   </div>
                 </div>
                 <div className="text-center">
@@ -119,7 +121,7 @@ const ScoresPage: NextPage = () => {
               <div className="mt-6">
                 <h3 className="font-medium mb-2">Score Description</h3>
                 <p className="text-gray-600">
-                  {getCreditScoreDescription(userCreditScore ? Number(userCreditScore) / 10000 : 0)}
+                  {getCreditScoreDescription(toPercent(userPageRankScore))}
                 </p>
               </div>
             </div>
@@ -135,12 +137,12 @@ const ScoresPage: NextPage = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div className="text-center">
-                  <div className={`text-5xl font-bold ${getCreditScoreColor(searchedCreditScore ? Number(searchedCreditScore) / 10000 : 0)}`}>
-                    {searchedCreditScore ? `${(Number(searchedCreditScore) / 10000).toFixed(2)}%` : "0.00%"}
+                  <div className={`text-5xl font-bold ${getCreditScoreColor(toPercent(searchedPageRankScore))}`}>
+                    {toPercent(searchedPageRankScore).toFixed(2)}%
                   </div>
                   <div className="text-sm text-gray-600">Credit Score</div>
                   <div className="text-lg font-medium mt-1">
-                    {getCreditScoreLabel(searchedCreditScore ? Number(searchedCreditScore) / 10000 : 0)}
+                    {getCreditScoreLabel(toPercent(searchedPageRankScore))}
                   </div>
                 </div>
                 <div className="text-center">
