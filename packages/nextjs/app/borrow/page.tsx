@@ -5,6 +5,7 @@ import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { CreditCardIcon, CalculatorIcon } from "@heroicons/react/24/outline";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
 
 const BorrowPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -20,7 +21,7 @@ const BorrowPage: NextPage = () => {
   });
 
   // Write contract functions
-  const { writeContractAsync: writeYourContractAsync } = useScaffoldWriteContract({
+  const { writeContractAsync } = useScaffoldWriteContract({
     contractName: "DecentralizedMicrocredit",
   });
 
@@ -36,7 +37,7 @@ const BorrowPage: NextPage = () => {
     
     setIsLoading(true);
     try {
-      await writeYourContractAsync({
+      await writeContractAsync({
         functionName: "requestLoan",
         args: [BigInt(amount)], // Remove the repayment period argument as it's not part of the function signature
       });

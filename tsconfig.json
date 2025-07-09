@@ -1,13 +1,24 @@
 {
-    "compilerOptions": {
-      "target": "ES2020",
-      "module": "ESNext",
-      "moduleResolution": "Node",
-      "esModuleInterop": true,
-      "skipLibCheck": true,
-      "strict": true,
-      "resolveJsonModule": true
-    },
-    "include": ["packages/foundry/scripts"]
-  }
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "packages/nextjs/**/*",
+    "packages/foundry/scripts-js/**/*",
+    "packages/foundry/scripts/**/*",
+    "packages/**/*.ts",
+    "packages/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+}
   

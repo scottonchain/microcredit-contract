@@ -6,6 +6,7 @@ import { useAccount } from "wagmi";
 import { CogIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { formatPercent } from "~~/utils/format";
 
 const AdminPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -25,7 +26,7 @@ const AdminPage: NextPage = () => {
   });
 
   // Write contract functions - only use functions that exist
-  const { writeContractAsync: writeYourContractAsync } = useScaffoldWriteContract({
+  const { writeContractAsync } = useScaffoldWriteContract({
     contractName: "DecentralizedMicrocredit",
   });
 
@@ -35,7 +36,7 @@ const AdminPage: NextPage = () => {
     setIsLoading(true);
     try {
       const scoreValue = Math.round(parseFloat(newScore) * 10000); // Convert to basis points
-      await writeYourContractAsync({
+      await writeContractAsync({
         functionName: "updateCreditScore",
         args: [userAddress as `0x${string}`, BigInt(scoreValue)],
       });

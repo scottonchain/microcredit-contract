@@ -4,6 +4,7 @@ import { NextPage } from "next";
 import { useState } from "react";
 import { useAccount } from "wagmi";
 import { useScaffoldWriteContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { formatUSDC } from "~~/utils/format";
 import { CurrencyDollarIcon, EyeIcon } from "@heroicons/react/24/outline";
 
 const RepayPage: NextPage = () => {
@@ -15,7 +16,7 @@ const RepayPage: NextPage = () => {
   // For now, we'll use a placeholder array since there's no function to get user loans
   const userLoans: bigint[] = [];
 
-  const { writeContractAsync: writeYourContractAsync } = useScaffoldWriteContract({
+  const { writeContractAsync } = useScaffoldWriteContract({
     contractName: "DecentralizedMicrocredit",
   });
 
@@ -25,7 +26,7 @@ const RepayPage: NextPage = () => {
       // For now, we'll use a placeholder outstanding amount
       // In a real implementation, you'd get this from the loan details
       const outstandingAmount = BigInt(1000000); // 1 USDC as placeholder
-      await writeYourContractAsync({
+      await writeContractAsync({
         functionName: "repayLoan",
         args: [BigInt(loanId), outstandingAmount],
       });
@@ -41,7 +42,7 @@ const RepayPage: NextPage = () => {
     
     setIsLoading(true);
     try {
-      await writeYourContractAsync({
+      await writeContractAsync({
         functionName: "repayLoan",
         args: [BigInt(loanId), BigInt(parseFloat(repayAmount) * 1e6)], // Convert to USDC with 6 decimals
       });
@@ -84,10 +85,7 @@ const RepayPage: NextPage = () => {
   const summary = calculateSummary();
 
   // Format USDC amounts (assuming 6 decimals)
-  const formatUSDC = (amount: bigint | undefined) => {
-    if (!amount) return "$0.00";
-    return `$${(Number(amount) / 1e6).toFixed(2)}`;
-  };
+  const formatUSDCAmount = formatUSDC;
 
   return (
     <>
@@ -110,13 +108,13 @@ const RepayPage: NextPage = () => {
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-500">
-                  {formatUSDC(summary.totalBorrowed)}
+                  {formatUSDCAmount(summary.totalBorrowed)}
                 </div>
                 <div className="text-sm text-gray-600">Total Borrowed</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-500">
-                  {formatUSDC(summary.outstandingBalance)}
+                  {formatUSDCAmount(summary.outstandingBalance)}
                 </div>
                 <div className="text-sm text-gray-600">Outstanding Balance</div>
               </div>
@@ -221,10 +219,7 @@ const UserLoanCard = ({
     args: [loanId],
   });
 
-  const formatUSDC = (amount: bigint | undefined) => {
-    if (!amount) return "$0.00";
-    return `$${(Number(amount) / 1e6).toFixed(2)}`;
-  };
+  const formatUSDCAmount = formatUSDC;
 
   const formatInterestRate = (rate: bigint | undefined) => {
     if (!rate) return "0%";
@@ -261,11 +256,11 @@ const UserLoanCard = ({
         </div>
         <div>
           <div className="font-medium">Principal</div>
-          <div className="text-lg font-bold">{formatUSDC(principal)} USDC</div>
+          <div className="text-lg font-bold">{formatUSDCAmount(principal)} USDC</div>
         </div>
         <div>
           <div className="font-medium">Outstanding</div>
-          <div className="text-lg font-bold text-orange-500">{formatUSDC(outstanding)} USDC</div>
+          <div className="text-lg font-bold text-orange-500">{formatUSDCAmount(outstanding)} USDC</div>
         </div>
         <div>
           <div className="font-medium">Interest Rate</div>
@@ -314,11 +309,11 @@ const UserLoanCard = ({
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-gray-600">Principal:</span>
-              <div className="font-medium">{formatUSDC(principal)}</div>
+              <div className="font-medium">{formatUSDCAmount(principal)}</div>
             </div>
             <div>
               <span className="text-gray-600">Outstanding:</span>
-              <div className="font-medium">{formatUSDC(outstanding)}</div>
+              <div className="font-medium">{formatUSDCAmount(outstanding)}</div>
             </div>
             <div>
               <span className="text-gray-600">Interest Rate:</span>
