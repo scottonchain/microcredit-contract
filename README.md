@@ -1,4 +1,4 @@
-# 🏦 Decentralized Microcredit System
+# Decentralized Microcredit System
 
 ![Frontend Vision](front_end_vision.png)
 
@@ -135,7 +135,7 @@ yarn next:check-types
 yarn next:lint
 ```
 
-## 📊 Smart Contract Functions
+## Smart Contract Functions
 
 ### Core Functions
 - `requestLoan(amount, repaymentPeriod)`: Request a new loan
@@ -161,7 +161,7 @@ yarn next:lint
 - `isLoanOverdue(loanId)`: Check if a loan is overdue
 - `calculateLateFees(loanId)`: Calculate late fees for overdue loans
 
-## 🎯 Key Features Explained
+## Key Features Explained
 
 ### PageRank Credit Scoring
 The system uses a modified PageRank algorithm to calculate credit scores based on:
@@ -205,7 +205,7 @@ Interest rates are calculated based on credit scores:
 - **DAO Governance**: Community governance for platform parameters
 - **Insurance Pool**: Optional insurance for lenders against defaults
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -214,11 +214,11 @@ Interest rates are calculated based on credit scores:
 5. Ensure all tests pass
 6. Submit a pull request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🆘 Support
+## Support
 
 For support and questions:
 - Check the documentation in the code comments
