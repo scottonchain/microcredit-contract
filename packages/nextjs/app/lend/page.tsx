@@ -6,7 +6,7 @@ import { useAccount } from "wagmi";
 import { BanknotesIcon, PlusIcon, EyeIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { parseEther } from "viem";
+// removed parseEther import because USDC uses 6 decimals
 
 const LendPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -19,9 +19,18 @@ const LendPage: NextPage = () => {
     contractName: "DecentralizedMicrocredit",
   });
 
-  // Temporary fallback - empty data until contract is redeployed
-  const poolInfo = [0n, 0n, 0n, 0n]; // [totalDeposits, availableFunds, totalEarned, activeLenders]
-  const lenderInfo = [0n, 0n, 0n]; // [totalDeposited, availableToLend, earnedYield]
+  // Remove placeholder arrays and fetch on-chain data
+  const { data: poolInfo } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getPoolInfo",
+  });
+
+  // poolInfo returns [_totalDeposits, _availableFunds, _lenderCount]
+  const totalDeposits = poolInfo ? poolInfo[0] : undefined;
+  const availableFunds = poolInfo ? poolInfo[1] : undefined;
+  const lenderCount = poolInfo ? poolInfo[2] : undefined;
+  // TODO: replace these with real data once contract supports them
+  const lenderInfo: bigint[] | undefined = undefined;
   const availableLoans: bigint[] = [];
 
   const handleDeposit = async () => {
@@ -29,9 +38,11 @@ const LendPage: NextPage = () => {
     
     setIsLoading(true);
     try {
+      // Convert USDC (6-decimals) string amount to integer with 6 decimals
+      const amountInt = BigInt(Math.floor(parseFloat(depositAmount) * 1e6));
       await writeYourContractAsync({
         functionName: "depositFunds",
-        args: [parseEther(depositAmount)],
+        args: [amountInt],
       });
       setDepositAmount("");
     } catch (error) {
@@ -77,71 +88,29 @@ const LendPage: NextPage = () => {
           {/* Pool Overview */}
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
             <h2 className="text-xl font-semibold mb-4">Lending Pool Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-500">
-                  {poolInfo ? formatUSDC(poolInfo[0]) : "$0.00"}
+                  {totalDeposits !== undefined ? formatUSDC(totalDeposits) : "Loading..."}
                 </div>
                 <div className="text-sm text-gray-600">Total Deposits</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-500">
-                  {poolInfo ? formatUSDC(poolInfo[1]) : "$0.00"}
+                  {availableFunds !== undefined ? formatUSDC(availableFunds) : "Loading..."}
                 </div>
                 <div className="text-sm text-gray-600">Available Funds</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-purple-500">
-                  {poolInfo ? formatUSDC(poolInfo[2]) : "$0.00"}
-                </div>
-                <div className="text-sm text-gray-600">Total Earned</div>
-              </div>
-              <div className="text-center">
                 <div className="text-2xl font-bold text-orange-500">
-                  {poolInfo ? poolInfo[3].toString() : "0"}
+                  {lenderCount !== undefined ? lenderCount.toString() : "Loading..."}
                 </div>
                 <div className="text-sm text-gray-600">Active Lenders</div>
               </div>
             </div>
           </div>
 
-          {/* Your Lender Profile */}
-          {connectedAddress && (
-            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-              <h2 className="text-xl font-semibold mb-4">Your Lender Profile</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <h3 className="font-medium mb-2">Total Deposited</h3>
-                  <div className="text-2xl font-bold text-green-500">
-                    {lenderInfo ? formatUSDC(lenderInfo[0]) : "$0.00"} USDC
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-medium mb-2">Available to Lend</h3>
-                  <div className="text-2xl font-bold text-blue-500">
-                    {lenderInfo ? formatUSDC(lenderInfo[1]) : "$0.00"} USDC
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-medium mb-2">Earned Yield</h3>
-                  <div className="text-2xl font-bold text-purple-500">
-                    {lenderInfo ? formatUSDC(lenderInfo[2]) : "$0.00"} USDC
-                  </div>
-                </div>
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="flex gap-4 mt-6">
-                <button
-                  onClick={handleClaimYield}
-                  disabled={isLoading || !lenderInfo || lenderInfo[2] === 0n}
-                  className="bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                >
-                  Claim Yield
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Lender-specific stats will be added once contract exposes them */}
 
           {/* Deposit Funds */}
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">

@@ -29,6 +29,11 @@ contract DecentralizedMicrocredit {
     mapping(uint256 => Loan) private loans;
     mapping(address => Attestation[]) private borrowerAttestations;
     mapping(address => uint256) private creditScores;
+
+    // Lending pool tracking
+    uint256 public totalDeposits;              // Cumulative deposits into the pool (6-decimals like USDC)
+    uint256 public lenderCount;                // Unique depositors count
+    mapping(address => bool) private isLender; // Tracks whether an address has deposited before
     
     // PageRank storage
     address[] private pagerankNodes;
@@ -61,6 +66,25 @@ contract DecentralizedMicrocredit {
     function depositFunds(uint256 amount) external {
         require(amount > 0, "");
         require(usdc.transferFrom(msg.sender, address(this), amount), "");
+
+        // Update pool stats
+        totalDeposits += amount;
+        if (!isLender[msg.sender]) {
+            isLender[msg.sender] = true;
+            lenderCount += 1;
+        }
+    }
+
+    /**
+     * @notice Return high-level pool statistics for front-end display
+     * @return _totalDeposits   Sum of all deposits ever made (USDC 6-decimals)
+     * @return _availableFunds  Current USDC balance held by the contract (funds ready to lend)
+     * @return _lenderCount     Unique addresses that have deposited
+     */
+    function getPoolInfo() external view returns (uint256 _totalDeposits, uint256 _availableFunds, uint256 _lenderCount) {
+        _totalDeposits = totalDeposits;
+        _availableFunds = usdc.balanceOf(address(this));
+        _lenderCount = lenderCount;
     }
     function previewLoanTerms(address borrower, uint256 principal, uint256 repaymentPeriod) external view returns (uint256 interestRate, uint256 payment) {
         uint256 score = creditScores[borrower];
