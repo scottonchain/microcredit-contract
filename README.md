@@ -1,10 +1,10 @@
-# 🏦 Decentralized Microcredit System
+# Decentralized Microcredit System
 
 ![Frontend Vision](front_end_vision.png)
 
 A decentralized microcredit platform built on Ethereum using social attestations and PageRank-based reputation scoring. This system enables peer-to-peer lending with credit scores calculated through social network analysis.
 
-## 🌟 Features
+## Features
 
 ### Core Functionality
 - **Social Attestations**: Users can vouch for borrowers' creditworthiness
@@ -29,7 +29,7 @@ A decentralized microcredit platform built on Ethereum using social attestations
 - **Credit Score Viewer**: Search and view credit scores with detailed breakdowns
 - **Admin Panel**: Oracle functions for credit score management
 
-## 🏗️ Architecture
+## Architecture
 
 ### Tech Stack
 - **Smart Contracts**: Solidity with OpenZeppelin contracts
@@ -45,7 +45,7 @@ A decentralized microcredit platform built on Ethereum using social attestations
 - **Frontend Pages**: React components for all user interactions
 - **Scaffold-ETH Hooks**: Custom hooks for contract interactions
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Node.js (>= v20.18.3)
@@ -84,7 +84,7 @@ yarn start
    - Main app: http://localhost:3000
    - Debug contracts: http://localhost:3000/debug
 
-## 📖 Usage Guide
+## Usage Guide
 
 ### For Borrowers
 1. **Get Attested**: Ask trusted contacts to vouch for your creditworthiness
@@ -108,7 +108,7 @@ yarn start
 2. **Batch Updates**: Update multiple credit scores at once
 3. **Monitor System**: View system statistics and loan status
 
-## 🔧 Development
+## Development
 
 ### Smart Contract Development
 - **Contracts**: Located in `packages/foundry/contracts/`
@@ -135,7 +135,7 @@ yarn next:check-types
 yarn next:lint
 ```
 
-## 📊 Smart Contract Functions
+## Smart Contract Functions
 
 ### Core Functions
 - `requestLoan(amount, repaymentPeriod)`: Request a new loan
@@ -161,7 +161,7 @@ yarn next:lint
 - `isLoanOverdue(loanId)`: Check if a loan is overdue
 - `calculateLateFees(loanId)`: Calculate late fees for overdue loans
 
-## 🎯 Key Features Explained
+## Key Features Explained
 
 ### PageRank Credit Scoring
 The system uses a modified PageRank algorithm to calculate credit scores based on:
@@ -188,7 +188,7 @@ Interest rates are calculated based on credit scores:
 - **Reputation Backpropagation**: Successful repayments improve attester reputation
 - **Network Effects**: Attestations create a trust network that benefits all participants
 
-## 🔒 Security Features
+## Security Features
 
 - **Reentrancy Protection**: All external calls are protected against reentrancy attacks
 - **Access Control**: Oracle functions are restricted to authorized addresses
@@ -196,7 +196,7 @@ Interest rates are calculated based on credit scores:
 - **Overflow Protection**: Uses SafeMath patterns and proper bounds checking
 - **Emergency Controls**: Owner can update critical parameters if needed
 
-## 📈 Future Enhancements
+## Future Enhancements
 
 - **Credit Score History**: Track credit score changes over time
 - **Advanced Analytics**: Dashboard with lending/borrowing analytics
@@ -205,7 +205,7 @@ Interest rates are calculated based on credit scores:
 - **DAO Governance**: Community governance for platform parameters
 - **Insurance Pool**: Optional insurance for lenders against defaults
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -214,11 +214,11 @@ Interest rates are calculated based on credit scores:
 5. Ensure all tests pass
 6. Submit a pull request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🆘 Support
+## Support
 
 For support and questions:
 - Check the documentation in the code comments
