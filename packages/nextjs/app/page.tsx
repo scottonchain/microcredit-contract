@@ -14,6 +14,7 @@ import {
   CogIcon
 } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
+import WalletSwitcher from "~~/components/WalletSwitcher";
 
 const Home: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -71,9 +72,12 @@ const Home: NextPage = () => {
             <span className="block text-2xl mb-2">Welcome to</span>
             <span className="block text-4xl font-bold">Decentralized Microcredit</span>
           </h1>
-          <p className="text-center text-lg mt-4 mb-8">
+          <p className="text-center text-lg mt-4 mb-4">
             A social reputation-based lending platform powered by PageRank
           </p>
+
+          {/* Wallet connect / switcher */}
+          <WalletSwitcher />
 
           {connectedAddress && (
             <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg">
