@@ -1,16 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
+import { useSearchParams, useRouter } from "next/navigation";
 import { HandThumbUpIcon } from "@heroicons/react/24/outline";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 const AttestPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
-  const [borrowerAddress, setBorrowerAddress] = useState("");
-  const [weight, setWeight] = useState(50); // Default 50% confidence
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const defaultBorrower = (searchParams.get("borrower") ?? "") as `0x${string}` | "";
+  const defaultWeight = Number(searchParams.get("weight") ?? "") || 50;
+
+  const [borrowerAddress, setBorrowerAddress] = useState<string>(defaultBorrower);
+  const [weight, setWeight] = useState<number>(defaultWeight);
   const [isLoading, setIsLoading] = useState(false);
 
   // Read contract data for borrower
@@ -44,6 +51,16 @@ const AttestPage: NextPage = () => {
     }
   };
 
+  // If query param "auto" is set, automatically submit once connected
+  useEffect(() => {
+    if (searchParams.get("auto") === "1" && connectedAddress && borrowerAddress) {
+      handleAttest();
+      // remove auto param to prevent loops
+      router.replace("/attest");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectedAddress]);
+
   const getWeightLabel = (value: number) => {
     if (value < 20) return "Very Low";
     if (value < 40) return "Low";
@@ -64,11 +81,25 @@ const AttestPage: NextPage = () => {
     <>
       <div className="flex items-center flex-col grow pt-10">
         <div className="px-5 w-full max-w-4xl">
+          {/* Anonymous visitor message */}
+          {!connectedAddress && (
+            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8 text-center">
+              <h2 className="text-xl font-semibold mb-4">Connect Your Wallet to Continue</h2>
+              {borrowerAddress ? (
+                <p className="text-gray-700 mb-4">You’ve been invited to attest to the creditworthiness of <span className="font-mono break-all">{borrowerAddress}</span>.</p>
+              ) : (
+                <p className="text-gray-700 mb-4">Log in to make social attestations that help others build credit.</p>
+              )}
+              <p className="text-gray-700 font-medium">Use the “Connect Wallet” button in the top-right.</p>
+            </div>
+          )}
+
           <div className="flex items-center justify-center mb-8">
             <HandThumbUpIcon className="h-8 w-8 mr-3" />
             <h1 className="text-3xl font-bold">Make Attestation</h1>
           </div>
 
+          {connectedAddress && (
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
             <h2 className="text-xl font-semibold mb-4">Attest to Creditworthiness</h2>
             <p className="text-gray-600 mb-6">
@@ -118,9 +149,10 @@ const AttestPage: NextPage = () => {
               </button>
             </div>
           </div>
+          )}
 
           {/* Borrower Information */}
-          {borrowerAddress && (
+          {connectedAddress && borrowerAddress && (
             <div className="bg-base-100 rounded-lg p-6 shadow-lg">
               <h2 className="text-xl font-semibold mb-4">Borrower Information</h2>
               

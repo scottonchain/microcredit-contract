@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     DecentralizedMicrocredit: {
-      address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
+      address: "0xbf3cd410aa5a3e9da22fd9109add5d3655fcb1c5",
       abi: [
         {
           type: "constructor",
@@ -228,6 +228,42 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getPoolInfo",
+          inputs: [],
+          outputs: [
+            {
+              name: "_totalDeposits",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_availableFunds",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_lenderCount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "lenderCount",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "oracle",
           inputs: [],
           outputs: [
@@ -400,6 +436,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "totalDeposits",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "updateCreditScore",
           inputs: [
             {
@@ -431,7 +480,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1752028665.json",
+      deploymentFile: "run-1752032762.json",
       deploymentScript: "Deploy.s.sol",
     },
   },

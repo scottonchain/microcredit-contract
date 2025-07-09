@@ -72,16 +72,24 @@ const BorrowPage: NextPage = () => {
               <h2 className="text-xl font-semibold mb-4">Your Credit Profile</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="text-center">
-                  <div className="text-4xl font-bold text-green-500">
-                    {creditScore ? `${(Number(creditScore) / 1000).toFixed(2)}%` : "0.00%"}
-                  </div>
-                  <div className="text-sm text-gray-600">Credit Score</div>
-                  <div className="text-lg font-medium mt-1">
-                    {creditScore ? (Number(creditScore) / 1000 < 30 ? "Poor" : 
-                                   Number(creditScore) / 1000 < 50 ? "Fair" : 
-                                   Number(creditScore) / 1000 < 70 ? "Good" : 
-                                   Number(creditScore) / 1000 < 90 ? "Very Good" : "Excellent") : "No Score"}
-                  </div>
+                  {creditScore && Number(creditScore) > 0 ? (
+                    <>
+                      <div className="text-4xl font-bold text-green-500">
+                        {(Number(creditScore) / 1000).toFixed(2)}%
+                      </div>
+                      <div className="text-sm text-gray-600">Credit Score</div>
+                      <div className="text-lg font-medium mt-1">
+                        {Number(creditScore) / 1000 < 30 ? "Poor" :
+                          Number(creditScore) / 1000 < 50 ? "Fair" :
+                          Number(creditScore) / 1000 < 70 ? "Good" :
+                          Number(creditScore) / 1000 < 90 ? "Very Good" : "Excellent"}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-yellow-600 text-sm">
+                      No attestations yet. Share your attestation link below to build your score.
+                    </div>
+                  )}
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-500">
@@ -100,6 +108,21 @@ const BorrowPage: NextPage = () => {
               </div>
             </div>
           )}
+
+          {/* Quick share link for attestations */}
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => {
+                if (!connectedAddress) return;
+                const url = `${window.location.origin}/attest?borrower=${connectedAddress}&weight=80`;
+                navigator.clipboard.writeText(url);
+                alert("Attestation link copied! Share it with your community.");
+              }}
+              className="btn btn-secondary btn-sm"
+            >
+              Copy Attestation Link
+            </button>
+          </div>
 
           {/* Loan Request Form */}
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
