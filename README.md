@@ -29,7 +29,7 @@ A decentralized microcredit platform built on Ethereum using social attestations
 - **Credit Score Viewer**: Search and view credit scores with detailed breakdowns
 - **Admin Panel**: Oracle functions for credit score management
 
-## 🏗️ Architecture
+## Architecture
 
 ### Tech Stack
 - **Smart Contracts**: Solidity with OpenZeppelin contracts
@@ -84,7 +84,7 @@ yarn start
    - Main app: http://localhost:3000
    - Debug contracts: http://localhost:3000/debug
 
-## 📖 Usage Guide
+## Usage Guide
 
 ### For Borrowers
 1. **Get Attested**: Ask trusted contacts to vouch for your creditworthiness
@@ -188,7 +188,7 @@ Interest rates are calculated based on credit scores:
 - **Reputation Backpropagation**: Successful repayments improve attester reputation
 - **Network Effects**: Attestations create a trust network that benefits all participants
 
-## 🔒 Security Features
+## Security Features
 
 - **Reentrancy Protection**: All external calls are protected against reentrancy attacks
 - **Access Control**: Oracle functions are restricted to authorized addresses
