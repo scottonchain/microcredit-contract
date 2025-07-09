@@ -66,7 +66,7 @@ const Home: NextPage = () => {
         <div className="px-5 w-full max-w-7xl">
           <h1 className="text-center">
             <span className="block text-2xl mb-2">Welcome to</span>
-            <span className="block text-4xl font-bold">Decentralized Microcredit</span>
+            <span className="block text-4xl font-bold">PeerLend</span>
           </h1>
           <p className="text-center text-lg mt-4 mb-4">
             A social reputation-based lending platform powered by PageRank
@@ -91,21 +91,9 @@ const Home: NextPage = () => {
                       </span>
                     </div>
                   ) : (
-                    <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 text-sm rounded-md p-3 col-span-2 flex flex-col md:flex-row md:items-center md:space-x-3">
-                      <span className="font-medium">No attestations yet.</span>
-                      <span>Share this link with trusted peers so they can attest to you.</span>
-                      <button
-                        onClick={() => {
-                          if (!connectedAddress) return;
-                          const url = `${window.location.origin}/attest?borrower=${connectedAddress}&weight=80`;
-                          navigator.clipboard.writeText(url);
-                          alert("Attestation link copied!");
-                        }}
-                        className="btn btn-secondary btn-xs mt-2 md:mt-0"
-                      >
-                        Copy Attestation Link
-                      </button>
-                    </div>
+                    <Link href="/borrower" className="btn btn-secondary col-span-2 justify-center">
+                      Go to Borrower Page
+                    </Link>
                   )}
                   <div className="flex items-center space-x-2">
                     <BanknotesIcon className="h-5 w-5" />
@@ -137,7 +125,7 @@ const Home: NextPage = () => {
           ) : (
             // Anonymous visitor card
             <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg text-center">
-              <h2 className="text-xl font-semibold mb-4">Get Started with Decentralized Microcredit</h2>
+              <h2 className="text-xl font-semibold mb-4">Get Started with PeerLend</h2>
               <p className="text-gray-700 mb-4 max-w-xl mx-auto">
                 Connect your wallet to build a community-backed credit score and access fair micro-loans. Your reputation is
                 calculated using social attestations and the PageRank algorithm.
