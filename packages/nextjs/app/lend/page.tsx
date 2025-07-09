@@ -126,37 +126,13 @@ const LendPage: NextPage = () => {
             </div>
           </div>
 
-          {/* Available Loans */}
-          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">Available Loans to Fund</h2>
-            
-            {!availableLoans || availableLoans.length === 0 ? (
-              <div className="text-center py-8 text-gray-600">
-                No loans available for funding at the moment.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {availableLoans.map((loanId) => (
-                  <AvailableLoanCard 
-                    key={loanId.toString()} 
-                    loanId={loanId} 
-                    onFund={handleFundLoan}
-                    onViewDetails={() => setSelectedLoanId(selectedLoanId === Number(loanId) ? null : Number(loanId))}
-                    isSelected={selectedLoanId === Number(loanId)}
-                    isLoading={isLoading}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* How Lending Works */}
           <HowItWorks
             title="How Lending Works"
             steps={[
-              { icon: null, title: "Deposit Funds", description: "Add USDC to the lending pool to start earning yield" },
-              { icon: null, title: "Fund Loans", description: "Your funds are automatically allocated to loan requests" },
-              { icon: null, title: "Earn Interest", description: "Receive interest payments when borrowers repay their loans" },
+              { icon: null, title: "Deposit Funds", description: "Add USDC to the shared pool" },
+              { icon: null, title: "Automatic Allocation", description: "Protocol distributes liquidity to qualified borrowers" },
+              { icon: null, title: "Earn Interest", description: "Interest accrues to your share of the pool" },
             ]}
           />
         </div>
