@@ -12,10 +12,10 @@ const BorrowPage: NextPage = () => {
   const [repaymentPeriod, setRepaymentPeriod] = useState(365); // Default 1 year
   const [isLoading, setIsLoading] = useState(false);
 
-  // Read contract data
+  // Fetch PageRank score
   const { data: creditScore } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "getCreditScore",
+    functionName: "getPageRankScore",
     args: [connectedAddress],
   });
 
@@ -73,14 +73,14 @@ const BorrowPage: NextPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="text-center">
                   <div className="text-4xl font-bold text-green-500">
-                    {creditScore ? `${(Number(creditScore) / 10000).toFixed(2)}%` : "0.00%"}
+                    {creditScore ? `${(Number(creditScore) / 1000).toFixed(2)}%` : "0.00%"}
                   </div>
                   <div className="text-sm text-gray-600">Credit Score</div>
                   <div className="text-lg font-medium mt-1">
-                    {creditScore ? (Number(creditScore) / 10000 < 30 ? "Poor" : 
-                                   Number(creditScore) / 10000 < 50 ? "Fair" : 
-                                   Number(creditScore) / 10000 < 70 ? "Good" : 
-                                   Number(creditScore) / 10000 < 90 ? "Very Good" : "Excellent") : "No Score"}
+                    {creditScore ? (Number(creditScore) / 1000 < 30 ? "Poor" : 
+                                   Number(creditScore) / 1000 < 50 ? "Fair" : 
+                                   Number(creditScore) / 1000 < 70 ? "Good" : 
+                                   Number(creditScore) / 1000 < 90 ? "Very Good" : "Excellent") : "No Score"}
                   </div>
                 </div>
                 <div className="text-center">
