@@ -4,8 +4,7 @@ import { NextPage } from "next";
 import { useState } from "react";
 import { useAccount } from "wagmi";
 import { useScaffoldWriteContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { Address } from "~~/components/scaffold-eth";
-import { CurrencyDollarIcon, ClockIcon, CheckCircleIcon, ExclamationTriangleIcon, EyeIcon } from "@heroicons/react/24/outline";
+import { CurrencyDollarIcon, EyeIcon } from "@heroicons/react/24/outline";
 
 const RepayPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -52,16 +51,6 @@ const RepayPage: NextPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString();
-  };
-
-  const getDaysUntilDue = (dueDate: number) => {
-    const now = Math.floor(Date.now() / 1000);
-    const daysUntilDue = Math.ceil((dueDate - now) / (24 * 60 * 60));
-    return daysUntilDue;
   };
 
   const getStatusColor = (isActive: boolean) => {

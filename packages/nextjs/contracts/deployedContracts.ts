@@ -37,19 +37,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "BACKPROPAGATION_FACTOR",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "SCALE",
           inputs: [],
           outputs: [
@@ -444,7 +431,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1752016720.json",
+      deploymentFile: "run-1752018948.json",
       deploymentScript: "Deploy.s.sol",
     },
   },

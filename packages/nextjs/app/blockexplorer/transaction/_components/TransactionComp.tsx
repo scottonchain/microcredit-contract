@@ -7,7 +7,8 @@ import { hardhat } from "viem/chains";
 import { usePublicClient } from "wagmi";
 import { Address } from "~~/components/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
-import { decodeTransactionData, getFunctionDetails } from "~~/utils/scaffold-eth";
+// decodeTransactionData & getFunctionDetails were removed in cleanup.
+// We will operate directly on the raw transaction.
 import { replacer } from "~~/utils/scaffold-eth/common";
 
 const TransactionComp = ({ txHash }: { txHash: Hash }) => {
@@ -25,11 +26,10 @@ const TransactionComp = ({ txHash }: { txHash: Hash }) => {
         const tx = await client.getTransaction({ hash: txHash });
         const receipt = await client.getTransactionReceipt({ hash: txHash });
 
-        const transactionWithDecodedData = decodeTransactionData(tx);
-        setTransaction(transactionWithDecodedData);
+        setTransaction(tx);
         setReceipt(receipt);
 
-        const functionCalled = transactionWithDecodedData.input.substring(0, 10);
+        const functionCalled = tx.input.substring(0, 10);
         setFunctionCalled(functionCalled);
       };
 
@@ -100,7 +100,6 @@ const TransactionComp = ({ txHash }: { txHash: Hash }) => {
                       "This transaction did not call any function."
                     ) : (
                       <>
-                        <span className="mr-2">{getFunctionDetails(transaction)}</span>
                         <span className="badge badge-primary font-bold">{functionCalled}</span>
                       </>
                     )}

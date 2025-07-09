@@ -1,5 +1,9 @@
 # PageRank Verification Tests
 
+**How the Baseline is Generated:**
+
+The expected values in the Solidity test `PageRankVerification.t.sol` are generated using the Python script `scripts/pagerank_oracle.py` (which uses NetworkX). If you change the PageRank algorithm or want to update the expected results, run the Python script with the appropriate attestation data and update the constants in the Solidity test accordingly. This ensures the Solidity implementation matches the Python/NetworkX baseline.
+
 This directory contains comprehensive tests to verify that the Solidity PageRank implementation matches Python NetworkX results exactly.
 
 ## Test Files

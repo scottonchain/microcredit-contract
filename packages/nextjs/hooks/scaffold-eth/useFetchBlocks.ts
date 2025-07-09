@@ -10,7 +10,6 @@ import {
   webSocket,
 } from "viem";
 import { hardhat } from "viem/chains";
-import { decodeTransactionData } from "~~/utils/scaffold-eth";
 
 const BLOCKS_PER_PAGE = 20;
 
@@ -54,9 +53,7 @@ export const useFetchBlocks = () => {
       });
       const fetchedBlocks = await Promise.all(blocksWithTransactions);
 
-      fetchedBlocks.forEach(block => {
-        block.transactions.forEach(tx => decodeTransactionData(tx as Transaction));
-      });
+      // Previously decoded transaction input data here (utility removed in cleanup)
 
       const txReceipts = await Promise.all(
         fetchedBlocks.flatMap(block =>
@@ -94,7 +91,7 @@ export const useFetchBlocks = () => {
             newBlock.transactions = transactionsDetails;
           }
 
-          newBlock.transactions.forEach((tx: Transaction) => decodeTransactionData(tx as Transaction));
+          // Removed decodeTransactionData, leaving raw transactions
 
           const receipts = await Promise.all(
             newBlock.transactions.map(async (tx: Transaction) => {
