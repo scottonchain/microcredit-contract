@@ -35,17 +35,17 @@ const BorrowWizard: React.FC<BorrowWizardProps> = ({ connectedAddress }) => {
   });
 
   // Interest rate bounds (for explanatory copy only)
-  const { data: rMin } = useScaffoldReadContract({
+  const { data: effrRate } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "rMin",
+    functionName: "effrRate" as any,
   });
-  const { data: rMax } = useScaffoldReadContract({
+  const { data: riskPremium } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "rMax",
+    functionName: "riskPremium" as any,
   });
 
-  const rMinPct = rMin ? (Number(rMin) / 10000).toFixed(2) : "-";
-  const rMaxPct = rMax ? (Number(rMax) / 10000).toFixed(2) : "-";
+  const totalRateBp = effrRate && riskPremium ? Number(effrRate) + Number(riskPremium) : undefined;
+  const totalRatePct = totalRateBp !== undefined ? (totalRateBp / 100).toFixed(2) : "-";
 
   // No loan form here; only summary
 

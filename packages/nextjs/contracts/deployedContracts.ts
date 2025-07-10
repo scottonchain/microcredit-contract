@@ -7,18 +7,23 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     DecentralizedMicrocredit: {
-      address: "0x2fb5e98f1efe95ae50f9becafce660701ad8d9be",
+      address: "0x7c10a8944baa22a41a51b82dc419e866a04e55db",
       abi: [
         {
           type: "constructor",
           inputs: [
             {
-              name: "_rMin",
+              name: "_effrRate",
               type: "uint256",
               internalType: "uint256",
             },
             {
-              name: "_rMax",
+              name: "_riskPremium",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "_maxLoanAmount",
               type: "uint256",
               internalType: "uint256",
             },
@@ -37,6 +42,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "BASIS_POINTS",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "SCALE",
           inputs: [],
           outputs: [
@@ -51,6 +69,19 @@ const deployedContracts = {
         {
           type: "function",
           name: "SECONDS_PER_YEAR",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "basePersonalization",
           inputs: [],
           outputs: [
             {
@@ -133,6 +164,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "effrRate",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "getAllPageRankScores",
           inputs: [],
           outputs: [
@@ -161,7 +205,7 @@ const deployedContracts = {
           ],
           outputs: [
             {
-              name: "score",
+              name: "",
               type: "uint256",
               internalType: "uint256",
             },
@@ -242,6 +286,11 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
+              name: "_reservedFunds",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
               name: "_lenderCount",
               type: "uint256",
               internalType: "uint256",
@@ -251,7 +300,84 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "isKYCVerified",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "kycBonus",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "lenderCount",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "lenderDeposits",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "markKYCVerified",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "maxLoanAmount",
           inputs: [],
           outputs: [
             {
@@ -290,6 +416,38 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "pagerankScores",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "personalizationCap",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "previewLoanTerms",
           inputs: [
             {
@@ -316,32 +474,6 @@ const deployedContracts = {
             },
             {
               name: "payment",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "rMax",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "rMin",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
               type: "uint256",
               internalType: "uint256",
             },
@@ -405,15 +537,75 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "setInterestRates",
-          inputs: [
+          name: "reservedLiquidity",
+          inputs: [],
+          outputs: [
             {
-              name: "_rMin",
+              name: "",
               type: "uint256",
               internalType: "uint256",
             },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "riskPremium",
+          inputs: [],
+          outputs: [
             {
-              name: "_rMax",
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "setBasePersonalization",
+          inputs: [
+            {
+              name: "_base",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setEffrRate",
+          inputs: [
+            {
+              name: "_effrRate",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setKycBonus",
+          inputs: [
+            {
+              name: "_kycBonus",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setMaxLoanAmount",
+          inputs: [
+            {
+              name: "_maxLoanAmount",
               type: "uint256",
               internalType: "uint256",
             },
@@ -436,6 +628,32 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "setPersonalizationCap",
+          inputs: [
+            {
+              name: "_cap",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setRiskPremium",
+          inputs: [
+            {
+              name: "_riskPremium",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "totalDeposits",
           inputs: [],
           outputs: [
@@ -446,24 +664,6 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "updateCreditScore",
-          inputs: [
-            {
-              name: "user",
-              type: "address",
-              internalType: "address",
-            },
-            {
-              name: "newScore",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -478,9 +678,22 @@ const deployedContracts = {
           ],
           stateMutability: "view",
         },
+        {
+          type: "function",
+          name: "withdrawFunds",
+          inputs: [
+            {
+              name: "amount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1752033912.json",
+      deploymentFile: "run-1752189952.json",
       deploymentScript: "Deploy.s.sol",
     },
   },

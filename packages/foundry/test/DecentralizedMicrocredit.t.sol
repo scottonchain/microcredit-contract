@@ -2,6 +2,7 @@
 pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
+import "forge-std/StdStorage.sol";
 import "forge-std/console.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../contracts/DecentralizedMicrocredit.sol";
@@ -67,12 +68,19 @@ contract MockUSDC is IERC20 {
 }
 
 contract DecentralizedMicrocreditTest is Test {
+    using stdStorage for StdStorage;
     DecentralizedMicrocredit credit;
     MockUSDC usdc;
     address owner;
     address borrower;
     address lender;
     address oracle;
+
+    // -- Utility: softplus expected score --
+    function _expected(uint256 pr) internal pure returns (uint256) {
+        uint256 x = (pr * 1000) / 100000; // PR_SCALE = 1e5
+        return (1e6 * x) / (x + 100);
+    }
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -84,7 +92,7 @@ contract DecentralizedMicrocreditTest is Test {
         usdc = new MockUSDC();
 
         vm.startPrank(owner);
-        credit = new DecentralizedMicrocredit(500, 2000, address(usdc), oracle); // 5% - 20% in basis points
+        credit = new DecentralizedMicrocredit(750, 250, 10_000e6, address(usdc), oracle); // prime 7.5%, premium 2.5%, 10k max loan at 100% score
         vm.stopPrank();
 
         // Set up initial balances
@@ -98,9 +106,12 @@ contract DecentralizedMicrocreditTest is Test {
         credit.depositFunds(500000e6); // Deposit 500K USDC
         vm.stopPrank();
 
-        // Set up credit score for borrower
-        vm.prank(oracle);
-        credit.updateCreditScore(borrower, 500000); // 50% credit score
+        // Establish an attestation so borrower has non-zero reputation
+        vm.prank(lender);
+        credit.recordAttestation(borrower, 800000); // 80% confidence
+
+        // Compute PageRank to materialise scores used by getCreditScore
+        credit.computePageRank();
     }
 
     function testRequestLoan() public {
@@ -151,16 +162,7 @@ contract DecentralizedMicrocreditTest is Test {
         assertGt(reward, 0);
     }
 
-    function testCreditScoreUpdate() public {
-        uint256 initialScore = credit.getCreditScore(borrower);
-        assertEq(initialScore, 500000);
-        
-        vm.prank(oracle);
-        credit.updateCreditScore(borrower, 700000); // Update to 70%
-        
-        uint256 newScore = credit.getCreditScore(borrower);
-        assertEq(newScore, 700000);
-    }
+    // Removed testCreditScoreUpdate – scores are now computed dynamically
 
     function testInterestRateCalculation() public {
         vm.startPrank(borrower);
@@ -168,10 +170,23 @@ contract DecentralizedMicrocreditTest is Test {
         vm.stopPrank();
         
         (,,, uint256 interestRate,) = credit.getLoan(loanId);
-        
-        // With 50% credit score, interest rate should be between rMin and rMax
-        assertGe(interestRate, 500); // rMin
-        assertLe(interestRate, 2000); // rMax
+
+        // Interest should equal EFFR base rate + premium regardless of credit score
+        uint256 expectedRate = credit.effrRate() + credit.riskPremium();
+        assertEq(interestRate, expectedRate);
+    }
+
+    function testMaxLoanAmountEnforced() public {
+        // Compute current dynamic credit score
+        uint256 score = credit.getCreditScore(borrower);
+        uint256 allowed = (score * 10_000e6) / 1e6;
+
+        vm.prank(borrower);
+        credit.requestLoan(allowed); // Should pass
+
+        vm.prank(borrower);
+        vm.expectRevert();
+        credit.requestLoan(allowed + 1e6); // Exceed by $1 -> revert
     }
 
     function testDepositFunds() public {
@@ -190,7 +205,77 @@ contract DecentralizedMicrocreditTest is Test {
         assertEq(newBalance, 600000e6); // Should have 600K total
     }
 
+    function testReservedLiquidityEnforced() public {
+        // Additional deposit so we have 1000 USDC liquid
+        vm.startPrank(owner);
+        usdc.approve(address(credit), 500000e6);
+        credit.depositFunds(500000e6); // total 1,000,000 USDC
+        vm.stopPrank();
+
+        // Raise borrowing cap so the borrower can take 800k USDC given their score
+        vm.prank(owner);
+        credit.setMaxLoanAmount(1_000_000e6); // $1M cap at 100% score
+
+        // Borrower requests 800k USDC (allowed by score)
+        vm.startPrank(borrower);
+        uint256 loanId1 = credit.requestLoan(800000e6);
+        vm.stopPrank();
+
+        // Reserved liquidity should be 800k
+        assertEq(credit.reservedLiquidity(), 800000e6);
+
+        // Attempt another loan exceeding remaining unreserved liquidity (200k left, try 300k)
+        vm.startPrank(borrower);
+        vm.expectRevert();
+        credit.requestLoan(300000e6);
+        vm.stopPrank();
+
+        // Lender attempts to withdraw more than available (only 200k liquid, try 250k)
+        vm.startPrank(owner);
+        vm.expectRevert();
+        credit.withdrawFunds(250000e6);
+        vm.stopPrank();
+
+        // Disburse first loan, reservedLiquidity should reduce
+        vm.prank(owner);
+        credit.disburseLoan(loanId1);
+        assertEq(credit.reservedLiquidity(), 0);
+    }
+
+    function testSoftplusCreditScoreMapping() public {
+        address dummy = address(0xdeadbeef);
+
+        uint256[7] memory prs = [uint256(0), 5000, 25000, 50000, 75000, 95000, 100000];
+
+        for (uint256 i = 0; i < prs.length; i++) {
+            uint256 prVal = prs[i];
+            uint256 slot = stdstore.target(address(credit)).sig("pagerankScores(address)").with_key(dummy).find();
+            vm.store(address(credit), bytes32(slot), bytes32(prVal));
+
+            uint256 score = credit.getCreditScore(dummy);
+            uint256 exp = _expected(prVal);
+            assertApproxEqAbs(score, exp, 2, "Softplus mapping mismatch");
+        }
+    }
+
+    function testSetEffrRateUpdatesRate() public {
+        // Owner updates the EFFR base rate
+        vm.prank(owner);
+        credit.setEffrRate(900); // 9.0%
+
+        // Check getter returns new value
+        uint256 newBase = credit.effrRate();
+        assertEq(newBase, 900);
+
+        // Preview loan terms should reflect updated rate
+        (uint256 rate, ) = credit.previewLoanTerms(borrower, 1000e6, 365 days);
+        uint256 expectedRate = 900 + credit.riskPremium();
+        assertEq(rate, expectedRate);
+    }
+
     function testPageRankMatchesNetworkX() public {
+        // Reset the PageRank graph to isolate this test's 3-node structure
+        credit.clearPageRankState();
         // Create the same graph as NetworkX test
         // NetworkX test case: 3 nodes with edges (0x1111 -> 0x2222: 80%, 0x1111 -> 0x3333: 40%)
         address node1 = address(0x1111);
@@ -293,6 +378,8 @@ contract DecentralizedMicrocreditTest is Test {
     }
 
     function testPageRankExactNetworkXMatch() public {
+        // Ensure a clean PageRank graph so results match the 3-node NetworkX fixture
+        credit.clearPageRankState();
         // This test verifies exact match with NetworkX results
         // Expected NetworkX results for simple test case (scaled to 100,000):
         // 0x1111: ~25974 (0.259741)
@@ -347,5 +434,79 @@ contract DecentralizedMicrocreditTest is Test {
         console.log("Node3 (0x3333):", score3);
         console.log("Total:", totalScore);
         console.log("Iterations:", iterations);
+    }
+
+    function testLenderWithdrawsSuccessfully() public {
+        // Lender balance before deposit
+        uint256 beforeDeposit = usdc.balanceOf(lender);
+        // Lender deposits funds
+        vm.startPrank(lender);
+        usdc.approve(address(credit), 200000e6);
+        credit.depositFunds(200000e6);
+        vm.stopPrank();
+
+        // Lender withdraws part of their deposit
+        vm.startPrank(lender);
+        credit.withdrawFunds(50000e6); // Withdraw 50k USDC
+        uint256 afterWithdraw = usdc.balanceOf(lender);
+        assertEq(afterWithdraw, beforeDeposit - 200000e6 + 50000e6, "Lender should receive exactly the withdrawn funds");
+        vm.stopPrank();
+    }
+
+    function testLenderCannotWithdrawMoreThanAvailablePoolFunds() public {
+        // Deploy a fresh contract with the correct owner
+        vm.startPrank(owner);
+        DecentralizedMicrocredit freshCredit = new DecentralizedMicrocredit(750, 250, 100_000e6, address(usdc), oracle);
+        vm.stopPrank();
+
+        // Lender deposits funds
+        vm.startPrank(lender);
+        usdc.approve(address(freshCredit), 100000e6);
+        freshCredit.depositFunds(100000e6);
+        vm.stopPrank();
+
+        // Ensure borrower can borrow full amount
+        // No manual credit score needed – dynamic computation now
+        vm.prank(owner);
+        freshCredit.setMaxLoanAmount(type(uint256).max);
+
+        // Give borrower minimal reputation so they can borrow
+        vm.prank(lender);
+        freshCredit.recordAttestation(borrower, 800000);
+        freshCredit.computePageRank();
+
+        // Determine max borrow allowed by score and borrow full deposit
+        uint256 score = freshCredit.getCreditScore(borrower);
+        uint256 allowedBorrow = (score * 100000e6) / 1e6;
+        if (allowedBorrow == 0) {
+            allowedBorrow = 10000e6; // fallback minimal borrow
+        }
+
+        vm.startPrank(borrower);
+        uint256 loanId = freshCredit.requestLoan(allowedBorrow);
+        vm.stopPrank();
+        vm.prank(owner);
+        freshCredit.disburseLoan(loanId);
+
+        // Assert available funds equal deposit minus borrowed amount
+        uint256 available = usdc.balanceOf(address(freshCredit));
+        assertEq(available, 100000e6 - allowedBorrow, "Available funds mismatch");
+        // Lender tries to withdraw more than available liquidity
+        vm.startPrank(lender);
+        vm.expectRevert();
+        freshCredit.withdrawFunds(available + 1e6);
+        vm.stopPrank();
+    }
+
+    function testLenderPartialWithdrawals() public {
+        vm.startPrank(lender);
+        usdc.approve(address(credit), 100000e6);
+        credit.depositFunds(100000e6);
+        credit.withdrawFunds(40000e6);
+        credit.withdrawFunds(30000e6);
+        // Should have 30k left
+        vm.expectRevert();
+        credit.withdrawFunds(40000e6); // Only 30k left, should revert
+        vm.stopPrank();
     }
 } 

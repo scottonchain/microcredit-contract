@@ -11,7 +11,6 @@ import { formatPercent } from "~~/utils/format";
 const AdminPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
   const [userAddress, setUserAddress] = useState("");
-  const [newScore, setNewScore] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   // Read contract data - only use functions that exist
@@ -30,24 +29,7 @@ const AdminPage: NextPage = () => {
     contractName: "DecentralizedMicrocredit",
   });
 
-  const handleUpdateScore = async () => {
-    if (!userAddress || !newScore) return;
-    
-    setIsLoading(true);
-    try {
-      const scoreValue = Math.round(parseFloat(newScore) * 10000); // Convert to basis points
-      await writeContractAsync({
-        functionName: "updateCreditScore",
-        args: [userAddress as `0x${string}`, BigInt(scoreValue)],
-      });
-      setUserAddress("");
-      setNewScore("");
-    } catch (error) {
-      console.error("Error updating credit score:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Removed manual credit score management – scores are now computed automatically from PageRank
 
   // Additional whitelisted admin addresses
   const ADDITIONAL_ADMINS = [
@@ -68,6 +50,42 @@ const AdminPage: NextPage = () => {
     args: [lookupAddress as `0x${string}` | undefined],
   });
 
+  // Lender lookup state
+  const [lenderLookup, setLenderLookup] = useState<string>("");
+  const { data: lenderDeposit } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "lenderDeposits",
+    args: [lenderLookup as `0x${string}` | undefined],
+  });
+  const { data: poolInfo } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getPoolInfo",
+  });
+  const availableFunds = poolInfo ? poolInfo[1] : undefined;
+  const lenderCount = poolInfo ? poolInfo[3] : undefined;
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || !connectedAddress) return;
+    setWithdrawLoading(true);
+    try {
+      await writeContractAsync({
+        functionName: "withdrawFunds",
+        args: [BigInt(Math.floor(parseFloat(withdrawAmount) * 1e6))],
+      });
+      setWithdrawAmount("");
+    } catch (error) {
+      console.error("Error withdrawing funds:", error);
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
+
+  // Helper to get lenderDeposit as a number (USDC)
+  const lenderDepositNumber = lenderDeposit !== undefined ? Number(lenderDeposit) : 0;
+  const availableFundsNumber = availableFunds !== undefined ? Number(availableFunds) : 0;
+
   // Show access denied if user doesn't have permissions
   if (!hasAccess) {
     return (
@@ -79,9 +97,9 @@ const AdminPage: NextPage = () => {
             You need to be the contract owner, oracle, or whitelisted to access this page.
           </p>
           <div className="space-y-2 text-sm text-gray-500">
-            <p>Current Oracle: {oracle ? <Address address={oracle as `0x${string}`} /> : "Loading..."}</p>
-            <p>Contract Owner: {owner ? <Address address={owner as `0x${string}`} /> : "Loading..."}</p>
-            <p>Your Address: {connectedAddress ? <Address address={connectedAddress} /> : "Not connected"}</p>
+            <div>Current Oracle: {oracle ? <Address address={oracle as `0x${string}`} /> : "Loading..."}</div>
+            <div>Contract Owner: {owner ? <Address address={owner as `0x${string}`} /> : "Loading..."}</div>
+            <div>Your Address: {connectedAddress ? <Address address={connectedAddress} /> : "Not connected"}</div>
           </div>
         </div>
       </div>
@@ -134,41 +152,45 @@ const AdminPage: NextPage = () => {
             </div>
           </div>
 
-          {/* Credit Score Management */}
+          {/* Lender Management */}
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">Credit Score Management</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">User Address</label>
-                <AddressInput
-                  value={userAddress}
-                  onChange={setUserAddress}
-                  placeholder="Enter user address"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">New Credit Score</label>
-                <input
-                  type="number"
-                  value={newScore}
-                  onChange={(e) => setNewScore(e.target.value)}
-                  placeholder="Enter score (0-100)"
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                />
-              </div>
-              <div className="flex items-end">
-                <button
-                  onClick={handleUpdateScore}
-                  disabled={!userAddress || !newScore || isLoading}
-                  className="w-full bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition-colors"
-                >
-                  {isLoading ? "Updating..." : "Update Score"}
-                </button>
+            <h2 className="text-xl font-semibold mb-4">Lender Management</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Lender Address Lookup</label>
+              <AddressInput value={lenderLookup} onChange={setLenderLookup} placeholder="0x..." />
+              <div className="mt-2 text-sm">
+                {lenderDeposit !== undefined && lenderDepositNumber > 0 ? (
+                  <span>Deposit Balance: {(lenderDepositNumber / 1e6).toLocaleString()} USDC</span>
+                ) : (
+                  <span>No deposit found for this address.</span>
+                )}
               </div>
             </div>
+            <div className="mb-4">
+              <span className="text-sm">Total Lenders: {lenderCount !== undefined ? lenderCount.toString() : "Loading..."}</span>
+            </div>
+            {connectedAddress && lenderLookup.toLowerCase() === connectedAddress.toLowerCase() && lenderDepositNumber > 0 && (
+              <div className="mt-4">
+                <label className="block text-sm font-medium mb-2">Withdraw Amount (USDC)</label>
+                <input
+                  type="number"
+                  value={withdrawAmount}
+                  onChange={e => setWithdrawAmount(e.target.value)}
+                  min="0.000001"
+                  max={Math.min(lenderDepositNumber / 1e6, availableFundsNumber / 1e6)}
+                  step="0.000001"
+                  className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter amount to withdraw"
+                />
+                <button
+                  onClick={handleWithdraw}
+                  disabled={withdrawLoading || !withdrawAmount || Number(withdrawAmount) <= 0 || Number(withdrawAmount) > lenderDepositNumber / 1e6 || Number(withdrawAmount) > availableFundsNumber / 1e6}
+                  className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition-colors mt-2"
+                >
+                  {withdrawLoading ? "Withdrawing..." : "Withdraw"}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* System Actions */}

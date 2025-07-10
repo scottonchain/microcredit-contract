@@ -4,12 +4,14 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract DecentralizedMicrocredit {
-    uint256 public rMin;
-    uint256 public rMax;
+    // NOTE: Variable-rate parameters removed in favour of fixed-rate design.
+    // uint256 public rMin;
+    // uint256 public rMax;
     IERC20 public immutable usdc;
     address public owner;
     address public oracle;
-    uint256 public constant SCALE = 1e6;
+    uint256 public constant SCALE = 1e6;          // Used for credit score scaling
+    uint256 public constant BASIS_POINTS = 10000; // Interest-rate scaling (1e4 = 100%)
     uint256 public constant SECONDS_PER_YEAR = 365 days;
     uint256 private nextLoanId = 1;
     
@@ -17,6 +19,45 @@ contract DecentralizedMicrocredit {
     uint256 constant PR_SCALE = 100000; // 1.0 = 100,000 (smaller scale)
     uint256 constant PR_ALPHA = 85000;  // 0.85 = 85,000
     uint256 constant PR_TOL = 100;      // 1e-6 * PR_SCALE
+
+    /* ─────────────────────────────────────────────────────────────────────────────
+     *  PERSONALIZATION & PRIME RATE PARAMETERS
+     *
+     *  These variables drive the new weighted PageRank teleportation mechanism
+     *  as well as the base interest-rate economics introduced in this upgrade.
+     *  All values are denominated in USDC’s 6-decimal format to keep consistency
+     *  with deposits, then normalized to PR_SCALE (100 000) for PageRank maths.
+     *
+     *  ‣ basePersonalization     :   Non-zero weight given to every address so
+     *                                 even nodes without deposits/KYC receive a
+     *                                 small share of the teleportation mass.
+     *  ‣ kycBonus               :   Extra weight applied if `isKYCVerified`.
+     *  ‣ personalizationCap      :   Upper bound of deposit amount considered
+     *                                 for the funding component (prevents whales
+     *                                 from dominating teleportation weights).
+     *
+     *  PRIME RATE:  Traditional banking concept used here as a configurable
+     *  base APR.  The final loan rate is a simple fixed sum `primeRate +
+     *  riskPremium` – both set at the platform level, independent of user
+     *  credit score (score now only gates maximum borrow size).
+     * ────────────────────────────────────────────────────────────────────────────*/
+    uint256 public basePersonalization;
+    uint256 public kycBonus;
+    uint256 public personalizationCap;
+
+    // ────────────── FIXED INTEREST PARAMETERS ──────────────
+    // All interest-rate values are expressed in BASIS_POINTS (1e4 = 100%).
+    // EFFR (Effective Federal Funds Rate), currently set manually for testing.
+    // In production, this will be fetched from Pyth Network:
+    // https://www.pyth.network/price-feeds/rates-effr
+    uint256 public effrRate;       // Base rate derived from EFFR (e.g. 750 = 7.5%)
+    uint256 public riskPremium;    // Additional platform-wide premium (basis points)
+
+    // Maximum principal a borrower can request scaled in USDC (6-decimals)
+    uint256 public maxLoanAmount;
+ 
+    // Per-lender cumulative deposit tracker used when computing personalization
+    mapping(address => uint256) public lenderDeposits;
     
     struct Loan {
         uint256 principal;
@@ -28,40 +69,75 @@ contract DecentralizedMicrocredit {
     struct Attestation { address attester; uint256 weight; }
     mapping(uint256 => Loan) private loans;
     mapping(address => Attestation[]) private borrowerAttestations;
-    mapping(address => uint256) private creditScores;
+    // Tracks whether a borrower has completed KYC verification
+    mapping(address => bool) public isKYCVerified;
 
     // Lending pool tracking
     uint256 public totalDeposits;              // Cumulative deposits into the pool (6-decimals like USDC)
     uint256 public lenderCount;                // Unique depositors count
     mapping(address => bool) private isLender; // Tracks whether an address has deposited before
+
+    // Amount of pool liquidity committed to yet-undisbursed loans
+    uint256 public reservedLiquidity;
     
     // PageRank storage
     address[] private pagerankNodes;
     mapping(address => bool) private pagerankNodeExists;
     mapping(address => mapping(address => uint256)) private pagerankEdges;
     mapping(address => uint256) private pagerankOutDegree;
-    mapping(address => uint256) private pagerankScores;
+    // Exposed as public to enable off-chain inspection and simplify tests.
+    mapping(address => uint256) public pagerankScores;
     mapping(address => mapping(address => uint256)) private pagerankStochasticEdges;
     
-    constructor(uint256 _rMin, uint256 _rMax, address _usdc, address _oracle) {
-        require(_rMin < _rMax, "rMin must be < rMax");
+    constructor(uint256 _effrRate, uint256 _riskPremium, uint256 _maxLoanAmount, address _usdc, address _oracle) {
         require(_usdc != address(0) && _oracle != address(0), "");
-        rMin = _rMin;
-        rMax = _rMax;
         usdc = IERC20(_usdc);
         owner = msg.sender;
         oracle = _oracle;
+        // Initialise fixed-rate parameters
+        effrRate = _effrRate;
+        riskPremium = _riskPremium;
+        maxLoanAmount = _maxLoanAmount;
+        basePersonalization = 100 * 1e6;      // $100 in 6-decimals
+        kycBonus = 100 * 1e6;                 // $100 bonus for KYC
+        personalizationCap = 100 * 1e6;       // Cap funding contribution at $100
     }
     modifier onlyOwner() { require(msg.sender == owner, ""); _; }
     modifier onlyOracle() { require(msg.sender == oracle, ""); _; }
-    function setInterestRates(uint256 _rMin, uint256 _rMax) external onlyOwner {
-        require(_rMin < _rMax, "rMin must be < rMax");
-        rMin = _rMin;
-        rMax = _rMax;
-    }
+    // Note: variable-rate setter removed in the fixed-rate model.
     function setOracle(address _oracle) external onlyOwner {
         require(_oracle != address(0), "");
         oracle = _oracle;
+    }
+
+    // ─────────────── ADMIN SETTERS (UX helpers) ───────────────
+    // Simple owner-only mutators exposing each economic parameter individually.
+    // NOTE: no additional validation performed here besides implicit uint range;
+    // callers (the dApp) should supply sane values.
+    function setKycBonus(uint256 _kycBonus) external onlyOwner {
+        kycBonus = _kycBonus;
+    }
+
+    function setBasePersonalization(uint256 _base) external onlyOwner {
+        basePersonalization = _base;
+    }
+
+    function setPersonalizationCap(uint256 _cap) external onlyOwner {
+        personalizationCap = _cap;
+    }
+
+    // Placeholder admin setter – will be replaced by oracle-powered update once
+    // EFFR is sourced directly from Pyth Network in production deployments.
+    function setEffrRate(uint256 _effrRate) external onlyOwner {
+        effrRate = _effrRate;
+    }
+
+    function setRiskPremium(uint256 _riskPremium) external onlyOwner {
+        riskPremium = _riskPremium;
+    }
+
+    function setMaxLoanAmount(uint256 _maxLoanAmount) external onlyOwner {
+        maxLoanAmount = _maxLoanAmount;
     }
     function depositFunds(uint256 amount) external {
         require(amount > 0, "");
@@ -69,41 +145,82 @@ contract DecentralizedMicrocredit {
 
         // Update pool stats
         totalDeposits += amount;
+        // Track individual deposits so we can compute funding-based weight in
+        // the PageRank personalization vector.
+        lenderDeposits[msg.sender] += amount;
         if (!isLender[msg.sender]) {
             isLender[msg.sender] = true;
             lenderCount += 1;
         }
     }
 
+    function withdrawFunds(uint256 amount) external {
+        require(amount > 0, "Amount must be > 0");
+        require(lenderDeposits[msg.sender] >= amount, "Insufficient deposited balance");
+
+        uint256 liquidBalance = usdc.balanceOf(address(this));
+        require(liquidBalance - reservedLiquidity >= amount, "Not enough liquid funds (some reserved for loans)");
+
+        lenderDeposits[msg.sender] -= amount;
+        totalDeposits -= amount;
+        require(usdc.transfer(msg.sender, amount), "USDC transfer failed");
+    }
+
     /**
      * @notice Return high-level pool statistics for front-end display
      * @return _totalDeposits   Sum of all deposits ever made (USDC 6-decimals)
-     * @return _availableFunds  Current USDC balance held by the contract (funds ready to lend)
+     * @return _availableFunds  Liquid USDC available to lend/withdraw (excludes reserved)
+     * @return _reservedFunds   Funds committed to pending loan disbursements
      * @return _lenderCount     Unique addresses that have deposited
      */
-    function getPoolInfo() external view returns (uint256 _totalDeposits, uint256 _availableFunds, uint256 _lenderCount) {
+    function getPoolInfo() external view returns (
+        uint256 _totalDeposits,
+        uint256 _availableFunds,
+        uint256 _reservedFunds,
+        uint256 _lenderCount
+    ) {
         _totalDeposits = totalDeposits;
-        _availableFunds = usdc.balanceOf(address(this));
+        _reservedFunds = reservedLiquidity;
+        _availableFunds = usdc.balanceOf(address(this)) - _reservedFunds;
         _lenderCount = lenderCount;
     }
     function previewLoanTerms(address borrower, uint256 principal, uint256 repaymentPeriod) external view returns (uint256 interestRate, uint256 payment) {
-        uint256 score = creditScores[borrower];
-        interestRate = _calculateInterest(score);
-        uint256 interest = (principal * interestRate * repaymentPeriod) / (SCALE * SECONDS_PER_YEAR);
+        // Fixed global rate (prime + premium)
+        interestRate = effrRate + riskPremium;
+        uint256 interest = (principal * interestRate * repaymentPeriod) / (BASIS_POINTS * SECONDS_PER_YEAR);
         payment = (principal + interest) / (repaymentPeriod / 30 days);
     }
     function requestLoan(uint256 amount) external returns (uint256 loanId) {
         require(amount > 0, "");
-        uint256 score = creditScores[msg.sender];
+        uint256 score = getCreditScore(msg.sender);
         require(score > 0, "");
+
+        // Enforce per-borrower loan cap proportional to credit score
+        // Compute allowed amount using division first to prevent overflow when
+        // maxLoanAmount is very large (e.g. type(uint256).max in tests).
+        // Safe because SCORE ≤ SCALE, so (maxLoanAmount / SCALE) fits in uint256.
+        uint256 allowed = (maxLoanAmount / SCALE) * score;
+        require(amount <= allowed, "Amount exceeds maximum for score");
+
+        // Ensure sufficient unreserved liquidity in the pool
+        uint256 liquidBalance = usdc.balanceOf(address(this));
+        require(amount <= liquidBalance - reservedLiquidity, "Insufficient available liquidity");
+
+        // Reserve liquidity immediately upon loan approval
+        reservedLiquidity += amount;
+
         loanId = nextLoanId++;
-        uint256 rate = _calculateInterest(score);
-        uint256 interest = (amount * rate * SECONDS_PER_YEAR) / (SCALE * SECONDS_PER_YEAR);
+        uint256 rate = effrRate + riskPremium;
+        uint256 interest = (amount * rate) / BASIS_POINTS;
         loans[loanId] = Loan(amount, amount + interest, msg.sender, rate, true);
     }
     function disburseLoan(uint256 loanId) external {
         Loan storage loan = loans[loanId];
         require(loan.isActive, "");
+
+        // Decrease reserved liquidity prior to transfer to avoid re-entrancy edge-cases
+        reservedLiquidity -= loan.principal;
+
         require(usdc.transfer(loan.borrower, loan.principal), "");
     }
     function repayLoan(uint256 loanId, uint256 amount) external {
@@ -138,11 +255,28 @@ contract DecentralizedMicrocredit {
         }
         attests.push(Attestation(msg.sender, weight));
     }
-    function updateCreditScore(address user, uint256 newScore) external onlyOracle {
-        creditScores[user] = newScore;
+    // ─────────────────────────────────────────────────────────────────────
+    //  CREDIT SCORE
+    //  Computed dynamically from PageRank so no storage is required.
+    //  Returns a value scaled to `SCALE` (1e6) for compatibility with the
+    //  previous fixed-score design.
+    // -------------------------------------------------------------------
+    function getCreditScore(address user) public view returns (uint256) {
+        // Converts PageRank score to credit score using a softplus-like curve:
+        //   credit = (SCALE * x) / (x + 100), where x = (PR * 1000) / PR_SCALE
+        // Produces a smooth 0 → SCALE output that breaks PageRank’s zero-sum nature.
+        uint256 pr = pagerankScores[user]; // 0 – PR_SCALE (1e5)
+        uint256 x = (pr * 1000) / PR_SCALE; // 0 – 1000
+        return (SCALE * x) / (x + 100);    // 0 – SCALE (1e6)
     }
-    function getCreditScore(address user) external view returns (uint256 score) {
-        return creditScores[user];
+    /**
+     * @notice Mark a user as having passed KYC verification
+     * @dev Can only be called by the oracle address set by the owner
+     * @param user The address of the user that has completed KYC
+     */
+    function markKYCVerified(address user) external onlyOracle {
+        require(!isKYCVerified[user], "Already verified");
+        isKYCVerified[user] = true;
     }
     function getLoan(uint256 loanId) external view returns (uint256 principal, uint256 outstanding, address borrower, uint256 interestRate, bool isActive) {
         Loan storage loan = loans[loanId];
@@ -223,13 +357,18 @@ contract DecentralizedMicrocredit {
         
         // Create stochastic graph (normalize edge weights by out-degree)
         _createStochasticGraph();
-        
+
+        // >>>>>> BUILD PERSONALIZATION VECTOR BASED ON FUNDING & KYC <<<<<<
+        // Build node-specific teleportation weights (funding + KYC + base)
+        uint256[] memory personalizationVector = _buildPersonalizationVector();
+        // <<<<<< END ADDITION >>>>>>
+
         // Run PageRank iterations
         iterations = 0;
         bool converged = false;
         
         while (iterations < maxIter && !converged) {
-            converged = _pagerankIteration(alpha, tol);
+            converged = _pagerankIteration(alpha, tol, personalizationVector);
             iterations++;
         }
         
@@ -262,10 +401,12 @@ contract DecentralizedMicrocredit {
         }
     }
     
-    function _pagerankIteration(uint256 alpha, uint256 tol) internal returns (bool converged) {
+    /**
+     * @dev One Gauss-Seidel style PageRank iteration using node-specific
+     *      personalization vector.  Returns `true` when L1 delta < tol * N.
+     */
+    function _pagerankIteration(uint256 alpha, uint256 tol, uint256[] memory personalizationVector) internal returns (bool converged) {
         uint256 totalDelta = 0;
-        uint256 personalizationValue = PR_SCALE / pagerankNodes.length;
-        uint256 personalizationContribution = ((PR_SCALE - alpha) * personalizationValue) / PR_SCALE;
         
         // Compute dangling sum (sum of scores from nodes with no outgoing edges)
         uint256 danglingSum = 0;
@@ -311,8 +452,10 @@ contract DecentralizedMicrocredit {
                 danglingContribution = danglingPerNode;
             }
             
-            // Update score: NetworkX: x[n] += danglesum * dangling_weights.get(n, 0) + (1.0 - alpha) * p.get(n, 0)
-            uint256 newScore = incomingScore + danglingContribution + personalizationContribution;
+            // Update score using weighted personalization vector
+            // Teleportation: (1 – α) * p[node]  (all values scaled by PR_SCALE)
+            uint256 teleportationContribution = ((PR_SCALE - alpha) * personalizationVector[i]) / PR_SCALE;
+            uint256 newScore = incomingScore + danglingContribution + teleportationContribution;
             pagerankScores[node] = newScore;
             
             // Track convergence
@@ -323,9 +466,51 @@ contract DecentralizedMicrocredit {
         return totalDelta < (tol * pagerankNodes.length);
     }
     
-    function _calculateInterest(uint256 score) internal view returns (uint256 rate) {
-        require(score <= SCALE, "");
-        uint256 x = score;
-        return rMin + ((rMax - rMin) * (SCALE - x)) / SCALE;
+    function _calculateInterest(uint256 /*ignored*/ ) internal view returns (uint256 rate) {
+        // Fixed platform-wide rate independent of individual credit score.
+        return effrRate + riskPremium;
+    }
+
+    /**
+     * @notice Assemble & normalise the personalization vector for PageRank.
+     * @dev Each node’s raw weight = BASE + min(deposits, CAP) + (KYC? BONUS:0).
+     *      The array is then scaled so that Σp_i = PR_SCALE (1.0 in our units).
+     */
+    function _buildPersonalizationVector() internal view returns (uint256[] memory vector) {
+        uint256 n = pagerankNodes.length;
+        vector = new uint256[](n);
+        if (n == 0) {
+            return vector;
+        }
+
+        uint256 totalWeight = 0;
+        for (uint256 i = 0; i < n; i++) {
+            address node = pagerankNodes[i];
+
+            uint256 weight = basePersonalization;
+
+            uint256 depositWeight = lenderDeposits[node];
+            if (depositWeight > personalizationCap) {
+                depositWeight = personalizationCap;
+            }
+            weight += depositWeight;
+
+            if (isKYCVerified[node]) {
+                weight += kycBonus;
+            }
+
+            vector[i] = weight;
+            totalWeight += weight;
+        }
+
+        if (totalWeight == 0) {
+            for (uint256 i = 0; i < n; i++) {
+                vector[i] = PR_SCALE / n;
+            }
+        } else {
+            for (uint256 i = 0; i < n; i++) {
+                vector[i] = (vector[i] * PR_SCALE) / totalWeight;
+            }
+        }
     }
 }

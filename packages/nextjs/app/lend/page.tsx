@@ -30,7 +30,7 @@ const LendPage: NextPage = () => {
   // poolInfo returns [_totalDeposits, _availableFunds, _lenderCount]
   const totalDeposits = poolInfo ? poolInfo[0] : undefined;
   const availableFunds = poolInfo ? poolInfo[1] : undefined;
-  const lenderCount = poolInfo ? poolInfo[2] : undefined;
+  const lenderCount = poolInfo ? poolInfo[3] : undefined;
   // TODO: replace these with real data once contract supports them
   const lenderInfo: bigint[] | undefined = undefined;
   const availableLoans: bigint[] = [];

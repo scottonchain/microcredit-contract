@@ -37,7 +37,8 @@ const Home: NextPage = () => {
 
   const totalDeposits = poolInfo ? Number(poolInfo[0]) / 1e6 : 0;
   const availableFunds = poolInfo ? Number(poolInfo[1]) / 1e6 : 0;
-  const activeLenders = poolInfo ? Number(poolInfo[2]) : 0;
+  const reservedFunds = poolInfo ? Number(poolInfo[2]) / 1e6 : 0;
+  const activeLenders = poolInfo ? Number(poolInfo[3]) : 0;
 
   const getScoreColor = (score: number) => {
     if (score < 30) return "text-red-500";
@@ -48,17 +49,17 @@ const Home: NextPage = () => {
   };
 
   // Interest rate bounds
-  const { data: rMin } = useScaffoldReadContract({
+  const { data: effrRate } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "rMin",
+    functionName: "effrRate" as any,
   });
-  const { data: rMax } = useScaffoldReadContract({
+  const { data: riskPremium } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "rMax",
+    functionName: "riskPremium" as any,
   });
 
-  const rMinPct = rMin ? (Number(rMin) / 10000).toFixed(2) : undefined;
-  const rMaxPct = rMax ? (Number(rMax) / 10000).toFixed(2) : undefined;
+  const totalRateBp = effrRate && riskPremium ? Number(effrRate) + Number(riskPremium) : undefined;
+  const totalRatePct = totalRateBp !== undefined ? (totalRateBp / 100).toFixed(2) : undefined;
 
   return (
     <>
@@ -74,7 +75,7 @@ const Home: NextPage = () => {
 
           {connectedAddress ? (
             <>
-              <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg">
+              <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg flex flex-col">
                 <h2 className="text-xl font-semibold mb-4">Your Profile</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="flex items-center space-x-2">
@@ -91,9 +92,19 @@ const Home: NextPage = () => {
                       </span>
                     </div>
                   ) : (
-                    <Link href="/borrower" className="btn btn-secondary col-span-2 justify-center">
-                      Go to Borrower Page
-                    </Link>
+                    <div className="col-span-2 text-sm md:text-base text-gray-700 leading-relaxed">
+                      <p className="mb-1">
+                        You don&rsquo;t have a credit score yet. Build your reputation by:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1">
+                        <li>Requesting social attestations from friends or community members</li>
+                        <li>Completing KYC verification</li>
+                        <li>Depositing funds or interacting on-chain</li>
+                      </ul>
+                      <p className="mt-2">
+                        Once you have a score you&rsquo;ll be able to request your first micro-loan.
+                      </p>
+                    </div>
                   )}
                   <div className="flex items-center space-x-2">
                     <BanknotesIcon className="h-5 w-5" />
@@ -108,10 +119,10 @@ const Home: NextPage = () => {
 
                 {/* Borrow CTA */}
                 {Number(pageRankScore ?? 0) > 0 && (
-                  <div className="mt-6 text-center">
+                  <div className="mt-auto text-center">
                     <Link href="/borrower" className="btn btn-primary btn-lg">
                       Borrow Now &nbsp;
-                      {rMinPct && rMaxPct && <span className="text-xs">({rMinPct}% – {rMaxPct}% APR)</span>}
+                      {totalRatePct && <span className="text-xs">({totalRatePct}% APR)</span>}
                     </Link>
                   </div>
                 )}
@@ -178,6 +189,12 @@ const Home: NextPage = () => {
                   ${availableFunds.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
                 <div className="text-sm text-gray-600">Available Funds</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-500">
+                  ${reservedFunds.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="text-sm text-gray-600">Reserved Funds</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-500">
