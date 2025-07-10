@@ -40,8 +40,9 @@ contract DeployScript is Script {
 
         // Deploy the Microcredit contract (oracle temporarily set to deployer)
         DecentralizedMicrocredit microcreditContract = new DecentralizedMicrocredit(
-            50000,   // rMin 5% (scaled 1e4)
-            200000,  // rMax 20%
+            750,     // effrRate 7.5% (scaled 1e4)
+            250,     // riskPremium 2.5% (scaled 1e4)
+            1_000_000 * 1e6, // maxLoanAmount 1,000,000 USDC (6 decimals)
             address(usdc),
             vm.addr(999) // set some address as oracle placeholder
         );
@@ -113,22 +114,28 @@ contract DeployScript is Script {
         microcreditContract.computePageRank();
         vm.stopBroadcast();
 
-        // 4. Oracle sets credit scores
-        vm.startBroadcast(oraclePK);
-        console.logString("Oracle broadcast");
-        console.logUint(vm.addr(oraclePK).balance);
-        // already funded on-chain; no vm.deal needed
+        // 4. Display borrower PageRank scores (no manual credit score setting required)
+        console.logString("Borrower PageRank scores (for reference):");
         for (uint256 j = 0; j < borrowerPKs.length; j++) {
             address borrowerAddr = vm.addr(borrowerPKs[j]);
             uint256 score = microcreditContract.getPageRankScore(borrowerAddr);
-            microcreditContract.updateCreditScore(borrowerAddr, score);
+            console.logString(string.concat("  ", vm.toString(borrowerAddr), " => ", vm.toString(score)));
         }
-        vm.stopBroadcast();
 
         // 5. Borrowers request sample loans
         for (uint256 j = 0; j < borrowerPKs.length; j++) {
             uint256 pk = borrowerPKs[j];
+            address borrowerAddr = vm.addr(pk);
             uint256 requestAmount = (5_000 + j * 2_500) * 1e6; // 5k, 7.5k, 10k
+            
+            // Check credit score and calculate max allowed
+            uint256 creditScore = microcreditContract.getCreditScore(borrowerAddr);
+            uint256 maxAllowed = (creditScore * 10000 * 1e6) / 1e6; // maxLoanAmount = 10000 * 1e6
+            
+            console.logString(string.concat("Borrower ", vm.toString(borrowerAddr), " credit score: ", vm.toString(creditScore)));
+            console.logString(string.concat("Max allowed loan: ", vm.toString(maxAllowed / 1e6), " USDC"));
+            console.logString(string.concat("Requesting: ", vm.toString(requestAmount / 1e6), " USDC"));
+            
             vm.startBroadcast(pk);
             console.logString(string.concat("Borrower loan broadcast: ", vm.toString(vm.addr(pk))));
             console.logUint(vm.addr(pk).balance);

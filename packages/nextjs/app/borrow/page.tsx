@@ -22,6 +22,13 @@ const BorrowPage: NextPage = () => {
     args: [connectedAddress],
   });
 
+  // Fetch pool info for total participants
+  const { data: poolInfo } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getPoolInfo",
+  });
+  const lenderCount = poolInfo ? poolInfo[3] : undefined;
+
   // Write contract functions
   const { writeContractAsync } = useScaffoldWriteContract({
     contractName: "DecentralizedMicrocredit",
@@ -151,8 +158,8 @@ const BorrowPage: NextPage = () => {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-500">
-                    {/* Placeholder for total participants */}
-                    0
+                    {/* Show actual total participants */}
+                    {lenderCount !== undefined ? lenderCount.toString() : "Loading..."}
                   </div>
                   <div className="text-sm text-gray-600">Total Participants</div>
                 </div>
@@ -285,7 +292,7 @@ const BorrowPage: NextPage = () => {
                 </div>
                 <div>
                   <h3 className="font-medium">Better Terms</h3>
-                  <p className="text-gray-600">Higher credit scores lead to lower interest rates and better loan terms</p>
+                  <p className="text-gray-600">A higher credit score unlocks lower interest rates and more favourable repayment terms.</p>
                 </div>
               </div>
             </div>

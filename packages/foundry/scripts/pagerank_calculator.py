@@ -39,7 +39,7 @@ class PageRankCalculator:
         # Add edge with weight
         self.graph.add_edge(attester, borrower, weight=normalized_weight)
         
-    def compute_pagerank(self, damping_factor: float = 0.7, max_iter: int = 100, tol: float = 1e-6) -> Dict[str, float]:
+    def compute_pagerank(self, damping_factor: float = 0.85, max_iter: int = 100, tol: float = 1e-6) -> Dict[str, float]:
         """
         Compute PageRank scores for all nodes
         

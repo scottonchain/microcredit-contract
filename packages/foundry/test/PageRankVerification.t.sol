@@ -59,7 +59,7 @@ contract PageRankVerificationTest is Test {
         usdc = new MockUSDC();
 
         vm.startPrank(owner);
-        credit = new DecentralizedMicrocredit(500, 2000, address(usdc), oracle);
+        credit = new DecentralizedMicrocredit(500, 2000, 10_000e6, address(usdc), oracle);
         vm.stopPrank();
 
         // Set up initial balances
@@ -76,14 +76,7 @@ contract PageRankVerificationTest is Test {
         credit.depositFunds(500000e6);
         vm.stopPrank();
 
-        // Set up credit scores for all test nodes
-        vm.startPrank(oracle);
-        credit.updateCreditScore(NODE1, 500000);
-        credit.updateCreditScore(NODE2, 500000);
-        credit.updateCreditScore(NODE3, 500000);
-        credit.updateCreditScore(NODE4, 500000);
-        credit.updateCreditScore(NODE5, 500000);
-        vm.stopPrank();
+        // No manual credit scores – reputation will be derived from PageRank
     }
 
     function _clearPageRankState() internal {

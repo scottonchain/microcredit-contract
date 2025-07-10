@@ -95,6 +95,14 @@ The frontend automatically reads contract addresses from:
 - `packages/nextjs/contracts/deployedContracts.ts` (for deployed contracts)
 - `packages/nextjs/contracts/externalContracts.ts` (for external contracts)
 
+## 📈 Interest Rate Source (EFFR)
+
+The platform uses the **Effective Federal Funds Rate (EFFR)** as its base rate.  
+For local development and testing the rate is set manually via the `setEffrRate` admin
+function on the `DecentralizedMicrocredit` contract.  In production this value
+will be provided automatically by the on-chain Pyth Network oracle
+([EFFR price feed](https://www.pyth.network/price-feeds/rates-effr)).
+
 ## 🎯 Usage Guide
 
 ### For Borrowers

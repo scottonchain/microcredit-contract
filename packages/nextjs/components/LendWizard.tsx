@@ -14,13 +14,14 @@ const LendWizard: React.FC<LendWizardProps> = ({ connectedAddress }) => {
     functionName: "getPoolInfo",
   });
   const totalDeposits = poolInfo ? Number(poolInfo[0]) : 0;
-  const lenderCount = poolInfo ? Number(poolInfo[2]) : 0;
+  const lenderCount = poolInfo ? Number(poolInfo[3]) : 0;
 
   // Interest bounds (rough yield)
-  const { data: rMin } = useScaffoldReadContract({ contractName: "DecentralizedMicrocredit", functionName: "rMin" });
-  const { data: rMax } = useScaffoldReadContract({ contractName: "DecentralizedMicrocredit", functionName: "rMax" });
-  const rMinPct = rMin ? (Number(rMin) / 10000).toFixed(2) : "-";
-  const rMaxPct = rMax ? (Number(rMax) / 10000).toFixed(2) : "-";
+  const { data: effrRate } = useScaffoldReadContract({ contractName: "DecentralizedMicrocredit", functionName: "effrRate" as any });
+  const { data: riskPremium } = useScaffoldReadContract({ contractName: "DecentralizedMicrocredit", functionName: "riskPremium" as any });
+  const totalRateBp = effrRate && riskPremium ? Number(effrRate) + Number(riskPremium) : undefined;
+  const totalRatePct = totalRateBp !== undefined ? (totalRateBp / 100).toFixed(2) : "-";
+  const effrPct = effrRate !== undefined ? (Number(effrRate) / 100).toFixed(2) : "-";
 
   // NOTE: Contract does not expose per-lender balances yet. We only show pool stats and APR range.
 
@@ -34,7 +35,17 @@ const LendWizard: React.FC<LendWizardProps> = ({ connectedAddress }) => {
       <div className="space-y-4 text-sm text-gray-700">
         <p>
           Earn passive yield by depositing USDC into the shared pool. Funds are matched to borrowers automatically.
-          Current APRs range between <span className="font-semibold">{rMinPct}% – {rMaxPct}%</span>.
+          {/* Base Rate display */}
+          <br />
+          Base Rate (EFFR): <span className="font-semibold">{effrPct}%</span>
+          <span
+            className="tooltip tooltip-bottom ml-1"
+            data-tip="This rate is currently set manually for testing but will be sourced from Pyth Network in production."
+          >
+            ℹ️
+          </span>
+          <br />
+          Platform APR (Base + Premium): <span className="font-semibold">{totalRatePct}%</span>
         </p>
         <p>
           Pool size: <span className="font-semibold">{formatUSDC(BigInt(totalDeposits))}</span> • Active lenders: {lenderCount}
