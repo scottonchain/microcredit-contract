@@ -234,8 +234,8 @@ const ScoresPage: NextPage = () => {
                       2
                     </div>
                     <div>
-                      <h4 className="font-medium">PageRank Algorithm</h4>
-                      <p className="text-gray-600">Scores are calculated using Google&apos;s PageRank algorithm</p>
+                      <h4 className="font-medium">Reputation Engine</h4>
+                      <p className="text-gray-600">Scores are calculated on-chain from social attestations</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">

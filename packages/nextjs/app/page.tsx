@@ -61,16 +61,28 @@ const Home: NextPage = () => {
   const totalRateBp = effrRate && riskPremium ? Number(effrRate) + Number(riskPremium) : undefined;
   const totalRatePct = totalRateBp !== undefined ? (totalRateBp / 100).toFixed(2) : undefined;
 
+  const { data: lentOut } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "totalLentOut" as any,
+  });
+  const { data: utilCapBp } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "lendingUtilizationCap" as any,
+  });
+
+  const utilizationPct = totalDeposits > 0 ? (((Number(lentOut ?? 0) + reservedFunds) / 1e6) / totalDeposits) * 100 : 0;
+  const capPct = utilCapBp ? Number(utilCapBp) / 100 : 0;
+
   return (
     <>
       <div className="flex items-center flex-col grow pt-10">
         <div className="px-5 w-full max-w-7xl">
           <h1 className="text-center">
             <span className="block text-2xl mb-2">Welcome to</span>
-            <span className="block text-4xl font-bold">PeerLend</span>
+            <span className="block text-4xl font-bold">LoanLink</span>
           </h1>
           <p className="text-center text-lg mt-4 mb-4">
-            A social reputation-based lending platform powered by PageRank
+            A social reputation-based lending platform powered by on-chain social underwriting
           </p>
 
           {connectedAddress ? (
@@ -136,10 +148,10 @@ const Home: NextPage = () => {
           ) : (
             // Anonymous visitor card
             <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg text-center">
-              <h2 className="text-xl font-semibold mb-4">Get Started with PeerLend</h2>
+              <h2 className="text-xl font-semibold mb-4">Get Started with LoanLink</h2>
               <p className="text-gray-700 mb-4 max-w-xl mx-auto">
                 Connect your wallet to build a community-backed credit score and access fair micro-loans. Your reputation is
-                calculated using social attestations and the PageRank algorithm.
+                calculated entirely on-chain from social attestations.
               </p>
               <p className="text-gray-700 mb-6 max-w-xl mx-auto">
                 After connecting, you can request loans, lend funds to earn interest, or attest to friends’ creditworthiness.
@@ -161,7 +173,7 @@ const Home: NextPage = () => {
               {
                 icon: <CreditCardIcon className="h-8 w-8 text-green-600" />,
                 title: "Request Loan",
-                description: "Submit loan requests based on your PageRank-based credit score",
+                description: "Submit loan requests based on your social credit score",
                 badgeColor: "bg-green-500",
               },
               {
@@ -202,8 +214,25 @@ const Home: NextPage = () => {
                 </div>
                 <div className="text-sm text-gray-600">Active Lenders</div>
               </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-indigo-500">
+                  {utilizationPct.toFixed(2)}%
+                </div>
+                <div className="text-sm text-gray-600">Pool Utilization</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-indigo-500">
+                  {capPct.toFixed(0)}%
+                </div>
+                <div className="text-sm text-gray-600">Utilization Cap</div>
+              </div>
             </div>
           </div>
+          {utilizationPct > (capPct * 0.9) && (
+            <div className="alert alert-warning mt-4">
+              Lending pool is above 90% of its utilization cap. Withdrawals may be limited until more funds are deposited or loans are repaid.
+            </div>
+          )}
 
           {/* Call to Action */}
           <div className="mt-16 text-center">

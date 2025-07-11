@@ -77,6 +77,13 @@ contract DecentralizedMicrocredit {
     uint256 public lenderCount;                // Unique depositors count
     mapping(address => bool) private isLender; // Tracks whether an address has deposited before
 
+    // ────────────── LENDING UTILIZATION ──────────────
+    // Tracks how much of the pool is currently committed to loans (principal value)
+    uint256 public totalLentOut;
+
+    // Maximum utilisation ratio expressed in BASIS_POINTS (e.g. 9000 = 90 %).
+    uint256 public lendingUtilizationCap;
+
     // Amount of pool liquidity committed to yet-undisbursed loans
     uint256 public reservedLiquidity;
     
@@ -101,6 +108,9 @@ contract DecentralizedMicrocredit {
         basePersonalization = 100 * 1e6;      // $100 in 6-decimals
         kycBonus = 100 * 1e6;                 // $100 bonus for KYC
         personalizationCap = 100 * 1e6;       // Cap funding contribution at $100
+
+        // Initialise utilisation cap at 90 %
+        lendingUtilizationCap = 9000; // 90 % in BASIS_POINTS
     }
     modifier onlyOwner() { require(msg.sender == owner, ""); _; }
     modifier onlyOracle() { require(msg.sender == oracle, ""); _; }
@@ -138,6 +148,15 @@ contract DecentralizedMicrocredit {
 
     function setMaxLoanAmount(uint256 _maxLoanAmount) external onlyOwner {
         maxLoanAmount = _maxLoanAmount;
+    }
+
+    /**
+     * @notice Update the maximum portion of pool funds that can be lent out.
+     * @param cap New cap in BASIS_POINTS (10 000 = 100 %).
+     */
+    function setLendingUtilizationCap(uint256 cap) external onlyOwner {
+        require(cap <= BASIS_POINTS, "Cap cannot exceed 100%");
+        lendingUtilizationCap = cap;
     }
     function depositFunds(uint256 amount) external {
         require(amount > 0, "");
@@ -202,11 +221,16 @@ contract DecentralizedMicrocredit {
         uint256 allowed = (maxLoanAmount / SCALE) * score;
         require(amount <= allowed, "Amount exceeds maximum for score");
 
+        // ────────── Utilisation guard ──────────
+        uint256 newTotalCommitted = reservedLiquidity + totalLentOut + amount;
+        uint256 maxAllowedCommitment = (totalDeposits * lendingUtilizationCap) / BASIS_POINTS;
+        require(newTotalCommitted <= maxAllowedCommitment, "Pool utilisation cap exceeded");
+
         // Ensure sufficient unreserved liquidity in the pool
         uint256 liquidBalance = usdc.balanceOf(address(this));
         require(amount <= liquidBalance - reservedLiquidity, "Insufficient available liquidity");
 
-        // Reserve liquidity immediately upon loan approval
+        // Reserve liquidity immediately upon loan approval; this counts towards utilisation via reservedLiquidity
         reservedLiquidity += amount;
 
         loanId = nextLoanId++;
@@ -218,8 +242,9 @@ contract DecentralizedMicrocredit {
         Loan storage loan = loans[loanId];
         require(loan.isActive, "");
 
-        // Decrease reserved liquidity prior to transfer to avoid re-entrancy edge-cases
+        // Move principal from reserved to lent-out balance (update utilisation state)
         reservedLiquidity -= loan.principal;
+        totalLentOut += loan.principal;
 
         require(usdc.transfer(loan.borrower, loan.principal), "");
     }
@@ -230,6 +255,9 @@ contract DecentralizedMicrocredit {
         require(amount > 0, "");
         require(usdc.transferFrom(msg.sender, address(this), amount), "");
         if (amount >= loan.outstanding) {
+            // Loan fully repaid – free up utilised principal
+            totalLentOut -= loan.principal;
+
             loan.outstanding = 0;
             loan.isActive = false;
         } else {

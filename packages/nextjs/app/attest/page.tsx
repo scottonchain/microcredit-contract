@@ -106,7 +106,7 @@ const AttestPage: NextPage = () => {
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
             <h2 className="text-xl font-semibold mb-4">Attest to Creditworthiness</h2>
             <p className="text-gray-600 mb-6">
-              Provide a confidence rating for someone&apos;s ability to repay loans. Your attestation will influence their PageRank-based credit score.
+              Provide a confidence rating for someone&apos;s ability to repay loans. Your attestation will influence their on-chain credit score.
             </p>
 
             <div className="space-y-6">
@@ -194,8 +194,8 @@ const AttestPage: NextPage = () => {
                   2
                 </div>
                 <div>
-                  <h3 className="font-medium">PageRank Algorithm</h3>
-                  <p className="text-gray-600">The system uses PageRank to calculate credit scores based on attestation weights</p>
+                  <h3 className="font-medium">Reputation Engine</h3>
+                  <p className="text-gray-600">The system aggregates attestations on-chain to calculate credit scores</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">

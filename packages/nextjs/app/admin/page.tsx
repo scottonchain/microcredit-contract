@@ -86,6 +86,19 @@ const AdminPage: NextPage = () => {
   const lenderDepositNumber = lenderDeposit !== undefined ? Number(lenderDeposit) : 0;
   const availableFundsNumber = availableFunds !== undefined ? Number(availableFunds) : 0;
 
+  // Utilisation stats
+  const { data: totalLent } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "totalLentOut" as any,
+  });
+  const { data: utilCap } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "lendingUtilizationCap" as any,
+  });
+
+  const utilisationPct = availableFundsNumber > 0 ? (((Number(totalLent ?? 0) + Number(availableFundsNumber)) / 1e6) / availableFundsNumber) * 100 : 0;
+  const capPct = utilCap ? Number(utilCap) / 100 : 0;
+
   // Show access denied if user doesn't have permissions
   if (!hasAccess) {
     return (
@@ -210,7 +223,11 @@ const AdminPage: NextPage = () => {
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span>PageRank: Available</span>
+                    <span>Reputation Engine: Active</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-2 h-2 rounded-full ${utilisationPct < capPct * 0.9 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                    <span>Pool Utilisation: {utilisationPct.toFixed(2)}% / {capPct.toFixed(0)}%</span>
                   </div>
                 </div>
               </div>
@@ -228,6 +245,11 @@ const AdminPage: NextPage = () => {
                 </div>
               </div>
             </div>
+            {utilisationPct > capPct * 0.9 && (
+              <div className="alert alert-warning mt-4">
+                Warning: pool is above 90% of its utilisation cap. Consider adding liquidity or pausing new loans to ensure withdrawals can be honoured.
+              </div>
+            )}
           </div>
 
           {/* Instructions */}
