@@ -43,11 +43,6 @@ export const menuLinks: HeaderMenuLink[] = [
     icon: <CogIcon className="h-4 w-4" />,
   },
   {
-    label: "Oracle Setup",
-    href: "/oracle-setup",
-    icon: <WrenchScrewdriverIcon className="h-4 w-4" />,
-  },
-  {
     label: "Debug",
     href: "/debug",
     icon: <BugAntIcon className="h-4 w-4" />,
@@ -114,10 +109,10 @@ export const Header = () => {
         </details>
         <Link href="/" passHref className="hidden lg:flex items-center gap-2 ml-4 mr-6 shrink-0">
           <div className="flex relative w-10 h-10">
-            <Image alt="PeerLend logo" className="cursor-pointer" fill src="/logo.svg" />
+            <Image alt="LoanLink logo" className="cursor-pointer" fill src="/logo.svg" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold leading-tight">PeerLend</span>
+            <span className="font-bold leading-tight">LoanLink</span>
             <span className="text-xs">Social lending platform</span>
           </div>
         </Link>

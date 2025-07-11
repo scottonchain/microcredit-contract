@@ -6,7 +6,7 @@ const BorrowHelpPage: NextPage = () => {
     <div className="flex flex-col items-center pt-10 px-5 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold mb-6 text-center">Borrower Guide</h1>
       <p className="text-gray-700 mb-4">
-        PeerLend lets you access small loans backed by your social reputation rather than traditional credit history. Here’s
+        LoanLink lets you access small loans backed by your social reputation rather than traditional credit history. Here’s
         how to get started:
       </p>
       <ol className="list-decimal list-inside space-y-3 text-gray-700">

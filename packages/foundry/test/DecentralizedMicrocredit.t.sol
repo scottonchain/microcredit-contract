@@ -509,4 +509,97 @@ contract DecentralizedMicrocreditTest is Test {
         credit.withdrawFunds(40000e6); // Only 30k left, should revert
         vm.stopPrank();
     }
+
+    function testUtilizationCapEnforced() public {
+        // Deposit 1,000,000 USDC so 90% cap = 900k
+        vm.startPrank(owner);
+        usdc.approve(address(credit), 500000e6);
+        credit.depositFunds(500000e6); // totalDeposits = 1,000,000
+        credit.setMaxLoanAmount(type(uint256).max); // remove per-borrower limit
+        vm.stopPrank();
+
+        // Give borrower minimal reputation
+        vm.prank(lender);
+        credit.recordAttestation(borrower, 800000);
+        credit.computePageRank();
+
+        uint256 score = credit.getCreditScore(borrower);
+        assertGt(score, 0, "Borrower should have positive score");
+
+        // Borrow 850k – below 900k cap
+        vm.startPrank(borrower);
+        uint256 loan1 = credit.requestLoan(850000e6);
+        vm.stopPrank();
+
+        // Borrow additional 50k – reaches exactly 900k cap (should succeed)
+        vm.startPrank(borrower);
+        uint256 loan2 = credit.requestLoan(50000e6);
+        vm.stopPrank();
+
+        // Attempt to borrow 1 USDC more – should revert
+        vm.startPrank(borrower);
+        vm.expectRevert();
+        credit.requestLoan(1e6);
+        vm.stopPrank();
+
+        // reservedLiquidity should equal 900k (loans not yet disbursed)
+        assertEq(credit.reservedLiquidity(), 900000e6);
+    }
+
+    function testUtilizationCapLeavesWithdrawalBuffer() public {
+        // Ensure pool has 1,000,000 USDC
+        vm.startPrank(owner);
+        usdc.approve(address(credit), 500000e6);
+        credit.depositFunds(500000e6);
+        credit.setMaxLoanAmount(type(uint256).max);
+        vm.stopPrank();
+
+        // Create borrower reputation
+        vm.prank(lender);
+        credit.recordAttestation(borrower, 800000);
+        credit.computePageRank();
+        
+        // Borrow 900k (full cap, remains reserved)
+        vm.startPrank(borrower);
+        credit.requestLoan(900000e6);
+        vm.stopPrank();
+
+        // Owner attempts to withdraw 50k (within 100k buffer) – should succeed
+        vm.startPrank(owner);
+        credit.withdrawFunds(50000e6);
+        vm.stopPrank();
+    }
+
+    function testRepayReducesTotalLentOut() public {
+        // Deposit and disburse to track totalLentOut
+        vm.startPrank(owner);
+        usdc.approve(address(credit), 500000e6);
+        credit.depositFunds(500000e6); // total 1,000,000
+        credit.setMaxLoanAmount(type(uint256).max);
+        vm.stopPrank();
+
+        // Reputation
+        vm.prank(lender);
+        credit.recordAttestation(borrower, 800000);
+        credit.computePageRank();
+
+        // Borrow 100k and disburse it so lent out increases
+        vm.startPrank(borrower);
+        uint256 loanId = credit.requestLoan(100000e6);
+        vm.stopPrank();
+        vm.prank(owner);
+        credit.disburseLoan(loanId);
+
+        assertEq(credit.totalLentOut(), 100000e6);
+
+        // Repay full outstanding
+        uint256 payoff = 100000e6 + ((100000e6 * (credit.effrRate() + credit.riskPremium())) / 10000);
+        usdc.mint(borrower, payoff);
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), payoff);
+        credit.repayLoan(loanId, payoff);
+        vm.stopPrank();
+
+        assertEq(credit.totalLentOut(), 0);
+    }
 } 

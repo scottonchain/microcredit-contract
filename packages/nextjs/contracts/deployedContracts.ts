@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     DecentralizedMicrocredit: {
-      address: "0x7c10a8944baa22a41a51b82dc419e866a04e55db",
+      address: "0x270fbc6a0f1007eb41863237eefb773795fd1f9c",
       abi: [
         {
           type: "constructor",
@@ -364,6 +364,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "lendingUtilizationCap",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "markKYCVerified",
           inputs: [
             {
@@ -602,6 +615,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "setLendingUtilizationCap",
+          inputs: [
+            {
+              name: "cap",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "setMaxLoanAmount",
           inputs: [
             {
@@ -667,6 +693,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "totalLentOut",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "usdc",
           inputs: [],
           outputs: [
@@ -693,7 +732,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1752189952.json",
+      deploymentFile: "run-1752265044.json",
       deploymentScript: "Deploy.s.sol",
     },
   },

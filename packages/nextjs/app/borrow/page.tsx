@@ -115,9 +115,9 @@ const BorrowPage: NextPage = () => {
           {showInfo && (
             <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
               <div className="bg-base-100 rounded-lg p-6 max-w-md w-11/12 shadow-lg">
-                <h3 className="text-lg font-semibold mb-3">How PeerLend attestations work</h3>
+                <h3 className="text-lg font-semibold mb-3">How LoanLink attestations work</h3>
                 <p className="text-sm mb-3">
-                  PeerLend builds your credit score from trust attestations your friends and community members give you. Share the link or QR code on this page with people who know you. Each attestation lifts your score.
+                  LoanLink builds your credit score from trust attestations your friends and community members give you. Share the link or QR code on this page with people who know you. Each attestation lifts your score.
                 </p>
                 <p className="text-sm mb-3">
                   Once your score is above zero, the loan request form unlocks and you can apply for your first loan.
@@ -282,8 +282,8 @@ const BorrowPage: NextPage = () => {
                   2
                 </div>
                 <div>
-                  <h3 className="font-medium">PageRank Calculation</h3>
-                  <p className="text-gray-600">The system calculates your credit score using the PageRank algorithm</p>
+                  <h3 className="font-medium">Reputation Engine</h3>
+                  <p className="text-gray-600">Scores are produced by an on-chain reputation engine driven by social attestations</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
