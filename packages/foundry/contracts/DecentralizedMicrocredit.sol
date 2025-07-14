@@ -2,6 +2,7 @@
 pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "forge-std/console.sol";
 
 contract DecentralizedMicrocredit {
     // NOTE: Variable-rate parameters removed in favour of fixed-rate design.
@@ -10,15 +11,15 @@ contract DecentralizedMicrocredit {
     IERC20 public immutable usdc;
     address public owner;
     address public oracle;
-    uint256 public constant SCALE = 1e6;          // Used for credit score scaling
+    uint256 public constant SCALE = 1e6; // Used for credit score scaling
     uint256 public constant BASIS_POINTS = 10000; // Interest-rate scaling (1e4 = 100%)
     uint256 public constant SECONDS_PER_YEAR = 365 days;
     uint256 private nextLoanId = 1;
-    
+
     // PageRank constants (using smaller scale to avoid overflow)
     uint256 constant PR_SCALE = 100000; // 1.0 = 100,000 (smaller scale)
-    uint256 constant PR_ALPHA = 85000;  // 0.85 = 85,000
-    uint256 constant PR_TOL = 100;      // 1e-6 * PR_SCALE
+    uint256 constant PR_ALPHA = 85000; // 0.85 = 85,000
+    uint256 constant PR_TOL = 100; // 1e-6 * PR_SCALE
 
     /* ─────────────────────────────────────────────────────────────────────────────
      *  PERSONALIZATION & PRIME RATE PARAMETERS
@@ -50,15 +51,15 @@ contract DecentralizedMicrocredit {
     // EFFR (Effective Federal Funds Rate), currently set manually for testing.
     // In production, this will be fetched from Pyth Network:
     // https://www.pyth.network/price-feeds/rates-effr
-    uint256 public effrRate;       // Base rate derived from EFFR (e.g. 750 = 7.5%)
-    uint256 public riskPremium;    // Additional platform-wide premium (basis points)
+    uint256 public effrRate; // Base rate derived from EFFR (e.g. 750 = 7.5%)
+    uint256 public riskPremium; // Additional platform-wide premium (basis points)
 
     // Maximum principal a borrower can request scaled in USDC (6-decimals)
     uint256 public maxLoanAmount;
- 
+
     // Per-lender cumulative deposit tracker used when computing personalization
     mapping(address => uint256) public lenderDeposits;
-    
+
     struct Loan {
         uint256 principal;
         uint256 outstanding;
@@ -66,16 +67,34 @@ contract DecentralizedMicrocredit {
         uint256 interestRate;
         bool isActive;
     }
-    struct Attestation { address attester; uint256 weight; }
+    struct Attestation {
+        address attester;
+        uint256 weight;
+    }
     mapping(uint256 => Loan) private loans;
     mapping(address => Attestation[]) private borrowerAttestations;
     // Tracks whether a borrower has completed KYC verification
     mapping(address => bool) public isKYCVerified;
 
     // Lending pool tracking
-    uint256 public totalDeposits;              // Cumulative deposits into the pool (6-decimals like USDC)
-    uint256 public lenderCount;                // Unique depositors count
+    uint256 public totalDeposits; // Cumulative deposits into the pool (6-decimals like USDC)
+    uint256 public lenderCount; // Unique depositors count
     mapping(address => bool) private isLender; // Tracks whether an address has deposited before
+
+    // ────────────── ENUMERATION STORAGE ──────────────
+    // All ever-created loan IDs
+    uint256[] private _allLoanIds;
+    // Unique borrowers and mapping to their loan IDs
+    address[] private _borrowers;
+    mapping(address => bool) private _borrowerSeen;
+    mapping(address => uint256[]) private _borrowerLoans;
+
+    // Unique lenders list (addresses that have deposited at least once)
+    address[] private _lenders;
+
+    // Unique attesters – filled when an address calls recordAttestation at least once
+    address[] private _attesters;
+    mapping(address => bool) private _attesterSeen;
 
     // ────────────── LENDING UTILIZATION ──────────────
     // Tracks how much of the pool is currently committed to loans (principal value)
@@ -86,7 +105,7 @@ contract DecentralizedMicrocredit {
 
     // Amount of pool liquidity committed to yet-undisbursed loans
     uint256 public reservedLiquidity;
-    
+
     // PageRank storage
     address[] private pagerankNodes;
     mapping(address => bool) private pagerankNodeExists;
@@ -94,9 +113,16 @@ contract DecentralizedMicrocredit {
     mapping(address => uint256) private pagerankOutDegree;
     // Exposed as public to enable off-chain inspection and simplify tests.
     mapping(address => uint256) public pagerankScores;
-    mapping(address => mapping(address => uint256)) private pagerankStochasticEdges;
-    
-    constructor(uint256 _effrRate, uint256 _riskPremium, uint256 _maxLoanAmount, address _usdc, address _oracle) {
+    mapping(address => mapping(address => uint256))
+        private pagerankStochasticEdges;
+
+    constructor(
+        uint256 _effrRate,
+        uint256 _riskPremium,
+        uint256 _maxLoanAmount,
+        address _usdc,
+        address _oracle
+    ) {
         require(_usdc != address(0) && _oracle != address(0), "");
         usdc = IERC20(_usdc);
         owner = msg.sender;
@@ -105,15 +131,23 @@ contract DecentralizedMicrocredit {
         effrRate = _effrRate;
         riskPremium = _riskPremium;
         maxLoanAmount = _maxLoanAmount;
-        basePersonalization = 100 * 1e6;      // $100 in 6-decimals
-        kycBonus = 100 * 1e6;                 // $100 bonus for KYC
-        personalizationCap = 100 * 1e6;       // Cap funding contribution at $100
+        basePersonalization = 100 * 1e6; // $100 in 6-decimals
+        kycBonus = 100 * 1e6; // $100 bonus for KYC
+        personalizationCap = 100 * 1e6; // Cap funding contribution at $100
 
         // Initialise utilisation cap at 90 %
         lendingUtilizationCap = 9000; // 90 % in BASIS_POINTS
     }
-    modifier onlyOwner() { require(msg.sender == owner, ""); _; }
-    modifier onlyOracle() { require(msg.sender == oracle, ""); _; }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "");
+        _;
+    }
+    modifier onlyOracle() {
+        require(msg.sender == oracle, "");
+        _;
+    }
+
     // Note: variable-rate setter removed in the fixed-rate model.
     function setOracle(address _oracle) external onlyOwner {
         require(_oracle != address(0), "");
@@ -158,6 +192,32 @@ contract DecentralizedMicrocredit {
         require(cap <= BASIS_POINTS, "Cap cannot exceed 100%");
         lendingUtilizationCap = cap;
     }
+
+    /**
+     * ------------------------------------------------------------------------
+     *  VIEW HELPERS FOR FRONT-END
+     * ---------------------------------------------------------------------*/
+
+    /**
+     * @notice Borrower loan rate (EFFR + premium) expressed in BASIS_POINTS.
+     */
+    function getLoanRate() external view returns (uint256) {
+        return effrRate + riskPremium; // e.g. 1000 = 10 % APR
+    }
+
+    /**
+     * @notice Projected APY for liquidity providers given current utilisation.
+     * @dev    Returns 0 when the pool is empty.
+     *         APY = LoanRate * Utilisation.
+     */
+    function getFundingPoolAPY() external view returns (uint256) {
+        if (totalDeposits == 0) return 0;
+        uint256 active = totalLentOut + reservedLiquidity; // principal accruing interest (includes yet-to-disburse)
+        uint256 utilisationBp = (active * BASIS_POINTS) / totalDeposits; // 0-10000
+        uint256 loanRateBp = effrRate + riskPremium;
+        return (loanRateBp * utilisationBp) / BASIS_POINTS; // BASIS_POINTS output
+    }
+
     function depositFunds(uint256 amount) external {
         require(amount > 0, "");
         require(usdc.transferFrom(msg.sender, address(this), amount), "");
@@ -170,15 +230,22 @@ contract DecentralizedMicrocredit {
         if (!isLender[msg.sender]) {
             isLender[msg.sender] = true;
             lenderCount += 1;
+            _lenders.push(msg.sender);
         }
     }
 
     function withdrawFunds(uint256 amount) external {
         require(amount > 0, "Amount must be > 0");
-        require(lenderDeposits[msg.sender] >= amount, "Insufficient deposited balance");
+        require(
+            lenderDeposits[msg.sender] >= amount,
+            "Insufficient deposited balance"
+        );
 
         uint256 liquidBalance = usdc.balanceOf(address(this));
-        require(liquidBalance - reservedLiquidity >= amount, "Not enough liquid funds (some reserved for loans)");
+        require(
+            liquidBalance - reservedLiquidity >= amount,
+            "Not enough liquid funds (some reserved for loans)"
+        );
 
         lenderDeposits[msg.sender] -= amount;
         totalDeposits -= amount;
@@ -192,23 +259,34 @@ contract DecentralizedMicrocredit {
      * @return _reservedFunds   Funds committed to pending loan disbursements
      * @return _lenderCount     Unique addresses that have deposited
      */
-    function getPoolInfo() external view returns (
-        uint256 _totalDeposits,
-        uint256 _availableFunds,
-        uint256 _reservedFunds,
-        uint256 _lenderCount
-    ) {
+    function getPoolInfo()
+        external
+        view
+        returns (
+            uint256 _totalDeposits,
+            uint256 _availableFunds,
+            uint256 _reservedFunds,
+            uint256 _lenderCount
+        )
+    {
         _totalDeposits = totalDeposits;
         _reservedFunds = reservedLiquidity;
         _availableFunds = usdc.balanceOf(address(this)) - _reservedFunds;
         _lenderCount = lenderCount;
     }
-    function previewLoanTerms(address borrower, uint256 principal, uint256 repaymentPeriod) external view returns (uint256 interestRate, uint256 payment) {
+
+    function previewLoanTerms(
+        address borrower,
+        uint256 principal,
+        uint256 repaymentPeriod
+    ) external view returns (uint256 interestRate, uint256 payment) {
         // Fixed global rate (prime + premium)
         interestRate = effrRate + riskPremium;
-        uint256 interest = (principal * interestRate * repaymentPeriod) / (BASIS_POINTS * SECONDS_PER_YEAR);
+        uint256 interest = (principal * interestRate * repaymentPeriod) /
+            (BASIS_POINTS * SECONDS_PER_YEAR);
         payment = (principal + interest) / (repaymentPeriod / 30 days);
     }
+
     function requestLoan(uint256 amount) external returns (uint256 loanId) {
         require(amount > 0, "");
         uint256 score = getCreditScore(msg.sender);
@@ -223,12 +301,19 @@ contract DecentralizedMicrocredit {
 
         // ────────── Utilisation guard ──────────
         uint256 newTotalCommitted = reservedLiquidity + totalLentOut + amount;
-        uint256 maxAllowedCommitment = (totalDeposits * lendingUtilizationCap) / BASIS_POINTS;
-        require(newTotalCommitted <= maxAllowedCommitment, "Pool utilisation cap exceeded");
+        uint256 maxAllowedCommitment = (totalDeposits * lendingUtilizationCap) /
+            BASIS_POINTS;
+        require(
+            newTotalCommitted <= maxAllowedCommitment,
+            "Pool utilisation cap exceeded"
+        );
 
         // Ensure sufficient unreserved liquidity in the pool
         uint256 liquidBalance = usdc.balanceOf(address(this));
-        require(amount <= liquidBalance - reservedLiquidity, "Insufficient available liquidity");
+        require(
+            amount <= liquidBalance - reservedLiquidity,
+            "Insufficient available liquidity"
+        );
 
         // Reserve liquidity immediately upon loan approval; this counts towards utilisation via reservedLiquidity
         reservedLiquidity += amount;
@@ -237,17 +322,44 @@ contract DecentralizedMicrocredit {
         uint256 rate = effrRate + riskPremium;
         uint256 interest = (amount * rate) / BASIS_POINTS;
         loans[loanId] = Loan(amount, amount + interest, msg.sender, rate, true);
-    }
-    function disburseLoan(uint256 loanId) external {
-        Loan storage loan = loans[loanId];
-        require(loan.isActive, "");
 
-        // Move principal from reserved to lent-out balance (update utilisation state)
-        reservedLiquidity -= loan.principal;
-        totalLentOut += loan.principal;
-
-        require(usdc.transfer(loan.borrower, loan.principal), "");
+        // ───── enumeration bookkeeping ─────
+        _allLoanIds.push(loanId);
+        if (!_borrowerSeen[msg.sender]) {
+            _borrowerSeen[msg.sender] = true;
+            _borrowers.push(msg.sender);
+        }
+        _borrowerLoans[msg.sender].push(loanId);
     }
+
+function disburseLoan(uint256 loanId) external {
+    Loan storage loan = loans[loanId];
+    require(loan.isActive, "Loan is not active");
+
+    // Log before state changes
+    console.log("Before state update. Reserved liquidity:", reservedLiquidity, "Total lent out:", totalLentOut);
+
+    // Move principal from reserved to lent-out balance (update utilisation state)
+    reservedLiquidity -= loan.principal;
+    totalLentOut += loan.principal;
+
+    // Log after state changes
+    console.log("After state update. Reserved liquidity:", reservedLiquidity, "Total lent out:", totalLentOut);
+
+    // Log before transfer
+    console.log("Initiating token transfer to borrower:", loan.borrower, "Amount:", loan.principal);
+
+    bool success = usdc.transfer(loan.borrower, loan.principal);
+    if (!success) {
+        console.log("Token transfer failed for borrower:", loan.borrower, "Amount:", loan.principal);
+        revert("Token transfer failed");
+    }
+
+    // Log after transfer
+    console.log("Token transfer successful to borrower:", loan.borrower);
+}
+
+
     function repayLoan(uint256 loanId, uint256 amount) external {
         Loan storage loan = loans[loanId];
         require(loan.isActive, "");
@@ -264,25 +376,73 @@ contract DecentralizedMicrocredit {
             loan.outstanding -= amount;
         }
     }
-    function recordAttestation(address borrower, uint256 weight) external {
-        require(weight <= SCALE, "");
-        require(borrower != msg.sender, "");
-        
-        // Add to PageRank graph first (always do this)
-        _addPagerankNode(msg.sender);
-        _addPagerankNode(borrower);
-        _addPagerankEdge(msg.sender, borrower, weight);
-        
-        // Then handle attestation storage
-        Attestation[] storage attests = borrowerAttestations[borrower];
-        for (uint256 i = 0; i < attests.length; i++) {
-            if (attests[i].attester == msg.sender) { 
-                attests[i].weight = weight; 
-                return; 
-            }
+
+
+    function addressToString(address _address) public pure returns (string memory) {
+        bytes memory addressBytes = abi.encodePacked(_address);
+        bytes memory hexString = new bytes(42); // Length for '0x' + 40 hex chars
+
+        hexString[0] = '0';
+        hexString[1] = 'x';
+
+        for (uint i = 0; i < 20; i++) {
+            uint8 byteVal = uint8(addressBytes[i]);
+            hexString[2 + i * 2] = _byteToHexChar(byteVal >> 4);
+            hexString[3 + i * 2] = _byteToHexChar(byteVal & 0x0f);
         }
-        attests.push(Attestation(msg.sender, weight));
+
+        return string(hexString);
     }
+
+    // Helper function to convert a byte to its corresponding hex character
+    function _byteToHexChar(uint8 _byte) internal pure returns (bytes1) {
+        if (_byte < 10) {
+            return bytes1(_byte + 48); // ASCII code for '0' to '9'
+        } else {
+            return bytes1(_byte + 87); // ASCII code for 'a' to 'f'
+        }
+    }
+
+ function recordAttestation(address borrower, uint256 weight) external {
+    uint256 gasBeforeRA = gasleft(); // Capture gas before the operation
+    uint256 gasUsedForAttestation = 0;
+    uint256 gasAfterRA = 0;
+    string memory borrowerString = addressToString(borrower);
+    bytes32 borrowerBytes = bytes32(bytes(borrowerString));
+    console.log("Attestation recordAttestation:", borrower);
+    console.log("Attestation recordAttestation: Block number:", block.number);
+
+    // Your attestation logic
+    require(weight <= SCALE, "");
+    require(borrower != msg.sender, "");
+
+    if (!_attesterSeen[msg.sender]) {
+        _attesterSeen[msg.sender] = true;
+        _attesters.push(msg.sender);
+    }
+
+    _addPagerankNode(msg.sender);
+    _addPagerankNode(borrower);
+    _addPagerankEdge(msg.sender, borrower, weight);
+
+    Attestation[] storage attests = borrowerAttestations[borrower];
+    for (uint256 i = 0; i < attests.length; i++) {
+        if (attests[i].attester == msg.sender) {
+            attests[i].weight = weight;
+            gasAfterRA = gasleft(); // Capture gas after the operation
+            gasUsedForAttestation += gasBeforeRA - gasAfterRA; // Calculate gas used and update tracking variable
+            console.log("Attestation recordAttestation: Gas after:", gasAfterRA, "Gas used:", gasUsedForAttestation);
+            return;
+        }
+    }
+    attests.push(Attestation(msg.sender, weight));
+
+    gasAfterRA = gasleft(); // Capture gas after the operation
+    gasUsedForAttestation += gasBeforeRA - gasAfterRA; // Calculate gas used and update tracking variable
+    console.log("Attestation recordAttestation: Gas after:", gasAfterRA, "Gas used:", gasUsedForAttestation);
+}
+
+
     // ─────────────────────────────────────────────────────────────────────
     //  CREDIT SCORE
     //  Computed dynamically from PageRank so no storage is required.
@@ -295,8 +455,9 @@ contract DecentralizedMicrocredit {
         // Produces a smooth 0 → SCALE output that breaks PageRank’s zero-sum nature.
         uint256 pr = pagerankScores[user]; // 0 – PR_SCALE (1e5)
         uint256 x = (pr * 1000) / PR_SCALE; // 0 – 1000
-        return (SCALE * x) / (x + 100);    // 0 – SCALE (1e6)
+        return (SCALE * x) / (x + 100); // 0 – SCALE (1e6)
     }
+
     /**
      * @notice Mark a user as having passed KYC verification
      * @dev Can only be called by the oracle address set by the owner
@@ -306,41 +467,70 @@ contract DecentralizedMicrocredit {
         require(!isKYCVerified[user], "Already verified");
         isKYCVerified[user] = true;
     }
-    function getLoan(uint256 loanId) external view returns (uint256 principal, uint256 outstanding, address borrower, uint256 interestRate, bool isActive) {
+
+    function getLoan(
+        uint256 loanId
+    )
+        external
+        view
+        returns (
+            uint256 principal,
+            uint256 outstanding,
+            address borrower,
+            uint256 interestRate,
+            bool isActive
+        )
+    {
         Loan storage loan = loans[loanId];
-        return (loan.principal, loan.outstanding, loan.borrower, loan.interestRate, loan.isActive);
+        return (
+            loan.principal,
+            loan.outstanding,
+            loan.borrower,
+            loan.interestRate,
+            loan.isActive
+        );
     }
-    function computeAttesterReward(uint256 loanId, address attester) external view returns (uint256 reward) {
+
+    function computeAttesterReward(
+        uint256 loanId,
+        address attester
+    ) external view returns (uint256 reward) {
         Loan storage loan = loans[loanId];
         Attestation[] storage attests = borrowerAttestations[loan.borrower];
         uint256 totalWeight = 0;
         uint256 attesterWeight = 0;
         for (uint256 i = 0; i < attests.length; i++) {
             totalWeight += attests[i].weight;
-            if (attests[i].attester == attester) { attesterWeight = attests[i].weight; }
+            if (attests[i].attester == attester) {
+                attesterWeight = attests[i].weight;
+            }
         }
         if (totalWeight == 0 || attesterWeight == 0) return 0;
         uint256 totalReward = (loan.principal * 50000) / SCALE;
         reward = (totalReward * attesterWeight) / totalWeight;
     }
-    
+
     // PageRank functions
     function computePageRank() external returns (uint256 iterations) {
         return _computePageRank(PR_ALPHA, 100, PR_TOL); // Adjusted maxIter and tol
     }
-    
+
     function getPageRankScore(address node) external view returns (uint256) {
         return pagerankScores[node];
     }
-    
-    function getAllPageRankScores() external view returns (address[] memory nodes, uint256[] memory scores) {
+
+    function getAllPageRankScores()
+        external
+        view
+        returns (address[] memory nodes, uint256[] memory scores)
+    {
         nodes = pagerankNodes;
         scores = new uint256[](nodes.length);
         for (uint256 i = 0; i < nodes.length; i++) {
             scores[i] = pagerankScores[nodes[i]];
         }
     }
-    
+
     function clearPageRankState() external {
         // Clear all PageRank data
         for (uint256 i = 0; i < pagerankNodes.length; i++) {
@@ -348,7 +538,7 @@ contract DecentralizedMicrocredit {
             pagerankNodeExists[node] = false;
             pagerankScores[node] = 0;
             pagerankOutDegree[node] = 0;
-            
+
             // Clear edges
             for (uint256 j = 0; j < pagerankNodes.length; j++) {
                 address target = pagerankNodes[j];
@@ -356,33 +546,41 @@ contract DecentralizedMicrocredit {
                 pagerankStochasticEdges[node][target] = 0;
             }
         }
-        
+
         // Clear arrays
         delete pagerankNodes;
     }
-    
+
     function _addPagerankNode(address node) internal {
         if (!pagerankNodeExists[node]) {
             pagerankNodes.push(node);
             pagerankNodeExists[node] = true;
         }
     }
-    
-    function _addPagerankEdge(address from, address to, uint256 weight) internal {
+
+    function _addPagerankEdge(
+        address from,
+        address to,
+        uint256 weight
+    ) internal {
         pagerankEdges[from][to] = weight;
         pagerankOutDegree[from] += weight;
     }
-    
-    function _computePageRank(uint256 alpha, uint256 maxIter, uint256 tol) internal returns (uint256 iterations) {
+
+    function _computePageRank(
+        uint256 alpha,
+        uint256 maxIter,
+        uint256 tol
+    ) internal returns (uint256 iterations) {
         if (pagerankNodes.length == 0) return 0;
-        
+
         // Initialize scores to 1.0 / numberOfNodes (scaled) - NetworkX default
         uint256 initialScore = PR_SCALE / pagerankNodes.length;
         for (uint256 i = 0; i < pagerankNodes.length; i++) {
             address node = pagerankNodes[i];
             pagerankScores[node] = initialScore;
         }
-        
+
         // Create stochastic graph (normalize edge weights by out-degree)
         _createStochasticGraph();
 
@@ -394,27 +592,27 @@ contract DecentralizedMicrocredit {
         // Run PageRank iterations
         iterations = 0;
         bool converged = false;
-        
+
         while (iterations < maxIter && !converged) {
             converged = _pagerankIteration(alpha, tol, personalizationVector);
             iterations++;
         }
-        
+
         return iterations;
     }
-    
+
     function _createStochasticGraph() internal {
         // Clear previous stochastic weights
         for (uint256 i = 0; i < pagerankNodes.length; i++) {
             address node = pagerankNodes[i];
             uint256 outDegree = pagerankOutDegree[node];
-            
+
             // Clear all stochastic edges for this node
             for (uint256 j = 0; j < pagerankNodes.length; j++) {
                 address target = pagerankNodes[j];
                 pagerankStochasticEdges[node][target] = 0;
             }
-            
+
             if (outDegree > 0) {
                 // Normalize edge weights by out-degree
                 for (uint256 j = 0; j < pagerankNodes.length; j++) {
@@ -422,20 +620,26 @@ contract DecentralizedMicrocredit {
                     uint256 originalWeight = pagerankEdges[node][target];
                     if (originalWeight > 0) {
                         // Normalize: weight / out_degree
-                        pagerankStochasticEdges[node][target] = (originalWeight * PR_SCALE) / outDegree;
+                        pagerankStochasticEdges[node][target] =
+                            (originalWeight * PR_SCALE) /
+                            outDegree;
                     }
                 }
             }
         }
     }
-    
+
     /**
      * @dev One Gauss-Seidel style PageRank iteration using node-specific
      *      personalization vector.  Returns `true` when L1 delta < tol * N.
      */
-    function _pagerankIteration(uint256 alpha, uint256 tol, uint256[] memory personalizationVector) internal returns (bool converged) {
+    function _pagerankIteration(
+        uint256 alpha,
+        uint256 tol,
+        uint256[] memory personalizationVector
+    ) internal returns (bool converged) {
         uint256 totalDelta = 0;
-        
+
         // Compute dangling sum (sum of scores from nodes with no outgoing edges)
         uint256 danglingSum = 0;
         for (uint256 i = 0; i < pagerankNodes.length; i++) {
@@ -444,19 +648,19 @@ contract DecentralizedMicrocredit {
                 danglingSum += pagerankScores[node];
             }
         }
-        
+
         // Store old scores in temporary array
         uint256[] memory oldScores = new uint256[](pagerankNodes.length);
         for (uint256 i = 0; i < pagerankNodes.length; i++) {
             oldScores[i] = pagerankScores[pagerankNodes[i]];
         }
-        
+
         // Process each node
         for (uint256 i = 0; i < pagerankNodes.length; i++) {
             address node = pagerankNodes[i];
             uint256 oldScore = oldScores[i];
             uint256 incomingScore = 0;
-            
+
             // Sum incoming scores from nodes that point to this node
             // This is the key part: we need to accumulate scores for the target node
             for (uint256 j = 0; j < pagerankNodes.length; j++) {
@@ -466,35 +670,44 @@ contract DecentralizedMicrocredit {
                     // NetworkX does: x[nbr] += alpha * xlast[n] * wt
                     // So we accumulate for the target node (node) from source
                     uint256 sourceScore = oldScores[j];
-                    uint256 contribution = (alpha * sourceScore * weight) / (PR_SCALE * PR_SCALE);
+                    uint256 contribution = (alpha * sourceScore * weight) /
+                        (PR_SCALE * PR_SCALE);
                     incomingScore += contribution;
                 }
             }
-            
+
             // Add dangling contribution (distributed according to personalization vector)
             uint256 danglingContribution = 0;
             if (danglingSum > 0) {
                 // NetworkX: x[n] += danglesum * dangling_weights.get(n, 0)
                 // Since we use uniform personalization, dangling_weights[n] = 1/N
-                uint256 danglingPerNode = (alpha * danglingSum) / (PR_SCALE * pagerankNodes.length);
+                uint256 danglingPerNode = (alpha * danglingSum) /
+                    (PR_SCALE * pagerankNodes.length);
                 danglingContribution = danglingPerNode;
             }
-            
+
             // Update score using weighted personalization vector
             // Teleportation: (1 – α) * p[node]  (all values scaled by PR_SCALE)
-            uint256 teleportationContribution = ((PR_SCALE - alpha) * personalizationVector[i]) / PR_SCALE;
-            uint256 newScore = incomingScore + danglingContribution + teleportationContribution;
+            uint256 teleportationContribution = ((PR_SCALE - alpha) *
+                personalizationVector[i]) / PR_SCALE;
+            uint256 newScore = incomingScore +
+                danglingContribution +
+                teleportationContribution;
             pagerankScores[node] = newScore;
-            
+
             // Track convergence
-            uint256 delta = oldScore > newScore ? oldScore - newScore : newScore - oldScore;
+            uint256 delta = oldScore > newScore
+                ? oldScore - newScore
+                : newScore - oldScore;
             totalDelta += delta;
         }
-        
+
         return totalDelta < (tol * pagerankNodes.length);
     }
-    
-    function _calculateInterest(uint256 /*ignored*/ ) internal view returns (uint256 rate) {
+
+    function _calculateInterest(
+        uint256 /*ignored*/
+    ) internal view returns (uint256 rate) {
         // Fixed platform-wide rate independent of individual credit score.
         return effrRate + riskPremium;
     }
@@ -504,7 +717,11 @@ contract DecentralizedMicrocredit {
      * @dev Each node’s raw weight = BASE + min(deposits, CAP) + (KYC? BONUS:0).
      *      The array is then scaled so that Σp_i = PR_SCALE (1.0 in our units).
      */
-    function _buildPersonalizationVector() internal view returns (uint256[] memory vector) {
+    function _buildPersonalizationVector()
+        internal
+        view
+        returns (uint256[] memory vector)
+    {
         uint256 n = pagerankNodes.length;
         vector = new uint256[](n);
         if (n == 0) {
@@ -540,5 +757,41 @@ contract DecentralizedMicrocredit {
                 vector[i] = (vector[i] * PR_SCALE) / totalWeight;
             }
         }
+    }
+
+    /**
+     * ------------------------------------------------------------------------
+     *  ENUMERATION GETTERS – used by Admin dashboard
+     * ---------------------------------------------------------------------*/
+
+    function getAllLoanIds() external view returns (uint256[] memory) {
+        return _allLoanIds;
+    }
+
+    function getBorrowers() external view returns (address[] memory) {
+        return _borrowers;
+    }
+
+    function getBorrowerLoanIds(
+        address borrower
+    ) external view returns (uint256[] memory) {
+        return _borrowerLoans[borrower];
+    }
+
+    function getLenders() external view returns (address[] memory) {
+        return _lenders;
+    }
+
+    function getAttesters() external view returns (address[] memory) {
+        return _attesters;
+    }
+
+    /**
+     * @notice Return all attestations received by a borrower for front-end use.
+     */
+    function getBorrowerAttestations(
+        address borrower
+    ) external view returns (Attestation[] memory) {
+        return borrowerAttestations[borrower];
     }
 }

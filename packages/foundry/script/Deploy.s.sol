@@ -3,16 +3,8 @@ pragma solidity ^0.8.30;
 
 import "forge-std/Script.sol";
 import "../contracts/DecentralizedMicrocredit.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
-// Lightweight 6-decimals mock USDC token
-contract MockUSDC is ERC20 {
-    constructor() ERC20("USD Coin", "USDC") {}
-    function decimals() public pure override returns (uint8) { return 6; }
-    function mint(address to, uint256 amount) external {
-        _mint(to, amount);
-    }
-}
+import "../contracts/MockUSDC.sol";
+import "./SeedDemo.s.sol";
 
 /**
  * @notice Main deployment script for all contracts
@@ -40,9 +32,9 @@ contract DeployScript is Script {
 
         // Deploy the Microcredit contract (oracle temporarily set to deployer)
         DecentralizedMicrocredit microcreditContract = new DecentralizedMicrocredit(
-            750,     // effrRate 7.5% (scaled 1e4)
-            250,     // riskPremium 2.5% (scaled 1e4)
-            1_000_000 * 1e6, // maxLoanAmount 1,000,000 USDC (6 decimals)
+            550,     // effrRate 5.5% (scaled 1e4) – closer to historical Fed funds
+            350,     // riskPremium 3.5% (scaled 1e4) – platform premium
+            100 * 1e6, // maxLoanAmount 100 USDC (6 decimals) – matches personalization cap
             address(usdc),
             vm.addr(999) // set some address as oracle placeholder
         );
@@ -51,14 +43,19 @@ contract DeployScript is Script {
         address deployer = vm.addr(deployerPrivateKey);
 
         // Arrays of private keys (hard-coded for local demo). NEVER use in prod.
-        uint256[3] memory lenderPKs = [uint256(1), uint256(2), uint256(3)];
-        uint256[3] memory borrowerPKs = [uint256(11), uint256(12), uint256(13)];
+        uint256[4] memory lenderPKs = [uint256(1), uint256(2), uint256(3), uint256(4)];
+        uint256[8] memory borrowerPKs = [uint256(11), uint256(12), uint256(13), uint256(14), uint256(15), uint256(16), uint256(17), uint256(18)];
         uint256 oraclePK = 999;
+
+        // Lender seed funding tuned for Base gas-limit demo (≈78 % utilisation)
+        uint256[4] memory depositUsd = [uint256(3_000), 3_000, 3_000, 3_000]; // 12k total
 
         // 1. Mint USDC to lenders and send them ETH for gas (on-chain transfers)
         for (uint256 i = 0; i < lenderPKs.length; i++) {
             address payable lender = payable(vm.addr(lenderPKs[i]));
-            uint256 amountUSDC = (50_000 + (i * 25_000)) * 1e6; // 50k,75k,100k
+
+            uint256 amountUSDC = depositUsd[i] * 1e6;
+
             usdc.mint(lender, amountUSDC);
 
             // send 1 ether for gas – uses deployer's balance
@@ -81,7 +78,7 @@ contract DeployScript is Script {
         // Deposit funds (each lender broadcasts individually)
         for (uint256 i = 0; i < lenderPKs.length; i++) {
             uint256 pk = lenderPKs[i];
-            uint256 amount = (50_000 + (i * 25_000)) * 1e6;
+            uint256 amount = depositUsd[i] * 1e6; // match minted amounts
             vm.startBroadcast(pk);
             console.logString(string.concat("Lender deposit broadcast: ", vm.toString(vm.addr(pk))));
             console.logUint(vm.addr(pk).balance);
@@ -92,7 +89,7 @@ contract DeployScript is Script {
         }
 
         // 2. Create social attestations from lenders → borrowers
-        uint256 weight = 80_000; // 80% confidence (basis points)
+        uint256 weight = 75_000; // 75% confidence (basis points) average
         for (uint256 i = 0; i < lenderPKs.length; i++) {
             uint256 pk = lenderPKs[i];
             vm.startBroadcast(pk);
@@ -126,31 +123,35 @@ contract DeployScript is Script {
         for (uint256 j = 0; j < borrowerPKs.length; j++) {
             uint256 pk = borrowerPKs[j];
             address borrowerAddr = vm.addr(pk);
-            uint256 requestAmount = (5_000 + j * 2_500) * 1e6; // 5k, 7.5k, 10k
-            
-            // Check credit score and calculate max allowed
+            // Compute borrower credit parameters
             uint256 creditScore = microcreditContract.getCreditScore(borrowerAddr);
-            uint256 maxAllowed = (creditScore * 10000 * 1e6) / 1e6; // maxLoanAmount = 10000 * 1e6
+            uint256 maxAllowed = (microcreditContract.maxLoanAmount() * creditScore) / 1e6;
+
+            // Borrow full credit-based allowance to maximise utilisation
+            uint256 requestAmount = maxAllowed;
             
             console.logString(string.concat("Borrower ", vm.toString(borrowerAddr), " credit score: ", vm.toString(creditScore)));
-            console.logString(string.concat("Max allowed loan: ", vm.toString(maxAllowed / 1e6), " USDC"));
-            console.logString(string.concat("Requesting: ", vm.toString(requestAmount / 1e6), " USDC"));
+            console.logString(string.concat("Taking max loan: ", vm.toString(requestAmount / 1e6), " USDC"));
             
             vm.startBroadcast(pk);
             console.logString(string.concat("Borrower loan broadcast: ", vm.toString(vm.addr(pk))));
             console.logUint(vm.addr(pk).balance);
             // already funded on-chain; no vm.deal needed
-            microcreditContract.requestLoan(requestAmount);
+            uint256 newLoanId = microcreditContract.requestLoan(requestAmount);
+            // Immediately disburse to mark principal as lent-out
+            microcreditContract.disburseLoan(newLoanId);
             vm.stopBroadcast();
         }
 
         // Log summary
-        console.logString(string.concat("MockUSDC deployed at: ", vm.toString(address(usdc))));
         console.logString(string.concat("DecentralizedMicrocredit deployed at: ", vm.toString(address(microcreditContract))));
         console.logString("--- Ecosystem seeded ---");
-        console.logString("Lenders deposited: 50k, 75k, 100k USDC");
-        console.logString("Borrowers created 3 loan requests (5k-10k USDC)");
-
+        console.logString("Lenders deposited 3k USDC each (total 12k)");
+        console.logString("Borrowers drew max loans (~47 USDC each)");
+ 
+        // OPTIONAL: populate demo data (deposits, attestations, loans) – comment out for production
+        new SeedDemo().seed(address(microcreditContract), address(usdc));
+ 
         // Save deployment information
         string memory json = "{}";
         json = vm.serializeAddress(json, "DecentralizedMicrocredit", address(microcreditContract));

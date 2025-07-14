@@ -2,6 +2,9 @@
 
 DEPLOY_SCRIPT ?= script/Deploy.s.sol
 
+# Default per-transaction gas limit (override by exporting GAS_LIMIT)
+GAS_LIMIT ?= 100000000
+
 # setup wallet for anvil
 setup-anvil-wallet:
 	shx rm ~/.foundry/keystores/scaffold-eth-default 2>/dev/null; 	shx rm -rf broadcast/Deploy.s.sol/31337
@@ -23,12 +26,12 @@ deploy:
 	fi
 	@if [ "$(RPC_URL)" = "localhost" ]; then \
 		if [ "$(ETH_KEYSTORE_ACCOUNT)" = "scaffold-eth-default" ]; then \
-			forge script $(DEPLOY_SCRIPT):DeployScript --rpc-url localhost --password localhost --broadcast --legacy --ffi; \
+			forge script $(DEPLOY_SCRIPT):DeployScript --rpc-url localhost --password localhost --broadcast --legacy --ffi --gas-limit $(GAS_LIMIT); \
 		else \
-			forge script $(DEPLOY_SCRIPT):DeployScript --rpc-url localhost --broadcast --legacy --ffi; \
+			forge script $(DEPLOY_SCRIPT):DeployScript --rpc-url localhost --broadcast --legacy --ffi --gas-limit $(GAS_LIMIT); \
 		fi \
 	else \
-		forge script $(DEPLOY_SCRIPT):DeployScript --rpc-url $(RPC_URL) --broadcast --legacy --ffi; \
+		forge script $(DEPLOY_SCRIPT):DeployScript --rpc-url $(RPC_URL) --broadcast --legacy --ffi --gas-limit $(GAS_LIMIT); \
 	fi
 
 # Deploy and generate ABIs
