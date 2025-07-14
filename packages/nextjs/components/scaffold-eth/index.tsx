@@ -3,5 +3,7 @@ export * from "./Balance";
 export * from "./BlockieAvatar";
 export * from "./Faucet";
 export * from "./FaucetButton";
+export * from "./USDCFaucetButton";
 export * from "./Input";
 export * from "./RainbowKitCustomConnectButton";
+export * from "./DisplayNameContext";

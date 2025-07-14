@@ -3,11 +3,12 @@
 import { useState } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import { CreditCardIcon, CalculatorIcon, InformationCircleIcon } from "@heroicons/react/24/outline";
+import { CreditCardIcon, CalculatorIcon, InformationCircleIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
+import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 
 const BorrowPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -27,7 +28,23 @@ const BorrowPage: NextPage = () => {
     contractName: "DecentralizedMicrocredit",
     functionName: "getPoolInfo",
   });
-  const lenderCount = poolInfo ? poolInfo[3] : undefined;
+
+  // Fetch current pool APR (lender yield) so borrowers can see prevailing rate
+  const { data: poolApyBp } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getFundingPoolAPY" as any,
+  });
+  // Convert basis-points to percentage with two decimals (e.g. 785 ⇒ "7.85")
+  const poolRatePercent = poolApyBp !== undefined ? (Number(poolApyBp) / 100).toFixed(2) : undefined;
+  // Removed lenderCount usage
+
+  // Fetch maxLoanAmount to compute eligible amount
+  const { data: maxLoanAmount } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "maxLoanAmount",
+  });
+
+  const { displayName } = useDisplayName();
 
   // Write contract functions
   const { writeContractAsync } = useScaffoldWriteContract({
@@ -80,37 +97,101 @@ const BorrowPage: NextPage = () => {
             <h1 className="text-3xl font-bold">Request Loan</h1>
           </div>
 
-          {/* Attestation Call-to-Action (shown first if no credit yet) */}
-          {!hasCredit && (
-            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8 flex flex-col items-center">
-              <div className="flex items-center justify-center mb-4 gap-2">
-                <h2 className="text-xl font-semibold text-center">Build Your Credit – Get Attestations</h2>
-                <button
-                  onClick={() => setShowInfo(true)}
-                  className="text-info hover:text-info/80"
-                  aria-label="What does this mean?"
+          {/* Borrower Widgets (CTA + Profile) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+
+            {/* Attestation Call-to-Action */}
+            {!hasCredit && (
+              <div className="bg-base-100 rounded-lg p-6 shadow-lg flex flex-col items-center">
+                <div className="flex items-center justify-center mb-4 gap-2">
+                  <h2 className="text-xl font-semibold text-center">Your Personal Attestation Link</h2>
+                  <button
+                    onClick={() => setShowInfo(true)}
+                    className="text-info hover:text-info/80"
+                    aria-label="What does this mean?"
+                  >
+                    <InformationCircleIcon className="h-5 w-5" />
+                  </button>
+                </div>
+                <div
+                  onClick={() => {
+                    navigator.clipboard.writeText(attestationUrl);
+                    alert("Attestation link copied! Share it with your community.");
+                  }}
+                  className="cursor-pointer flex flex-col items-center"
                 >
-                  <InformationCircleIcon className="h-5 w-5" />
-                </button>
+                  <QRCodeDisplay value={attestationUrl} size={120} />
+                  <span className="text-xs text-gray-500">Click to copy</span>
+                </div>
+                <div className="text-xs flex items-center justify-center gap-1 text-blue-600 mt-3 max-w-full">
+                  <a
+                    href={attestationUrl}
+                    target="_blank"
+                    className="underline truncate max-w-[220px]"
+                    title={attestationUrl}
+                  >
+                    {attestationUrl}
+                  </a>
+                  <DocumentDuplicateIcon
+                    className="h-4 w-4 cursor-pointer flex-shrink-0"
+                    onClick={() => { navigator.clipboard.writeText(attestationUrl); alert("Attestation link copied! Share it with your community."); }}
+                  />
+                </div>
               </div>
-              <QRCodeDisplay value={attestationUrl} size={180} />
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(attestationUrl);
-                  alert("Attestation link copied! Share it with your community.");
-                }}
-                className="btn btn-primary mt-4"
-              >
-                Copy Attestation Link
-              </button>
-              <p
-                className="text-xs text-gray-500 mt-2 truncate max-w-full text-center"
-                title={attestationUrl}
-              >
-                {attestationUrl}
-              </p>
-            </div>
-          )}
+            )}
+
+            {/* Your Account Profile */}
+            {connectedAddress && (
+              <div className="bg-base-100 rounded-lg p-6 shadow-lg">
+                <h2 className="text-xl font-semibold mb-4">Your Account Profile{displayName && ` – ${displayName}`}</h2>
+
+                {creditScore && Number(creditScore) > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Credit Score */}
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-green-500">
+                        {(Number(creditScore) / 1000).toFixed(2)}%
+                      </div>
+                      <div className="text-sm text-gray-600">Credit Score</div>
+                    </div>
+
+                    {/* Eligible Amount */}
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-500">
+                        {maxLoanAmount !== undefined ? formatUSDC(BigInt(maxLoanAmount) * BigInt(creditScore!) / BigInt(1e6)) : "-"}
+                      </div>
+                      <div className="text-sm text-gray-600">Eligible to Borrow</div>
+                    </div>
+
+                    {/* Amount Borrowed (placeholder) */}
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-500">0</div>
+                      <div className="text-sm text-gray-600">Amount Borrowed</div>
+                    </div>
+
+                    {/* Pool APR */}
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-500">
+                        {poolRatePercent !== undefined ? `${poolRatePercent}%` : "-"}
+                      </div>
+                      <div className="text-sm text-gray-600">Pool APR</div>
+                    </div>
+
+                    {/* Outstanding & Due Date placeholders */}
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-500">0</div>
+                      <div className="text-sm text-gray-600">Amount Owed</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-yellow-600 text-sm text-center md:flex md:items-start md:justify-center md:h-full md:-mt-2">
+                    You&apos;ll unlock borrowing once you gain at least one attestation and your credit score is above zero.
+                  </div>
+                )}
+                </div>
+            )}
+
+          </div>
 
           {showInfo && (
             <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
@@ -127,49 +208,6 @@ const BorrowPage: NextPage = () => {
                   <Link href="/help/borrow" className="link">Read the Borrower guide</Link>.
                 </p>
                 <button onClick={() => setShowInfo(false)} className="btn btn-primary w-full">Got it</button>
-              </div>
-            </div>
-          )}
-
-          {/* Your Credit Score */}
-          {connectedAddress && (
-            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-              <h2 className="text-xl font-semibold mb-4">Your Credit Profile</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  {creditScore && Number(creditScore) > 0 ? (
-                    <>
-                      <div className="text-4xl font-bold text-green-500">
-                        {(Number(creditScore) / 1000).toFixed(2)}%
-                      </div>
-                      <div className="text-sm text-gray-600">Credit Score</div>
-                      <div className="text-lg font-medium mt-1">
-                        {Number(creditScore) / 1000 < 30 ? "Poor" :
-                          Number(creditScore) / 1000 < 50 ? "Fair" :
-                          Number(creditScore) / 1000 < 70 ? "Good" :
-                          Number(creditScore) / 1000 < 90 ? "Very Good" : "Excellent"}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-yellow-600 text-sm">
-                      No attestations yet. Share your attestation link above to build your score.
-                    </div>
-                  )}
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-500">
-                    {/* Show actual total participants */}
-                    {lenderCount !== undefined ? lenderCount.toString() : "Loading..."}
-                  </div>
-                  <div className="text-sm text-gray-600">Total Participants</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-500">
-                    {/* Placeholder for attestations */}
-                    0
-                  </div>
-                  <div className="text-sm text-gray-600">Your Attestations</div>
-                </div>
               </div>
             </div>
           )}

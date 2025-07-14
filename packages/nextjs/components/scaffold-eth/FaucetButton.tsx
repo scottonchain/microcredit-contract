@@ -54,9 +54,12 @@ export const FaucetButton = () => {
 
   return (
     <div className="ml-1">
-      <button className="btn btn-secondary btn-sm px-2 rounded-full" onClick={sendETH} disabled={loading}>
+      <button className="btn btn-secondary btn-sm px-2 rounded-full w-20" onClick={sendETH} disabled={loading}>
         {!loading ? (
-          <BanknotesIcon className="h-4 w-4" />
+          <>
+            <BanknotesIcon className="h-4 w-4 mr-1" />
+            <span className="text-[10px] font-semibold">ETH</span>
+          </>
         ) : (
           <span className="loading loading-spinner loading-xs"></span>
         )}

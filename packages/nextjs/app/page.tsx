@@ -16,6 +16,7 @@ import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import BorrowWizard from "~~/components/BorrowWizard";
 import LendWizard from "~~/components/LendWizard";
+import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 
 const Home: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -60,6 +61,7 @@ const Home: NextPage = () => {
 
   const totalRateBp = effrRate && riskPremium ? Number(effrRate) + Number(riskPremium) : undefined;
   const totalRatePct = totalRateBp !== undefined ? (totalRateBp / 100).toFixed(2) : undefined;
+  const { displayName } = useDisplayName();
 
   const { data: lentOut } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
@@ -88,12 +90,26 @@ const Home: NextPage = () => {
           {connectedAddress ? (
             <>
               <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg flex flex-col">
-                <h2 className="text-xl font-semibold mb-4">Your Profile</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <UserIcon className="h-5 w-5" />
-                    <span className="font-medium">Address:</span>
-                    <Address address={connectedAddress} />
+                  <div className="flex flex-col">
+                    <h2 className="text-xl font-semibold mb-2">Your Profile</h2>
+                    <div className="flex items-start space-x-2">
+                      <UserIcon className="h-5 w-5" />
+                      <span className="font-medium">Address:</span>
+                      <Address address={connectedAddress} />
+                    </div>
+                    {displayName && (
+                      <span className="ml-7 mt-1 font-medium text-sm">{displayName}</span>
+                    )}
+                    <div className="flex items-center space-x-2 mt-2">
+                      <BanknotesIcon className="h-4 w-4" />
+                      <span className="font-medium">Status:</span>
+                      {Number(pageRankScore ?? 0) > 0 ? (
+                        <span className="font-semibold text-green-600">Eligible for loans</span>
+                      ) : (
+                        <span className="font-semibold text-red-600">Not eligible yet</span>
+                      )}
+                    </div>
                   </div>
                   {Number(pageRankScore ?? 0) > 0 ? (
                     <div className="flex items-center space-x-2">
@@ -104,29 +120,12 @@ const Home: NextPage = () => {
                       </span>
                     </div>
                   ) : (
-                    <div className="col-span-2 text-sm md:text-base text-gray-700 leading-relaxed">
-                      <p className="mb-1">
-                        You don&rsquo;t have a credit score yet. Build your reputation by:
-                      </p>
-                      <ul className="list-disc list-inside space-y-1">
-                        <li>Requesting social attestations from friends or community members</li>
-                        <li>Completing KYC verification</li>
-                        <li>Depositing funds or interacting on-chain</li>
-                      </ul>
-                      <p className="mt-2">
-                        Once you have a score you&rsquo;ll be able to request your first micro-loan.
+                    <div className="col-span-2 text-sm md:text-base text-gray-700 leading-relaxed md:flex md:items-center md:h-full">
+                      <p>
+                        You don&rsquo;t have a credit score yet. Request social attestations from friends or community members to unlock your first micro-loan.
                       </p>
                     </div>
                   )}
-                  <div className="flex items-center space-x-2">
-                    <BanknotesIcon className="h-5 w-5" />
-                    <span className="font-medium">Status:</span>
-                    {Number(pageRankScore ?? 0) > 0 ? (
-                      <span className="text-lg font-bold text-green-600">Eligible for loans</span>
-                    ) : (
-                      <span className="text-lg font-bold text-red-600">Not eligible yet</span>
-                    )}
-                  </div>
                 </div>
 
                 {/* Borrow CTA */}

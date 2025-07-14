@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 import { NetworkOptions } from "./NetworkOptions";
 import { getAddress } from "viem";
 import { Address } from "viem";
@@ -11,6 +12,7 @@ import {
   ChevronDownIcon,
   DocumentDuplicateIcon,
   QrCodeIcon,
+  PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import { BlockieAvatar, isENS } from "~~/components/scaffold-eth";
 import { useCopyToClipboard, useOutsideClick } from "~~/hooks/scaffold-eth";
@@ -44,6 +46,13 @@ export const AddressInfoDropdown = ({
     dropdownRef.current?.removeAttribute("open");
   };
 
+  const { setDisplayName } = useDisplayName();
+  const editName = () => {
+    const name = window.prompt("Enter display name (demo only, not on-chain)", displayName);
+    if (name !== null) setDisplayName(name);
+    closeDropdown();
+  };
+
   useOutsideClick(dropdownRef, closeDropdown);
 
   return (
@@ -52,7 +61,7 @@ export const AddressInfoDropdown = ({
         <summary className="btn btn-secondary btn-sm pl-0 pr-2 shadow-md dropdown-toggle gap-0 h-auto!">
           <BlockieAvatar address={checkSumAddress} size={30} ensImage={ensAvatar} />
           <span className="ml-2 mr-1">
-            {isENS(displayName) ? displayName : checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4)}
+            {displayName ? displayName : checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4)}
           </span>
           <ChevronDownIcon className="h-6 w-4 ml-2 sm:ml-0" />
         </summary>
@@ -81,6 +90,11 @@ export const AddressInfoDropdown = ({
               <QrCodeIcon className="h-6 w-4 ml-2 sm:ml-0" />
               <span className="whitespace-nowrap">View QR Code</span>
             </label>
+          </li>
+          <li className={selectingNetwork ? "hidden" : ""}>
+            <button className="h-8 btn-sm rounded-xl! flex gap-3 py-3" type="button" onClick={editName}>
+              <PencilSquareIcon className="h-6 w-4 ml-2 sm:ml-0" /> <span>Edit display name</span>
+            </button>
           </li>
           <li className={selectingNetwork ? "hidden" : ""}>
             <button className="h-8 btn-sm rounded-xl! flex gap-3 py-3" type="button">
