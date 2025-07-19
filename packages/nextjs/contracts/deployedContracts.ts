@@ -342,7 +342,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1752531427.json",
+      deploymentFile: "run-1752952713.json",
       deploymentScript: "Deploy.s.sol",
     },
     DecentralizedMicrocredit: {
@@ -453,6 +453,13 @@ const deployedContracts = {
         {
           type: "function",
           name: "clearPageRankState",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "clearPageRankStateEfficient",
           inputs: [],
           outputs: [],
           stateMutability: "nonpayable",
@@ -630,6 +637,19 @@ const deployedContracts = {
         {
           type: "function",
           name: "getBorrowers",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address[]",
+              internalType: "address[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getBorrowersWithAttestations",
           inputs: [],
           outputs: [
             {
@@ -999,6 +1019,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "registerBorrower",
+          inputs: [
+            {
+              name: "borrower",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "repayLoan",
           inputs: [
             {
@@ -1218,7 +1251,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1752531427.json",
+      deploymentFile: "run-1752952713.json",
       deploymentScript: "Deploy.s.sol",
     },
   },
