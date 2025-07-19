@@ -81,7 +81,7 @@ const Home: NextPage = () => {
         <div className="px-5 w-full max-w-7xl">
           <h1 className="text-center">
             <span className="block text-2xl mb-2">Welcome to</span>
-            <span className="block text-4xl font-bold">LoanLink</span>
+            <span className="block text-4xl font-bold text-green-600">LoanLink</span>
           </h1>
           <p className="text-center text-lg mt-4 mb-4">
             A social reputation-based lending platform powered by on-chain social underwriting
