@@ -276,7 +276,7 @@ contract DecentralizedMicrocredit {
     }
 
     function previewLoanTerms(
-        address borrower,
+        address /* borrower */,
         uint256 principal,
         uint256 repaymentPeriod
     ) external view returns (uint256 interestRate, uint256 payment) {
@@ -408,7 +408,6 @@ function disburseLoan(uint256 loanId) external {
     uint256 gasUsedForAttestation = 0;
     uint256 gasAfterRA = 0;
     string memory borrowerString = addressToString(borrower);
-    bytes32 borrowerBytes = bytes32(bytes(borrowerString));
     console.log("Attestation recordAttestation:", borrower);
     console.log("Attestation recordAttestation: Block number:", block.number);
 

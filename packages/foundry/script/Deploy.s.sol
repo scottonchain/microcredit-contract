@@ -1,54 +1,55 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.30;
 
 import "forge-std/Script.sol";
 import "../contracts/DecentralizedMicrocredit.sol";
 import "../contracts/MockUSDC.sol";
 
 /**
- * @notice Deploys MockUSDC & DecentralizedMicrocredit, mints USDC + ETH to 10 lenders,
- * and writes deployment.json with addresses.
+ * @notice Main deployment script for all contracts
+ * @dev Run this when you want to deploy multiple contracts at once
+ *
+ * Example: yarn deploy # runs this script(without`--file` flag)
  */
 contract DeployScript is Script {
     function run() external {
-        // Start broadcasting - the private key will be provided by the forge script command
-        vm.startBroadcast();
+        // Debug: Print the current working directory
+        console.logString(string.concat("Current working directory: ", vm.projectRoot()));
+        
+        // Debug: Print the sender address
+        console.logString(string.concat("Sender address: ", vm.toString(msg.sender)));
+        
+        // Use the default Anvil account for local deployment
+        uint256 deployerPrivateKey = 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6;
+        console.logString("Using default Anvil account");
+        
+        // Start broadcasting transactions
+        vm.startBroadcast(deployerPrivateKey);
 
-        // 1) Deploy token + microcredit
+        // Deploy mock USDC and mint initial supply
         MockUSDC usdc = new MockUSDC();
-        DecentralizedMicrocredit micro = new DecentralizedMicrocredit(
-            550,       // 5.5% effrRate (1e4)
-            350,       // 3.5% riskPremium (1e4)
-            100 * 1e6, // maxLoan = 100 USDC (6 decimals)
+
+        // Deploy the Microcredit contract (oracle temporarily set to deployer)
+        DecentralizedMicrocredit microcreditContract = new DecentralizedMicrocredit(
+            550,     // effrRate 5.5% (scaled 1e4) – closer to historical Fed funds
+            350,     // riskPremium 3.5% (scaled 1e4) – platform premium
+            100 * 1e6, // maxLoanAmount 100 USDC (6 decimals) – matches personalization cap
             address(usdc),
-            vm.addr(999) // placeholder oracle
+            vm.addr(999) // set some address as oracle placeholder
         );
 
-        // 2) Mint USDC + ETH top-up for 10 lenders
-        // Read the mnemonic from the environment, passed in by the Makefile
-        string memory mnemonic = vm.envString("MNEMONIC");
-        require(bytes(mnemonic).length > 0, "MNEMONIC env var not set");
-
-        uint256 depositAmount = 3000 * 1e6; // 3,000 USDC
-
-        for (uint i = 0; i < 10; i++) {
-            // Derive the private key for each lender account using cast-compatible derivation
-            uint256 lenderPK = vm.deriveKey(mnemonic, uint32(i));
-            address payable lender = payable(vm.addr(lenderPK));
-
-            // mint 3,000 USDC
-            usdc.mint(lender, depositAmount);
-            // send 1 ETH for gas
-            (bool ok, ) = lender.call{value: 1 ether}("");
-            require(ok, "ETH topup failed");
-        }
-
-        vm.stopBroadcast();
-
-        // 3) Write deployment.json for Makefile
+        // Log deployment information
+        console.logString(string.concat("DecentralizedMicrocredit deployed at: ", vm.toString(address(microcreditContract))));
+        console.logString(string.concat("MockUSDC deployed at: ", vm.toString(address(usdc))));
+        console.logString("--- Contracts deployed successfully ---");
+        console.logString("Use the web interface to populate test data (lenders, borrowers, attestations)");
+ 
+        // Save deployment information
         string memory json = "{}";
-        json = vm.serializeAddress(json, "MICRO_ADDRESS", address(micro));
-        json = vm.serializeAddress(json, "USDC_ADDRESS", address(usdc));
+        json = vm.serializeAddress(json, "DecentralizedMicrocredit", address(microcreditContract));
+        json = vm.serializeAddress(json, "USDC", address(usdc));
         vm.writeFile("deployment.json", json);
     }
+
+    function test() public {}
 }
