@@ -7,6 +7,24 @@ import { CogIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { formatPercent, formatUSDC } from "~~/utils/format";
+import { createPublicClient, http } from "viem";
+import { localhost } from "viem/chains";
+import deployedContracts from "~~/contracts/deployedContracts";
+import Link from "next/link";
+
+// Constants for contract interaction
+const CHAIN_ID = 31337; // Localhost chain ID
+const RPC_URL = "http://localhost:8545";
+
+// Read deployed addresses from the contracts file
+const deployedContractsData = deployedContracts[31337];
+const CONTRACT_ADDRESS = deployedContractsData?.DecentralizedMicrocredit?.address;
+const USDC_ADDRESS = deployedContractsData?.MockUSDC?.address;
+
+const publicClient = createPublicClient({
+  chain: { ...localhost, id: CHAIN_ID },
+  transport: http(RPC_URL),
+});
 
 const AdminPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -46,45 +64,13 @@ const AdminPage: NextPage = () => {
   const isWhitelisted = connectedAddress ? ADDITIONAL_ADMINS.includes(connectedAddress.toLowerCase()) : false;
   const hasAccess = isOwner || isOracle || isWhitelisted;
 
-  // Credit-score lookup
-  const [lookupAddress, setLookupAddress] = useState<string>("");
-  const { data: lookupScore } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "getPageRankScore",
-    args: [lookupAddress as `0x${string}` | undefined],
-  });
-
-  // Lender lookup
-  const [lenderLookup, setLenderLookup] = useState<string>("");
-  const { data: lenderDeposit } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "lenderDeposits",
-    args: [lenderLookup as `0x${string}` | undefined],
-  });
+  // Pool info for overview stats
   const { data: poolInfo } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "getPoolInfo",
   });
   const availableFunds = poolInfo ? poolInfo[1] : undefined;
   const lenderCount = poolInfo ? poolInfo[3] : undefined;
-  const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [withdrawLoading, setWithdrawLoading] = useState(false);
-
-  const handleWithdraw = async () => {
-    if (!withdrawAmount || !connectedAddress) return;
-    setWithdrawLoading(true);
-    try {
-      await writeContractAsync({
-        functionName: "withdrawFunds",
-        args: [BigInt(Math.floor(parseFloat(withdrawAmount) * 1e6))],
-      });
-      setWithdrawAmount("");
-    } catch (error) {
-      console.error("Error withdrawing funds:", error);
-    } finally {
-      setWithdrawLoading(false);
-    }
-  };
 
   const handleComputePageRank = async () => {
     setPageRankLoading(true);
@@ -162,7 +148,6 @@ const AdminPage: NextPage = () => {
 
 
   // Helper numbers
-  const lenderDepositNumber = lenderDeposit !== undefined ? Number(lenderDeposit) : 0;
   const availableFundsNumber = availableFunds !== undefined ? Number(availableFunds) : 0;
 
   // Utilisation stats
@@ -173,6 +158,24 @@ const AdminPage: NextPage = () => {
   const { data: utilCap } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "lendingUtilizationCap",
+  });
+
+  // Interest rate parameters
+  const { data: effrRate } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "effrRate",
+  });
+  const { data: riskPremium } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "riskPremium",
+  });
+  const { data: loanRate } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getLoanRate",
+  });
+  const { data: fundingPoolAPY } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getFundingPoolAPY",
   });
 
   const utilisationPct =
@@ -305,6 +308,89 @@ const AdminPage: NextPage = () => {
     );
   };
 
+  // ──────────── BORROWER LOAN AMOUNTS COMPONENT ────────────
+  const BorrowerLoanAmounts = ({ loanIds }: { loanIds: readonly bigint[] }) => {
+    const [totalAmount, setTotalAmount] = useState<bigint>(0n);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+      const fetchLoanAmounts = async () => {
+        if (loanIds.length === 0) {
+          setTotalAmount(0n);
+          setIsLoading(false);
+          return;
+        }
+
+        let total = 0n;
+        for (const loanId of loanIds) {
+          try {
+            const loan = await publicClient.readContract({
+              address: CONTRACT_ADDRESS as `0x${string}`,
+              abi: deployedContractsData.DecentralizedMicrocredit.abi,
+              functionName: "getLoan",
+              args: [loanId],
+            });
+            
+            if (loan && loan[4]) { // loan[4] is isActive
+              total += loan[0]; // loan[0] is principal
+            }
+          } catch (error) {
+            console.error(`Failed to fetch loan ${loanId}:`, error);
+          }
+        }
+        
+        setTotalAmount(total);
+        setIsLoading(false);
+      };
+
+      fetchLoanAmounts();
+    }, [loanIds]);
+
+    if (isLoading) {
+      return <span className="text-gray-500">Loading...</span>;
+    }
+
+    return (
+      <div className="text-sm">
+        <div className="text-gray-600">
+          {formatUSDC(totalAmount)}
+        </div>
+      </div>
+    );
+  };
+
+  // ──────────── BORROWER MAX LOAN AMOUNT COMPONENT ────────────
+  const BorrowerMaxLoanAmount = ({ creditScore }: { creditScore: bigint | undefined }) => {
+    const { data: maxLoanAmount } = useScaffoldReadContract({
+      contractName: "DecentralizedMicrocredit",
+      functionName: "maxLoanAmount",
+    });
+
+    const maxAllowedAmount = useMemo(() => {
+      if (!creditScore || !maxLoanAmount) return 0n;
+      
+      // Calculate max allowed amount based on credit score
+      // Formula: (maxLoanAmount / SCALE) * creditScore
+      // where SCALE = 1e6 and creditScore is in the same scale
+      return (BigInt(maxLoanAmount) * creditScore) / BigInt(1e6);
+    }, [creditScore, maxLoanAmount]);
+
+    if (!creditScore || creditScore === 0n) {
+      return <span className="text-gray-500">No credit</span>;
+    }
+
+    return (
+      <div className="text-sm">
+        <div className="text-green-600 font-medium">
+          {formatUSDC(maxAllowedAmount)}
+        </div>
+        <div className="text-gray-600 text-xs">
+          Max eligible
+        </div>
+      </div>
+    );
+  };
+
   // ──────────── BORROWERS TABLE ────────────
   const BorrowerRow = ({ address, index }: { address: `0x${string}`; index: number }) => {
     const { data: creditScore } = useScaffoldReadContract({
@@ -324,6 +410,23 @@ const AdminPage: NextPage = () => {
       functionName: "isKYCVerified",
       args: [address],
     });
+
+    // Get borrower's loan IDs
+    const { data: borrowerLoanIds } = useScaffoldReadContract({
+      contractName: "DecentralizedMicrocredit",
+      functionName: "getBorrowerLoanIds",
+      args: [address],
+    });
+
+    // Calculate total loan amount from all active loans
+    const totalLoanAmount = useMemo(() => {
+      if (!borrowerLoanIds || borrowerLoanIds.length === 0) return 0n;
+      
+      // For now, we'll show the count of loans
+      // In a future implementation, we could fetch individual loan details
+      // to show the actual total amount borrowed
+      return 0n; // Placeholder for total amount calculation
+    }, [borrowerLoanIds]);
 
     const getCreditScoreColor = (score: bigint | undefined) => {
       if (!score) return "text-gray-500";
@@ -346,6 +449,16 @@ const AdminPage: NextPage = () => {
         </td>
         <td>
           {pageRankScore ? `${(Number(pageRankScore) / 1000).toFixed(2)}%` : "-"}
+        </td>
+        <td>
+          {borrowerLoanIds && borrowerLoanIds.length > 0 ? (
+            <BorrowerLoanAmounts loanIds={borrowerLoanIds} />
+          ) : (
+            <span className="text-gray-500">No loans</span>
+          )}
+        </td>
+        <td>
+          <BorrowerMaxLoanAmount creditScore={creditScore} />
         </td>
         <td>
           {kycVerified ? (
@@ -392,6 +505,8 @@ const AdminPage: NextPage = () => {
                 <th>Address</th>
                 <th>Credit Score</th>
                 <th>PageRank</th>
+                <th>Loans</th>
+                <th>Max Loan</th>
                 <th>KYC Status</th>
               </tr>
             </thead>
@@ -424,57 +539,137 @@ const AdminPage: NextPage = () => {
   };
 
   // ──────────── ATTESTATIONS TABLE ────────────
-  const AttestationRows = ({ borrower }: { borrower: `0x${string}` }) => {
-    const { data: attests } = useScaffoldReadContract({
-      contractName: "DecentralizedMicrocredit",
-      functionName: "getBorrowerAttestations",
-      args: [borrower],
-    });
-
-    if (!attests) return null;
-    const list = attests as readonly any[];
-    return (
-      <>
-        {list.map((a, i) => {
-          const attesterAddr = (a.attester ?? a[0]) as `0x${string}`;
-          const weightVal = (a.weight ?? a[1]) as bigint;
-          return (
-            <tr key={`${borrower}-${attesterAddr}-${i}`} className="hover text-sm">
-              <td>
-                <Address address={attesterAddr} />
-              </td>
-              <td>
-                <Address address={borrower} />
-              </td>
-              <td>{(Number(weightVal) / 10000).toFixed(1)}%</td>
-            </tr>
-          );
-        })}
-      </>
-    );
-  };
-
   const AttestationsTable = ({ borrowers }: { borrowers?: readonly `0x${string}`[] }) => {
+    const [filter, setFilter] = useState("");
+    const [allAttestations, setAllAttestations] = useState<Array<{
+      borrower: `0x${string}`;
+      attester: `0x${string}`;
+      weight: bigint;
+    }>>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Fetch all attestations when component mounts
+    useEffect(() => {
+      const fetchAllAttestations = async () => {
+        if (!borrowers || borrowers.length === 0) {
+          setAllAttestations([]);
+          setIsLoading(false);
+          return;
+        }
+
+        const attestations: Array<{
+          borrower: `0x${string}`;
+          attester: `0x${string}`;
+          weight: bigint;
+        }> = [];
+
+        // Fetch attestations for each borrower
+        for (const borrower of borrowers) {
+          try {
+            console.log(`Fetching attestations for borrower: ${borrower}`);
+            const attests = await publicClient.readContract({
+              address: CONTRACT_ADDRESS as `0x${string}`,
+              abi: deployedContractsData.DecentralizedMicrocredit.abi,
+              functionName: "getBorrowerAttestations",
+              args: [borrower],
+            });
+
+            console.log(`Attestations for ${borrower}:`, attests);
+            
+            if (attests && Array.isArray(attests)) {
+              const list = attests as readonly any[];
+              list.forEach((a) => {
+                const attesterAddr = (a.attester ?? a[0]) as `0x${string}`;
+                const weightVal = (a.weight ?? a[1]) as bigint;
+                attestations.push({
+                  borrower,
+                  attester: attesterAddr,
+                  weight: weightVal,
+                });
+              });
+            }
+          } catch (error) {
+            console.error(`Failed to fetch attestations for borrower ${borrower}:`, error);
+            // Continue with other borrowers even if one fails
+          }
+        }
+
+        setAllAttestations(attestations);
+        setIsLoading(false);
+      };
+
+      fetchAllAttestations();
+    }, [borrowers]);
+
+    // Filter attestations based on search text
+    const filteredAttestations = useMemo(() => {
+      if (!filter) return allAttestations;
+      
+      const lowerFilter = filter.toLowerCase();
+      return allAttestations.filter(att => 
+        att.borrower.toLowerCase().includes(lowerFilter) ||
+        att.attester.toLowerCase().includes(lowerFilter)
+      );
+    }, [allAttestations, filter]);
+
     if (!borrowers || borrowers.length === 0) return null;
+
     return (
       <div>
         <h3 className="font-medium mb-2">Attestations</h3>
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="Filter by borrower or attester address"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            className="input input-bordered w-full max-w-md"
+          />
+        </div>
         <div className="overflow-x-auto max-h-96">
           <table className="table w-full">
             <thead>
               <tr>
+                <th>Borrower</th>
                 <th>Attester</th>
-                <th>Attestee</th>
                 <th>Strength</th>
               </tr>
             </thead>
             <tbody>
-              {borrowers.map(b => (
-                <AttestationRows key={b} borrower={b as `0x${string}`} />
-              ))}
+              {isLoading ? (
+                <tr>
+                  <td colSpan={3} className="text-center text-gray-500 py-4">
+                    Loading attestations...
+                  </td>
+                </tr>
+              ) : filteredAttestations.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="text-center text-gray-500 py-4">
+                    {filter ? 'No attestations match your filter' : 'No attestations found'}
+                  </td>
+                </tr>
+              ) : (
+                filteredAttestations.map((att, index) => (
+                  <tr key={`${att.borrower}-${att.attester}-${index}`} className="hover text-sm">
+                    <td>
+                      <Address address={att.borrower} />
+                    </td>
+                    <td>
+                      <Address address={att.attester} />
+                    </td>
+                    <td>{(Number(att.weight) / 10000).toFixed(1)}%</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
+        {filteredAttestations.length > 0 && (
+          <div className="mt-2 text-sm text-gray-600">
+            Showing {filteredAttestations.length} of {allAttestations.length} attestations
+            {filter && ` (filtered by "${filter}")`}
+          </div>
+        )}
       </div>
     );
   };
@@ -564,93 +759,81 @@ const AdminPage: NextPage = () => {
             <CogIcon className="h-8 w-8 mr-3" />
             <h1 className="text-3xl font-bold">Admin Panel</h1>
           </div>
+          
+          {/* Navigation Links */}
+          <div className="flex justify-center mb-6">
+            <Link 
+              href="/populate_test_data" 
+              className="btn btn-primary btn-sm"
+            >
+              🛠️ Populate Test Data
+            </Link>
+          </div>
 
-          {/* Credit Score Lookup */}
+
+
+          {/* Pool Utilization Widget */}
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">Credit Score Lookup</h2>
-            {!hasPageRankScores && (
-              <div className="alert alert-warning mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <span>PageRank scores have not been computed yet. Credit scores will show as 0% until PageRank is computed.</span>
+            <h2 className="text-xl font-semibold mb-4">Pool Utilization</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-green-50 p-4 rounded-lg">
+                <h3 className="font-medium text-green-800 mb-2">Total Pool</h3>
+                <div className="text-2xl font-bold text-green-600">
+                  {poolInfo ? formatUSDC(poolInfo[0]) : "Loading..."}
+                </div>
+                <p className="text-sm text-green-600 mt-1">Total deposits</p>
+              </div>
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-medium text-blue-800 mb-2">Amount Lent Out</h3>
+                <div className="text-2xl font-bold text-blue-600">
+                  {totalLent ? formatUSDC(totalLent) : "Loading..."}
+                </div>
+                <p className="text-sm text-blue-600 mt-1">Currently active loans</p>
+              </div>
+              <div className="bg-orange-50 p-4 rounded-lg">
+                <h3 className="font-medium text-orange-800 mb-2">Available Funds</h3>
+                <div className="text-2xl font-bold text-orange-600">
+                  {poolInfo ? formatUSDC(poolInfo[1]) : "Loading..."}
+                </div>
+                <p className="text-sm text-orange-600 mt-1">Liquid for lending/withdrawal</p>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <h3 className="font-medium text-purple-800 mb-2">Utilization</h3>
+                <div className="text-2xl font-bold text-purple-600">
+                  {poolInfo && totalLent ? `${((Number(totalLent) / Number(poolInfo[0])) * 100).toFixed(1)}%` : "Loading..."}
+                </div>
+                <p className="text-sm text-purple-600 mt-1">
+                  Cap: {utilCap ? `${(Number(utilCap) / 100).toFixed(0)}%` : "Loading..."}
+                </p>
+              </div>
+            </div>
+            
+            {/* Utilization Progress Bar */}
+            {poolInfo && totalLent && utilCap && (
+              <div className="mt-6">
+                <div className="flex justify-between text-sm text-gray-600 mb-2">
+                  <span>Current Utilization</span>
+                  <span>{((Number(totalLent) / Number(poolInfo[0])) * 100).toFixed(1)}% / {(Number(utilCap) / 100).toFixed(0)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className={`h-3 rounded-full transition-all duration-300 ${
+                      (Number(totalLent) / Number(poolInfo[0])) * 100 > (Number(utilCap) / 100) * 0.9 
+                        ? 'bg-red-500' 
+                        : (Number(totalLent) / Number(poolInfo[0])) * 100 > (Number(utilCap) / 100) * 0.7 
+                        ? 'bg-yellow-500' 
+                        : 'bg-green-500'
+                    }`}
+                    style={{ 
+                      width: `${Math.min((Number(totalLent) / Number(poolInfo[0])) * 100, 100)}%` 
+                    }}
+                  ></div>
+                </div>
+                <div className="mt-2 text-xs text-gray-500">
+                  {poolInfo[2] ? `Reserved: ${formatUSDC(poolInfo[2])}` : ''}
+                </div>
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Address</label>
-                <AddressInput value={lookupAddress} onChange={setLookupAddress} placeholder="0x..." />
-              </div>
-              <div className="flex items-end text-lg font-bold">
-                {lookupScore ? `${(Number(lookupScore) / 1000).toFixed(2)}%` : "-"}
-              </div>
-            </div>
-          </div>
-
-          {/* Oracle Management */}
-          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">Oracle Management</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="font-medium mb-2">Current Oracle</h3>
-                {oracle ? <Address address={oracle as `0x${string}`} /> : <div className="text-gray-500">Loading...</div>}
-              </div>
-              <div>
-                <h3 className="font-medium mb-2">Contract Owner</h3>
-                {owner ? <Address address={owner as `0x${string}`} /> : <div className="text-gray-500">Loading...</div>}
-              </div>
-            </div>
-          </div>
-
-          {/* Lender Management */}
-          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">Lender Management</h2>
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">Lender Address Lookup</label>
-              <AddressInput value={lenderLookup} onChange={setLenderLookup} placeholder="0x..." />
-              <div className="mt-2 text-sm">
-                {lenderDeposit !== undefined && lenderDepositNumber > 0 ? (
-                  <span>Deposit Balance: {(lenderDepositNumber / 1e6).toLocaleString()} USDC</span>
-                ) : (
-                  <span>No deposit found for this address.</span>
-                )}
-              </div>
-            </div>
-            <div className="mb-4">
-              <span className="text-sm">
-                Total Lenders: {lenderCount !== undefined ? lenderCount.toString() : "Loading..."}
-              </span>
-            </div>
-            {connectedAddress &&
-              lenderLookup.toLowerCase() === connectedAddress.toLowerCase() &&
-              lenderDepositNumber > 0 && (
-                <div className="mt-4">
-                  <label className="block text-sm font-medium mb-2">Withdraw Amount (USDC)</label>
-                  <input
-                    type="number"
-                    value={withdrawAmount}
-                    onChange={e => setWithdrawAmount(e.target.value)}
-                    min="0.000001"
-                    max={Math.min(lenderDepositNumber / 1e6, availableFundsNumber / 1e6)}
-                    step="0.000001"
-                    className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter amount to withdraw"
-                  />
-                  <button
-                    onClick={handleWithdraw}
-                    disabled={
-                      withdrawLoading ||
-                      !withdrawAmount ||
-                      Number(withdrawAmount) <= 0 ||
-                      Number(withdrawAmount) > lenderDepositNumber / 1e6 ||
-                      Number(withdrawAmount) > availableFundsNumber / 1e6
-                    }
-                    className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition-colors mt-2"
-                  >
-                    {withdrawLoading ? "Withdrawing..." : "Withdraw"}
-                  </button>
-                </div>
-              )}
           </div>
 
           {/* Overview Stats */}
@@ -677,6 +860,47 @@ const AdminPage: NextPage = () => {
                 <div className="text-2xl font-bold text-red-500">{totalAttestations}</div>
                 <div className="text-sm text-gray-600">Attestations</div>
               </div>
+            </div>
+          </div>
+
+          {/* Interest Rate Configuration */}
+          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+            <h2 className="text-xl font-semibold mb-4">Interest Rate Configuration</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-medium text-blue-800 mb-2">Effective Federal Funds Rate (EFFR)</h3>
+                <div className="text-2xl font-bold text-blue-600">
+                  {effrRate !== undefined ? (Number(effrRate) / 100).toFixed(2) : "-"}%
+                </div>
+                <p className="text-sm text-blue-600 mt-1">Base rate for all loans</p>
+              </div>
+              <div className="bg-orange-50 p-4 rounded-lg">
+                <h3 className="font-medium text-orange-800 mb-2">Risk Premium</h3>
+                <div className="text-2xl font-bold text-orange-600">
+                  {riskPremium !== undefined ? (Number(riskPremium) / 100).toFixed(2) : "-"}%
+                </div>
+                <p className="text-sm text-orange-600 mt-1">Platform risk adjustment</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <h3 className="font-medium text-green-800 mb-2">Loan Rate (APR)</h3>
+                <div className="text-2xl font-bold text-green-600">
+                  {loanRate !== undefined ? (Number(loanRate) / 100).toFixed(2) : "-"}%
+                </div>
+                <p className="text-sm text-green-600 mt-1">EFFR + Risk Premium</p>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <h3 className="font-medium text-purple-800 mb-2">Funding Pool APY</h3>
+                <div className="text-2xl font-bold text-purple-600">
+                  {fundingPoolAPY !== undefined ? (Number(fundingPoolAPY) / 100).toFixed(2) : "-"}%
+                </div>
+                <p className="text-sm text-purple-600 mt-1">Projected lender yield</p>
+              </div>
+            </div>
+            <div className="mt-4 p-3 bg-gray-100 rounded-md">
+              <p className="text-sm text-gray-700">
+                <strong>Note:</strong> EFFR should be updated to reflect current market conditions (currently 4.33%). 
+                Risk premium is set to 5% for platform sustainability.
+              </p>
             </div>
           </div>
 
@@ -826,6 +1050,21 @@ const AdminPage: NextPage = () => {
                 withdrawals can be honoured.
               </div>
             )}
+          </div>
+
+          {/* Oracle Management */}
+          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+            <h2 className="text-xl font-semibold mb-4">Oracle Management</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="font-medium mb-2">Current Oracle</h3>
+                {oracle ? <Address address={oracle as `0x${string}`} /> : <div className="text-gray-500">Loading...</div>}
+              </div>
+              <div>
+                <h3 className="font-medium mb-2">Contract Owner</h3>
+                {owner ? <Address address={owner as `0x${string}`} /> : <div className="text-gray-500">Loading...</div>}
+              </div>
+            </div>
           </div>
 
           {/* Instructions */}

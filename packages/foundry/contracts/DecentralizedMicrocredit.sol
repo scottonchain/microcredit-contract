@@ -428,6 +428,10 @@ function disburseLoan(uint256 loanId) external {
     for (uint256 i = 0; i < attests.length; i++) {
         if (attests[i].attester == msg.sender) {
             attests[i].weight = weight;
+            
+            // Compute PageRank as a side effect of updating attestation
+            // Do not compute PageRank here, it will be computed by a direct call to computePageRank()
+            
             gasAfterRA = gasleft(); // Capture gas after the operation
             gasUsedForAttestation += gasBeforeRA - gasAfterRA; // Calculate gas used and update tracking variable
             console.log("Attestation recordAttestation: Gas after:", gasAfterRA, "Gas used:", gasUsedForAttestation);
@@ -435,6 +439,9 @@ function disburseLoan(uint256 loanId) external {
         }
     }
     attests.push(Attestation(msg.sender, weight));
+
+    // Do not compute PageRank here, it will be computed by a direct call to computePageRank()
+    //_computePageRank(PR_ALPHA, 100, PR_TOL);
 
     gasAfterRA = gasleft(); // Capture gas after the operation
     gasUsedForAttestation += gasBeforeRA - gasAfterRA; // Calculate gas used and update tracking variable
@@ -448,12 +455,28 @@ function disburseLoan(uint256 loanId) external {
     //  Returns a value scaled to `SCALE` (1e6) for compatibility with the
     //  previous fixed-score design.
     // -------------------------------------------------------------------
+    function getMaxPageRankScore() public view returns (uint256) {
+        uint256 maxScore = 0;
+        for (uint256 i = 0; i < pagerankNodes.length; i++) {
+            address node = pagerankNodes[i];
+            uint256 score = pagerankScores[node];
+            if (score > maxScore) {
+                maxScore = score;
+            }
+        }
+        return maxScore;
+    }
+
     function getCreditScore(address user) public view returns (uint256) {
         // Converts PageRank score to credit score using a softplus-like curve:
-        //   credit = (SCALE * x) / (x + 100), where x = (PR * 1000) / PR_SCALE
+        //   credit = (SCALE * x) / (x + 100), where x = (PR * 1000) / maxPageRank
         // Produces a smooth 0 → SCALE output that breaks PageRank’s zero-sum nature.
-        uint256 pr = pagerankScores[user]; // 0 – PR_SCALE (1e5)
-        uint256 x = (pr * 1000) / PR_SCALE; // 0 – 1000
+        uint256 pr = pagerankScores[user]; // 0 – maxPageRank
+        uint256 maxPageRank = getMaxPageRankScore();
+        
+        if (maxPageRank == 0) return 0; // No PageRank scores computed yet
+        
+        uint256 x = (pr * 1000) / maxPageRank; // 0 – 1000
         return (SCALE * x) / (x + 100); // 0 – SCALE (1e6)
     }
 
