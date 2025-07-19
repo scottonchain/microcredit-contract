@@ -276,7 +276,7 @@ contract DecentralizedMicrocredit {
     }
 
     function previewLoanTerms(
-        address borrower,
+        address /* borrower */,
         uint256 principal,
         uint256 repaymentPeriod
     ) external view returns (uint256 interestRate, uint256 payment) {
@@ -408,7 +408,6 @@ function disburseLoan(uint256 loanId) external {
     uint256 gasUsedForAttestation = 0;
     uint256 gasAfterRA = 0;
     string memory borrowerString = addressToString(borrower);
-    bytes32 borrowerBytes = bytes32(bytes(borrowerString));
     console.log("Attestation recordAttestation:", borrower);
     console.log("Attestation recordAttestation: Block number:", block.number);
 
@@ -466,6 +465,19 @@ function disburseLoan(uint256 loanId) external {
     function markKYCVerified(address user) external onlyOracle {
         require(!isKYCVerified[user], "Already verified");
         isKYCVerified[user] = true;
+    }
+
+    /**
+     * @notice Register a borrower (for testing purposes)
+     * @dev Can only be called by the owner or oracle
+     * @param borrower The address of the borrower to register
+     */
+    function registerBorrower(address borrower) external {
+        require(msg.sender == owner || msg.sender == oracle, "Only owner or oracle can register borrowers");
+        if (!_borrowerSeen[borrower]) {
+            _borrowerSeen[borrower] = true;
+            _borrowers.push(borrower);
+        }
     }
 
     function getLoan(
@@ -545,6 +557,23 @@ function disburseLoan(uint256 loanId) external {
                 pagerankEdges[node][target] = 0;
                 pagerankStochasticEdges[node][target] = 0;
             }
+        }
+
+        // Clear arrays
+        delete pagerankNodes;
+    }
+
+    /**
+     * @notice Clear PageRank state efficiently (gas-optimized version)
+     * @dev Only clears node data, not edge data (edges will be overwritten anyway)
+     */
+    function clearPageRankStateEfficient() external {
+        // Clear node data only (skip edge clearing to save gas)
+        for (uint256 i = 0; i < pagerankNodes.length; i++) {
+            address node = pagerankNodes[i];
+            pagerankNodeExists[node] = false;
+            pagerankScores[node] = 0;
+            pagerankOutDegree[node] = 0;
         }
 
         // Clear arrays
@@ -793,5 +822,30 @@ function disburseLoan(uint256 loanId) external {
         address borrower
     ) external view returns (Attestation[] memory) {
         return borrowerAttestations[borrower];
+    }
+
+    /**
+     * @notice Get all addresses that have received attestations (borrowers)
+     * @dev This returns addresses that have attestations, even if they haven't requested loans
+     */
+    function getBorrowersWithAttestations() external view returns (address[] memory) {
+        address[] memory borrowers = new address[](pagerankNodes.length);
+        uint256 count = 0;
+        
+        for (uint256 i = 0; i < pagerankNodes.length; i++) {
+            address node = pagerankNodes[i];
+            if (borrowerAttestations[node].length > 0) {
+                borrowers[count] = node;
+                count++;
+            }
+        }
+        
+        // Resize array to actual count
+        address[] memory result = new address[](count);
+        for (uint256 i = 0; i < count; i++) {
+            result[i] = borrowers[i];
+        }
+        
+        return result;
     }
 }

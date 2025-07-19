@@ -1,0 +1,59 @@
+🚀 Running full SeedDemo pipeline: borrowers, attestations, finalize...
+🚀 Starting SeedDemo full execution (borrowers, attestations, finalize)...
+📁 Working directory: /home/scottonchain/microcredit-contract/packages/foundry
+👤 Creating 300 borrowers (one per transaction)...
+--- Creating borrower 1/300 ---
+No files changed, compilation skipped
+Script ran successfully.
+
+== Logs ==
+  MockUSDC deployed at: 0x3E05D7036cCa2058f3392Cb24013E2025c38bc2b
+  Creating borrower: 0x3DA8D322CB2435dA26E9C9fEE670f9fB7Fe74E49
+  Funded with 1 ETH for gas
+✅ Successfully created borrower 0
+--- Creating borrower 2/300 ---
+No files changed, compilation skipped
+Script ran successfully.
+
+== Logs ==
+  MockUSDC deployed at: 0x3E05D7036cCa2058f3392Cb24013E2025c38bc2b
+  Creating borrower: 0xDbc23AE43a150ff8884B02Cea117b22D1c3b9796
+  Funded with 1 ETH for gas
+✅ Successfully created borrower 1
+--- Creating borrower 3/300 ---
+No files changed, compilation skipped
+Script ran successfully.
+
+== Logs ==
+  MockUSDC deployed at: 0x3E05D7036cCa2058f3392Cb24013E2025c38bc2b
+  Creating borrower: 0x68E527780872cda0216Ba0d8fBD58b67a5D5e351
+  Funded with 1 ETH for gas
+✅ Successfully created borrower 2
+--- Creating borrower 4/300 ---
+No files changed, compilation skipped
+Script ran successfully.
+
+== Logs ==
+  MockUSDC deployed at: 0x3E05D7036cCa2058f3392Cb24013E2025c38bc2b
+  Creating borrower: 0x5A83529ff76Ac5723A87008c4D9B436AD4CA7d28
+  Funded with 1 ETH for gas
+✅ Successfully created borrower 3
+--- Creating borrower 5/300 ---
+No files changed, compilation skipped
+Script ran successfully.
+
+== Logs ==
+  MockUSDC deployed at: 0x3E05D7036cCa2058f3392Cb24013E2025c38bc2b
+  Creating borrower: 0x8735015837bD10e05d9cf5EA43A2486Bf4Be156F
+  Funded with 1 ETH for gas
+✅ Successfully created borrower 4
+--- Creating borrower 6/300 ---
+No files changed, compilation skipped
+Script ran successfully.
+
+== Logs ==
+  MockUSDC deployed at: 0x3E05D7036cCa2058f3392Cb24013E2025c38bc2b
+  Creating borrower: 0xfaE394561e33e242c551d15D4625309EA4c0B97f
+  Funded with 1 ETH for gas
+✅ Successfully created borrower 5
+--- Creating borrower 7/300 ---
