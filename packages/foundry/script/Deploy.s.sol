@@ -31,8 +31,8 @@ contract DeployScript is Script {
 
         // Deploy the Microcredit contract (oracle temporarily set to deployer)
         DecentralizedMicrocredit microcreditContract = new DecentralizedMicrocredit(
-            550,     // effrRate 5.5% (scaled 1e4) – closer to historical Fed funds
-            350,     // riskPremium 3.5% (scaled 1e4) – platform premium
+            433,     // effrRate 4.33% (scaled 1e4) – current market rate
+            500,     // riskPremium 5.0% (scaled 1e4) – platform premium
             100 * 1e6, // maxLoanAmount 100 USDC (6 decimals) – matches personalization cap
             address(usdc),
             vm.addr(999) // set some address as oracle placeholder
