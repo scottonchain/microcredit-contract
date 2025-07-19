@@ -1,109 +1,103 @@
-# NetworkX PageRank Integration
+# SeedDemo Execution Scripts
 
-This directory contains Python scripts for integrating NetworkX PageRank calculations with the DecentralizedMicrocredit smart contract.
+This directory contains scripts to run the SeedDemo contract 3000 times to create all attestations and loans.
 
-## Overview
+## Background
 
-Instead of implementing PageRank directly in Solidity (which is complex and gas-intensive), we use NetworkX to compute PageRank scores externally and then update the smart contract with the results.
+The SeedDemo contract is designed to create a large ecosystem with:
+- 10 lenders (private keys 1-10)
+- 300 borrowers (private keys 11-310)
+- 3000 attestations (10 lenders × 300 borrowers)
+- Loans for all borrowers after all attestations are complete
 
-## Files
+The contract processes only 1 attestation per run and only creates loans after all attestations are done.
 
-- `pagerank_calculator.py` - Core PageRank calculation using NetworkX
-- `pagerank_oracle.py` - Oracle script for computing and updating PageRank scores
-- `integrate_pagerank.py` - Complete demonstration of NetworkX integration
-- `networkx_interface.py` - NetworkX interface for testing against Solidity implementation
-- `compare_implementations.py` - Script to compare Solidity and NetworkX implementations
-- `contract_integration.py` - Integration layer for processing contract data
-- `requirements.txt` - Python dependencies
-- `README.md` - This documentation
+## Scripts
 
-## Installation
+### 1. Python Script (`run_seeddemo.py`)
 
-1. Install Python dependencies:
+A Python script that runs SeedDemo 3000 times with proper error handling and progress tracking.
+
+**Usage:**
 ```bash
-pip install -r requirements.txt
+# From project root
+python packages/foundry/scripts/run_seeddemo.py
 ```
 
-## Usage
+**Features:**
+- Progress tracking
+- Error handling and recovery
+- Automatic retry logic
+- Detailed logging
 
-### Basic PageRank Calculation
+### 2. Bash Script (`run_seeddemo.sh`)
 
+A simpler bash script alternative.
+
+**Usage:**
 ```bash
-# Run test calculations
-python pagerank_calculator.py test
-
-# Compute PageRank from JSON file
-python pagerank_calculator.py compute attestations.json
+# From project root
+bash packages/foundry/scripts/run_seeddemo.sh
 ```
 
-### Oracle Integration
+**Features:**
+- Simple execution
+- Progress tracking
+- Error handling
 
-```bash
-# Run oracle test
-python pagerank_oracle.py test
+## Manual Execution
 
-# Process attestation data and update contract
-python pagerank_oracle.py compute attestations.json
-```
-
-### Complete Integration Demo
-
-```bash
-# Run complete NetworkX integration demonstration
-python integrate_pagerank.py
-```
-
-### Contract Integration
+If you prefer to run manually or resume from a specific point:
 
 ```bash
-# Run integration test
-python contract_integration.py test
+cd packages/foundry
 
-# Process attestation data from JSON
-python contract_integration.py process attestations.json
+# Run with specific START_INDEX (0-2999)
+START_INDEX=0 forge script SeedDemo --rpc-url http://localhost:8545 --broadcast
+
+# Resume from where you left off
+START_INDEX=1500 forge script SeedDemo --rpc-url http://localhost:8545 --broadcast
 ```
 
-## Smart Contract Integration
+## Expected Results
 
-The smart contract has been simplified to:
+After running all 3000 attestations:
 
-1. **Export attestation data** via `exportAttestationData()` function
-2. **Use simple scoring** as a placeholder for external PageRank
-3. **Support external score updates** (to be implemented)
+1. **300 borrowers** will be created and added to the `_borrowers` array
+2. **3000 attestations** will be recorded (10 per borrower)
+3. **PageRank scores** will be computed once after all attestations
+4. **300 loans** will be created and disbursed
 
-### Workflow
+## Troubleshooting
 
-1. **Collect attestations** in the smart contract
-2. **Export data** using `exportAttestationData()`
-3. **Compute PageRank** using NetworkX
-4. **Update scores** in the smart contract (future enhancement)
+### If the script fails partway through:
 
-## Example JSON Format
+1. Note the last successful START_INDEX
+2. Resume from that point:
+   ```bash
+   START_INDEX=<last_successful_index> forge script SeedDemo --rpc-url http://localhost:8545 --broadcast
+   ```
 
-```json
-{
-  "borrowers": ["0x2222", "0x3333"],
-  "attesters": [
-    ["0x1111", "0x4444"],
-    ["0x1111"]
-  ],
-  "weights": [
-    [100000, 200000],
-    [300000]
-  ]
-}
-```
+### If you need to start over:
 
-## Benefits
+1. Redeploy the contracts:
+   ```bash
+   yarn deploy
+   ```
+2. Run the execution script again
 
-- **Proven algorithm**: Uses NetworkX's battle-tested PageRank implementation
-- **Gas efficiency**: Complex calculations done off-chain
-- **Flexibility**: Easy to modify PageRank parameters
-- **Scalability**: Can handle large graphs efficiently
+### RPC Issues:
 
-## Future Enhancements
+If you encounter RPC timeouts or rate limiting:
+- Increase the sleep delay in the scripts
+- Use a different RPC endpoint
+- Run in smaller batches
 
-- Web3 integration for direct contract updates
-- Batch processing for large datasets
-- Real-time score updates
-- Integration with oracle networks 
+## Verification
+
+After completion, you can verify the results:
+
+1. Check the admin page for 300 borrowers
+2. Verify all lenders have made attestations
+3. Confirm all borrowers have loans
+4. Check PageRank scores are computed 
