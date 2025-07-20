@@ -65,7 +65,7 @@ const AdminPage: NextPage = () => {
   const hasAccess = isOwner || isOracle || isWhitelisted;
 
   // Pool info for overview stats
-  const { data: poolInfo } = useScaffoldReadContract({
+  const { data: poolInfo, refetch: refetchPoolInfo } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "getPoolInfo",
   });
@@ -151,11 +151,11 @@ const AdminPage: NextPage = () => {
   const availableFundsNumber = availableFunds !== undefined ? Number(availableFunds) : 0;
 
   // Utilisation stats
-  const { data: totalLent } = useScaffoldReadContract({
+  const { data: totalLent, refetch: refetchTotalLent } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "totalLentOut",
   });
-  const { data: utilCap } = useScaffoldReadContract({
+  const { data: utilCap, refetch: refetchUtilCap } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "lendingUtilizationCap",
   });
@@ -770,11 +770,65 @@ const AdminPage: NextPage = () => {
             </Link>
           </div>
 
+          {/* PageRank Computation - Moved to top */}
+          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+            <h2 className="text-xl font-semibold mb-4">PageRank Computation</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Compute PageRank scores for all users. This is required for credit scores to work properly.
+            </p>
+            <div className="text-sm mb-4">
+              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                hasPageRankScores ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              }`}>
+                PageRank Status: {hasPageRankScores ? 'Computed' : 'Not Computed'}
+              </span>
+              {pageRankData && (
+                <span className="ml-2 text-gray-600">
+                  ({pageRankData[0]?.length || 0} nodes)
+                </span>
+              )}
+            </div>
+            <button
+              onClick={handleComputePageRank}
+              disabled={pageRankLoading}
+              className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition-colors"
+            >
+              {pageRankLoading ? "Computing PageRank..." : "Compute PageRank"}
+            </button>
+            {pageRankResult && (
+              <div className="mt-2 text-sm">
+                <span className={pageRankResult.includes("Error") ? "text-red-500" : "text-green-500"}>
+                  {pageRankResult}
+                </span>
+              </div>
+            )}
+            <div className="mt-2 text-sm text-gray-600">
+              <p>💡 <strong>Debug Info:</strong> Open browser console (F12) to see detailed logs during PageRank computation.</p>
+              <p>⚠️ <strong>Gas Optimization:</strong> PageRank computation now skips clearing to avoid gas limits.</p>
+              <p>🔧 <strong>Current State:</strong> {pageRankData?.[0]?.length || 0} nodes, {pageRankData?.[1]?.filter(score => score > 0n).length || 0} with scores</p>
+            </div>
+          </div>
+
 
 
           {/* Pool Utilization Widget */}
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">Pool Utilization</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Pool Utilization</h2>
+              <button
+                onClick={async () => {
+                  await Promise.all([
+                    refetchPoolInfo(),
+                    refetchTotalLent(),
+                    refetchUtilCap()
+                  ]);
+                }}
+                className="btn btn-sm btn-outline"
+                title="Refresh pool data"
+              >
+                🔄 Refresh
+              </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-green-50 p-4 rounded-lg">
                 <h3 className="font-medium text-green-800 mb-2">Total Pool</h3>
@@ -919,54 +973,6 @@ const AdminPage: NextPage = () => {
           {/* System Actions */}
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
             <h2 className="text-xl font-semibold mb-4">System Actions</h2>
-            
-            {/* PageRank Computation */}
-            <div className="mb-6">
-              <h3 className="font-medium mb-2">PageRank Computation</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Compute PageRank scores for all users. This is required for credit scores to work properly.
-              </p>
-              <div className="text-sm mb-4">
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                  hasPageRankScores ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}>
-                  PageRank Status: {hasPageRankScores ? 'Computed' : 'Not Computed'}
-                </span>
-                {pageRankData && (
-                  <span className="ml-2 text-gray-600">
-                    ({pageRankData[0]?.length || 0} nodes)
-                  </span>
-                )}
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleComputePageRank}
-                  disabled={pageRankLoading}
-                  className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition-colors"
-                >
-                  {pageRankLoading ? "Computing PageRank..." : "Compute PageRank"}
-                </button>
-                <button
-                  onClick={handleClearPageRank}
-                  disabled={pageRankLoading}
-                  className="bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition-colors"
-                >
-                  {pageRankLoading ? "Clearing..." : "Clear PageRank"}
-                </button>
-              </div>
-              <div className="mt-2 text-sm text-gray-600">
-                <p>💡 <strong>Debug Info:</strong> Open browser console (F12) to see detailed logs during PageRank computation.</p>
-                <p>⚠️ <strong>Gas Optimization:</strong> PageRank computation now skips clearing to avoid gas limits. Use &apos;Clear PageRank&apos; only if needed.</p>
-                <p>🔧 <strong>Current State:</strong> {pageRankData?.[0]?.length || 0} nodes, {pageRankData?.[1]?.filter(score => score > 0n).length || 0} with scores</p>
-              </div>
-              {pageRankResult && (
-                <div className="mt-2 text-sm">
-                  <span className={pageRankResult.includes("Error") ? "text-red-500" : "text-green-500"}>
-                    {pageRankResult}
-                  </span>
-                </div>
-              )}
-            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>

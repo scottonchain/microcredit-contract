@@ -16,7 +16,7 @@ const AttestPage: NextPage = () => {
   const router = useRouter();
 
   const defaultBorrower = (searchParams.get("borrower") ?? "") as `0x${string}` | "";
-  const defaultWeight = Number(searchParams.get("weight") ?? "") || 50;
+  const defaultWeight = Number(searchParams.get("weight") ?? "") || 80;
 
   const [borrowerAddress, setBorrowerAddress] = useState<string>(defaultBorrower);
   const borrowerReadOnly = !!defaultBorrower;
@@ -46,7 +46,7 @@ const AttestPage: NextPage = () => {
         args: [borrowerAddress as `0x${string}`, weightBasisPoints],
       });
       setBorrowerAddress("");
-      setWeight(50);
+      setWeight(80);
     } catch (error) {
       console.error("Error recording attestation:", error);
     } finally {

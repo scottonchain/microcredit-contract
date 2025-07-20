@@ -699,7 +699,7 @@ export default function PopulatePage() {
             </label>
           </div>
           <p className="text-xs text-gray-600 mt-1">
-            When enabled, each lender will attest to other lenders, creating additional trust relationships.
+            When enabled, one random lender will attest to another random lender, creating a single lender-to-lender trust relationship.
           </p>
         </div>
         <div className="mt-4">
@@ -723,7 +723,8 @@ export default function PopulatePage() {
           <p className="text-sm text-blue-800">
             <strong>Summary:</strong> This will create {numLenders} lenders (each depositing $400) and {numBorrowers} borrowers, 
             resulting in ~{Math.round((numLenders * numBorrowers * attestationProbability) / 100)} lender-to-borrower attestations (at {attestationProbability}% probability)
-            {includeLenderAttestations && `, plus 1 random lender-to-lender attestation`}
+            {includeLenderAttestations && numLenders >= 2 && `, plus 1 random lender-to-lender attestation`}
+            {includeLenderAttestations && numLenders < 2 && ` (lender-to-lender attestations skipped - need at least 2 lenders)`}
             , and borrowers will request loans for 80% or 100% of their maximum allowed amount. Total funding pool: ${numLenders * 400}.
           </p>
         </div>
@@ -757,15 +758,19 @@ export default function PopulatePage() {
         </div>
       )}
       
-      {/* Populate Button */}
-      <button
-        onClick={populate}
-        disabled={!hasAccess}
-        className="btn btn-primary"
-        style={{ marginTop: "1rem" }}
-      >
-        Populate Test Data
-      </button>
+      {/* Action Buttons */}
+      <div className="flex gap-4" style={{ marginTop: "1rem" }}>
+        <button
+          onClick={populate}
+          disabled={!hasAccess}
+          className="btn btn-primary"
+        >
+          Populate Test Data
+        </button>
+        <Link href="/debug" className="btn btn-secondary">
+          Debug Contract
+        </Link>
+      </div>
     </div>
   );
 

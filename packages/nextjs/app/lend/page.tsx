@@ -23,6 +23,29 @@ const LendPage: NextPage = () => {
   const [attestations, setAttestations] = useState<{ borrower: `0x${string}`; weight: number }[]>([]);
   const [filterText, setFilterText] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [usdcBalance, setUsdcBalance] = useState<bigint>(0n);
+  const [usdcAllowance, setUsdcAllowance] = useState<bigint>(0n);
+  const [approvalLoading, setApprovalLoading] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [mintLoading, setMintLoading] = useState(false);
+
+  // Helper function to safely parse deposit amount to BigInt
+  const parseDepositAmount = (amount: string): bigint | null => {
+    if (!amount || amount.trim() === "") return null;
+    const parsed = parseFloat(amount);
+    if (isNaN(parsed) || parsed <= 0) return null;
+    return BigInt(Math.floor(parsed * 1e6));
+  };
+
+  // Helper function to safely parse withdraw amount to BigInt
+  const parseWithdrawAmount = (amount: string): bigint | null => {
+    if (!amount || amount.trim() === "") return null;
+    const parsed = parseFloat(amount);
+    if (isNaN(parsed) || parsed <= 0) return null;
+    return BigInt(Math.floor(parsed * 1e6));
+  };
 
   // Load cached attestations from localStorage when wallet connects
   useEffect(() => {
@@ -54,8 +77,24 @@ const LendPage: NextPage = () => {
     contractName: "DecentralizedMicrocredit",
   });
 
+  // USDC contract hooks
+  const { data: usdcAddress } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "usdc",
+  });
+
+  // Get contract addresses for debugging
+  const { data: contractAddress } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "owner", // Just to get the contract address
+  });
+
+  const { writeContractAsync: writeUSDCAsync } = useScaffoldWriteContract({
+    contractName: "MockUSDC",
+  });
+
   // ────── Lender-specific data ──────
-  const { data: lenderDeposit } = useScaffoldReadContract({
+  const { data: lenderDeposit, refetch: refetchLenderDeposit } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "lenderDeposits",
     args: [connectedAddress as `0x${string}` | undefined],
@@ -65,10 +104,17 @@ const LendPage: NextPage = () => {
     contractName: "DecentralizedMicrocredit",
     functionName: "getFundingPoolAPY" as any,
   });
+  
+  const { data: loanRateBp } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getLoanRate",
+  });
+  
   const poolRatePercent = poolApyBp !== undefined ? (Number(poolApyBp) / 100).toFixed(2) : undefined;
+  const loanRatePercent = loanRateBp !== undefined ? (Number(loanRateBp) / 100).toFixed(2) : undefined;
 
-  const interestEarned = lenderDeposit !== undefined && poolApyBp !== undefined
-    ? (BigInt(lenderDeposit) * BigInt(Number(poolApyBp)) / BigInt(10000))
+  const interestEarned = lenderDeposit !== undefined && loanRateBp !== undefined
+    ? (BigInt(lenderDeposit) * BigInt(Number(loanRateBp)) / BigInt(10000))
     : undefined; // simplistic yearly projection
 
   const totalBalance = lenderDeposit !== undefined && interestEarned !== undefined
@@ -76,7 +122,7 @@ const LendPage: NextPage = () => {
     : undefined;
 
   // Remove placeholder arrays and fetch on-chain data
-  const { data: poolInfo } = useScaffoldReadContract({
+  const { data: poolInfo, refetch: refetchPoolInfo } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "getPoolInfo",
   });
@@ -89,20 +135,128 @@ const LendPage: NextPage = () => {
   const lenderInfo: bigint[] | undefined = undefined;
   const availableLoans: bigint[] = [];
 
+  // Read USDC balance and allowance
+  const { data: usdcBalanceData, refetch: refetchUsdcBalance } = useScaffoldReadContract({
+    contractName: "MockUSDC",
+    functionName: "balanceOf",
+    args: [connectedAddress as `0x${string}` | undefined],
+  });
+
+  const { data: usdcAllowanceData, refetch: refetchUsdcAllowance } = useScaffoldReadContract({
+    contractName: "MockUSDC",
+    functionName: "allowance",
+    args: [connectedAddress as `0x${string}` | undefined, usdcAddress as `0x${string}` | undefined],
+  });
+
+  // Update state when data changes
+  useEffect(() => {
+    if (usdcBalanceData) setUsdcBalance(usdcBalanceData);
+    if (usdcAllowanceData) setUsdcAllowance(usdcAllowanceData);
+  }, [usdcBalanceData, usdcAllowanceData]);
+
   const handleDeposit = async () => {
-    if (!depositAmount || !connectedAddress) return;
+    if (!depositAmount || !connectedAddress || !usdcAddress) return;
+    
+    const amountInt = parseDepositAmount(depositAmount);
+    if (!amountInt) {
+      setErrorMessage("Please enter a valid deposit amount greater than 0.");
+      return;
+    }
     
     setIsLoading(true);
     try {
-      // Convert USDC (6-decimals) string amount to integer with 6 decimals
-      const amountInt = BigInt(Math.floor(parseFloat(depositAmount) * 1e6));
+      
+      // Check if approval is needed
+      if (usdcAllowance < amountInt) {
+        setApprovalLoading(true);
+        try {
+          console.log("🔍 Approval needed. Current allowance:", formatUSDC(usdcAllowance), "Required:", formatUSDC(amountInt));
+          
+          // First, try to approve the exact amount needed
+          const approvalTx = await writeUSDCAsync({
+            functionName: "approve",
+            args: [usdcAddress, amountInt],
+          });
+          
+          console.log("🔍 Approval transaction sent, waiting for confirmation...");
+          
+          // Wait for the transaction to be mined
+          if (approvalTx) {
+            console.log("🔍 Waiting for approval transaction to be mined...");
+            // Add a small delay to allow the transaction to be mined
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          
+          // Refetch allowance after approval
+          await refetchUsdcAllowance();
+          
+          // Double-check that approval was successful
+          const newAllowance = await refetchUsdcAllowance();
+          console.log("🔍 New allowance after approval:", formatUSDC(usdcAllowance));
+          
+          // If approval still failed, try with a larger amount
+          if (usdcAllowance < amountInt) {
+            console.log("🔍 Approval may have failed, trying with larger amount...");
+            await writeUSDCAsync({
+              functionName: "approve",
+              args: [usdcAddress, amountInt * 2n], // Approve double the amount
+            });
+            
+            // Wait again
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await refetchUsdcAllowance();
+          }
+          
+        } catch (approvalError: any) {
+          console.error("🔍 Approval failed:", approvalError);
+          setErrorMessage(`Approval failed: ${approvalError?.message || "Unknown error"}`);
+          return;
+        } finally {
+          setApprovalLoading(false);
+        }
+      }
+      
+      // Final check before deposit
+      if (usdcAllowance < amountInt) {
+        setErrorMessage("Approval is still insufficient. Please try approving again or refresh the page.");
+        return;
+      }
+      
       await writeContractAsync({
         functionName: "depositFunds",
         args: [amountInt],
       });
+      
+      // Refetch all relevant data after successful deposit
+      await Promise.all([
+        refetchPoolInfo(),
+        refetchLenderDeposit(),
+        refetchUsdcBalance(),
+        refetchUsdcAllowance()
+      ]);
+      
       setDepositAmount("");
-    } catch (error) {
+      setErrorMessage(null);
+    } catch (error: any) {
       console.error("Error depositing funds:", error);
+      
+      // Provide more specific error messages based on common failure cases
+      if (error?.message?.includes("0xfb8f41b2")) {
+        // This is likely an ERC20 transfer failure - check balance and allowance
+        const balance = Number(usdcBalance) / 1e6;
+        const allowance = Number(usdcAllowance) / 1e6;
+        const requested = Number(amountInt) / 1e6;
+        
+        setErrorMessage(`USDC transfer failed (Error: 0xfb8f41b2).\n\nDebug info:\n- Your USDC Balance: ${balance.toFixed(2)} USDC\n- Contract Allowance: ${allowance.toFixed(2)} USDC\n- Requested Amount: ${requested.toFixed(2)} USDC\n\nPlease check:\n1. You have sufficient USDC balance (${balance.toFixed(2)} >= ${requested.toFixed(2)})\n2. You have approved the contract to spend your USDC (${allowance.toFixed(2)} >= ${requested.toFixed(2)})\n3. The amount is valid`);
+      } else if (error?.message?.includes("insufficient balance") || error?.message?.includes("ERC20: transfer amount exceeds balance")) {
+        setErrorMessage("Insufficient USDC balance. Please check your wallet balance.");
+      } else if (error?.message?.includes("ERC20: transfer amount exceeds allowance")) {
+        setErrorMessage("Insufficient allowance. Please approve the contract to spend your USDC first.");
+      } else if (error?.message?.includes("Amount > 0")) {
+        setErrorMessage("Please enter a valid deposit amount greater than 0.");
+      } else {
+        setErrorMessage(`Deposit failed: ${error?.message || "Unknown error"}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -112,8 +266,139 @@ const LendPage: NextPage = () => {
     // TODO: Implement fund loan functionality when contract is updated
   };
 
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || !connectedAddress) return;
+    
+    const amountInt = parseWithdrawAmount(withdrawAmount);
+    if (!amountInt) {
+      setErrorMessage("Please enter a valid withdrawal amount greater than 0.");
+      return;
+    }
+    
+    setWithdrawLoading(true);
+    try {
+      await writeContractAsync({
+        functionName: "withdrawFunds",
+        args: [amountInt],
+      });
+      
+      // Refetch all relevant data after successful withdrawal
+      await Promise.all([
+        refetchPoolInfo(),
+        refetchLenderDeposit(),
+        refetchUsdcBalance(),
+        refetchUsdcAllowance()
+      ]);
+      
+      setWithdrawAmount("");
+      setErrorMessage(null);
+    } catch (error: any) {
+      console.error("Error withdrawing funds:", error);
+      
+      // Provide more specific error messages based on common failure cases
+      if (error?.message?.includes("Insufficient balance")) {
+        setErrorMessage("Insufficient deposited balance. You can only withdraw what you have deposited.");
+      } else if (error?.message?.includes("Insufficient liquidity")) {
+        setErrorMessage("Insufficient liquidity in the pool. Some funds may be reserved for loans.");
+      } else if (error?.message?.includes("Amount > 0")) {
+        setErrorMessage("Please enter a valid withdrawal amount greater than 0.");
+      } else if (error?.message?.includes("Transfer failed")) {
+        setErrorMessage("USDC transfer failed. Please try again.");
+      } else {
+        setErrorMessage(`Withdrawal failed: ${error?.message || "Unknown error"}`);
+      }
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
+
   const handleClaimYield = async () => {
     // TODO: Implement claim yield functionality when contract is updated
+  };
+
+  const handleDebugDeposit = async () => {
+    if (!connectedAddress) return;
+    
+    try {
+      console.log("🔍 Debugging deposit for address:", connectedAddress);
+      console.log("🔍 Lender deposit from contract:", lenderDeposit);
+      console.log("🔍 Pool info:", poolInfo);
+      console.log("🔍 USDC balance:", usdcBalance);
+      console.log("🔍 USDC allowance:", usdcAllowance);
+      
+      // Force refetch all data
+      await Promise.all([
+        refetchPoolInfo(),
+        refetchLenderDeposit(),
+        refetchUsdcBalance(),
+        refetchUsdcAllowance()
+      ]);
+      
+      console.log("🔍 After refetch - Lender deposit:", lenderDeposit);
+      console.log("🔍 After refetch - Pool info:", poolInfo);
+      console.log("🔍 After refetch - USDC balance:", usdcBalance);
+      console.log("🔍 After refetch - USDC allowance:", usdcAllowance);
+      
+      // Check if user has any USDC
+      if (usdcBalance === 0n) {
+        console.log("🔍 User has no USDC balance. They need to mint some first.");
+        setErrorMessage("You have no USDC balance. Please use the 'Mint 1000 USDC' button to get some test tokens.");
+      } else {
+        console.log("🔍 User has USDC balance:", formatUSDC(usdcBalance));
+      }
+      
+      // Check allowance
+      if (usdcAllowance === 0n) {
+        console.log("🔍 User has no allowance. They need to approve USDC spending.");
+        setErrorMessage("You haven't approved the contract to spend your USDC. Please use the 'Approve Unlimited' button.");
+      } else {
+        console.log("🔍 User has allowance:", formatUSDC(usdcAllowance));
+      }
+      
+    } catch (error) {
+      console.error("Debug error:", error);
+    }
+  };
+
+  const handleMintUSDC = async () => {
+    if (!connectedAddress) return;
+    
+    setMintLoading(true);
+    try {
+      const mintAmount = BigInt(1000 * 1e6); // Mint 1000 USDC
+      console.log("🔍 Minting", formatUSDC(mintAmount), "to", connectedAddress);
+      
+      await writeUSDCAsync({
+        functionName: "mint",
+        args: [connectedAddress, mintAmount],
+      });
+      
+      // Refetch balance after minting
+      await refetchUsdcBalance();
+      setErrorMessage(null);
+      
+      // Auto-approve after minting for convenience
+      if (usdcAddress) {
+        console.log("🔍 Auto-approving USDC spending...");
+        try {
+          const maxAmount = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
+          await writeUSDCAsync({
+            functionName: "approve",
+            args: [usdcAddress, maxAmount],
+          });
+          await refetchUsdcAllowance();
+          console.log("🔍 Auto-approval successful");
+        } catch (approvalError) {
+          console.log("🔍 Auto-approval failed, user can approve manually:", approvalError);
+        }
+      }
+      
+    } catch (error: any) {
+      console.error("Mint error:", error);
+      setErrorMessage(`Mint failed: ${error?.message || "Unknown error"}`);
+    } finally {
+      setMintLoading(false);
+    }
   };
 
   const handleAttestation = async () => {
@@ -165,8 +450,79 @@ const LendPage: NextPage = () => {
           {/* Your Pool Position */}
           {connectedAddress && (
           <div className="bg-base-100 rounded-lg p-6 shadow-lg w-full">
-            <h2 className="text-xl font-semibold mb-4">Your Pool Position</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Your Pool Position</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    await Promise.all([
+                      refetchPoolInfo(),
+                      refetchLenderDeposit(),
+                      refetchUsdcBalance(),
+                      refetchUsdcAllowance()
+                    ]);
+                  }}
+                  className="btn btn-sm btn-outline"
+                  title="Refresh your position data"
+                >
+                  🔄 Refresh
+                </button>
+                <button
+                  onClick={handleDebugDeposit}
+                  className="btn btn-sm btn-outline btn-warning"
+                  title="Debug deposit data"
+                >
+                  🔍 Debug
+                </button>
+              </div>
+            </div>
+            
+            {/* Debug Info */}
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="text-sm text-yellow-800">
+                <div className="flex justify-between">
+                  <span>Connected Address:</span>
+                  <span className="font-mono text-xs">{connectedAddress}</span>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span>Contract Address:</span>
+                  <span className="font-mono text-xs">{contractAddress}</span>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span>USDC Address:</span>
+                  <span className="font-mono text-xs">{usdcAddress}</span>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span>Your Deposit Amount:</span>
+                  <span className="font-medium">{lenderDeposit !== undefined ? formatUSDC(lenderDeposit) : "Loading..."}</span>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span>Pool Total Deposits:</span>
+                  <span className="font-medium">{poolInfo ? formatUSDC(poolInfo[0]) : "Loading..."}</span>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span>USDC Balance:</span>
+                  <span className="font-medium">{formatUSDC(usdcBalance)}</span>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span>USDC Allowance:</span>
+                  <span className="font-medium">{formatUSDC(usdcAllowance)}</span>
+                </div>
+                {depositAmount && (
+                  <div className="flex justify-between mt-1">
+                    <span>Requested Deposit:</span>
+                    <span className="font-medium">{depositAmount} USDC</span>
+                  </div>
+                )}
+                {depositAmount && parseDepositAmount(depositAmount) && (
+                  <div className="flex justify-between mt-1">
+                    <span>Requested (6-decimals):</span>
+                    <span className="font-medium">{parseDepositAmount(depositAmount)?.toString()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-center">
               <div>
                 <div className="text-2xl font-bold text-blue-500">
                   {lenderDeposit !== undefined ? formatUSDC(lenderDeposit) : "-"}
@@ -181,9 +537,15 @@ const LendPage: NextPage = () => {
               </div>
               <div>
                 <div className="text-2xl font-bold text-purple-500">
+                  {loanRatePercent !== undefined ? loanRatePercent + "%" : "-"}
+                </div>
+                <div className="text-sm text-gray-600">Loan Rate (APR)</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-indigo-500">
                   {poolRatePercent !== undefined ? poolRatePercent + "%" : "-"}
                 </div>
-                <div className="text-sm text-gray-600">Pool Rate (APR)</div>
+                <div className="text-sm text-gray-600">Funding Pool APY</div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-orange-500">
@@ -199,6 +561,170 @@ const LendPage: NextPage = () => {
               <PlusIcon className="h-5 w-5 mr-2" />
               {lenderDeposit !== undefined && BigInt(lenderDeposit) > 0n ? "Deposit More Funds" : "Deposit Funds"}
             </h3>
+            
+            {/* Error Message */}
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="text-sm text-red-800">
+                  <div className="flex justify-between items-start">
+                    <span className="font-medium">Error:</span>
+                    <button 
+                      onClick={() => setErrorMessage(null)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="mt-1 whitespace-pre-line">{errorMessage}</div>
+                </div>
+              </div>
+            )}
+            
+            {/* USDC Balance Info */}
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+              <div className="text-sm text-blue-800">
+                <div className="flex justify-between">
+                  <span>USDC Balance:</span>
+                  <span className="font-medium">{formatUSDC(usdcBalance)}</span>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span>Current Allowance:</span>
+                  <span className="font-medium">{formatUSDC(usdcAllowance)}</span>
+                </div>
+                {(() => {
+                  const parsedAmount = parseDepositAmount(depositAmount);
+                  return depositAmount && parsedAmount ? (
+                    <div className="flex justify-between mt-1">
+                      <span>Required Approval:</span>
+                      <span className="font-medium">{formatUSDC(parsedAmount)}</span>
+                    </div>
+                  ) : null;
+                })()}
+                <div className="flex justify-between mt-2 pt-2 border-t border-blue-200">
+                  <span>Need USDC for testing?</span>
+                  <button
+                    onClick={handleMintUSDC}
+                    disabled={mintLoading}
+                    className="text-blue-600 hover:text-blue-800 font-medium disabled:text-blue-400"
+                  >
+                    {mintLoading ? "Minting..." : "Mint 1000 USDC"}
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            {/* USDC Approval Section */}
+            {(() => {
+              const parsedAmount = parseDepositAmount(depositAmount);
+              return depositAmount && parsedAmount;
+            })() && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="text-sm text-yellow-800">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">USDC Approval Required</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          if (!usdcAddress || !depositAmount) return;
+                          const amountInt = parseDepositAmount(depositAmount);
+                          if (!amountInt) {
+                            setErrorMessage("Please enter a valid deposit amount.");
+                            return;
+                          }
+                          setApprovalLoading(true);
+                          try {
+                            await writeUSDCAsync({
+                              functionName: "approve",
+                              args: [usdcAddress, amountInt],
+                            });
+                            // Wait for transaction to be mined
+                            await new Promise(resolve => setTimeout(resolve, 3000));
+                            await refetchUsdcAllowance();
+                            setErrorMessage(null);
+                          } catch (error: any) {
+                            console.error("Approval failed:", error);
+                            setErrorMessage(`Approval failed: ${error?.message || "Unknown error"}`);
+                          } finally {
+                            setApprovalLoading(false);
+                          }
+                        }}
+                        disabled={approvalLoading || !usdcAddress || !depositAmount || !parseDepositAmount(depositAmount)}
+                        className="bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-300 text-white font-medium py-2 px-4 rounded transition-colors"
+                      >
+                        {approvalLoading ? "Approving..." : "Approve Exact"}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!usdcAddress) return;
+                          setApprovalLoading(true);
+                          try {
+                            // Approve maximum amount (infinite approval)
+                            const maxAmount = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935"); // 2^256 - 1
+                            await writeUSDCAsync({
+                              functionName: "approve",
+                              args: [usdcAddress, maxAmount],
+                            });
+                            // Wait for transaction to be mined
+                            await new Promise(resolve => setTimeout(resolve, 3000));
+                            await refetchUsdcAllowance();
+                            setErrorMessage(null);
+                          } catch (error: any) {
+                            console.error("Infinite approval failed:", error);
+                            setErrorMessage(`Infinite approval failed: ${error?.message || "Unknown error"}`);
+                          } finally {
+                            setApprovalLoading(false);
+                          }
+                        }}
+                        disabled={approvalLoading || !usdcAddress}
+                        className="bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white font-medium py-2 px-4 rounded transition-colors"
+                        title="Approve unlimited USDC spending (recommended for convenience)"
+                      >
+                        {approvalLoading ? "Approving..." : "Approve Unlimited"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs">
+                    {(() => {
+                      const parsedAmount = parseDepositAmount(depositAmount);
+                      return parsedAmount && usdcAllowance < parsedAmount ? (
+                        <span className="text-red-600">⚠️ Insufficient allowance. Please approve USDC spending first.</span>
+                      ) : (
+                        <span className="text-green-600">✅ Sufficient allowance. You can proceed with deposit.</span>
+                      );
+                    })()}
+                    {usdcAllowance > 0n && (
+                      <div className="mt-1">
+                        <button
+                          onClick={async () => {
+                            if (!usdcAddress) return;
+                            setApprovalLoading(true);
+                            try {
+                              await writeUSDCAsync({
+                                functionName: "approve",
+                                args: [usdcAddress, 0n],
+                              });
+                              await new Promise(resolve => setTimeout(resolve, 2000));
+                              await refetchUsdcAllowance();
+                              setErrorMessage(null);
+                            } catch (error: any) {
+                              console.error("Revoke approval failed:", error);
+                              setErrorMessage(`Revoke approval failed: ${error?.message || "Unknown error"}`);
+                            } finally {
+                              setApprovalLoading(false);
+                            }
+                          }}
+                          disabled={approvalLoading || !usdcAddress}
+                          className="text-red-600 hover:text-red-800 text-xs underline"
+                        >
+                          Revoke Approval
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="flex flex-col md:flex-row gap-4">
               <input
                 type="number"
@@ -207,17 +733,87 @@ const LendPage: NextPage = () => {
                 placeholder="Enter amount in USDC"
                 className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 min="1"
+                max={Number(usdcBalance) / 1e6}
               />
               <button
                 onClick={handleDeposit}
-                disabled={!depositAmount || !connectedAddress || isLoading}
-                className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+                disabled={
+                  !depositAmount || 
+                  !connectedAddress || 
+                  isLoading || 
+                  approvalLoading || 
+                  (() => {
+                    const parsedAmount = parseDepositAmount(depositAmount);
+                    if (!parsedAmount) return true;
+                    return Number(parsedAmount) / 1e6 > Number(usdcBalance) / 1e6 || usdcAllowance < parsedAmount;
+                  })()
+                }
+                className={`font-bold py-3 px-6 rounded-lg transition-colors ${
+                  (() => {
+                    const parsedAmount = parseDepositAmount(depositAmount);
+                    return parsedAmount && usdcAllowance < parsedAmount;
+                  })() && depositAmount
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white"
+                }`}
+                title={
+                  (() => {
+                    const parsedAmount = parseDepositAmount(depositAmount);
+                    return parsedAmount && usdcAllowance < parsedAmount;
+                  })() && depositAmount
+                    ? "Please approve USDC spending first"
+                    : undefined
+                }
               >
-                {isLoading ? "Depositing..." : "Deposit"}
+                {approvalLoading ? "Approving..." : isLoading ? "Depositing..." : "Deposit"}
               </button>
             </div>
 
             <p className="text-xs text-gray-500 mt-3">*Interest displayed is a simplified projection based on current pool APR.</p>
+            
+            {/* Helpful guidance */}
+            {(() => {
+              const parsedAmount = parseDepositAmount(depositAmount);
+              return depositAmount && parsedAmount && usdcAllowance < parsedAmount;
+            })() && (
+              <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                💡 <strong>Tip:</strong> You need to approve USDC spending before depositing. Use the &ldquo;Approve Unlimited&rdquo; button above for convenience, or &ldquo;Approve Exact&rdquo; for the specific amount.
+              </div>
+            )}
+            
+            {/* Withdraw Funds */}
+            {lenderDeposit !== undefined && BigInt(lenderDeposit) > 0n && (
+              <>
+                <div className="divider my-6"></div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center">
+                  <BanknotesIcon className="h-5 w-5 mr-2" />
+                  Withdraw Funds
+                </h3>
+                <div className="flex flex-col md:flex-row gap-4">
+                  <input
+                    type="number"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    placeholder="Enter amount to withdraw"
+                    className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    min="1"
+                    max={Number(lenderDeposit) / 1e6}
+                  />
+                  <button
+                    onClick={handleWithdraw}
+                    disabled={(() => {
+                      if (!withdrawAmount || !connectedAddress || withdrawLoading) return true;
+                      const parsedAmount = parseWithdrawAmount(withdrawAmount);
+                      if (!parsedAmount) return true;
+                      return Number(parsedAmount) / 1e6 > Number(lenderDeposit) / 1e6;
+                    })()}
+                    className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+                  >
+                    {withdrawLoading ? "Withdrawing..." : "Withdraw"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
           )}
 
