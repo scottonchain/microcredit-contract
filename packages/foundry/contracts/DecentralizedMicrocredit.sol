@@ -123,7 +123,7 @@ contract DecentralizedMicrocredit {
         address _usdc,
         address _oracle
     ) {
-        require(_usdc != address(0) && _oracle != address(0), "");
+        require(_usdc != address(0) && _oracle != address(0), "Invalid addresses");
         usdc = IERC20(_usdc);
         owner = msg.sender;
         oracle = _oracle;
@@ -140,17 +140,17 @@ contract DecentralizedMicrocredit {
     }
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "");
+        require(msg.sender == owner, "Owner only");
         _;
     }
     modifier onlyOracle() {
-        require(msg.sender == oracle, "");
+        require(msg.sender == oracle, "Oracle only");
         _;
     }
 
     // Note: variable-rate setter removed in the fixed-rate model.
     function setOracle(address _oracle) external onlyOwner {
-        require(_oracle != address(0), "");
+        require(_oracle != address(0), "Invalid oracle");
         oracle = _oracle;
     }
 
@@ -219,8 +219,8 @@ contract DecentralizedMicrocredit {
     }
 
     function depositFunds(uint256 amount) external {
-        require(amount > 0, "");
-        require(usdc.transferFrom(msg.sender, address(this), amount), "");
+        require(amount > 0, "Amount > 0");
+        require(usdc.transferFrom(msg.sender, address(this), amount), "Transfer failed");
 
         // Update pool stats
         totalDeposits += amount;
@@ -235,21 +235,21 @@ contract DecentralizedMicrocredit {
     }
 
     function withdrawFunds(uint256 amount) external {
-        require(amount > 0, "Amount must be > 0");
+        require(amount > 0, "Amount > 0");
         require(
             lenderDeposits[msg.sender] >= amount,
-            "Insufficient deposited balance"
+            "Insufficient balance"
         );
 
         uint256 liquidBalance = usdc.balanceOf(address(this));
         require(
             liquidBalance - reservedLiquidity >= amount,
-            "Not enough liquid funds (some reserved for loans)"
+            "Insufficient liquidity"
         );
 
         lenderDeposits[msg.sender] -= amount;
         totalDeposits -= amount;
-        require(usdc.transfer(msg.sender, amount), "USDC transfer failed");
+        require(usdc.transfer(msg.sender, amount), "Transfer failed");
     }
 
     /**
@@ -288,9 +288,9 @@ contract DecentralizedMicrocredit {
     }
 
     function requestLoan(uint256 amount) external returns (uint256 loanId) {
-        require(amount > 0, "");
+        require(amount > 0, "Amount > 0");
         uint256 score = getCreditScore(msg.sender);
-        require(score > 0, "");
+        require(score > 0, "Score > 0");
 
         // Enforce per-borrower loan cap proportional to credit score
         // Compute allowed amount using division first to prevent overflow when
@@ -334,38 +334,25 @@ contract DecentralizedMicrocredit {
 
 function disburseLoan(uint256 loanId) external {
     Loan storage loan = loans[loanId];
-    require(loan.isActive, "Loan is not active");
+    require(loan.isActive, "Loan inactive");
 
-    // Log before state changes
-    console.log("Before state update. Reserved liquidity:", reservedLiquidity, "Total lent out:", totalLentOut);
-
-    // Move principal from reserved to lent-out balance (update utilisation state)
+    // Move principal from reserved to lent-out balance
     reservedLiquidity -= loan.principal;
     totalLentOut += loan.principal;
 
-    // Log after state changes
-    console.log("After state update. Reserved liquidity:", reservedLiquidity, "Total lent out:", totalLentOut);
-
-    // Log before transfer
-    console.log("Initiating token transfer to borrower:", loan.borrower, "Amount:", loan.principal);
-
     bool success = usdc.transfer(loan.borrower, loan.principal);
     if (!success) {
-        console.log("Token transfer failed for borrower:", loan.borrower, "Amount:", loan.principal);
-        revert("Token transfer failed");
+        revert("Transfer failed");
     }
-
-    // Log after transfer
-    console.log("Token transfer successful to borrower:", loan.borrower);
 }
 
 
     function repayLoan(uint256 loanId, uint256 amount) external {
         Loan storage loan = loans[loanId];
-        require(loan.isActive, "");
-        require(msg.sender == loan.borrower, "");
-        require(amount > 0, "");
-        require(usdc.transferFrom(msg.sender, address(this), amount), "");
+        require(loan.isActive, "Loan inactive");
+        require(msg.sender == loan.borrower, "Borrower only");
+        require(amount > 0, "Amount > 0");
+        require(usdc.transferFrom(msg.sender, address(this), amount), "Transfer failed");
         if (amount >= loan.outstanding) {
             // Loan fully repaid – free up utilised principal
             totalLentOut -= loan.principal;
@@ -404,16 +391,8 @@ function disburseLoan(uint256 loanId) external {
     }
 
  function recordAttestation(address borrower, uint256 weight) external {
-    uint256 gasBeforeRA = gasleft(); // Capture gas before the operation
-    uint256 gasUsedForAttestation = 0;
-    uint256 gasAfterRA = 0;
-    string memory borrowerString = addressToString(borrower);
-    console.log("Attestation recordAttestation:", borrower);
-    console.log("Attestation recordAttestation: Block number:", block.number);
-
-    // Your attestation logic
-    require(weight <= SCALE, "");
-    require(borrower != msg.sender, "");
+    require(weight <= SCALE, "Weight too high");
+    require(borrower != msg.sender, "Self-attestation");
 
     if (!_attesterSeen[msg.sender]) {
         _attesterSeen[msg.sender] = true;
@@ -428,24 +407,10 @@ function disburseLoan(uint256 loanId) external {
     for (uint256 i = 0; i < attests.length; i++) {
         if (attests[i].attester == msg.sender) {
             attests[i].weight = weight;
-            
-            // Compute PageRank as a side effect of updating attestation
-            // Do not compute PageRank here, it will be computed by a direct call to computePageRank()
-            
-            gasAfterRA = gasleft(); // Capture gas after the operation
-            gasUsedForAttestation += gasBeforeRA - gasAfterRA; // Calculate gas used and update tracking variable
-            console.log("Attestation recordAttestation: Gas after:", gasAfterRA, "Gas used:", gasUsedForAttestation);
             return;
         }
     }
     attests.push(Attestation(msg.sender, weight));
-
-    // Do not compute PageRank here, it will be computed by a direct call to computePageRank()
-    //_computePageRank(PR_ALPHA, 100, PR_TOL);
-
-    gasAfterRA = gasleft(); // Capture gas after the operation
-    gasUsedForAttestation += gasBeforeRA - gasAfterRA; // Calculate gas used and update tracking variable
-    console.log("Attestation recordAttestation: Gas after:", gasAfterRA, "Gas used:", gasUsedForAttestation);
 }
 
 

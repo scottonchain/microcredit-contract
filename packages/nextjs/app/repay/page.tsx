@@ -40,11 +40,18 @@ const RepayPage: NextPage = () => {
   const handlePartialRepayment = async (loanId: number) => {
     if (!repayAmount) return;
     
+    // Safely parse the repay amount
+    const parsedAmount = parseFloat(repayAmount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      console.error("Invalid repay amount");
+      return;
+    }
+    
     setIsLoading(true);
     try {
       await writeContractAsync({
         functionName: "repayLoan",
-        args: [BigInt(loanId), BigInt(parseFloat(repayAmount) * 1e6)], // Convert to USDC with 6 decimals
+        args: [BigInt(loanId), BigInt(Math.floor(parsedAmount * 1e6))], // Convert to USDC with 6 decimals
       });
       setRepayAmount("");
     } catch (error) {
