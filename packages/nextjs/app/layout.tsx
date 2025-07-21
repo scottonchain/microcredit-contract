@@ -4,7 +4,11 @@ import { ThemeProvider } from "~~/components/ThemeProvider";
 import "~~/styles/globals.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
-export const metadata = getMetadata({ title: "LoanLink", description: "Peer-to-peer social lending platform powered by on-chain social underwriting" });
+export const metadata = getMetadata({ 
+  title: "LoanLink", 
+  description: "Peer-to-peer social lending platform powered by on-chain social underwriting",
+  imageRelativePath: "/logo.svg"
+});
 
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   return (
