@@ -342,7 +342,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1752952713.json",
+      deploymentFile: "run-1752983706.json",
       deploymentScript: "Deploy.s.sol",
     },
     DecentralizedMicrocredit: {
@@ -759,6 +759,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getMaxPageRankScore",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "getPageRankScore",
           inputs: [
             {
@@ -970,7 +983,7 @@ const deployedContracts = {
           name: "previewLoanTerms",
           inputs: [
             {
-              name: "borrower",
+              name: "",
               type: "address",
               internalType: "address",
             },
@@ -1251,7 +1264,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1752952713.json",
+      deploymentFile: "run-1752983706.json",
       deploymentScript: "Deploy.s.sol",
     },
   },

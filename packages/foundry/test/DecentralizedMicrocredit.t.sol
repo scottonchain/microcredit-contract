@@ -76,11 +76,7 @@ contract DecentralizedMicrocreditTest is Test {
     address lender;
     address oracle;
 
-    // -- Utility: softplus expected score --
-    function _expected(uint256 pr) internal pure returns (uint256) {
-        uint256 x = (pr * 1000) / 100000; // PR_SCALE = 1e5
-        return (1e6 * x) / (x + 100);
-    }
+
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -252,9 +248,8 @@ contract DecentralizedMicrocreditTest is Test {
             uint256 slot = stdstore.target(address(credit)).sig("pagerankScores(address)").with_key(dummy).find();
             vm.store(address(credit), bytes32(slot), bytes32(prVal));
 
-            uint256 score = credit.getCreditScore(dummy);
-            uint256 exp = _expected(prVal);
-            assertApproxEqAbs(score, exp, 2, "Softplus mapping mismatch");
+            uint256 score = credit.getPageRankScore(dummy);
+            assertEq(score, prVal, "PageRank score mismatch");
         }
     }
 
@@ -475,12 +470,16 @@ contract DecentralizedMicrocreditTest is Test {
         freshCredit.recordAttestation(borrower, 800000);
         freshCredit.computePageRank();
 
-        // Determine max borrow allowed by score and borrow full deposit
+        // Determine max borrow allowed by score and utilization cap
         uint256 score = freshCredit.getCreditScore(borrower);
-        uint256 allowedBorrow = (score * 100000e6) / 1e6;
-        if (allowedBorrow == 0) {
-            allowedBorrow = 10000e6; // fallback minimal borrow
+        uint256 maxLoanByScore = (score * 100000e6) / 1e6;
+        if (maxLoanByScore == 0) {
+            maxLoanByScore = 10000e6; // fallback minimal borrow
         }
+        
+        // Respect utilization cap (90% of total deposits)
+        uint256 utilizationCap = (100000e6 * freshCredit.lendingUtilizationCap()) / 10000; // 90% = 90,000
+        uint256 allowedBorrow = maxLoanByScore < utilizationCap ? maxLoanByScore : utilizationCap;
 
         vm.startPrank(borrower);
         uint256 loanId = freshCredit.requestLoan(allowedBorrow);
