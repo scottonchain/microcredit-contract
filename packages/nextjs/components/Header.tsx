@@ -43,11 +43,6 @@ export const menuLinks: HeaderMenuLink[] = [
     href: "/admin",
     icon: <CogIcon className="h-4 w-4" />,
   },
-  {
-    label: "Debug",
-    href: "/debug",
-    icon: <BugAntIcon className="h-4 w-4" />,
-  },
 ];
 
 type HeaderMenuLinksProps = {
@@ -112,7 +107,7 @@ export const Header = () => {
         </details>
         <Link href="/" passHref className="hidden lg:flex items-center gap-2 ml-4 mr-6 shrink-0">
           <div className="flex relative w-10 h-10">
-            <Image alt="LoanLink logo" className="cursor-pointer" fill src="/logo.svg" />
+            <Image alt="LoanLink logo" className="cursor-pointer" width={40} height={40} src="/logo.svg" />
           </div>
           <div className="flex flex-col">
             <span className="font-bold leading-tight">LoanLink</span>
@@ -120,7 +115,7 @@ export const Header = () => {
           </div>
         </Link>
         {(() => {
-          const advanced = ["Admin", "Oracle Setup", "Debug"];
+          const advanced = ["Admin", "Oracle Setup"];
           const userLinks = menuLinks.filter(l => !advanced.includes(l.label));
           return (
             <ul className="hidden lg:flex lg:flex-nowrap menu menu-horizontal px-1 gap-2">
