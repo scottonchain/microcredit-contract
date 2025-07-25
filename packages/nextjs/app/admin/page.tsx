@@ -53,10 +53,8 @@ const AdminPage: NextPage = () => {
 
   // Additional whitelisted admin addresses
   const ADDITIONAL_ADMINS = [
-    "0x8b45296027564EF1e472EEa87B4D03BBF9DAD149".toLowerCase(),
-    "0xffE03408f9789C0dd867c398C36A2511Bf346600".toLowerCase(),
-    "0x4Dc35a5a3bdB14e9b7675cc0cA833Ce8248509fF".toLowerCase(),
-    "0xa03629fD42d6A5Bb156003132f8eF45f774B4009".toLowerCase()
+    "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf".toLowerCase(), // Anvil deployer
+    "0xef4b3cbca9f0a6b4b80e57a12a19e7ef1124f754" // Dummy admin
   ];
 
   // Permissions
@@ -756,11 +754,30 @@ const AdminPage: NextPage = () => {
     <>
       <div className="flex items-center flex-col grow pt-10">
         <div className="px-5 w-full max-w-6xl">
-          <div className="flex items-center justify-center mb-8">
-            <CogIcon className="h-8 w-8 mr-3" />
-            <h1 className="text-3xl font-bold">Admin Panel</h1>
+          <h1 className="text-3xl font-bold mb-6">🛠️ Admin Panel</h1>
+
+          {/* Overview cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-base-100 p-6 rounded-lg shadow text-center">
+              <div className="text-2xl font-bold text-green-500">
+                {poolInfo ? formatUSDC(poolInfo[0]) : "Loading…"}
+              </div>
+              <div className="text-sm text-gray-600">Total Deposits</div>
+            </div>
+            <div className="bg-base-100 p-6 rounded-lg shadow text-center">
+              <div className="text-2xl font-bold text-blue-500">
+                {availableFunds !== undefined ? formatUSDC(availableFunds) : "Loading…"}
+              </div>
+              <div className="text-sm text-gray-600">Available Funds</div>
+            </div>
+            <div className="bg-base-100 p-6 rounded-lg shadow text-center">
+              <div className="text-2xl font-bold text-orange-500">
+                {lenderCount !== undefined ? lenderCount.toString() : "Loading…"}
+              </div>
+              <div className="text-sm text-gray-600">Active Lenders</div>
+            </div>
           </div>
-          
+
           {/* Navigation Links */}
           <div className="flex justify-center mb-6">
             <Link 
@@ -768,6 +785,9 @@ const AdminPage: NextPage = () => {
               className="btn btn-primary btn-sm"
             >
               🛠️ Populate Test Data
+            </Link>
+            <Link href="/admin/nonce-sync" className="btn btn-outline btn-sm ml-2">
+              🔄 Nonce Sync
             </Link>
           </div>
 
@@ -1103,6 +1123,22 @@ const AdminPage: NextPage = () => {
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Site Map */}
+          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+            <h2 className="text-xl font-semibold mb-4">Site Map</h2>
+            <ul className="list-disc ml-5 space-y-2 text-blue-600">
+              <li><Link href="/">Home</Link></li>
+              <li><Link href="/lend">Lender Portal</Link></li>
+              <li><Link href="/borrow">Borrower Portal</Link></li>
+              <li><Link href="/scores">Credit Scores</Link></li>
+              <li><Link href="/admin">Admin Panel</Link></li>
+              <li><Link href="/populate_test_data">Populate Test Data</Link></li>
+              <li><Link href="/admin/nonce-sync">Nonce Sync Utility</Link></li>
+              <li><Link href="/debug">Debug Contract</Link></li>
+              <li><Link href="/oracle-setup">Oracle Setup</Link></li>
+            </ul>
           </div>
         </div>
       </div>

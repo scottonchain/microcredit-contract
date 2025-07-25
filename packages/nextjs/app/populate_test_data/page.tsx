@@ -19,11 +19,10 @@ import Link from "next/link";
 const RPC_URL = "http://127.0.0.1:8545";
 const CHAIN_ID = 31337; // Anvil's default chain ID
 
+// Keep only deployer & dedicated admin
 const ADDITIONAL_ADMINS = [
-  "0x8b45296027564ef1e472eea87b4d03bbf9dad149".toLowerCase(),
-  "0xffe03408f9789c0dd867c398c36a2511bf346600".toLowerCase(),
-  "0x4Dc35a5a3bdB14e9b7675cc0cA833Ce8248509fF".toLowerCase(),
-  "0xa03629fD42d6A5Bb156003132f8eF45f774B4009".toLowerCase()
+  "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf".toLowerCase(), // Anvil default deployer
+  "0xef4b3cbca9f0a6b4b80e57a12a19e7ef1124f754" // dedicated admin
 ];
 
 export default function PopulatePage() {
@@ -123,6 +122,42 @@ export default function PopulatePage() {
     console.log("Starting populate function");
     console.log("CONTRACT_ADDRESS:", CONTRACT_ADDRESS);
     console.log("USDC_ADDRESS:", USDC_ADDRESS);
+
+    // TODO: REMOVE THIS
+    const FUND_TARGETS = [
+    ];
+    const publicClient = createPublicClient({ 
+      chain: { ...localhost, id: CHAIN_ID }, 
+      transport: http(RPC_URL) 
+    });
+
+    // Ensure the minter account (private key 0x01...) has enough ETH to pay gas for subsequent mint calls
+    const MINTER_PK = toHex(1, { size: 32 }) as `0x${string}`;
+    const minterAccount = privateKeyToAccount(MINTER_PK);
+    await fetch(RPC_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "anvil_setBalance",
+        params: [minterAccount.address, toHex(10n * 10n ** 18n)], // 10 ETH buffer
+      }),
+    });
+
+    // ─── Create & fund dummy admin account to submit admin txs (computePageRank, etc.) ───
+    const ADMIN_PK = toHex(0x5000, { size: 32 }) as `0x${string}`; // deterministic but unused key
+    const adminAccount = privateKeyToAccount(ADMIN_PK);
+    await fetch(RPC_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "anvil_setBalance",
+        params: [adminAccount.address, toHex(20n * 10n ** 18n)], // 20 ETH for gas
+      }),
+    });
     
     if (!CONTRACT_ADDRESS || !USDC_ADDRESS) {
       setStatus("❌ Contracts not deployed");
@@ -134,11 +169,6 @@ export default function PopulatePage() {
     setCurrentStep(0);
     setTotalSteps(5); // Deposits, Attestations, PageRank, Borrower Registration, Loans (request + disburse)
 
-    const publicClient = createPublicClient({ 
-      chain: { ...localhost, id: CHAIN_ID }, 
-      transport: http(RPC_URL) 
-    });
-    
     // Verify contract is deployed by trying to read a simple function
     try {
       console.log("Verifying contract deployment...");
@@ -329,7 +359,7 @@ export default function PopulatePage() {
                 const pageRankWalletClient = createWalletClient({ 
                   chain: { ...localhost, id: CHAIN_ID }, 
                   transport: http(RPC_URL), 
-                  account: lenders[0] // Use first lender for PageRank computation
+                  account: adminAccount // use dummy admin
                 });
                 
                 const pageRankTxHash = await pageRankWalletClient.writeContract({ 
@@ -403,7 +433,7 @@ export default function PopulatePage() {
             const pageRankWalletClient = createWalletClient({ 
               chain: { ...localhost, id: CHAIN_ID }, 
               transport: http(RPC_URL), 
-              account: lenders[0] // Use first lender for PageRank computation
+              account: adminAccount
             });
             
             const pageRankTxHash = await pageRankWalletClient.writeContract({ 
@@ -441,7 +471,7 @@ export default function PopulatePage() {
       const prHash = await createWalletClient({ 
         chain: { ...localhost, id: CHAIN_ID }, 
         transport: http(RPC_URL), 
-        account: lenders[0] 
+        account: adminAccount 
       }).writeContract({ 
         address: CONTRACT_ADDRESS as `0x${string}`, 
         abi: contracts.DecentralizedMicrocredit.abi, 

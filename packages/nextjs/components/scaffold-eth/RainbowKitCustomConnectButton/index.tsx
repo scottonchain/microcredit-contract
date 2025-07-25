@@ -31,10 +31,17 @@ export const RainbowKitCustomConnectButton = () => {
     functionName: "usdc" as any,
   });
 
-  // Fetch usdc balance for connected account (runs even if undefined, hook order stable)
+  // Fetch USDC balance for connected account.
+  // We disable the query until we actually know the token address to avoid
+  // an initial fetch that returns the native ETH balance (which caused the
+  // widget to show the ETH amount next to "USDC").
+  const usdcTokenAddress = usdcAddress as Address | undefined;
   const { data: usdcBal } = useBalance({
     address: connectedAddress as Address | undefined,
-    token: (usdcAddress as Address | undefined) ?? undefined,
+    token: usdcTokenAddress,
+    query: {
+      refetchInterval: 4000,
+    },
   });
 
   return (
@@ -64,7 +71,9 @@ export const RainbowKitCustomConnectButton = () => {
                 <>
                   <div className="flex flex-col items-center mr-1 text-xs">
                     <Balance address={account.address as Address} className="min-h-0 h-auto" />
-                    {usdcBal && <span>{Number(usdcBal.formatted).toFixed(2)} USDC</span>}
+                    {usdcTokenAddress && usdcBal && (
+                      <span>{Number(usdcBal.formatted).toFixed(2)} USDC</span>
+                    )}
                     <span className="text-xs mt-0.5" style={{ color: networkColor }}>
                       {chain.name}
                     </span>

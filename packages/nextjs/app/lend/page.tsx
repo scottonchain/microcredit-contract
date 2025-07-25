@@ -3,17 +3,19 @@
 import { useState, useEffect } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
+import { formatUSDC, formatUSDCAllowance, getCreditScoreColor } from "~~/utils/format";
 import { BanknotesIcon, PlusIcon, EyeIcon, HandThumbUpIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import HowItWorks from "~~/components/HowItWorks";
 // removed parseEther import because USDC uses 6 decimals
 import { AddressInput } from "~~/components/scaffold-eth";
+import deployedContracts from "~~/contracts/deployedContracts";
 
 const LendPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
-  const [depositAmount, setDepositAmount] = useState("");
+  // Default deposit amount set to 1000 USDC for convenience; adjust or remove as needed.
+  const [depositAmount, setDepositAmount] = useState("1000");
   const [selectedLoanId, setSelectedLoanId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [attestBorrower, setAttestBorrower] = useState("");
@@ -83,11 +85,8 @@ const LendPage: NextPage = () => {
     functionName: "usdc",
   });
 
-  // Get contract addresses for debugging
-  const { data: contractAddress } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "owner", // Just to get the contract address
-  });
+  // Resolve DecentralizedMicrocredit contract address from deployments
+  const CONTRACT_ADDRESS = deployedContracts[31337]?.DecentralizedMicrocredit?.address as `0x${string}`;
 
   const { writeContractAsync: writeUSDCAsync } = useScaffoldWriteContract({
     contractName: "MockUSDC",
@@ -113,13 +112,14 @@ const LendPage: NextPage = () => {
   const poolRatePercent = poolApyBp !== undefined ? (Number(poolApyBp) / 100).toFixed(2) : undefined;
   const loanRatePercent = loanRateBp !== undefined ? (Number(loanRateBp) / 100).toFixed(2) : undefined;
 
-  const interestEarned = lenderDeposit !== undefined && loanRateBp !== undefined
-    ? (BigInt(lenderDeposit) * BigInt(Number(loanRateBp)) / BigInt(10000))
-    : undefined; // simplistic yearly projection
+  /**
+   * Interest should accrue only when borrowers make repayments.  Until the
+   * smart-contract exposes an on-chain "lenderInterest" value we keep this at
+   * 0 so the UI doesn’t over-promise returns immediately after a deposit.
+   */
+  const interestEarned: bigint | undefined = 0n;
 
-  const totalBalance = lenderDeposit !== undefined && interestEarned !== undefined
-    ? lenderDeposit + interestEarned
-    : undefined;
+  const totalBalance = lenderDeposit !== undefined ? lenderDeposit : undefined;
 
   // Remove placeholder arrays and fetch on-chain data
   const { data: poolInfo, refetch: refetchPoolInfo } = useScaffoldReadContract({
@@ -145,7 +145,7 @@ const LendPage: NextPage = () => {
   const { data: usdcAllowanceData, refetch: refetchUsdcAllowance } = useScaffoldReadContract({
     contractName: "MockUSDC",
     functionName: "allowance",
-    args: [connectedAddress as `0x${string}` | undefined, usdcAddress as `0x${string}` | undefined],
+    args: [connectedAddress as `0x${string}` | undefined, CONTRACT_ADDRESS],
   });
 
   // Update state when data changes
@@ -175,7 +175,7 @@ const LendPage: NextPage = () => {
           // First, try to approve the exact amount needed
           const approvalTx = await writeUSDCAsync({
             functionName: "approve",
-            args: [usdcAddress, amountInt],
+            args: [CONTRACT_ADDRESS, amountInt],
           });
           
           console.log("🔍 Approval transaction sent, waiting for confirmation...");
@@ -199,7 +199,7 @@ const LendPage: NextPage = () => {
             console.log("🔍 Approval may have failed, trying with larger amount...");
             await writeUSDCAsync({
               functionName: "approve",
-              args: [usdcAddress, amountInt * 2n], // Approve double the amount
+              args: [CONTRACT_ADDRESS, amountInt * 2n], // Approve double the amount
             });
             
             // Wait again
@@ -234,6 +234,23 @@ const LendPage: NextPage = () => {
         refetchUsdcBalance(),
         refetchUsdcAllowance()
       ]);
+
+      /* -------------------------------------------------------------
+         DEMO ONLY: trigger PageRank recomputation automatically
+         after every successful deposit so lenders immediately see
+         updated pool APR & credit-score effects in the UI.
+
+         This adds extra gas cost and should NOT be enabled in
+         production.  Simply delete the block (or wrap with a flag)
+         to revert to manual PageRank runs from the Admin panel.
+      --------------------------------------------------------------*/
+      try {
+        console.log("🔄 Auto-computing PageRank after deposit (demo mode)…");
+        await writeContractAsync({ functionName: "computePageRank" });
+        console.log("✅ PageRank recomputed");
+      } catch (prErr) {
+        console.warn("⚠️ Auto PageRank failed (safe to ignore in demo):", prErr);
+      }
       
       setDepositAmount("");
       setErrorMessage(null);
@@ -378,13 +395,13 @@ const LendPage: NextPage = () => {
       setErrorMessage(null);
       
       // Auto-approve after minting for convenience
-      if (usdcAddress) {
-        console.log("🔍 Auto-approving USDC spending...");
+      if (CONTRACT_ADDRESS) {
+        console.log("🔍 Auto-approving USDC spending for DecentralizedMicrocredit...");
         try {
           const maxAmount = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
           await writeUSDCAsync({
             functionName: "approve",
-            args: [usdcAddress, maxAmount],
+            args: [CONTRACT_ADDRESS, maxAmount],
           });
           await refetchUsdcAllowance();
           console.log("🔍 Auto-approval successful");
@@ -477,51 +494,12 @@ const LendPage: NextPage = () => {
               </div>
             </div>
             
-            {/* Debug Info */}
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div className="text-sm text-yellow-800">
-                <div className="flex justify-between">
-                  <span>Connected Address:</span>
-                  <span className="font-mono text-xs">{connectedAddress}</span>
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span>Contract Address:</span>
-                  <span className="font-mono text-xs">{contractAddress}</span>
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span>USDC Address:</span>
-                  <span className="font-mono text-xs">{usdcAddress}</span>
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span>Your Deposit Amount:</span>
-                  <span className="font-medium">{lenderDeposit !== undefined ? formatUSDC(lenderDeposit) : "Loading..."}</span>
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span>Pool Total Deposits:</span>
-                  <span className="font-medium">{poolInfo ? formatUSDC(poolInfo[0]) : "Loading..."}</span>
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span>USDC Balance:</span>
-                  <span className="font-medium">{formatUSDC(usdcBalance)}</span>
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span>USDC Allowance:</span>
-                  <span className="font-medium">{formatUSDC(usdcAllowance)}</span>
-                </div>
-                {depositAmount && (
-                  <div className="flex justify-between mt-1">
-                    <span>Requested Deposit:</span>
-                    <span className="font-medium">{depositAmount} USDC</span>
-                  </div>
-                )}
-                {depositAmount && parseDepositAmount(depositAmount) && (
-                  <div className="flex justify-between mt-1">
-                    <span>Requested (6-decimals):</span>
-                    <span className="font-medium">{parseDepositAmount(depositAmount)?.toString()}</span>
-                  </div>
-                )}
+            {/* Debug panel hidden for cleaner demo; restore if needed */}
+            {false && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                {/* original debug info here */}
               </div>
-            </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-center">
               <div>
                 <div className="text-2xl font-bold text-blue-500">
@@ -531,7 +509,7 @@ const LendPage: NextPage = () => {
               </div>
               <div>
                 <div className="text-2xl font-bold text-green-500">
-                  {interestEarned !== undefined ? formatUSDC(interestEarned) : "-"}
+                  <span className="font-medium">{interestEarned !== undefined ? formatUSDC(interestEarned) : "-"}</span>
                 </div>
                 <div className="text-sm text-gray-600">Interest Earned*</div>
               </div>
@@ -589,7 +567,7 @@ const LendPage: NextPage = () => {
                 </div>
                 <div className="flex justify-between mt-1">
                   <span>Current Allowance:</span>
-                  <span className="font-medium">{formatUSDC(usdcAllowance)}</span>
+                  <span className="font-medium">{formatUSDCAllowance(usdcAllowance)}</span>
                 </div>
                 {(() => {
                   const parsedAmount = parseDepositAmount(depositAmount);
@@ -622,75 +600,42 @@ const LendPage: NextPage = () => {
                 <div className="text-sm text-yellow-800">
                   <div className="flex justify-between items-center">
                     <span className="font-medium">USDC Approval Required</span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={async () => {
-                          if (!usdcAddress || !depositAmount) return;
-                          const amountInt = parseDepositAmount(depositAmount);
-                          if (!amountInt) {
-                            setErrorMessage("Please enter a valid deposit amount.");
-                            return;
-                          }
-                          setApprovalLoading(true);
-                          try {
-                            await writeUSDCAsync({
-                              functionName: "approve",
-                              args: [usdcAddress, amountInt],
-                            });
-                            // Wait for transaction to be mined
-                            await new Promise(resolve => setTimeout(resolve, 3000));
-                            await refetchUsdcAllowance();
-                            setErrorMessage(null);
-                          } catch (error: any) {
-                            console.error("Approval failed:", error);
-                            setErrorMessage(`Approval failed: ${error?.message || "Unknown error"}`);
-                          } finally {
-                            setApprovalLoading(false);
-                          }
-                        }}
-                        disabled={approvalLoading || !usdcAddress || !depositAmount || !parseDepositAmount(depositAmount)}
-                        className="bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-300 text-white font-medium py-2 px-4 rounded transition-colors"
-                      >
-                        {approvalLoading ? "Approving..." : "Approve Exact"}
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!usdcAddress) return;
-                          setApprovalLoading(true);
-                          try {
-                            // Approve maximum amount (infinite approval)
-                            const maxAmount = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935"); // 2^256 - 1
-                            await writeUSDCAsync({
-                              functionName: "approve",
-                              args: [usdcAddress, maxAmount],
-                            });
-                            // Wait for transaction to be mined
-                            await new Promise(resolve => setTimeout(resolve, 3000));
-                            await refetchUsdcAllowance();
-                            setErrorMessage(null);
-                          } catch (error: any) {
-                            console.error("Infinite approval failed:", error);
-                            setErrorMessage(`Infinite approval failed: ${error?.message || "Unknown error"}`);
-                          } finally {
-                            setApprovalLoading(false);
-                          }
-                        }}
-                        disabled={approvalLoading || !usdcAddress}
-                        className="bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white font-medium py-2 px-4 rounded transition-colors"
-                        title="Approve unlimited USDC spending (recommended for convenience)"
-                      >
-                        {approvalLoading ? "Approving..." : "Approve Unlimited"}
-                      </button>
+                    <div>
+                      {(() => {
+                        const parsedAmount = parseDepositAmount(depositAmount);
+                        const isApproved = parsedAmount !== null && (usdcAllowance >= parsedAmount || usdcAllowance >= BigInt(2) ** BigInt(256) - BigInt(1));
+                        return (
+                          <button
+                            onClick={async () => {
+                              if (isApproved) return;
+                              if (!usdcAddress || !depositAmount) return;
+                              const amountInt = parseDepositAmount(depositAmount);
+                              if (!amountInt) return;
+                              setApprovalLoading(true);
+                              try {
+                                await writeUSDCAsync({
+                                  functionName: "approve",
+                                  args: [CONTRACT_ADDRESS, amountInt],
+                                });
+                                await new Promise(r => setTimeout(r, 3000));
+                                await refetchUsdcAllowance();
+                              } finally {
+                                setApprovalLoading(false);
+                              }
+                            }}
+                            disabled={approvalLoading || !depositAmount || parseDepositAmount(depositAmount) === null || isApproved}
+                            className={`${isApproved ? "bg-green-500" : "bg-yellow-500 hover:bg-yellow-600"} text-white font-medium py-2 px-4 rounded transition-colors disabled:bg-green-500`}
+                          >
+                            {isApproved ? "Approved" : approvalLoading ? "Approving..." : "Approve"}
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="mt-2 text-xs">
                     {(() => {
                       const parsedAmount = parseDepositAmount(depositAmount);
-                      return parsedAmount && usdcAllowance < parsedAmount ? (
-                        <span className="text-red-600">⚠️ Insufficient allowance. Please approve USDC spending first.</span>
-                      ) : (
-                        <span className="text-green-600">✅ Sufficient allowance. You can proceed with deposit.</span>
-                      );
+                      return parsedAmount === null ? undefined : usdcAllowance < parsedAmount;
                     })()}
                     {usdcAllowance > 0n && (
                       <div className="mt-1">
@@ -701,7 +646,7 @@ const LendPage: NextPage = () => {
                             try {
                               await writeUSDCAsync({
                                 functionName: "approve",
-                                args: [usdcAddress, 0n],
+                                args: [CONTRACT_ADDRESS, 0n],
                               });
                               await new Promise(resolve => setTimeout(resolve, 2000));
                               await refetchUsdcAllowance();
@@ -751,7 +696,7 @@ const LendPage: NextPage = () => {
                 className={`font-bold py-3 px-6 rounded-lg transition-colors ${
                   (() => {
                     const parsedAmount = parseDepositAmount(depositAmount);
-                    return parsedAmount && usdcAllowance < parsedAmount;
+                    return !!parsedAmount && usdcAllowance < parsedAmount;
                   })() && depositAmount
                     ? "bg-gray-400 cursor-not-allowed"
                     : "bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white"
@@ -759,7 +704,7 @@ const LendPage: NextPage = () => {
                 title={
                   (() => {
                     const parsedAmount = parseDepositAmount(depositAmount);
-                    return parsedAmount && usdcAllowance < parsedAmount;
+                    return !!parsedAmount && usdcAllowance < parsedAmount;
                   })() && depositAmount
                     ? "Please approve USDC spending first"
                     : undefined
@@ -889,30 +834,7 @@ const LendPage: NextPage = () => {
 
           </div> {/* end grid */}
 
-          {/* Pool Overview */}
-          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">Lending Pool Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-500">
-                  {totalDeposits !== undefined ? formatUSDC(totalDeposits) : "Loading..."}
-                </div>
-                <div className="text-sm text-gray-600">Total Deposits</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-500">
-                  {availableFunds !== undefined ? formatUSDC(availableFunds) : "Loading..."}
-                </div>
-                <div className="text-sm text-gray-600">Available Funds</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-500">
-                  {lenderCount !== undefined ? lenderCount.toString() : "Loading..."}
-                </div>
-                <div className="text-sm text-gray-600">Active Lenders</div>
-              </div>
-            </div>
-          </div>
+          {/* Pool Overview moved to Admin page */}
 
           {/* How Lending Works */}
           <HowItWorks

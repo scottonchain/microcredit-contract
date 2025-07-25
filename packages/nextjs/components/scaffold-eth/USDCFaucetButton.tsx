@@ -1,19 +1,15 @@
 'use client';
 
 import { useState } from "react";
-import { createWalletClient, http, encodeFunctionData } from "viem";
-import { hardhat } from "viem/chains";
+import { useQueryClient } from "@tanstack/react-query";
+import { encodeFunctionData } from "viem";
 import { useAccount } from "wagmi";
+import { foundry } from "viem/chains";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
 import { useScaffoldReadContract, useTransactor } from "~~/hooks/scaffold-eth";
 
 const FAUCET_ADDRESS = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"; // Anvil default deployer
 const NUM_USDC = 10000n * 1000000n; // 10,000 USDC (6 decimals)
-
-const localWalletClient = createWalletClient({
-  chain: hardhat,
-  transport: http(),
-});
 
 const usdcAbi = [
   {
@@ -37,23 +33,33 @@ export const USDCFaucetButton = () => {
     functionName: "usdc" as any,
   });
 
-  const faucetTxn = useTransactor(localWalletClient);
+  const faucetTxn = useTransactor();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
 
   const sendUSDC = async () => {
     if (!address || !usdcAddress) return;
+    // Extract address from contract read result
+    const targetAddress = Array.isArray(usdcAddress) && typeof usdcAddress[0] === 'string' 
+      ? usdcAddress[0] 
+      : typeof usdcAddress === 'string' 
+        ? usdcAddress 
+        : null;
+    
+    if (!targetAddress) return;
+    
     try {
       setLoading(true);
       await faucetTxn({
-        account: FAUCET_ADDRESS,
-        // @ts-ignore – address read from contract returns `0x` string at runtime
-        to: usdcAddress,
+        to: targetAddress as `0x${string}`,
         data: encodeFunctionData({
           abi: usdcAbi,
           functionName: "mint",
           args: [address, NUM_USDC],
         }),
       });
+      // Invalidate all balance queries so UI shows fresh numbers
+      queryClient.invalidateQueries();
     } catch (err) {
       console.error("USDC faucet error", err);
     } finally {
@@ -61,7 +67,7 @@ export const USDCFaucetButton = () => {
     }
   };
 
-  if (connectedChain?.id !== hardhat.id) return null;
+  if (connectedChain?.id !== foundry.id) return null;
 
   return (
     <button className="btn btn-secondary btn-sm px-2 rounded-full ml-1 w-20" onClick={sendUSDC} disabled={loading || !usdcAddress}>

@@ -116,7 +116,7 @@ const RepayPage: NextPage = () => {
                 <div className="text-2xl font-bold text-orange-500">
                   {formatUSDCAmount(summary.outstandingBalance)}
                 </div>
-                <div className="text-sm text-gray-600">Outstanding Balance</div>
+                <div className="text-sm text-gray-600">Payoff Amount</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-500">
@@ -291,13 +291,7 @@ const UserLoanCard = ({
             >
               {isLoading ? "Repaying..." : "Full Repayment"}
             </button>
-            <button
-              onClick={() => onPartialRepayment(Number(loanId))}
-              disabled={isLoading || !repayAmount}
-              className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-            >
-              {isLoading ? "Repaying..." : "Partial Repayment"}
-            </button>
+            {/* Quick partial repayment button removed – use the form inside details */}
           </>
         )}
       </div>
