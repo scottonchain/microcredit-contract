@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     MockUSDC: {
-      address: "0x2a264f26859166c5bf3868a54593ee716aebc848",
+      address: "0x6379ebd504941f50d5bfde9348b37593bd29c835",
       abi: [
         {
           type: "constructor",
@@ -342,11 +342,11 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1753403113.json",
+      deploymentFile: "run-1753460083.json",
       deploymentScript: "Deploy.s.sol",
     },
     DecentralizedMicrocredit: {
-      address: "0xd04ff4a75edd737a73e92b2f2274cb887d96e110",
+      address: "0x5b3120d0da5fdcba7aef87a9c3c64829c1c0d76b",
       abi: [
         {
           type: "constructor",
@@ -1264,7 +1264,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1753403113.json",
+      deploymentFile: "run-1753460083.json",
       deploymentScript: "Deploy.s.sol",
     },
   },

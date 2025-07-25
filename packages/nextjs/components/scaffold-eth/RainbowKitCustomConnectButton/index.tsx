@@ -13,6 +13,7 @@ import { useNetworkColor } from "~~/hooks/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-eth";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
+import { formatUSDC } from "~~/utils/format";
 
 /**
  * Custom Wagmi Connect Button (watch balance + custom design)
@@ -31,17 +32,12 @@ export const RainbowKitCustomConnectButton = () => {
     functionName: "usdc" as any,
   });
 
-  // Fetch USDC balance for connected account.
-  // We disable the query until we actually know the token address to avoid
-  // an initial fetch that returns the native ETH balance (which caused the
-  // widget to show the ETH amount next to "USDC").
-  const usdcTokenAddress = usdcAddress as Address | undefined;
-  const { data: usdcBal } = useBalance({
-    address: connectedAddress as Address | undefined,
-    token: usdcTokenAddress,
-    query: {
-      refetchInterval: 4000,
-    },
+  // Fetch USDC balance for connected account using the same logic as lend/page.tsx
+  const { data: usdcBalanceData } = useScaffoldReadContract({
+    contractName: "MockUSDC",
+    functionName: "balanceOf",
+    args: usdcAddress && connectedAddress ? [connectedAddress as `0x${string}`] : [undefined],
+    query: { refetchInterval: 4000 },
   });
 
   return (
@@ -71,8 +67,8 @@ export const RainbowKitCustomConnectButton = () => {
                 <>
                   <div className="flex flex-col items-center mr-1 text-xs">
                     <Balance address={account.address as Address} className="min-h-0 h-auto" />
-                    {usdcTokenAddress && usdcBal && (
-                      <span>{Number(usdcBal.formatted).toFixed(2)} USDC</span>
+                    {usdcBalanceData !== undefined && (
+                      <span>{formatUSDC(usdcBalanceData)} USDC</span>
                     )}
                     <span className="text-xs mt-0.5" style={{ color: networkColor }}>
                       {chain.name}
