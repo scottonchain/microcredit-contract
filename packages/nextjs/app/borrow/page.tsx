@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { createPublicClient, http } from "viem";
+import { localhost } from "viem/chains";
+import deployedContracts from "~~/contracts/deployedContracts";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { CreditCardIcon, CalculatorIcon, InformationCircleIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
@@ -16,10 +19,10 @@ const BorrowPage: NextPage = () => {
   const [repaymentPeriod, setRepaymentPeriod] = useState(365); // Default 1 year
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch PageRank score
+  // Fetch on-chain credit score (0 – 1e6)
   const { data: creditScore } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "getPageRankScore",
+    functionName: "getCreditScore",
     args: [connectedAddress],
   });
 
@@ -29,13 +32,13 @@ const BorrowPage: NextPage = () => {
     functionName: "getPoolInfo",
   });
 
-  // Fetch current pool APR (lender yield) so borrowers can see prevailing rate
-  const { data: poolApyBp } = useScaffoldReadContract({
+  // Fetch borrower APR (loan rate) so borrowers know expected rate
+  const { data: loanRateBp } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "getFundingPoolAPY" as any,
+    functionName: "getLoanRate",
   });
-  // Convert basis-points to percentage with two decimals (e.g. 785 ⇒ "7.85")
-  const poolRatePercent = poolApyBp !== undefined ? (Number(poolApyBp) / 100).toFixed(2) : undefined;
+  // Convert basis-points to percentage with two decimals (e.g. 1000 ⇒ "10.00")
+  const borrowerAprPercent = loanRateBp !== undefined ? (Number(loanRateBp) / 100).toFixed(2) : undefined;
   // Removed lenderCount usage
 
   // Fetch maxLoanAmount to compute eligible amount
@@ -44,29 +47,128 @@ const BorrowPage: NextPage = () => {
     functionName: "maxLoanAmount",
   });
 
+  // Compute max eligible amount (BigInt, 6-decimals)
+  const maxEligibleAmount = useMemo(() => {
+    if (!creditScore || !maxLoanAmount) return 0n;
+    return (BigInt(maxLoanAmount) * creditScore) / BigInt(1e6);
+  }, [creditScore, maxLoanAmount]);
+
   const { displayName } = useDisplayName();
+
+  // Pre-populate amount once eligible amount known and input empty (hasCredit defined below)
+  // This useEffect must come after hasCredit declaration to avoid linter error
+
+  // Helper to convert token amount (string) to micro-USDC BigInt
+  const parseLoanAmount = (val: string): bigint | null => {
+    if (!val || val.trim() === "") return null;
+    const num = parseFloat(val);
+    if (isNaN(num) || num <= 0) return null;
+    return BigInt(Math.round(num * 1e6));
+  };
 
   // Write contract functions
   const { writeContractAsync } = useScaffoldWriteContract({
     contractName: "DecentralizedMicrocredit",
   });
 
+  // --- viem public client (local Anvil) -----------------------------------
+  const CHAIN_ID = 31337;
+  const RPC_URL = "http://localhost:8545";
+
+  const publicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: { ...localhost, id: CHAIN_ID },
+        transport: http(RPC_URL),
+      }),
+    []
+  );
+
+  // Deployed Microcredit contract address / ABI
+  const microcreditData = deployedContracts[CHAIN_ID]?.DecentralizedMicrocredit as any;
+  const CONTRACT_ADDRESS = microcreditData?.address as `0x${string}` | undefined;
+
   // Preview loan terms when amount or repayment period changes
   const { data: previewTermsData } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "previewLoanTerms",
-    args: [connectedAddress as `0x${string}` | undefined, connectedAddress && amount ? BigInt(amount) : undefined, connectedAddress && amount ? BigInt(repaymentPeriod * 24 * 60 * 60) : undefined],
+    args: [
+      connectedAddress as `0x${string}` | undefined,
+      connectedAddress && amount ? parseLoanAmount(amount) ?? undefined : undefined,
+      connectedAddress && amount ? BigInt(repaymentPeriod * 24 * 60 * 60) : undefined,
+    ],
   });
+
+  // ───────────── Borrower current loan ─────────────
+  const { data: borrowerLoanIds, refetch: refetchBorrowerLoanIds } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getBorrowerLoanIds" as any,
+    args: connectedAddress ? ([connectedAddress as `0x${string}`] as any) : undefined,
+  });
+
+  // There is at most one active loan per borrower; take first
+  const latestLoanId = borrowerLoanIds && borrowerLoanIds.length > 0 ? borrowerLoanIds[0] : undefined;
+
+  const { data: latestLoan, refetch: refetchLatestLoan } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getLoan" as any,
+    args: latestLoanId !== undefined ? ([latestLoanId as bigint] as any) : undefined,
+    query: {
+      enabled: latestLoanId !== undefined,
+    },
+  });
+
+  const activePrincipal: bigint | undefined = latestLoan && (latestLoan as any)[4] ? (latestLoan as any)[0] : undefined;
+  const activeOutstanding: bigint | undefined = latestLoan && (latestLoan as any)[4] ? (latestLoan as any)[1] : undefined;
 
   const handleRequestLoan = async () => {
     if (!amount || !connectedAddress) return;
     
     setIsLoading(true);
     try {
-      await writeContractAsync({
+      const principal = parseLoanAmount(amount);
+      if (!principal) return;
+      // 1) Request the loan (returns loanId in the tx logs)
+      const hash = await writeContractAsync({
         functionName: "requestLoan",
-        args: [BigInt(amount)], // Remove the repayment period argument as it's not part of the function signature
+        args: [principal],
       });
+
+      /**
+       * 2) Once the request tx is mined, look up the borrower’s latest loan
+       *    and immediately call `disburseLoan` so funds are transferred in a
+       *    single UX flow (demo convenience – in production a keeper / oracle
+       *    might handle disbursement).
+       */
+      try {
+        // Wait ~3 seconds for the tx to be mined
+        await new Promise(r => setTimeout(r, 3000));
+
+        if (!publicClient || !CONTRACT_ADDRESS) throw new Error("Missing client or contract");
+
+        // Fetch borrower loan IDs and pick the most recent
+        const loanIds = (await publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: microcreditData.abi,
+          functionName: "getBorrowerLoanIds",
+          args: [connectedAddress as `0x${string}`],
+        })) as bigint[];
+
+        const newLoanId = loanIds.length > 0 ? loanIds[loanIds.length - 1] : undefined;
+
+        if (newLoanId !== undefined) {
+          await writeContractAsync({
+            functionName: "disburseLoan",
+            args: [newLoanId],
+          });
+
+          // Refresh frontend state
+          await refetchBorrowerLoanIds();
+          await refetchLatestLoan();
+        }
+      } catch (e) {
+        console.error("Auto-disburse failed", e);
+      }
       setAmount("");
     } catch (error) {
       console.error("Error requesting loan:", error);
@@ -85,6 +187,27 @@ const BorrowPage: NextPage = () => {
   };
 
   const hasCredit = creditScore && Number(creditScore) > 0;
+
+  useEffect(() => {
+    if (hasCredit && maxEligibleAmount > 0n && amount === "") {
+      const floorTwoDecimals = Math.floor(Number(maxEligibleAmount) / 1e4) / 100; // safe floor
+      setAmount(floorTwoDecimals.toFixed(2));
+    }
+  }, [hasCredit, maxEligibleAmount, amount]);
+
+  // Whenever loanId changes, refetch its details once
+  useEffect(() => {
+    if (latestLoanId !== undefined) {
+      refetchLatestLoan();
+    }
+  }, [latestLoanId]);
+
+  // Ensure user-entered amount does not exceed maximum
+  const isAmountTooHigh = () => {
+    const parsed = parseLoanAmount(amount);
+    return parsed !== null && parsed > maxEligibleAmount;
+  };
+
   const [showInfo, setShowInfo] = useState(false);
   const attestationUrl = connectedAddress ? `${window.location.origin}/attest?borrower=${connectedAddress}&weight=80` : "";
 
@@ -150,7 +273,7 @@ const BorrowPage: NextPage = () => {
                     {/* Credit Score */}
                     <div className="text-center">
                       <div className="text-4xl font-bold text-green-500">
-                        {(Number(creditScore) / 1000).toFixed(2)}%
+                        {(Number(creditScore) / 10000).toFixed(2)}%
                       </div>
                       <div className="text-sm text-gray-600">Credit Score</div>
                     </div>
@@ -163,24 +286,28 @@ const BorrowPage: NextPage = () => {
                       <div className="text-sm text-gray-600">Eligible to Borrow</div>
                     </div>
 
-                    {/* Amount Borrowed (placeholder) */}
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-500">0</div>
-                      <div className="text-sm text-gray-600">Amount Borrowed</div>
-                    </div>
-
-                    {/* Pool APR */}
+                    {/* Loan Principal */}
                     <div className="text-center">
                       <div className="text-2xl font-bold text-purple-500">
-                        {poolRatePercent !== undefined ? `${poolRatePercent}%` : "-"}
+                        {activePrincipal !== undefined ? formatUSDC(activePrincipal) : "-"}
                       </div>
-                      <div className="text-sm text-gray-600">Pool APR</div>
+                      <div className="text-sm text-gray-600">Loan Principal</div>
                     </div>
 
-                    {/* Outstanding & Due Date placeholders */}
+                    {/* Outstanding / Payoff */}
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-500">0</div>
-                      <div className="text-sm text-gray-600">Amount Owed</div>
+                      <div className="text-2xl font-bold text-orange-500">
+                        {activeOutstanding !== undefined ? formatUSDC(activeOutstanding) : "-"}
+                      </div>
+                      <div className="text-sm text-gray-600">Payoff Amount</div>
+                    </div>
+
+                    {/* Borrower APR */}
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-500">
+                        {borrowerAprPercent !== undefined ? `${borrowerAprPercent}%` : "-"}
+                      </div>
+                      <div className="text-sm text-gray-600">Borrower APR</div>
                     </div>
                   </div>
                 ) : (
@@ -250,7 +377,20 @@ const BorrowPage: NextPage = () => {
                 </select>
               </div>
 
-              {/* Loan Terms Preview */}
+              {/* Request Button */}
+              <button
+                onClick={handleRequestLoan}
+                disabled={!amount || !connectedAddress || isLoading || !hasCredit || isAmountTooHigh()}
+                className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-colors mb-4"
+              >
+                {isLoading ? "Requesting Loan..." : "Request Loan"}
+              </button>
+
+              {isAmountTooHigh() && (
+                <p className="text-red-600 text-sm">Amount exceeds your maximum eligible loan. Lower the amount.</p>
+              )}
+
+              {/* Loan Terms Preview & Repayment Schedule */}
               {amount && previewTermsData && (
                 <div className="bg-base-200 rounded-lg p-4">
                   <h3 className="font-medium mb-3 flex items-center">
@@ -267,33 +407,55 @@ const BorrowPage: NextPage = () => {
                     <div>
                       <span className="text-sm text-gray-600">Monthly Payment:</span>
                       <div className="text-lg font-bold text-green-500">
-                        ${(Number(previewTermsData[1]) / 1000000).toFixed(2)} USDC
+                        ${(Number(previewTermsData[1]) / 1e6).toFixed(2)} USDC
                       </div>
                     </div>
                     <div>
                       <span className="text-sm text-gray-600">Total Interest:</span>
                       <div className="text-lg font-bold text-orange-500">
-                        ${(Number(amount) * Number(previewTermsData[0]) / 1000000).toFixed(2)} USDC
+                        {(() => {
+                          const interest = Number(amount) * Number(previewTermsData[0]) / 10000;
+                          return interest.toFixed(2);
+                        })()} USDC
                       </div>
                     </div>
                     <div>
                       <span className="text-sm text-gray-600">Total Repayment:</span>
                       <div className="text-lg font-bold text-purple-500">
-                        ${(Number(amount) * (1 + Number(previewTermsData[0]) / 1000000)).toFixed(2)} USDC
+                        {(() => {
+                          const total = Number(amount) * (1 + Number(previewTermsData[0]) / 10000);
+                          return total.toFixed(2);
+                        })()} USDC
                       </div>
                     </div>
                   </div>
+
+                  {/* Repayment Schedule */}
+                  {repaymentPeriod && (
+                    <div className="mt-6 overflow-x-auto text-xs">
+                      <h4 className="font-medium mb-2">Repayment Schedule</h4>
+                      <table className="table w-full">
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>Due (days)</th>
+                            <th>Payment (USDC)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.from({ length: Math.ceil(repaymentPeriod / 30) }).map((_, idx) => (
+                            <tr key={idx}>
+                              <td>{idx + 1}</td>
+                              <td>{(idx + 1) * 30}</td>
+                              <td>{(Number(previewTermsData[1]) / 1e6).toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
-
-              {/* Request Button */}
-              <button
-                onClick={handleRequestLoan}
-                disabled={!amount || !connectedAddress || isLoading || !hasCredit}
-                className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-colors"
-              >
-                {isLoading ? "Requesting Loan..." : "Request Loan"}
-              </button>
             </div>
             ) : (
               <div className="text-sm text-gray-700 space-y-3">

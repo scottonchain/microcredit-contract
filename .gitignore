@@ -27,3 +27,5 @@ dist
 git-credential-manager
 
 lib/solidity-bytes-utils/
+.cursor/
+/chain-state.json*

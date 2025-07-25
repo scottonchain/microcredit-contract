@@ -5,6 +5,7 @@ import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { useSearchParams, useRouter } from "next/navigation";
 import { HandThumbUpIcon } from "@heroicons/react/24/outline";
+import Link from "next/link";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
 import { getCreditScoreColor, formatPercent } from "~~/utils/format";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
@@ -29,6 +30,15 @@ const AttestPage: NextPage = () => {
     functionName: "getCreditScore",
     args: [borrowerAddress as `0x${string}` | undefined],
   });
+
+  // Check whether the connected address has deposited any funds yet
+  const { data: lenderDeposit } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "lenderDeposits",
+    args: [connectedAddress as `0x${string}` | undefined],
+  });
+
+  const hasDeposit = lenderDeposit !== undefined && lenderDeposit > 0n;
 
   // Write contract functions
   const { writeContractAsync } = useScaffoldWriteContract({
@@ -146,13 +156,25 @@ const AttestPage: NextPage = () => {
               {/* Attestation Button */}
               <button
                 onClick={handleAttest}
-                disabled={!borrowerAddress || !connectedAddress || isLoading}
+                disabled={!borrowerAddress || !connectedAddress || isLoading || !hasDeposit}
                 className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-colors"
               >
                 {isLoading ? "Recording Attestation..." : "Record Attestation"}
               </button>
             </div>
           </div>
+          )}
+
+          {/* Warning if lender has not deposited */}
+          {connectedAddress && lenderDeposit !== undefined && lenderDeposit === 0n && (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4 mb-8">
+              <p className="font-medium">You haven&apos;t deposited any funds yet.</p>
+              <p>
+                Please&nbsp;
+                <Link href="/lend" className="underline font-medium">deposit USDC</Link>
+                &nbsp;before recording attestations.
+              </p>
+            </div>
           )}
 
           {/* Borrower Information */}
@@ -168,7 +190,7 @@ const AttestPage: NextPage = () => {
                 
                 <div>
                   <h3 className="font-medium mb-2">Credit Score</h3>
-                  <div className={`text-lg font-bold ${borrowerCreditScore ? getCreditScoreColor(Number(borrowerCreditScore)/1000) : 'text-gray-500'}`}> 
+                  <div className={`text-lg font-bold ${borrowerCreditScore ? getCreditScoreColor(Number(borrowerCreditScore)/10000) : 'text-gray-500'}`}> 
                     {borrowerCreditScore ? formatPercent(Number(borrowerCreditScore)/10000) : "No score yet"}
                   </div>
                 </div>

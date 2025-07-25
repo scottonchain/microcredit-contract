@@ -36,6 +36,36 @@ export const AddressInfoDropdown = ({
   const { disconnect } = useDisconnect();
   const checkSumAddress = getAddress(address);
 
+  // Custom disconnect handler to clear wallet connection state
+  const handleDisconnect = () => {
+    disconnect();
+    // Clear all wagmi/RainbowKit/WalletConnect connection state from localStorage/sessionStorage
+    Object.keys(localStorage).forEach(key => {
+      if (key.toLowerCase().includes('wagmi') || key.toLowerCase().includes('walletconnect') || key.toLowerCase().includes('rainbowkit')) {
+        localStorage.removeItem(key);
+        console.log('[Disconnect] Removed localStorage key:', key);
+      }
+    });
+    Object.keys(sessionStorage).forEach(key => {
+      if (key.toLowerCase().includes('wagmi') || key.toLowerCase().includes('walletconnect') || key.toLowerCase().includes('rainbowkit')) {
+        sessionStorage.removeItem(key);
+        console.log('[Disconnect] Removed sessionStorage key:', key);
+      }
+    });
+    // Attempt to clear IndexedDB databases related to walletconnect, wagmi, or rainbowkit
+    if (window.indexedDB && indexedDB.databases) {
+      indexedDB.databases().then(dbs => {
+        dbs.forEach(db => {
+          if (db.name && (db.name.toLowerCase().includes('walletconnect') || db.name.toLowerCase().includes('wagmi') || db.name.toLowerCase().includes('rainbowkit'))) {
+            const req = indexedDB.deleteDatabase(db.name);
+            req.onsuccess = () => console.log('[Disconnect] Deleted IndexedDB database:', db.name);
+            req.onerror = () => console.log('[Disconnect] Failed to delete IndexedDB database:', db.name);
+          }
+        });
+      });
+    }
+  };
+
   const { copyToClipboard: copyAddressToClipboard, isCopiedToClipboard: isAddressCopiedToClipboard } =
     useCopyToClipboard();
   const [selectingNetwork, setSelectingNetwork] = useState(false);
@@ -126,7 +156,7 @@ export const AddressInfoDropdown = ({
             <button
               className="menu-item text-error h-8 btn-sm rounded-xl! flex gap-3 py-3"
               type="button"
-              onClick={() => disconnect()}
+              onClick={handleDisconnect}
             >
               <ArrowLeftOnRectangleIcon className="h-6 w-4 ml-2 sm:ml-0" /> <span>Disconnect</span>
             </button>
