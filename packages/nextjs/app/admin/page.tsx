@@ -786,9 +786,7 @@ const AdminPage: NextPage = () => {
             >
               🛠️ Populate Test Data
             </Link>
-            <Link href="/admin/nonce-sync" className="btn btn-outline btn-sm ml-2">
-              🔄 Nonce Sync
-            </Link>
+
           </div>
 
           {/* PageRank Computation - Moved to top */}
@@ -1135,7 +1133,7 @@ const AdminPage: NextPage = () => {
               <li><Link href="/scores">Credit Scores</Link></li>
               <li><Link href="/admin">Admin Panel</Link></li>
               <li><Link href="/populate_test_data">Populate Test Data</Link></li>
-              <li><Link href="/admin/nonce-sync">Nonce Sync Utility</Link></li>
+
               <li><Link href="/debug">Debug Contract</Link></li>
               <li><Link href="/oracle-setup">Oracle Setup</Link></li>
             </ul>
