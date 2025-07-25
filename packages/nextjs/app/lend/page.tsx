@@ -274,6 +274,14 @@ const LendPage: NextPage = () => {
       } else {
         setErrorMessage(`Deposit failed: ${error?.message || "Unknown error"}`);
       }
+      // Add user-friendly error for USDC transfer failure
+      if (
+        error?.message?.includes("0xfb8f41b2") ||
+        error?.message?.includes("Transfer failed")
+      ) {
+        setErrorMessage("USDC transfer failed. Please check your USDC balance and allowance, and try again.");
+        return;
+      }
     } finally {
       setIsLoading(false);
     }
@@ -484,13 +492,46 @@ const LendPage: NextPage = () => {
                 >
                   🔄 Refresh
                 </button>
-                <button
-                  onClick={handleDebugDeposit}
-                  className="btn btn-sm btn-outline btn-warning"
-                  title="Debug deposit data"
-                >
-                  🔍 Debug
-                </button>
+                
+  <button
+    onClick={handleDebugDeposit}
+    className="btn btn-sm btn-outline btn-warning"
+    title="Debug deposit data"
+  >
+    🔍 Debug
+  </button>
+  <button
+    onClick={async () => {
+      if (!connectedAddress || !CONTRACT_ADDRESS) {
+        console.error("Missing address or contract.");
+        return;
+      }
+
+      try {
+        const manualAmount = BigInt(1000 * 1e6); // 1000 USDC
+
+        console.log("🧪 Manually calling USDC.transferFrom...");
+        const tx = await writeUSDCAsync({
+          functionName: "transferFrom",
+          args: [
+            connectedAddress,     // from
+            CONTRACT_ADDRESS,     // to
+            manualAmount          // amount (6 decimals)
+          ],
+        });
+
+        console.log("✅ transferFrom transaction sent:", tx);
+      } catch (err) {
+        console.error("❌ transferFrom failed", err);
+        alert("transferFrom failed — see console for details.");
+      }
+    }}
+    className="btn btn-sm btn-outline btn-error"
+    title="Manually test USDC transferFrom"
+  >
+    🧪 Test transferFrom()
+  </button>
+
               </div>
             </div>
             
@@ -713,6 +754,19 @@ const LendPage: NextPage = () => {
                 {approvalLoading ? "Approving..." : isLoading ? "Depositing..." : "Deposit"}
               </button>
             </div>
+
+            {/* Add a warning message below the deposit input/button if the user does not have enough balance or allowance */}
+            {(() => {
+              const parsedAmount = parseDepositAmount(depositAmount);
+              if (!parsedAmount) return null;
+              if (Number(parsedAmount) / 1e6 > Number(usdcBalance) / 1e6) {
+                return <div className="text-red-500 text-sm mt-1">Insufficient USDC balance.</div>;
+              }
+              if (usdcAllowance < parsedAmount) {
+                return <div className="text-yellow-600 text-sm mt-1">Please approve USDC spending before depositing.</div>;
+              }
+              return null;
+            })()}
 
             <p className="text-xs text-gray-500 mt-3">*Interest displayed is a simplified projection based on current pool APR.</p>
             

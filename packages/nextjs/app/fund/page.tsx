@@ -59,6 +59,19 @@ export default function FundPage() {
     setProcessing(true);
     setStatus("⛽ Funding ETH...");
     try {
+      // Fetch current ETH balance
+      const { result: currentBalanceHex } = await fetch(RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "eth_getBalance",
+          params: [connectedAddress, "latest"],
+        }),
+      }).then(res => res.json());
+      const currentBalance = BigInt(currentBalanceHex || "0x0");
+      const newBalance = currentBalance + 1n * 10n ** 18n;
       await fetch(RPC_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -66,7 +79,7 @@ export default function FundPage() {
           jsonrpc: "2.0",
           id: 1,
           method: "anvil_setBalance",
-          params: [connectedAddress, toHex(1n * 10n ** 18n)], // 1 ETH
+          params: [connectedAddress, toHex(newBalance)],
         }),
       });
       setStatus("✅ Funded 1 ETH to your address");
@@ -83,12 +96,21 @@ export default function FundPage() {
     setProcessing(true);
     setStatus("💵 Minting 10,000 USDC...");
     try {
+      // Fetch current USDC balance
+      const currentUsdc = await publicClient.readContract({
+        address: USDC_ADDRESS,
+        abi: USDC_ABI,
+        functionName: "balanceOf",
+        args: [connectedAddress],
+      });
+      const mintAmount = 10_000n * 1_000_000n;
       const minter = await ensureMinterEth();
+      // Mint 10,000 USDC on top of current balance
       const txHash = await minter.writeContract({
         address: USDC_ADDRESS,
         abi: USDC_ABI,
         functionName: "mint",
-        args: [connectedAddress, 10_000n * 1_000_000n], // 10,000 USDC (6 dec)
+        args: [connectedAddress, mintAmount],
         gas: 5_000_000n,
       });
       await publicClient.waitForTransactionReceipt({ hash: txHash });

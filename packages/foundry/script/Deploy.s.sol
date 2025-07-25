@@ -10,6 +10,7 @@ import "../contracts/MockUSDC.sol";
  * @dev Run this when you want to deploy multiple contracts at once
  *
  * Example: yarn deploy # runs this script(without`--file` flag)
+ * To deploy with MockUSDC: DEPLOY_MOCK_USDC=true yarn deploy
  */
 contract DeployScript is Script {
     function run() external {
@@ -26,28 +27,38 @@ contract DeployScript is Script {
         // Start broadcasting transactions
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy mock USDC and mint initial supply
-        MockUSDC usdc = new MockUSDC();
+        // Only deploy MockUSDC if DEPLOY_MOCK_USDC=true, otherwise do not deploy and do not print the address. Print a message about the flag if not set.
+        bool deployMockUSDC = vm.envOr("DEPLOY_MOCK_USDC", false);
+        address usdcAddress;
+        if (deployMockUSDC) {
+            MockUSDC usdc = new MockUSDC();
+            usdcAddress = address(usdc);
+            // No need to print the address
+        } else {
+            usdcAddress = vm.envOr("USDC_ADDRESS", address(0));
+            if (usdcAddress == address(0)) {
+                console.log("USDC not deployed. To deploy a mock USDC contract, set DEPLOY_MOCK_USDC=true.");
+            }
+        }
 
         // Deploy the Microcredit contract (oracle temporarily set to deployer)
         DecentralizedMicrocredit microcreditContract = new DecentralizedMicrocredit(
             433,     // effrRate 4.33% (scaled 1e4) – current market rate
             500,     // riskPremium 5.0% (scaled 1e4) – platform premium
             100 * 1e6, // maxLoanAmount 100 USDC (6 decimals) – matches personalization cap
-            address(usdc),
+            usdcAddress,
             vm.addr(999) // set some address as oracle placeholder
         );
 
         // Log deployment information
         console.logString(string.concat("DecentralizedMicrocredit deployed at: ", vm.toString(address(microcreditContract))));
-        console.logString(string.concat("MockUSDC deployed at: ", vm.toString(address(usdc))));
         console.logString("--- Contracts deployed successfully ---");
         console.logString("Use the web interface to populate test data (lenders, borrowers, attestations)");
  
         // Save deployment information
         string memory json = "{}";
         json = vm.serializeAddress(json, "DecentralizedMicrocredit", address(microcreditContract));
-        json = vm.serializeAddress(json, "USDC", address(usdc));
+        json = vm.serializeAddress(json, "USDC", usdcAddress);
         vm.writeFile("deployment.json", json);
     }
 

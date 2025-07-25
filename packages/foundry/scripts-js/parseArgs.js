@@ -22,13 +22,18 @@ Usage: yarn deploy [options]
 Options:
   --file <filename>     Specify the deployment script file (default: Deploy.s.sol)
   --network <network>   Specify the network (default: localhost)
-  --keystore <name>     Specify the keystore account to use (bypasses selection prompt)
+  --keystore <n>     Specify the keystore account to use (bypasses selection prompt)
   --help, -h           Show this help message
+
+Environment Variables:
+  DEPLOY_MOCK_USDC=true Deploy MockUSDC contract (default: false)
+
 Examples:
   yarn deploy --file DeployDecentralizedMicrocredit.s.sol --network sepolia
   yarn deploy --network sepolia --keystore my-account
   yarn deploy --file DeployDecentralizedMicrocredit.s.sol
   yarn deploy
+  DEPLOY_MOCK_USDC=true yarn deploy  # Deploy with MockUSDC contract
   `);
   process.exit(0);
 }

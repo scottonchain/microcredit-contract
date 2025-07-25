@@ -53,6 +53,10 @@ yarn chain
 ```
 3. **Deploy contracts & seed demo users**
 ```bash
+# For testing with MockUSDC (recommended for first deployment)
+DEPLOY_MOCK_USDC=true yarn deploy
+
+# Or deploy without MockUSDC (production-like)
 yarn deploy
 ```
 4. **Launch the front-end**

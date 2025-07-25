@@ -75,6 +75,14 @@ const Home: NextPage = () => {
   const utilizationPct = totalDeposits > 0 ? (((Number(lentOut ?? 0) + reservedFunds) / 1e6) / totalDeposits) * 100 : 0;
   const capPct = utilCapBp ? Number(utilCapBp) / 100 : 0;
 
+  // Fetch lender deposit for connected address
+  const { data: lenderDeposit } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "lenderDeposits",
+    args: [connectedAddress],
+  });
+  const isLender = lenderDeposit !== undefined && BigInt(lenderDeposit) > 0n;
+
   return (
     <>
       <div className="flex items-center flex-col grow pt-10">
@@ -121,9 +129,15 @@ const Home: NextPage = () => {
                     </div>
                   ) : (
                     <div className="col-span-2 text-sm md:text-base text-gray-700 leading-relaxed md:flex md:items-center md:h-full">
-                      <p>
-                        You don&rsquo;t have a credit score yet. Request social attestations from friends or community members to unlock your first micro-loan.
-                      </p>
+                      {isLender ? (
+                        <p>
+                          <span className="font-semibold text-blue-600">You are a lender.</span> You can earn interest by funding loans. To borrow, please use a separate address, as lenders cannot borrow from the same account for security and protocol reasons.
+                        </p>
+                      ) : (
+                        <p>
+                          You don&rsquo;t have a credit score yet. Request social attestations from friends or community members to unlock your first micro-loan.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
