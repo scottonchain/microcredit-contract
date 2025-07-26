@@ -191,36 +191,7 @@ const Home: NextPage = () => {
                 </div>
               </div>
 
-              {/* Quick Stats */}
-              <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg">
-                <h3 className="text-lg font-semibold mb-4 text-center">Platform Overview</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                  <div>
-                    <div className="text-2xl font-bold text-green-500">
-                      ${totalDeposits.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                    </div>
-                    <div className="text-sm text-gray-600">Total Pool</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-blue-500">
-                      ${availableFunds.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                    </div>
-                    <div className="text-sm text-gray-600">Available</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-purple-500">
-                      {activeLenders}
-                    </div>
-                    <div className="text-sm text-gray-600">Lenders</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-orange-500">
-                      {utilizationPct.toFixed(0)}%
-                    </div>
-                    <div className="text-sm text-gray-600">Utilized</div>
-                  </div>
-                </div>
-              </div>
+
             </>
           ) : (
             // Anonymous visitor card
@@ -262,54 +233,6 @@ const Home: NextPage = () => {
             ]}
             className="mt-8"
           />
-
-          {/* Pool Statistics */}
-          <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg mt-8">
-            <h2 className="text-xl font-semibold mb-4">Lending Pool Statistics</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-500">
-                  ${totalDeposits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-sm text-gray-600">Total Deposits</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-500">
-                  ${availableFunds.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-sm text-gray-600">Available Funds</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-500">
-                  ${reservedFunds.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-sm text-gray-600">Reserved Funds</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-500">
-                  {activeLenders}
-                </div>
-                <div className="text-sm text-gray-600">Active Lenders</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-indigo-500">
-                  {utilizationPct.toFixed(2)}%
-                </div>
-                <div className="text-sm text-gray-600">Pool Utilization</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-indigo-500">
-                  {capPct.toFixed(0)}%
-                </div>
-                <div className="text-sm text-gray-600">Utilization Cap</div>
-              </div>
-            </div>
-          </div>
-          {utilizationPct > (capPct * 0.9) && (
-            <div className="alert alert-warning mt-4">
-              Lending pool is above 90% of its utilization cap. Withdrawals may be limited until more funds are deposited or loans are repaid.
-            </div>
-          )}
 
           {/* Call to Action */}
           <div className="mt-16 text-center">
