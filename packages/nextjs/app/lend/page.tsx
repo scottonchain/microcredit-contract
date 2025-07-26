@@ -478,59 +478,10 @@ const LendPage: NextPage = () => {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Your Pool Position</h2>
               <div className="flex gap-2">
-                <button
-                  onClick={async () => {
-                    await Promise.all([
-                      refetchPoolInfo(),
-                      refetchLenderDeposit(),
-                      refetchUsdcBalance(),
-                      refetchUsdcAllowance()
-                    ]);
-                  }}
-                  className="btn btn-sm btn-outline"
-                  title="Refresh your position data"
-                >
-                  🔄 Refresh
-                </button>
                 
-  <button
-    onClick={handleDebugDeposit}
-    className="btn btn-sm btn-outline btn-warning"
-    title="Debug deposit data"
-  >
-    🔍 Debug
-  </button>
-  <button
-    onClick={async () => {
-      if (!connectedAddress || !CONTRACT_ADDRESS) {
-        console.error("Missing address or contract.");
-        return;
-      }
+                
 
-      try {
-        const manualAmount = BigInt(1000 * 1e6); // 1000 USDC
 
-        console.log("🧪 Manually calling USDC.transferFrom...");
-        const tx = await writeUSDCAsync({
-          functionName: "transferFrom",
-          args: [
-            connectedAddress,     // from
-            CONTRACT_ADDRESS,     // to
-            manualAmount          // amount (6 decimals)
-          ],
-        });
-
-        console.log("✅ transferFrom transaction sent:", tx);
-      } catch (err) {
-        console.error("❌ transferFrom failed", err);
-        alert("transferFrom failed — see console for details.");
-      }
-    }}
-    className="btn btn-sm btn-outline btn-error"
-    title="Manually test USDC transferFrom"
-  >
-    🧪 Test transferFrom()
-  </button>
 
               </div>
             </div>
@@ -632,84 +583,8 @@ const LendPage: NextPage = () => {
               </div>
             </div>
             
-            {/* USDC Approval Section */}
-            {(() => {
-              const parsedAmount = parseDepositAmount(depositAmount);
-              return depositAmount && parsedAmount;
-            })() && (
-              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="text-sm text-yellow-800">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">USDC Approval Required</span>
-                    <div>
-                      {(() => {
-                        const parsedAmount = parseDepositAmount(depositAmount);
-                        const isApproved = parsedAmount !== null && (usdcAllowance >= parsedAmount || usdcAllowance >= BigInt(2) ** BigInt(256) - BigInt(1));
-                        return (
-                          <button
-                            onClick={async () => {
-                              if (isApproved) return;
-                              if (!usdcAddress || !depositAmount) return;
-                              const amountInt = parseDepositAmount(depositAmount);
-                              if (!amountInt) return;
-                              setApprovalLoading(true);
-                              try {
-                                await writeUSDCAsync({
-                                  functionName: "approve",
-                                  args: [CONTRACT_ADDRESS, amountInt],
-                                });
-                                await new Promise(r => setTimeout(r, 3000));
-                                await refetchUsdcAllowance();
-                              } finally {
-                                setApprovalLoading(false);
-                              }
-                            }}
-                            disabled={approvalLoading || !depositAmount || parseDepositAmount(depositAmount) === null || isApproved}
-                            className={`${isApproved ? "bg-green-500" : "bg-yellow-500 hover:bg-yellow-600"} text-white font-medium py-2 px-4 rounded transition-colors disabled:bg-green-500`}
-                          >
-                            {isApproved ? "Approved" : approvalLoading ? "Approving..." : "Approve"}
-                          </button>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-xs">
-                    {(() => {
-                      const parsedAmount = parseDepositAmount(depositAmount);
-                      return parsedAmount === null ? undefined : usdcAllowance < parsedAmount;
-                    })()}
-                    {usdcAllowance > 0n && (
-                      <div className="mt-1">
-                        <button
-                          onClick={async () => {
-                            if (!usdcAddress) return;
-                            setApprovalLoading(true);
-                            try {
-                              await writeUSDCAsync({
-                                functionName: "approve",
-                                args: [CONTRACT_ADDRESS, 0n],
-                              });
-                              await new Promise(resolve => setTimeout(resolve, 2000));
-                              await refetchUsdcAllowance();
-                              setErrorMessage(null);
-                            } catch (error: any) {
-                              console.error("Revoke approval failed:", error);
-                              setErrorMessage(`Revoke approval failed: ${error?.message || "Unknown error"}`);
-                            } finally {
-                              setApprovalLoading(false);
-                            }
-                          }}
-                          disabled={approvalLoading || !usdcAddress}
-                          className="text-red-600 hover:text-red-800 text-xs underline"
-                        >
-                          Revoke Approval
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+           
+           
             
             <div className="flex flex-col md:flex-row gap-4">
               <input
@@ -727,58 +602,31 @@ const LendPage: NextPage = () => {
                   !depositAmount || 
                   !connectedAddress || 
                   isLoading || 
-                  approvalLoading || 
                   (() => {
                     const parsedAmount = parseDepositAmount(depositAmount);
                     if (!parsedAmount) return true;
-                    return Number(parsedAmount) / 1e6 > Number(usdcBalance) / 1e6 || usdcAllowance < parsedAmount;
+                    return Number(parsedAmount) / 1e6 > Number(usdcBalance) / 1e6;
                   })()
                 }
-                className={`font-bold py-3 px-6 rounded-lg transition-colors ${
-                  (() => {
-                    const parsedAmount = parseDepositAmount(depositAmount);
-                    return !!parsedAmount && usdcAllowance < parsedAmount;
-                  })() && depositAmount
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white"
-                }`}
-                title={
-                  (() => {
-                    const parsedAmount = parseDepositAmount(depositAmount);
-                    return !!parsedAmount && usdcAllowance < parsedAmount;
-                  })() && depositAmount
-                    ? "Please approve USDC spending first"
-                    : undefined
-                }
+                className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-colors"
               >
-                {approvalLoading ? "Approving..." : isLoading ? "Depositing..." : "Deposit"}
+                {isLoading ? "Processing..." : "Deposit"}
               </button>
             </div>
 
-            {/* Add a warning message below the deposit input/button if the user does not have enough balance or allowance */}
+            {/* Add a warning message below the deposit input/button if the user does not have enough balance */}
             {(() => {
               const parsedAmount = parseDepositAmount(depositAmount);
               if (!parsedAmount) return null;
               if (Number(parsedAmount) / 1e6 > Number(usdcBalance) / 1e6) {
                 return <div className="text-red-500 text-sm mt-1">Insufficient USDC balance.</div>;
               }
-              if (usdcAllowance < parsedAmount) {
-                return <div className="text-yellow-600 text-sm mt-1">Please approve USDC spending before depositing.</div>;
-              }
               return null;
             })()}
 
             <p className="text-xs text-gray-500 mt-3">*Interest displayed is a simplified projection based on current pool APR.</p>
             
-            {/* Helpful guidance */}
-            {(() => {
-              const parsedAmount = parseDepositAmount(depositAmount);
-              return depositAmount && parsedAmount && usdcAllowance < parsedAmount;
-            })() && (
-              <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
-                💡 <strong>Tip:</strong> You need to approve USDC spending before depositing. Use the &ldquo;Approve Unlimited&rdquo; button above for convenience, or &ldquo;Approve Exact&rdquo; for the specific amount.
-              </div>
-            )}
+
             
             {/* Withdraw Funds */}
             {lenderDeposit !== undefined && BigInt(lenderDeposit) > 0n && (

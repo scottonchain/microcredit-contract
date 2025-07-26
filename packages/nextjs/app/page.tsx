@@ -14,6 +14,7 @@ import {
 import HowItWorks from "~~/components/HowItWorks";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { formatUSDC } from "~~/utils/format";
 import BorrowWizard from "~~/components/BorrowWizard";
 import LendWizard from "~~/components/LendWizard";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
@@ -87,75 +88,138 @@ const Home: NextPage = () => {
     <>
       <div className="flex items-center flex-col grow pt-10">
         <div className="px-5 w-full max-w-7xl">
-          <h1 className="text-center">
-            <span className="block text-2xl mb-2">Welcome to</span>
-            <span className="block text-4xl font-bold text-green-600">LoanLink</span>
-          </h1>
-          <p className="text-center text-lg mt-4 mb-4">
-            A social reputation-based lending platform powered by on-chain social underwriting
-          </p>
+          {/* Hero Section */}
+          <div className="text-center mb-12">
+            <h1 className="text-5xl font-bold text-green-600 mb-4">LoanLink</h1>
+            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+              A social reputation-based lending platform powered by on-chain social underwriting
+            </p>
+          </div>
 
           {connectedAddress ? (
             <>
-              <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg flex flex-col">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="flex flex-col">
-                    <h2 className="text-xl font-semibold mb-2">Your Profile</h2>
-                    <div className="flex items-start space-x-2">
-                      <UserIcon className="h-5 w-5" />
-                      <span className="font-medium">Address:</span>
-                      <Address address={connectedAddress} />
-                    </div>
-                    {displayName && (
-                      <span className="ml-7 mt-1 font-medium text-sm">{displayName}</span>
+              {/* Main Call to Action Cards */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+                {/* I am a Borrower */}
+                <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
+                  <div className="text-center">
+                    <CreditCardIcon className="h-16 w-16 text-green-600 mx-auto mb-4" />
+                    <h2 className="text-3xl font-bold text-green-700 mb-4">I am a Borrower</h2>
+                    <p className="text-gray-600 mb-6">
+                      Build your credit score through social attestations and access fair micro-loans with transparent terms.
+                    </p>
+                    
+                    {Number(pageRankScore ?? 0) > 0 ? (
+                      <div className="space-y-4">
+                        <div className="bg-white rounded-lg p-4">
+                          <div className="flex items-center justify-center space-x-2 mb-2">
+                            <ChartBarIcon className="h-5 w-5 text-green-600" />
+                            <span className="font-medium">Your Credit Score:</span>
+                            <span className={`text-lg font-bold ${getScoreColor(Number(percentScore))}`}>
+                              {percentScore}%
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {totalRatePct && `Current loan rate: ${totalRatePct}% APR`}
+                          </div>
+                        </div>
+                        <Link 
+                          href="/borrower" 
+                          className="block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors"
+                        >
+                          Request a Loan
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="bg-white rounded-lg p-4">
+                          <p className="text-sm text-gray-600 mb-2">
+                            {isLender ? (
+                              "Lenders cannot borrow from the same account for security reasons. Use a separate address to borrow."
+                            ) : (
+                              "Get attested by friends and community members to unlock your first loan."
+                            )}
+                          </p>
+                        </div>
+                        <Link 
+                          href="/borrower" 
+                          className="block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors"
+                        >
+                          Build Credit Score
+                        </Link>
+                      </div>
                     )}
-                    <div className="flex items-center space-x-2 mt-2">
-                      <BanknotesIcon className="h-4 w-4" />
-                      <span className="font-medium">Status:</span>
-                      {Number(pageRankScore ?? 0) > 0 ? (
-                        <span className="font-semibold text-green-600">Eligible for loans</span>
-                      ) : (
-                        <span className="font-semibold text-red-600">Not eligible yet</span>
-                      )}
-                    </div>
                   </div>
-                  {Number(pageRankScore ?? 0) > 0 ? (
-                    <div className="flex items-center space-x-2">
-                      <ChartBarIcon className="h-5 w-5" />
-                      <span className="font-medium">Credit Score:</span>
-                      <span className={`text-lg font-bold ${getScoreColor(Number(percentScore))}`}>
-                        {percentScore}%
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="col-span-2 text-sm md:text-base text-gray-700 leading-relaxed md:flex md:items-center md:h-full">
-                      {isLender ? (
-                        <p>
-                          <span className="font-semibold text-blue-600">You are a lender.</span> You can earn interest by funding loans. To borrow, please use a separate address, as lenders cannot borrow from the same account for security and protocol reasons.
-                        </p>
-                      ) : (
-                        <p>
-                          You don&rsquo;t have a credit score yet. Request social attestations from friends or community members to unlock your first micro-loan.
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </div>
 
-                {/* Borrow CTA */}
-                {Number(pageRankScore ?? 0) > 0 && (
-                  <div className="mt-auto text-center">
-                    <Link href="/borrower" className="btn btn-primary btn-lg">
-                      Borrow Now &nbsp;
-                      {totalRatePct && <span className="text-xs">({totalRatePct}% APR)</span>}
-                    </Link>
+                {/* I am a Lender */}
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
+                  <div className="text-center">
+                    <BanknotesIcon className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+                    <h2 className="text-3xl font-bold text-blue-700 mb-4">I am a Lender</h2>
+                    <p className="text-gray-600 mb-6">
+                      Earn interest on your USDC deposits by funding loans backed by social reputation.
+                    </p>
+                    
+                    <div className="space-y-4">
+                      <div className="bg-white rounded-lg p-4">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <div className="font-medium text-gray-600">Pool APY</div>
+                            <div className="text-lg font-bold text-blue-600">
+                              {totalRatePct ? `${(Number(totalRatePct) * 0.8).toFixed(2)}%` : "~8.00%"}
+                            </div>
+                          </div>
+                          {/* USDC amount hidden for production
+                          <div>
+                            <div className="font-medium text-gray-600">Your Deposit</div>
+                            <div className="text-lg font-bold text-blue-600">
+                              {lenderDeposit ? formatUSDC(BigInt(lenderDeposit)) : "$0.00"}
+                            </div>
+                          </div>
+                          */}
+                        </div>
+                      </div>
+                      <Link 
+                        href="/lend" 
+                        className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors"
+                      >
+                        {isLender ? "Manage Deposits" : "Start Lending"}
+                      </Link>
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
-              {/* NEW: Wizards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <BorrowWizard connectedAddress={connectedAddress as `0x${string}`} />
-                <LendWizard connectedAddress={connectedAddress as `0x${string}`} />
+
+              {/* Quick Stats */}
+              <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg">
+                <h3 className="text-lg font-semibold mb-4 text-center">Platform Overview</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-green-500">
+                      ${totalDeposits.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </div>
+                    <div className="text-sm text-gray-600">Total Pool</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-blue-500">
+                      ${availableFunds.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </div>
+                    <div className="text-sm text-gray-600">Available</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-purple-500">
+                      {activeLenders}
+                    </div>
+                    <div className="text-sm text-gray-600">Lenders</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-orange-500">
+                      {utilizationPct.toFixed(0)}%
+                    </div>
+                    <div className="text-sm text-gray-600">Utilized</div>
+                  </div>
+                </div>
               </div>
             </>
           ) : (

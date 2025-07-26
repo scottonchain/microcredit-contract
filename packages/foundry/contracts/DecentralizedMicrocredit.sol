@@ -293,10 +293,18 @@ contract DecentralizedMicrocredit {
         require(score > 0, "Score > 0");
 
         // Enforce per-borrower loan cap proportional to credit score
-        // Compute allowed amount using division first to prevent overflow when
-        // maxLoanAmount is very large (e.g. type(uint256).max in tests).
-        // Safe because SCORE ≤ SCALE, so (maxLoanAmount / SCALE) fits in uint256.
         uint256 allowed = (maxLoanAmount / SCALE) * score;
+
+        // NEW: Sum all outstanding principal for this borrower
+        uint256 totalOutstanding = 0;
+        uint256[] storage borrowerLoans = _borrowerLoans[msg.sender];
+        for (uint256 i = 0; i < borrowerLoans.length; i++) {
+            Loan storage l = loans[borrowerLoans[i]];
+            if (l.isActive) {
+                totalOutstanding += l.principal;
+            }
+        }
+        require(totalOutstanding + amount <= allowed, "Outstanding loans exceed max");
         require(amount <= allowed, "Amount exceeds maximum for score");
 
         // ────────── Utilisation guard ──────────

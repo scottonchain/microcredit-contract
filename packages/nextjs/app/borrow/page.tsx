@@ -6,7 +6,7 @@ import { localhost } from "viem/chains";
 import deployedContracts from "~~/contracts/deployedContracts";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import { CreditCardIcon, CalculatorIcon, InformationCircleIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
+import { CreditCardIcon, CalculatorIcon, InformationCircleIcon, DocumentDuplicateIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
@@ -16,7 +16,7 @@ import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 const BorrowPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
   const [amount, setAmount] = useState("");
-  const [repaymentPeriod, setRepaymentPeriod] = useState(365); // Default 1 year
+  const [repaymentPeriod, setRepaymentPeriod] = useState(7); // Default 1 week
   const [isLoading, setIsLoading] = useState(false);
 
   // Fetch on-chain credit score (0 – 1e6)
@@ -48,10 +48,32 @@ const BorrowPage: NextPage = () => {
   });
 
   // Compute max eligible amount (BigInt, 6-decimals)
+  // TODO: This should be made consistent with best practices for loan amount calculation
+  // Current implementation reduces borrowable amount by 1% for each additional week beyond 1 week
   const maxEligibleAmount = useMemo(() => {
     if (!creditScore || !maxLoanAmount) return 0n;
-    return (BigInt(maxLoanAmount) * creditScore) / BigInt(1e6);
-  }, [creditScore, maxLoanAmount]);
+    const baseAmount = (BigInt(maxLoanAmount) * creditScore) / BigInt(1e6);
+    
+    // Calculate weeks from repayment period (repaymentPeriod is in days)
+    const weeks = Math.ceil(repaymentPeriod / 7);
+    
+    // For 1 week, full amount is available. For each additional week, reduce by 1%
+    if (weeks <= 1) {
+      return baseAmount;
+    }
+    
+    // Calculate reduction factor: (0.99)^(weeks-1)
+    const reductionFactor = Math.pow(0.99, weeks - 1);
+    return BigInt(Math.floor(Number(baseAmount) * reductionFactor));
+  }, [creditScore, maxLoanAmount, repaymentPeriod]);
+
+  // Auto-update amount when repayment period changes
+  useEffect(() => {
+    if (maxEligibleAmount > 0n) {
+      const maxAmountInUSDC = Number(maxEligibleAmount) / 1e6;
+      setAmount(maxAmountInUSDC.toString());
+    }
+  }, [maxEligibleAmount]);
 
   const { displayName } = useDisplayName();
 
@@ -107,7 +129,7 @@ const BorrowPage: NextPage = () => {
   });
 
   // There is at most one active loan per borrower; take first
-  const latestLoanId = borrowerLoanIds && borrowerLoanIds.length > 0 ? borrowerLoanIds[0] : undefined;
+  const latestLoanId = borrowerLoanIds && Array.isArray(borrowerLoanIds) && borrowerLoanIds.length > 0 ? (borrowerLoanIds[0] as bigint) : undefined;
 
   const { data: latestLoan, refetch: refetchLatestLoan } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
@@ -178,12 +200,15 @@ const BorrowPage: NextPage = () => {
   };
 
   const getPeriodLabel = (days: number) => {
-    if (days === 30) return "1 Month";
-    if (days === 90) return "3 Months";
-    if (days === 180) return "6 Months";
-    if (days === 365) return "1 Year";
-    if (days === 730) return "2 Years";
-    return `${Math.round(days / 365)} Years`;
+    const weeks = Math.ceil(days / 7);
+    if (weeks === 1) return "1 Week";
+    if (weeks === 2) return "2 Weeks";
+    if (weeks === 4) return "4 Weeks";
+    if (weeks === 8) return "8 Weeks";
+    if (weeks === 12) return "12 Weeks";
+    if (weeks === 26) return "26 Weeks";
+    if (weeks === 52) return "52 Weeks";
+    return `${weeks} Weeks`;
   };
 
   const hasCredit = creditScore && Number(creditScore) > 0;
@@ -209,7 +234,7 @@ const BorrowPage: NextPage = () => {
   };
 
   const [showInfo, setShowInfo] = useState(false);
-  const attestationUrl = connectedAddress ? `${window.location.origin}/attest?borrower=${connectedAddress}&weight=80` : "";
+  const attestationUrl = connectedAddress ? `${window.location.origin}/attest?borrower=${connectedAddress}` : "";
 
   return (
     <>
@@ -281,9 +306,16 @@ const BorrowPage: NextPage = () => {
                     {/* Eligible Amount */}
                     <div className="text-center">
                       <div className="text-2xl font-bold text-blue-500">
-                        {maxLoanAmount !== undefined ? formatUSDC(BigInt(maxLoanAmount) * BigInt(creditScore!) / BigInt(1e6)) : "-"}
+                        {maxEligibleAmount > 0n ? formatUSDC(maxEligibleAmount) : "-"}
                       </div>
-                      <div className="text-sm text-gray-600">Eligible to Borrow</div>
+                      <div className="text-sm text-gray-600">
+                        {(() => {
+                          const weeks = Math.ceil(repaymentPeriod / 7);
+                          if (weeks <= 1) return "Eligible to Borrow";
+                          const reduction = ((1 - Math.pow(0.99, weeks - 1)) * 100).toFixed(1);
+                          return `Eligible to Borrow (${reduction}% reduced for ${weeks} weeks)`;
+                        })()}
+                      </div>
                     </div>
 
                     {/* Loan Principal */}
@@ -360,21 +392,23 @@ const BorrowPage: NextPage = () => {
 
               {/* Repayment Period */}
               <div>
-                <label className="block text-sm font-medium mb-2">Repayment Period</label>
+                <label className="block text-sm font-medium mb-2">Repayment Period (Weekly Increments)</label>
                 <select
                   value={repaymentPeriod}
                   onChange={(e) => setRepaymentPeriod(Number(e.target.value))}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  <option value={30}>1 Month</option>
-                  <option value={90}>3 Months</option>
-                  <option value={180}>6 Months</option>
-                  <option value={365}>1 Year</option>
-                  <option value={730}>2 Years</option>
-                  <option value={1095}>3 Years</option>
-                  <option value={1460}>4 Years</option>
-                  <option value={1825}>5 Years</option>
+                  <option value={7}>1 Week</option>
+                  <option value={14}>2 Weeks</option>
+                  <option value={28}>4 Weeks</option>
+                  <option value={56}>8 Weeks</option>
+                  <option value={84}>12 Weeks</option>
+                  <option value={182}>26 Weeks</option>
+                  <option value={364}>52 Weeks</option>
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Note: Borrowable amount decreases by 1% for each additional week beyond 1 week
+                </p>
               </div>
 
               {/* Request Button */}
@@ -433,23 +467,32 @@ const BorrowPage: NextPage = () => {
                   {/* Repayment Schedule */}
                   {repaymentPeriod && (
                     <div className="mt-6 overflow-x-auto text-xs">
-                      <h4 className="font-medium mb-2">Repayment Schedule</h4>
+                      <h4 className="font-medium mb-2">Weekly Repayment Schedule</h4>
                       <table className="table w-full">
                         <thead>
                           <tr>
-                            <th>#</th>
-                            <th>Due (days)</th>
-                            <th>Payment (USDC)</th>
+                            <th>Week #</th>
+                            <th>Due Date</th>
+                            <th>Weekly Payment (USDC)</th>
+                            <th>Remaining Balance (USDC)</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {Array.from({ length: Math.ceil(repaymentPeriod / 30) }).map((_, idx) => (
-                            <tr key={idx}>
-                              <td>{idx + 1}</td>
-                              <td>{(idx + 1) * 30}</td>
-                              <td>{(Number(previewTermsData[1]) / 1e6).toFixed(2)}</td>
-                            </tr>
-                          ))}
+                          {Array.from({ length: Math.ceil(repaymentPeriod / 7) }).map((_, idx) => {
+                            const weekNumber = idx + 1;
+                            const weeklyPayment = Number(previewTermsData[1]) / 1e6;
+                            const totalWeeks = Math.ceil(repaymentPeriod / 7);
+                            const remainingBalance = Number(amount) * (1 + Number(previewTermsData[0]) / 10000) - (weeklyPayment * weekNumber);
+                            
+                            return (
+                              <tr key={idx}>
+                                <td>{weekNumber}</td>
+                                <td>Week {weekNumber}</td>
+                                <td>{weeklyPayment.toFixed(2)}</td>
+                                <td>{Math.max(0, remainingBalance).toFixed(2)}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -463,6 +506,138 @@ const BorrowPage: NextPage = () => {
               </div>
             )}
           </div>
+
+          {/* Active Loan & Repayment Section */}
+          {latestLoan && (latestLoan as any)[4] && (
+            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <CurrencyDollarIcon className="h-5 w-5 mr-2" />
+                Active Loan & Repayment
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Loan Summary */}
+                <div className="bg-base-200 rounded-lg p-4">
+                  <h3 className="font-medium mb-3">Loan Summary</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Loan ID:</span>
+                      <span className="font-medium">#{latestLoanId?.toString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Principal:</span>
+                      <span className="font-medium">{activePrincipal !== undefined ? formatUSDC(activePrincipal) : "-"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Outstanding:</span>
+                      <span className="font-medium text-orange-500">{activeOutstanding !== undefined ? formatUSDC(activeOutstanding) : "-"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Interest Rate:</span>
+                      <span className="font-medium text-blue-500">
+                        {latestLoan && (latestLoan as any)[3] ? `${(Number((latestLoan as any)[3]) / 100).toFixed(2)}% APR` : "-"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Next Payment Due */}
+                <div className="bg-base-200 rounded-lg p-4">
+                  <h3 className="font-medium mb-3">Next Payment Due</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Weekly Payment:</span>
+                      <span className="font-medium text-green-500">
+                        {previewTermsData && amount ? `${(Number(previewTermsData[1]) / 1e6).toFixed(2)} USDC` : "-"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Due Date:</span>
+                      <span className="font-medium">Next Week</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Status:</span>
+                      <span className="font-medium text-green-500">Current</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Repayment Actions */}
+              <div className="mt-6 pt-4 border-t border-gray-300">
+                <h3 className="font-medium mb-3">Make a Payment</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Full Repayment */}
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h4 className="font-medium text-green-800 mb-2">Full Repayment</h4>
+                    <p className="text-sm text-green-600 mb-3">Pay off your entire outstanding balance</p>
+                    <button
+                      onClick={async () => {
+                        if (!latestLoanId || !activeOutstanding) return;
+                        setIsLoading(true);
+                        try {
+                          await writeContractAsync({
+                            functionName: "repayLoan",
+                            args: [latestLoanId as bigint, activeOutstanding as bigint],
+                          });
+                          await refetchLatestLoan();
+                        } catch (error) {
+                          console.error("Error repaying loan:", error);
+                        } finally {
+                          setIsLoading(false);
+                        }
+                      }}
+                      disabled={isLoading || !activeOutstanding}
+                      className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                    >
+                      {isLoading ? "Processing..." : `Pay ${activeOutstanding !== undefined ? formatUSDC(activeOutstanding) : "-"}`}
+                    </button>
+                  </div>
+
+                  {/* Partial Repayment */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-800 mb-2">Partial Repayment</h4>
+                    <p className="text-sm text-blue-600 mb-3">Make a partial payment to reduce your balance</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="Enter amount in USDC"
+                        className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        min="0.01"
+                        step="0.01"
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!latestLoanId || !amount) return;
+                          const repayAmount = parseLoanAmount(amount);
+                          if (!repayAmount) return;
+                          setIsLoading(true);
+                          try {
+                            await writeContractAsync({
+                              functionName: "repayLoan",
+                              args: [latestLoanId as bigint, repayAmount as bigint],
+                            });
+                            setAmount("");
+                            await refetchLatestLoan();
+                          } catch (error) {
+                            console.error("Error making partial repayment:", error);
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }}
+                        disabled={isLoading || !amount || !parseLoanAmount(amount)}
+                        className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                      >
+                        {isLoading ? "Processing..." : "Repay"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* How Credit Scores Work */}
           <div className="bg-base-300 rounded-lg p-6">

@@ -133,3 +133,18 @@ See `CONTRIBUTING.md` for guidelines.  Pull requests are welcome.
 ---
 
 © 2024 — Licensed under the MIT License
+
+---
+
+## Implementation Notes
+
+**TODO: Loan Amount Calculation** - The current implementation reduces the borrowable amount by 1% for each additional week beyond 1 week. This approach should be reviewed and made consistent with industry best practices for loan amount calculation, risk assessment, and borrower qualification criteria. Consider factors such as:
+
+- Risk-based pricing models
+- Borrower income verification
+- Debt-to-income ratios
+- Collateral requirements for longer-term loans
+- Regulatory compliance requirements
+- Industry standard loan-to-value ratios
+
+The current weekly reduction model is a simplified approach for demonstration purposes and should be enhanced for production use.

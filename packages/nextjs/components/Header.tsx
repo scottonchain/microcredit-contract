@@ -127,10 +127,12 @@ export const Header = () => {
       <div className="navbar-end grow mr-4">
         <RainbowKitCustomConnectButton />
         {/* balance handled inside connect button now */}
+        {/* Faucets hidden for production
         {isLocalNetwork && (<>
           <FaucetButton />
           <USDCFaucetButton />
         </>)}
+        */}
       </div>
     </div>
   );
