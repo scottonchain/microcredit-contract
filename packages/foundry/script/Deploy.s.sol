@@ -27,18 +27,53 @@ contract DeployScript is Script {
         // Start broadcasting transactions
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy MockUSDC if DEPLOY_MOCK_USDC=true, otherwise use provided USDC_ADDRESS
-        bool deployMockUSDC = vm.envOr("DEPLOY_MOCK_USDC", false);
+        // Get USDC address from deployment config file or deploy new MockUSDC
         address usdcAddress;
-        if (deployMockUSDC) {
+        
+        // Try to read USDC address from deployment config file
+        string memory configPath = string.concat(vm.projectRoot(), "/deployment-config.json");
+        string memory configContent = vm.readFile(configPath);
+        
+        // Parse JSON to find USDC address
+        bool foundInFile = false;
+        if (bytes(configContent).length > 0) {
+            // Look for "usdcAddress": "0x..."
+            string memory addressPattern = '"usdcAddress": "';
+            uint256 addressIndex = vm.indexOf(configContent, addressPattern);
+            if (addressIndex != type(uint256).max) {
+                // Extract address (42 characters: 0x + 40 hex chars)
+                uint256 addressStart = addressIndex + bytes(addressPattern).length;
+                
+                // Manual string extraction for address
+                bytes memory contentBytes = bytes(configContent);
+                bytes memory addressBytes = new bytes(42);
+                for (uint i = 0; i < 42 && addressStart + i < contentBytes.length; i++) {
+                    addressBytes[i] = contentBytes[addressStart + i];
+                }
+                string memory addressHex = string(addressBytes);
+                
+                // Convert hex string to address
+                usdcAddress = vm.parseAddress(addressHex);
+                foundInFile = true;
+                console.logString(string.concat("Found USDC address in deployment config: ", vm.toString(usdcAddress)));
+            }
+        }
+        
+        if (!foundInFile) {
+            // No USDC found in file, deploy new MockUSDC
+            console.logString("No USDC found in deployment config. Deploying new MockUSDC...");
             MockUSDC usdc = new MockUSDC();
             usdcAddress = address(usdc);
             console.logString(string.concat("MockUSDC deployed at: ", vm.toString(usdcAddress)));
-        } else {
-            usdcAddress = vm.envOr("USDC_ADDRESS", address(0));
-
-                console.logString(string.concat("Using existing USDC.  To deploy mock USDC, set DEPLOY_MOCK_USDC=true"));
-            }
+            
+            // Update the deployment config file with the new address
+            string memory newConfig = string.concat(
+                '{\n',
+                '  "usdcAddress": "', vm.toString(usdcAddress), '"\n',
+                '}'
+            );
+            vm.writeFile(configPath, newConfig);
+            console.logString("Updated deployment config with new USDC address");
         }
 
         // Deploy the Microcredit contract (oracle temporarily set to deployer)

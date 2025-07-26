@@ -346,7 +346,7 @@ const deployedContracts = {
       deploymentScript: "Deploy.s.sol",
     },
     DecentralizedMicrocredit: {
-      address: "0x067c804bb006836469379d4a2a69a81803bd1f45",
+      address: "0x45009dd3abbe29db54fc5d893ceaa98a624882df",
       abi: [
         {
           type: "constructor",
@@ -1264,7 +1264,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1753478423.json",
+      deploymentFile: "run-1753492096.json",
       deploymentScript: "Deploy.s.sol",
     },
   },
