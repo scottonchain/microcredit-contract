@@ -245,65 +245,65 @@ const BorrowPage: NextPage = () => {
             <h1 className="text-3xl font-bold">Request Loan</h1>
           </div>
 
-          {/* Borrower Widgets (CTA + Profile) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-
-            {/* Attestation Call-to-Action */}
-            {!hasCredit && (
-              <div className="bg-base-100 rounded-lg p-6 shadow-lg flex flex-col items-center">
-                <div className="flex items-center justify-center mb-4 gap-2">
-                  <h2 className="text-xl font-semibold text-center">Your Personal Attestation Link</h2>
-                  <button
-                    onClick={() => setShowInfo(true)}
-                    className="text-info hover:text-info/80"
-                    aria-label="What does this mean?"
-                  >
-                    <InformationCircleIcon className="h-5 w-5" />
-                  </button>
-                </div>
-                <div
-                  onClick={() => {
-                    navigator.clipboard.writeText(attestationUrl);
-                    alert("Attestation link copied! Share it with your community.");
-                  }}
-                  className="cursor-pointer flex flex-col items-center"
+          {/* Attestation Call-to-Action */}
+          {!hasCredit && (
+            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8 flex flex-col items-center">
+              <div className="flex items-center justify-center mb-4 gap-2">
+                <h2 className="text-xl font-semibold text-center">Your Personal Attestation Link</h2>
+                <button
+                  onClick={() => setShowInfo(true)}
+                  className="text-info hover:text-info/80"
+                  aria-label="What does this mean?"
                 >
-                  <QRCodeDisplay value={attestationUrl} size={120} />
-                  <span className="text-xs text-gray-500">Click to copy</span>
-                </div>
-                <div className="text-xs flex items-center justify-center gap-1 text-blue-600 mt-3 max-w-full">
-                  <a
-                    href={attestationUrl}
-                    target="_blank"
-                    className="underline truncate max-w-[220px]"
-                    title={attestationUrl}
-                  >
-                    {attestationUrl}
-                  </a>
-                  <DocumentDuplicateIcon
-                    className="h-4 w-4 cursor-pointer flex-shrink-0"
-                    onClick={() => { navigator.clipboard.writeText(attestationUrl); alert("Attestation link copied! Share it with your community."); }}
-                  />
-                </div>
+                  <InformationCircleIcon className="h-5 w-5" />
+                </button>
               </div>
-            )}
+              <div
+                onClick={() => {
+                  navigator.clipboard.writeText(attestationUrl);
+                  alert("Attestation link copied! Share it with your community.");
+                }}
+                className="cursor-pointer flex flex-col items-center"
+              >
+                <QRCodeDisplay value={attestationUrl} size={120} />
+                <span className="text-xs text-gray-500">Click to copy</span>
+              </div>
+              <div className="text-xs flex items-center justify-center gap-1 text-blue-600 mt-3 max-w-full">
+                <a
+                  href={attestationUrl}
+                  target="_blank"
+                  className="underline truncate max-w-[220px]"
+                  title={attestationUrl}
+                >
+                  {attestationUrl}
+                </a>
+                <DocumentDuplicateIcon
+                  className="h-4 w-4 cursor-pointer flex-shrink-0"
+                  onClick={() => { navigator.clipboard.writeText(attestationUrl); alert("Attestation link copied! Share it with your community."); }}
+                />
+              </div>
+            </div>
+          )}
 
-            {/* Your Account Profile */}
-            {connectedAddress && (
-              <div className="bg-base-100 rounded-lg p-6 shadow-lg">
-                <h2 className="text-xl font-semibold mb-4">Your Account Profile{displayName && ` – ${displayName}`}</h2>
+          {/* Your Account Profile - Full Width */}
+          {connectedAddress && (
+            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+              <h2 className="text-xl font-semibold mb-4">Your Account Profile{displayName && ` – ${displayName}`}</h2>
 
-                {creditScore && Number(creditScore) > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Credit Score */}
+              {creditScore && Number(creditScore) > 0 ? (
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  {/* Credit Score */}
+                  <div className="flex items-center gap-3">
                     <div className="text-center">
-                      <div className="text-4xl font-bold text-green-500">
+                      <div className="text-3xl font-bold text-green-500">
                         {(Number(creditScore) / 10000).toFixed(2)}%
                       </div>
                       <div className="text-sm text-gray-600">Credit Score</div>
                     </div>
+                  </div>
 
-                    {/* Eligible Amount */}
+                  {/* Eligible Amount */}
+                  <div className="flex items-center gap-3">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-blue-500">
                         {maxEligibleAmount > 0n ? formatUSDC(maxEligibleAmount) : "-"}
@@ -313,28 +313,34 @@ const BorrowPage: NextPage = () => {
                           const weeks = Math.ceil(repaymentPeriod / 7);
                           if (weeks <= 1) return "Eligible to Borrow";
                           const reduction = ((1 - Math.pow(0.99, weeks - 1)) * 100).toFixed(1);
-                          return `Eligible to Borrow (${reduction}% reduced for ${weeks} weeks)`;
+                          return `Eligible (${reduction}% reduced)`;
                         })()}
                       </div>
                     </div>
+                  </div>
 
-                    {/* Loan Principal */}
+                  {/* Loan Principal */}
+                  <div className="flex items-center gap-3">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-purple-500">
                         {activePrincipal !== undefined ? formatUSDC(activePrincipal) : "-"}
                       </div>
                       <div className="text-sm text-gray-600">Loan Principal</div>
                     </div>
+                  </div>
 
-                    {/* Outstanding / Payoff */}
+                  {/* Outstanding / Payoff */}
+                  <div className="flex items-center gap-3">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-orange-500">
                         {activeOutstanding !== undefined ? formatUSDC(activeOutstanding) : "-"}
                       </div>
                       <div className="text-sm text-gray-600">Payoff Amount</div>
                     </div>
+                  </div>
 
-                    {/* Borrower APR */}
+                  {/* Borrower APR */}
+                  <div className="flex items-center gap-3">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-purple-500">
                         {borrowerAprPercent !== undefined ? `${borrowerAprPercent}%` : "-"}
@@ -342,15 +348,14 @@ const BorrowPage: NextPage = () => {
                       <div className="text-sm text-gray-600">Borrower APR</div>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-yellow-600 text-sm text-center md:flex md:items-start md:justify-center md:h-full md:-mt-2">
-                    You&apos;ll unlock borrowing once you gain at least one attestation and your credit score is above zero.
-                  </div>
-                )}
                 </div>
-            )}
-
-          </div>
+              ) : (
+                <div className="text-yellow-600 text-sm text-center">
+                  You&apos;ll unlock borrowing once you gain at least one attestation and your credit score is above zero.
+                </div>
+              )}
+            </div>
+          )}
 
           {showInfo && (
             <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
