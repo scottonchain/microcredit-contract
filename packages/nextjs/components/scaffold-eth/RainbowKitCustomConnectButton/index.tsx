@@ -66,7 +66,6 @@ export const RainbowKitCustomConnectButton = () => {
               return (
                 <>
                   <div className="flex flex-col items-center mr-1 text-xs">
-                    <Balance address={account.address as Address} className="min-h-0 h-auto" />
                     {usdcBalanceData !== undefined && (
                       <span>{formatUSDC(usdcBalanceData)} USDC</span>
                     )}

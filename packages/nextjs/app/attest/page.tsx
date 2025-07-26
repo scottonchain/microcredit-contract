@@ -112,6 +112,40 @@ const AttestPage: NextPage = () => {
             <h1 className="text-3xl font-bold">Make Attestation</h1>
           </div>
 
+          {/* Message for users viewing their own attestation page */}
+          {connectedAddress && borrowerAddress && connectedAddress.toLowerCase() === borrowerAddress.toLowerCase() && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+              <h2 className="text-xl font-semibold text-blue-800 mb-3">This is your personal attestation page!</h2>
+              <div className="space-y-3 text-blue-700">
+                <p>
+                  <strong>What is this page?</strong> This is where others can attest to your creditworthiness and help you build your on-chain credit score.
+                </p>
+                <p>
+                  <strong>How to share it:</strong> Copy the link below and share it with friends, family, or community members who know you well and can vouch for your reliability.
+                </p>
+                <div className="bg-white rounded-lg p-4 mt-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-sm break-all text-blue-600">
+                      {window.location.href}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.href);
+                        alert("Attestation link copied to clipboard!");
+                      }}
+                      className="ml-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+                <p className="text-sm mt-3">
+                  <strong>Tip:</strong> The more people who attest to your creditworthiness, the higher your credit score will be, leading to better loan terms!
+                </p>
+              </div>
+            </div>
+          )}
+
           {connectedAddress && (
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
             <h2 className="text-xl font-semibold mb-4">Attest to Creditworthiness</h2>

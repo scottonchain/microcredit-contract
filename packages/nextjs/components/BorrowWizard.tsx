@@ -49,7 +49,7 @@ const BorrowWizard: React.FC<BorrowWizardProps> = ({ connectedAddress }) => {
 
   // No loan form here; only summary
 
-  const attestationUrl = connectedAddress ? `${window.location.origin}/attest?borrower=${connectedAddress}&weight=80` : "";
+  const attestationUrl = connectedAddress ? `${window.location.origin}/attest?borrower=${connectedAddress}` : "";
 
   return (
     <div className="bg-base-100 rounded-lg p-6 shadow-lg">

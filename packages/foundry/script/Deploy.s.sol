@@ -27,17 +27,17 @@ contract DeployScript is Script {
         // Start broadcasting transactions
         vm.startBroadcast(deployerPrivateKey);
 
-        // Only deploy MockUSDC if DEPLOY_MOCK_USDC=true, otherwise do not deploy and do not print the address. Print a message about the flag if not set.
+        // Deploy MockUSDC if DEPLOY_MOCK_USDC=true, otherwise use provided USDC_ADDRESS
         bool deployMockUSDC = vm.envOr("DEPLOY_MOCK_USDC", false);
         address usdcAddress;
         if (deployMockUSDC) {
             MockUSDC usdc = new MockUSDC();
             usdcAddress = address(usdc);
-            // No need to print the address
+            console.logString(string.concat("MockUSDC deployed at: ", vm.toString(usdcAddress)));
         } else {
             usdcAddress = vm.envOr("USDC_ADDRESS", address(0));
-            if (usdcAddress == address(0)) {
-                console.log("USDC not deployed. To deploy a mock USDC contract, set DEPLOY_MOCK_USDC=true.");
+
+                console.logString(string.concat("Using existing USDC.  To deploy mock USDC, set DEPLOY_MOCK_USDC=true"));
             }
         }
 
@@ -47,7 +47,7 @@ contract DeployScript is Script {
             500,     // riskPremium 5.0% (scaled 1e4) – platform premium
             100 * 1e6, // maxLoanAmount 100 USDC (6 decimals) – matches personalization cap
             usdcAddress,
-            vm.addr(999) // set some address as oracle placeholder
+            vm.addr(deployerPrivateKey) // set deployer as oracle placeholder
         );
 
         // Log deployment information
