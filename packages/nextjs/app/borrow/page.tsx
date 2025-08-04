@@ -93,6 +93,141 @@ const BorrowPage: NextPage = () => {
     contractName: "DecentralizedMicrocredit",
   });
 
+  // Separate hook for USDC approvals
+  const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({
+    contractName: "MockUSDC",
+  });
+
+  // Contract configs
+  const contracts = deployedContracts[31337];
+  const USDC_ADDRESS = contracts?.MockUSDC?.address as `0x${string}` | undefined;
+  const USDC_ABI = contracts?.MockUSDC?.abi;
+  const MICRO_ADDRESS = contracts?.DecentralizedMicrocredit?.address as `0x${string}` | undefined;
+
+  // Helper function to check and handle USDC allowance
+  const ensureAllowance = async (amount: bigint) => {
+    if (!connectedAddress || !USDC_ADDRESS || !MICRO_ADDRESS) {
+      throw new Error("Missing required addresses");
+    }
+
+    try {
+      // Check current allowance
+      const currentAllowance = await publicClient.readContract({
+        address: USDC_ADDRESS,
+        abi: USDC_ABI,
+        functionName: "allowance",
+        args: [connectedAddress, MICRO_ADDRESS],
+      });
+
+      console.log("Current allowance:", currentAllowance.toString());
+      console.log("Required amount:", amount.toString());
+
+      // If allowance is insufficient, approve
+      if (currentAllowance < amount) {
+        console.log("Insufficient allowance, approving...");
+        await writeUsdcAsync({
+          functionName: "approve",
+          args: [MICRO_ADDRESS, amount],
+        });
+        
+        // Wait for approval to be processed
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Verify the approval
+        const newAllowance = await publicClient.readContract({
+          address: USDC_ADDRESS,
+          abi: USDC_ABI,
+          functionName: "allowance",
+          args: [connectedAddress, MICRO_ADDRESS],
+        });
+        
+        console.log("New allowance:", newAllowance.toString());
+        
+        if (newAllowance < amount) {
+          throw new Error("Allowance approval failed");
+        }
+      } else {
+        console.log("Sufficient allowance already exists");
+      }
+    } catch (error) {
+      console.error("Error in ensureAllowance:", error);
+      throw error;
+    }
+  };
+
+  // Helper function to check USDC balance
+  const checkUSDCBalance = async (amount: bigint) => {
+    if (!connectedAddress || !USDC_ADDRESS) {
+      throw new Error("Missing required addresses");
+    }
+
+    try {
+      const balance = await publicClient.readContract({
+        address: USDC_ADDRESS,
+        abi: USDC_ABI,
+        functionName: "balanceOf",
+        args: [connectedAddress],
+      });
+
+      console.log("USDC Balance:", balance.toString());
+      console.log("Required amount:", amount.toString());
+
+      if (balance < amount) {
+        throw new Error(`Insufficient USDC balance. You have ${formatUSDC(balance)} but need ${formatUSDC(amount)}`);
+      }
+
+      return balance;
+    } catch (error) {
+      console.error("Error checking USDC balance:", error);
+      throw error;
+    }
+  };
+
+  // Helper function to handle transfer errors
+  const handleTransferError = (error: any) => {
+    console.error("Transaction error:", error);
+    
+    if (error && typeof error === 'object') {
+      const errorMessage = error.message || '';
+      const errorData = error.data || error.error?.data || '';
+      
+      // Check for transfer failed error (0xe450d38c)
+      if (errorMessage.includes('0xe450d38c') || 
+          errorData.includes('0xe450d38c') ||
+          errorMessage.includes('Transfer failed') ||
+          errorMessage.includes('transfer failed')) {
+        
+        console.error("USDC Transfer Failed!");
+        console.error("This could be due to:");
+        console.error("1. Insufficient USDC balance");
+        console.error("2. Insufficient allowance (though we tried to approve)");
+        console.error("3. MockUSDC contract issues");
+        
+        return "TRANSFER_FAILED";
+      }
+      
+      // Check for ERC20 allowance error (0xfb8f41b2)
+      if (errorMessage.includes('0xfb8f41b2') || 
+          errorData.includes('0xfb8f41b2') ||
+          errorMessage.includes('insufficient allowance') ||
+          errorMessage.includes('ERC20InsufficientAllowance')) {
+        
+        return "ERC20_APPROVAL_NEEDED";
+      }
+      
+      // Check for other common errors
+      if (errorMessage.includes('insufficient funds') || errorMessage.includes('gas')) {
+        return "INSUFFICIENT_FUNDS";
+      }
+      
+      if (errorMessage.includes('user rejected') || errorMessage.includes('User denied')) {
+        return "USER_REJECTED";
+      }
+    }
+    
+    return "UNKNOWN_ERROR";
+  };
+
   // --- viem public client (local Anvil) -----------------------------------
   const CHAIN_ID = 31337;
   const RPC_URL = "http://localhost:8545";
@@ -225,7 +360,7 @@ const BorrowPage: NextPage = () => {
     if (latestLoanId !== undefined) {
       refetchLatestLoan();
     }
-  }, [latestLoanId]);
+  }, [latestLoanId, refetchLatestLoan]);
 
   // Ensure user-entered amount does not exceed maximum
   const isAmountTooHigh = () => {
@@ -247,9 +382,9 @@ const BorrowPage: NextPage = () => {
 
           {/* Attestation Call-to-Action */}
           {!hasCredit && (
-            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8 flex flex-col items-center">
+            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
               <div className="flex items-center justify-center mb-4 gap-2">
-                <h2 className="text-xl font-semibold text-center">Your Personal Attestation Link</h2>
+                <h2 className="text-lg font-semibold text-center">Attestation Link</h2>
                 <button
                   onClick={() => setShowInfo(true)}
                   className="text-info hover:text-info/80"
@@ -258,102 +393,144 @@ const BorrowPage: NextPage = () => {
                   <InformationCircleIcon className="h-5 w-5" />
                 </button>
               </div>
-              <div
-                onClick={() => {
-                  navigator.clipboard.writeText(attestationUrl);
-                  alert("Attestation link copied! Share it with your community.");
-                }}
-                className="cursor-pointer flex flex-col items-center"
-              >
-                <QRCodeDisplay value={attestationUrl} size={120} />
-                <span className="text-xs text-gray-500">Click to copy</span>
-              </div>
-              <div className="text-xs flex items-center justify-center gap-1 text-blue-600 mt-3 max-w-full">
-                <a
-                  href={attestationUrl}
-                  target="_blank"
-                  className="underline truncate max-w-[220px]"
-                  title={attestationUrl}
-                >
-                  {attestationUrl}
-                </a>
-                <DocumentDuplicateIcon
-                  className="h-4 w-4 cursor-pointer flex-shrink-0"
-                  onClick={() => { navigator.clipboard.writeText(attestationUrl); alert("Attestation link copied! Share it with your community."); }}
-                />
+              
+              <div className="flex items-start gap-6">
+                {/* QR Code on the left */}
+                <div className="flex-shrink-0">
+                  <div
+                    onClick={() => {
+                      navigator.clipboard.writeText(attestationUrl);
+                      alert("Attestation link copied! Share it with your community.");
+                    }}
+                    className="cursor-pointer flex flex-col items-center"
+                  >
+                    <QRCodeDisplay value={attestationUrl} size={80} />
+                    <span className="text-xs text-gray-500 mt-2">Click to copy</span>
+                  </div>
+                </div>
+                
+                {/* Instructions and link on the right */}
+                <div className="flex-1">
+                  <div className="mb-3">
+                    <p className="text-gray-700 mb-2">
+                      <strong>Share this link with people who know you well</strong>
+                    </p>
+                    <p className="text-sm text-gray-600 mb-2">
+                      You need at least one attestation to request a loan. Share your attestation link with trusted peers and build your credit score.
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Ask friends, family, or community members to vouch for your trustworthiness. 
+                      Each person who attests to you helps build your credit score.
+                    </p>
+                  </div>
+                  
+                  <div className="text-xs flex items-center gap-1 text-blue-600">
+                    <span
+                      className="underline truncate max-w-[300px] cursor-pointer"
+                      title={attestationUrl}
+                      onClick={() => { navigator.clipboard.writeText(attestationUrl); alert("Attestation link copied! Share it with your community."); }}
+                    >
+                      {attestationUrl}
+                    </span>
+                    <DocumentDuplicateIcon
+                      className="h-4 w-4 cursor-pointer flex-shrink-0"
+                      onClick={() => { navigator.clipboard.writeText(attestationUrl); alert("Attestation link copied! Share it with your community."); }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
+          {/* Welcome Section for Borrowers */}
+          <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-6 mb-8">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold text-green-800 mb-3">Welcome to Social Borrowing</h2>
+              <p className="text-green-700 max-w-3xl mx-auto">
+                Access fair microloans based on your community&apos;s trust, not traditional credit scores. 
+                Your friends, family, and community members vouch for your reliability, creating a credit score that reflects your real-world reputation.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+              <div className="bg-white rounded-lg p-4">
+                <div className="text-2xl font-bold text-green-600 mb-2">No Bank Required</div>
+                <div className="text-sm text-gray-600">No traditional credit history or bank account needed</div>
+              </div>
+              <div className="bg-white rounded-lg p-4">
+                <div className="text-2xl font-bold text-green-600 mb-2">Community Trust</div>
+                <div className="text-sm text-gray-600">Your credit score is built through social attestations</div>
+              </div>
+              <div className="bg-white rounded-lg p-4">
+                <div className="text-2xl font-bold text-green-600 mb-2">Fair Terms</div>
+                <div className="text-sm text-gray-600">Transparent loan terms based on your social reputation</div>
+              </div>
+            </div>
+          </div>
+
           {/* Your Account Profile - Full Width */}
-          {connectedAddress && (
+          {connectedAddress && hasCredit && (
             <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
               <h2 className="text-xl font-semibold mb-4">Your Account Profile{displayName && ` – ${displayName}`}</h2>
 
-              {creditScore && Number(creditScore) > 0 ? (
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  {/* Credit Score */}
-                  <div className="flex items-center gap-3">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-green-500">
-                        {(Number(creditScore) / 10000).toFixed(2)}%
-                      </div>
-                      <div className="text-sm text-gray-600">Credit Score</div>
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                {/* Credit Score */}
+                <div className="flex items-center gap-3">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-green-500">
+                      {(Number(creditScore) / 10000).toFixed(2)}%
                     </div>
+                    <div className="text-sm text-gray-600">Credit Score</div>
                   </div>
+                </div>
 
-                  {/* Eligible Amount */}
-                  <div className="flex items-center gap-3">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-500">
-                        {maxEligibleAmount > 0n ? formatUSDC(maxEligibleAmount) : "-"}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {(() => {
-                          const weeks = Math.ceil(repaymentPeriod / 7);
-                          if (weeks <= 1) return "Eligible to Borrow";
-                          const reduction = ((1 - Math.pow(0.99, weeks - 1)) * 100).toFixed(1);
-                          return `Eligible (${reduction}% reduced)`;
-                        })()}
-                      </div>
+                {/* Eligible Amount */}
+                <div className="flex items-center gap-3">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-500">
+                      {maxEligibleAmount > 0n ? formatUSDC(maxEligibleAmount) : "-"}
                     </div>
-                  </div>
-
-                  {/* Loan Principal */}
-                  <div className="flex items-center gap-3">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-500">
-                        {activePrincipal !== undefined ? formatUSDC(activePrincipal) : "-"}
-                      </div>
-                      <div className="text-sm text-gray-600">Loan Principal</div>
-                    </div>
-                  </div>
-
-                  {/* Outstanding / Payoff */}
-                  <div className="flex items-center gap-3">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-500">
-                        {activeOutstanding !== undefined ? formatUSDC(activeOutstanding) : "-"}
-                      </div>
-                      <div className="text-sm text-gray-600">Payoff Amount</div>
-                    </div>
-                  </div>
-
-                  {/* Borrower APR */}
-                  <div className="flex items-center gap-3">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-500">
-                        {borrowerAprPercent !== undefined ? `${borrowerAprPercent}%` : "-"}
-                      </div>
-                      <div className="text-sm text-gray-600">Borrower APR</div>
+                    <div className="text-sm text-gray-600">
+                      {(() => {
+                        const weeks = Math.ceil(repaymentPeriod / 7);
+                        if (weeks <= 1) return "Eligible to Borrow";
+                        const reduction = ((1 - Math.pow(0.99, weeks - 1)) * 100).toFixed(1);
+                        return `Eligible (${reduction}% reduced)`;
+                      })()}
                     </div>
                   </div>
                 </div>
-              ) : (
-                <div className="text-yellow-600 text-sm text-center">
-                  You&apos;ll unlock borrowing once you gain at least one attestation and your credit score is above zero.
+
+                {/* Loan Principal */}
+                <div className="flex items-center gap-3">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-500">
+                      {activePrincipal !== undefined ? formatUSDC(activePrincipal) : "-"}
+                    </div>
+                    <div className="text-sm text-gray-600">Loan Principal</div>
+                  </div>
                 </div>
-              )}
+
+                {/* Outstanding / Payoff */}
+                <div className="flex items-center gap-3">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-500">
+                      {activeOutstanding !== undefined ? formatUSDC(activeOutstanding) : "-"}
+                    </div>
+                    <div className="text-sm text-gray-600">Payoff Amount</div>
+                  </div>
+                </div>
+
+                {/* Borrower APR */}
+                <div className="flex items-center gap-3">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-500">
+                      {borrowerAprPercent !== undefined ? `${borrowerAprPercent}%` : "-"}
+                    </div>
+                    <div className="text-sm text-gray-600">Borrower APR</div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -377,9 +554,9 @@ const BorrowPage: NextPage = () => {
           )}
 
           {/* Loan Request Section */}
+          {hasCredit && (
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">{hasCredit ? "Request New Loan" : "How to Become Eligible"}</h2>
-            {hasCredit ? (
+            <h2 className="text-xl font-semibold mb-4">Request New Loan</h2>
             <div className="space-y-6">
               {/* Loan Amount */}
               <div>
@@ -505,12 +682,8 @@ const BorrowPage: NextPage = () => {
                 </div>
               )}
             </div>
-            ) : (
-              <div className="text-sm text-gray-700 space-y-3">
-                <p>You need at least one attestation to request a loan. Share your attestation link with trusted peers and build your credit score.</p>
-              </div>
-            )}
           </div>
+          )}
 
           {/* Active Loan & Repayment Section */}
           {latestLoan && (latestLoan as any)[4] && (
@@ -581,13 +754,44 @@ const BorrowPage: NextPage = () => {
                         if (!latestLoanId || !activeOutstanding) return;
                         setIsLoading(true);
                         try {
+                          console.log("Starting full repayment process...");
+                          
+                          // Check USDC balance first
+                          console.log("Checking USDC balance...");
+                          await checkUSDCBalance(activeOutstanding as bigint);
+                          
+                          // Ensure USDC allowance
+                          console.log("Ensuring USDC allowance...");
+                          await ensureAllowance(activeOutstanding as bigint);
+                          
+                          // Execute repayment
+                          console.log("Executing repayment...");
                           await writeContractAsync({
                             functionName: "repayLoan",
                             args: [latestLoanId as bigint, activeOutstanding as bigint],
                           });
+                          
+                          console.log("Repayment completed successfully!");
                           await refetchLatestLoan();
                         } catch (error) {
-                          console.error("Error repaying loan:", error);
+                          const errorType = handleTransferError(error);
+                          
+                          switch (errorType) {
+                            case "TRANSFER_FAILED":
+                              console.error("USDC transfer failed. Please check your USDC balance and try again.");
+                              break;
+                            case "ERC20_APPROVAL_NEEDED":
+                              console.error("ERC20 Allowance Error: Please try again. The system will handle the approval automatically.");
+                              break;
+                            case "INSUFFICIENT_FUNDS":
+                              console.error("Insufficient funds for gas or USDC balance.");
+                              break;
+                            case "USER_REJECTED":
+                              console.error("Transaction was rejected by user.");
+                              break;
+                            default:
+                              console.error("Unknown error occurred:", error);
+                          }
                         } finally {
                           setIsLoading(false);
                         }
@@ -620,14 +824,45 @@ const BorrowPage: NextPage = () => {
                           if (!repayAmount) return;
                           setIsLoading(true);
                           try {
+                            console.log("Starting partial repayment process...");
+                            
+                            // Check USDC balance first
+                            console.log("Checking USDC balance for partial repayment...");
+                            await checkUSDCBalance(repayAmount as bigint);
+                            
+                            // Ensure USDC allowance for partial amount
+                            console.log("Ensuring USDC allowance for partial repayment...");
+                            await ensureAllowance(repayAmount as bigint);
+                            
+                            // Execute partial repayment
+                            console.log("Executing partial repayment...");
                             await writeContractAsync({
                               functionName: "repayLoan",
                               args: [latestLoanId as bigint, repayAmount as bigint],
                             });
+                            
+                            console.log("Partial repayment completed successfully!");
                             setAmount("");
                             await refetchLatestLoan();
                           } catch (error) {
-                            console.error("Error making partial repayment:", error);
+                            const errorType = handleTransferError(error);
+                            
+                            switch (errorType) {
+                              case "TRANSFER_FAILED":
+                                console.error("USDC transfer failed. Please check your USDC balance and try again.");
+                                break;
+                              case "ERC20_APPROVAL_NEEDED":
+                                console.error("ERC20 Allowance Error: Please try again. The system will handle the approval automatically.");
+                                break;
+                              case "INSUFFICIENT_FUNDS":
+                                console.error("Insufficient funds for gas or USDC balance.");
+                                break;
+                              case "USER_REJECTED":
+                                console.error("Transaction was rejected by user.");
+                                break;
+                              default:
+                                console.error("Unknown error occurred:", error);
+                            }
                           } finally {
                             setIsLoading(false);
                           }
@@ -644,39 +879,7 @@ const BorrowPage: NextPage = () => {
             </div>
           )}
 
-          {/* How Credit Scores Work */}
-          <div className="bg-base-300 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">How Credit Scores Work</h2>
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
-                  1
-                </div>
-                <div>
-                  <h3 className="font-medium">Get Attested</h3>
-                  <p className="text-gray-600">Others in your community attest to your creditworthiness</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
-                  2
-                </div>
-                <div>
-                  <h3 className="font-medium">Reputation Engine</h3>
-                  <p className="text-gray-600">Scores are produced by an on-chain reputation engine driven by social attestations</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
-                  3
-                </div>
-                <div>
-                  <h3 className="font-medium">Better Terms</h3>
-                  <p className="text-gray-600">A higher credit score unlocks lower interest rates and more favourable repayment terms.</p>
-                </div>
-              </div>
-            </div>
-          </div>
+
         </div>
       </div>
     </>

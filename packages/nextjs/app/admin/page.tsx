@@ -54,7 +54,8 @@ const AdminPage: NextPage = () => {
   // Additional whitelisted admin addresses
   const ADDITIONAL_ADMINS = [
     "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf".toLowerCase(), // Anvil deployer
-    "0xef4b3cbca9f0a6b4b80e57a12a19e7ef1124f754" // Dummy admin
+    "0xef4b3cbca9f0a6b4b80e57a12a19e7ef1124f754", // Dummy admin
+    "0xE51a60126dF85801D4C76bDAf58D6F9E81Cc26cA".toLowerCase(), // Added per request
   ];
 
   // Permissions

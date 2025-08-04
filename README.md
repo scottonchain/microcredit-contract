@@ -86,6 +86,19 @@ The borrower’s APR is simply `effrRate + riskPremium`.
 
 ---
 
+## Wallet Support
+
+The application supports multiple wallet providers including:
+- **MetaMask** - Most popular browser extension
+- **WalletConnect** - Mobile/desktop bridge for any wallet
+- **Ledger** - Hardware wallet security
+- **Coinbase Wallet** - User-friendly mobile app
+- **Rainbow Wallet** - Beautiful mobile interface
+- **Rabby Wallet** - Security-focused browser extension
+- **Safe Wallet** - Multi-signature team wallets
+
+For detailed wallet setup and troubleshooting, see [Wallet Support Documentation](packages/nextjs/docs/WALLET_SUPPORT.md).
+
 ## User Guides
 
 ### Borrowers
