@@ -49,6 +49,8 @@ const LendPage: NextPage = () => {
     return BigInt(Math.floor(parsed * 1e6));
   };
 
+
+
   // Load cached attestations from localStorage when wallet connects
   useEffect(() => {
     if (!connectedAddress) return;
@@ -62,6 +64,8 @@ const LendPage: NextPage = () => {
       }
     }
   }, [connectedAddress]);
+
+
 
   // Persist whenever attestations change
   useEffect(() => {
@@ -166,16 +170,18 @@ const LendPage: NextPage = () => {
     setIsLoading(true);
     try {
       
-      // Check if approval is needed
-      if (usdcAllowance < amountInt) {
+      // Check if approval is needed and handle it properly
+      let currentAllowance = usdcAllowance;
+      if (currentAllowance < amountInt) {
         setApprovalLoading(true);
         try {
-          console.log("🔍 Approval needed. Current allowance:", formatUSDC(usdcAllowance), "Required:", formatUSDC(amountInt));
+          console.log("🔍 Approval needed. Current allowance:", formatUSDC(currentAllowance), "Required:", formatUSDC(amountInt));
           
-          // First, try to approve the exact amount needed
+          // Approve the exact amount needed
           const approvalTx = await writeUSDCAsync({
             functionName: "approve",
             args: [CONTRACT_ADDRESS, amountInt],
+            gas: 200_000n, // Set explicit gas limit for approval
           });
           
           console.log("🔍 Approval transaction sent, waiting for confirmation...");
@@ -183,28 +189,29 @@ const LendPage: NextPage = () => {
           // Wait for the transaction to be mined
           if (approvalTx) {
             console.log("🔍 Waiting for approval transaction to be mined...");
-            // Add a small delay to allow the transaction to be mined
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Wait for transaction receipt
+            await new Promise(resolve => setTimeout(resolve, 3000));
           }
           
-          // Refetch allowance after approval
-          await refetchUsdcAllowance();
-          
-          // Double-check that approval was successful
-          const newAllowance = await refetchUsdcAllowance();
-          console.log("🔍 New allowance after approval:", formatUSDC(usdcAllowance));
+          // Refetch allowance after approval and get the new value
+          const { data: newAllowanceData } = await refetchUsdcAllowance();
+          currentAllowance = newAllowanceData || 0n;
+          console.log("🔍 New allowance after approval:", formatUSDC(currentAllowance));
           
           // If approval still failed, try with a larger amount
-          if (usdcAllowance < amountInt) {
+          if (currentAllowance < amountInt) {
             console.log("🔍 Approval may have failed, trying with larger amount...");
             await writeUSDCAsync({
               functionName: "approve",
               args: [CONTRACT_ADDRESS, amountInt * 2n], // Approve double the amount
+              gas: 200_000n, // Set explicit gas limit for approval
             });
             
-            // Wait again
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            await refetchUsdcAllowance();
+            // Wait again and refetch
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            const { data: finalAllowanceData } = await refetchUsdcAllowance();
+            currentAllowance = finalAllowanceData || 0n;
+            console.log("🔍 Final allowance after second approval:", formatUSDC(currentAllowance));
           }
           
         } catch (approvalError: any) {
@@ -216,15 +223,16 @@ const LendPage: NextPage = () => {
         }
       }
       
-      // Final check before deposit
-      if (usdcAllowance < amountInt) {
-        setErrorMessage("Approval is still insufficient. Please try approving again or refresh the page.");
+      // Final check before deposit using the updated allowance
+      if (currentAllowance < amountInt) {
+        setErrorMessage(`Approval is still insufficient. Current allowance: ${formatUSDC(currentAllowance)}, Required: ${formatUSDC(amountInt)}. Please try approving again or refresh the page.`);
         return;
       }
       
       await writeContractAsync({
         functionName: "depositFunds",
         args: [amountInt],
+        gas: 500_000n, // Set explicit gas limit
       });
       
       // Refetch all relevant data after successful deposit
@@ -271,6 +279,8 @@ const LendPage: NextPage = () => {
         setErrorMessage("Insufficient allowance. Please approve the contract to spend your USDC first.");
       } else if (error?.message?.includes("Amount > 0")) {
         setErrorMessage("Please enter a valid deposit amount greater than 0.");
+      } else if (error?.message?.includes("insufficient funds") || error?.message?.includes("gas") || error?.message?.includes("Gas")) {
+        setErrorMessage("Insufficient ETH for gas fees. You need ETH to pay for transaction costs. Please fund your wallet with more ETH.");
       } else {
         setErrorMessage(`Deposit failed: ${error?.message || "Unknown error"}`);
       }
@@ -467,7 +477,31 @@ const LendPage: NextPage = () => {
             <h1 className="text-3xl font-bold">Lend Funds</h1>
           </div>
 
-          {/* Lender-specific stats will be added once contract exposes them */}
+          {/* Welcome Section for Lenders */}
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 mb-8">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold text-blue-800 mb-3">Welcome to Social Lending</h2>
+              <p className="text-blue-700 max-w-3xl mx-auto">
+                Support financial inclusion while earning returns. Your deposits fund microloans for borrowers 
+                who are vetted by their communities, not traditional banks. Help build stronger communities through social lending.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+              <div className="bg-white rounded-lg p-4">
+                <div className="text-2xl font-bold text-blue-600 mb-2">Earn Returns</div>
+                <div className="text-sm text-gray-600">Competitive APY on your USDC deposits</div>
+              </div>
+              <div className="bg-white rounded-lg p-4">
+                <div className="text-2xl font-bold text-blue-600 mb-2">Social Impact</div>
+                <div className="text-sm text-gray-600">Support underserved communities and entrepreneurs</div>
+              </div>
+              <div className="bg-white rounded-lg p-4">
+                <div className="text-2xl font-bold text-blue-600 mb-2">Community Vetted</div>
+                <div className="text-sm text-gray-600">Borrowers are attested by their trusted networks</div>
+              </div>
+            </div>
+          </div>
 
           {/* Pool & Attestations grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
@@ -550,38 +584,7 @@ const LendPage: NextPage = () => {
               </div>
             )}
             
-            {/* USDC Balance Info */}
-            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-              <div className="text-sm text-blue-800">
-                <div className="flex justify-between">
-                  <span>USDC Balance:</span>
-                  <span className="font-medium">{formatUSDC(usdcBalance)}</span>
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span>Current Allowance:</span>
-                  <span className="font-medium">{formatUSDCAllowance(usdcAllowance)}</span>
-                </div>
-                {(() => {
-                  const parsedAmount = parseDepositAmount(depositAmount);
-                  return depositAmount && parsedAmount ? (
-                    <div className="flex justify-between mt-1">
-                      <span>Required Approval:</span>
-                      <span className="font-medium">{formatUSDC(parsedAmount)}</span>
-                    </div>
-                  ) : null;
-                })()}
-                <div className="flex justify-between mt-2 pt-2 border-t border-blue-200">
-                  <span>Need USDC for testing?</span>
-                  <button
-                    onClick={handleMintUSDC}
-                    disabled={mintLoading}
-                    className="text-blue-600 hover:text-blue-800 font-medium disabled:text-blue-400"
-                  >
-                    {mintLoading ? "Minting..." : "Mint 1000 USDC"}
-                  </button>
-                </div>
-              </div>
-            </div>
+
             
            
            

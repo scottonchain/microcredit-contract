@@ -1,29 +1,32 @@
 import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 import {
   coinbaseWallet,
-  ledgerWallet,
   metaMaskWallet,
-  rainbowWallet,
-  safeWallet,
-  walletConnectWallet,
+  rabbyWallet,
 } from "@rainbow-me/rainbowkit/wallets";
 import * as chains from "viem/chains";
 import scaffoldConfig from "~~/scaffold.config";
 
+
+
 const { onlyLocalBurnerWallet, targetNetworks } = scaffoldConfig;
 
-const wallets = [
-  metaMaskWallet,
-  walletConnectWallet,
-  ledgerWallet,
-  coinbaseWallet,
-  rainbowWallet,
-  safeWallet,
-  // Burner wallet removed for true disconnect/reconnect testing
-];
+// Create wallets array with only the three specified wallets
+const createWallets = () => {
+  return [
+    coinbaseWallet,
+    rabbyWallet,
+    metaMaskWallet,
+  ];
+};
+
+const wallets = createWallets();
 
 /**
  * wagmi connectors for the wagmi context
+ * 
+ * Note: WalletConnect requires a valid project ID from https://cloud.walletconnect.com
+ * Set NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID in .env.local for production use
  */
 export const wagmiConnectors = connectorsForWallets(
   [
@@ -34,7 +37,7 @@ export const wagmiConnectors = connectorsForWallets(
   ],
 
   {
-    appName: "scaffold-eth-2",
+    appName: "LoanLink",
     projectId: scaffoldConfig.walletConnectProjectId,
   },
 );

@@ -21,7 +21,6 @@ const BorrowWizard: React.FC<BorrowWizardProps> = ({ connectedAddress }) => {
   const hasAttestations = scoreNumeric > 0;
 
   // Balances
-  const { data: ethBalance } = useBalance({ address: connectedAddress });
 
   const { data: usdcAddress } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
@@ -65,15 +64,12 @@ const BorrowWizard: React.FC<BorrowWizardProps> = ({ connectedAddress }) => {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-center">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
             <div>
               <div className="text-3xl font-bold">{(Number(creditScore) / 1000).toFixed(2)}%</div>
               <p className="text-xs text-gray-600">Credit Score</p>
             </div>
-            <div>
-              <div className="text-2xl font-bold">{ethBalance ? Number(ethBalance.formatted).toFixed(3) : "-"}</div>
-              <p className="text-xs text-gray-600">ETH Balance</p>
-            </div>
+
             <div>
               <div className="text-2xl font-bold">{usdcBalance ? Number(usdcBalance.formatted).toFixed(2) : "-"}</div>
               <p className="text-xs text-gray-600">USDC Balance</p>

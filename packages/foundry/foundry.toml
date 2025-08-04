@@ -35,6 +35,13 @@ pgnTestnet = "https://sepolia.publicgoods.network"
 
 localhost = "http://127.0.0.1:8545"
 
+[anvil]
+# Set very low gas fees to simulate modern L2s (1/100000 of current fees)
+gas_price = 0  # 1 wei per gas (extremely low)
+gas_limit = 30000000  # 30M gas limit
+block_time = 1  # 1 second block time
+base_fee = 1  # 1 wei base fee (very low)
+
 [etherscan]
 localhost = { url = "http://127.0.0.1:8545", key = "" }
 polygonMumbai = { key = "${ETHERSCAN_API_KEY}" }

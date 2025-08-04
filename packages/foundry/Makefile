@@ -10,9 +10,9 @@ setup-anvil-wallet:
 	shx rm ~/.foundry/keystores/scaffold-eth-default 2>/dev/null; 	shx rm -rf broadcast/Deploy.s.sol/31337
 	cast wallet import --private-key 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6 --unsafe-password 'localhost' scaffold-eth-default
 
-# Start local chain
+# Start local chain with low gas fees (L2-like)
 chain: setup-anvil-wallet
-	anvil
+	anvil --gas-price 100 --base-fee 50 --gas-limit 30000000
 
 # Start a fork
 fork: setup-anvil-wallet

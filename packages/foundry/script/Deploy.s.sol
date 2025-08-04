@@ -74,6 +74,22 @@ contract DeployScript is Script {
             );
             vm.writeFile(configPath, newConfig);
             console.logString("Updated deployment config with new USDC address");
+        } else {
+            // We found an address in file; double-check that a contract actually exists there.
+            if (usdcAddress.code.length == 0) {
+                console.logString("USDC address from config has no code. Deploying fresh MockUSDC and updating config...");
+                MockUSDC usdc = new MockUSDC();
+                usdcAddress = address(usdc);
+                console.logString(string.concat("MockUSDC freshly deployed at: ", vm.toString(usdcAddress)));
+                // Overwrite the deployment config with the new valid address
+                string memory updatedConfig = string.concat(
+                    '{\n',
+                    '  "usdcAddress": "', vm.toString(usdcAddress), '"\n',
+                    '}'
+                );
+                vm.writeFile(configPath, updatedConfig);
+                console.logString("Deployment config updated with freshly deployed USDC address");
+            }
         }
 
         // Deploy the Microcredit contract (oracle temporarily set to deployer)
@@ -87,7 +103,24 @@ contract DeployScript is Script {
 
         // Log deployment information
         console.logString(string.concat("DecentralizedMicrocredit deployed at: ", vm.toString(address(microcreditContract))));
-        console.logString("--- Contracts deployed successfully ---");
+        
+        // Provision 10 ETH to demo addresses
+        console.logString("--- Provisioning 10 ETH to demo addresses ---");
+        
+        address[] memory demoAddresses = new address[](3);
+        demoAddresses[0] = 0x455EB67473a5f8Da69dbFde7eDe1d1c008C31274;
+        demoAddresses[1] = 0xE51a60126dF85801D4C76bDAf58D6F9E81Cc26cA;
+        demoAddresses[2] = 0xC9E2518013169a09dfE47Da38b8DA092AB68d66A;
+        
+        uint256 ethAmount = 10 * 1e18; // 10 ETH in wei
+        
+        for (uint256 i = 0; i < demoAddresses.length; i++) {
+            // Use vm.deal() to set the balance directly
+            vm.deal(demoAddresses[i], ethAmount);
+            console.logString(string.concat("Provisioned 10 ETH to: ", vm.toString(demoAddresses[i])));
+        }
+        
+        console.logString("--- Contracts deployed and demo addresses funded successfully ---");
         console.logString("Use the web interface to populate test data (lenders, borrowers, attestations)");
  
         // Save deployment information
