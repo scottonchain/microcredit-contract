@@ -22,7 +22,8 @@ const CHAIN_ID = 31337; // Anvil's default chain ID
 // Keep only deployer & dedicated admin
 const ADDITIONAL_ADMINS = [
   "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf".toLowerCase(), // Anvil default deployer
-  "0xef4b3cbca9f0a6b4b80e57a12a19e7ef1124f754" // dedicated admin
+  "0xef4b3cbca9f0a6b4b80e57a12a19e7ef1124f754", // dedicated admin
+  "0xd7c5a101eE877daAB1a3731cDcF316066dDccf92".toLowerCase(), // Added per request
 ];
 
 export default function PopulatePage() {

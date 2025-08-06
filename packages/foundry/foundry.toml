@@ -37,10 +37,10 @@ localhost = "http://127.0.0.1:8545"
 
 [anvil]
 # Set very low gas fees to simulate modern L2s (1/100000 of current fees)
-gas_price = 0  # 1 wei per gas (extremely low)
-gas_limit = 30000000  # 30M gas limit
+gas_price = 0  # 0 wei per gas for demo purposes -simulate Eth L2 (base)
+gas_limit = 600000000  # 600M gas limit -simulate Eth L2 (base)
 block_time = 1  # 1 second block time
-base_fee = 1  # 1 wei base fee (very low)
+base_fee = 0  # 0 wei base for demo purposes -simulate Eth L2 (base)
 
 [etherscan]
 localhost = { url = "http://127.0.0.1:8545", key = "" }

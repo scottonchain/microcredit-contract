@@ -29,6 +29,13 @@ const MICRO_ABI = contracts?.DecentralizedMicrocredit?.abi;
 
 const RepayPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
+
+  // Helper function to round down to the nearest penny (0.01 USDC = 10000 wei)
+  const roundDownToNearestPenny = (amount: bigint): bigint => {
+    const pennyInWei = 10000n; // 0.01 USDC = 10000 wei
+    return (amount / pennyInWei) * pennyInWei;
+  };
+
   const [selectedLoanId, setSelectedLoanId] = useState<number | null>(null);
   const [repayAmount, setRepayAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -163,6 +170,10 @@ const RepayPage: NextPage = () => {
 
       console.log("USDC Balance:", balance.toString());
       console.log("Required amount:", amount.toString());
+      console.log("Balance as number:", Number(balance));
+      console.log("Amount as number:", Number(amount));
+      console.log("Balance >= Amount:", balance >= amount);
+      console.log("Balance == Amount:", balance === amount);
 
       if (balance < amount) {
         throw new Error(`Insufficient USDC balance. You have ${formatUSDC(balance)} but need ${formatUSDC(amount)}`);
@@ -236,22 +247,23 @@ const RepayPage: NextPage = () => {
     setIsLoading(true);
     try {
       const amountInWei = BigInt(parseFloat(repayAmount) * 1e6); // Convert to USDC with 6 decimals
+      const roundedAmount = roundDownToNearestPenny(amountInWei); // Round down to nearest penny
       
-      console.log("Partial repayment amount:", amountInWei.toString());
+      console.log("Partial repayment amount:", roundedAmount.toString());
       
       // Ensure USDC allowance for partial amount
       console.log("Ensuring USDC allowance for partial repayment...");
-      await ensureAllowance(amountInWei);
+      await ensureAllowance(roundedAmount);
 
       // Check USDC balance
       console.log("Checking USDC balance...");
-      await checkUSDCBalance(amountInWei);
+      await checkUSDCBalance(roundedAmount);
       
       // Execute partial repayment
       console.log("Executing partial repayment...");
       await writeContractAsync({
         functionName: "repayLoan",
-        args: [BigInt(loanId), amountInWei],
+        args: [BigInt(loanId), roundedAmount],
       });
       
       console.log("Partial repayment completed successfully!");
@@ -376,20 +388,20 @@ const RepayPage: NextPage = () => {
             <div className="space-y-6">
               <h2 className="text-xl font-semibold">Your Loans</h2>
               {userLoans.map((loanId, index) => (
-                <UserLoanCard
+                  <UserLoanCard 
                   key={index}
-                  loanId={loanId}
-                  onFullRepayment={handleFullRepayment}
-                  onPartialRepayment={handlePartialRepayment}
+                    loanId={loanId} 
+                    onFullRepayment={handleFullRepayment}
+                    onPartialRepayment={handlePartialRepayment}
                   onViewDetails={() => setSelectedLoanId(Number(loanId))}
-                  isSelected={selectedLoanId === Number(loanId)}
-                  isLoading={isLoading}
-                  repayAmount={repayAmount}
-                  setRepayAmount={setRepayAmount}
-                />
-              ))}
-            </div>
-          )}
+                    isSelected={selectedLoanId === Number(loanId)}
+                    isLoading={isLoading}
+                    repayAmount={repayAmount}
+                    setRepayAmount={setRepayAmount}
+                  />
+                ))}
+              </div>
+            )}
         </div>
       </div>
     </>
@@ -451,7 +463,7 @@ const UserLoanCard = ({
             Rate: {formatInterestRate(interestRate)}
           </div>
         </div>
-      </div>
+        </div>
 
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
@@ -463,7 +475,7 @@ const UserLoanCard = ({
           <div className="font-semibold text-orange-600">{formatUSDC(outstandingAmount)}</div>
         </div>
       </div>
-
+      
       <div className="flex gap-2">
         <button
           onClick={() => onFullRepayment(Number(loanId))}
@@ -474,22 +486,22 @@ const UserLoanCard = ({
         </button>
         
         <div className="flex-1 flex gap-2">
-          <input
-            type="number"
-            value={repayAmount}
-            onChange={(e) => setRepayAmount(e.target.value)}
+                <input
+                  type="number"
+                  value={repayAmount}
+                  onChange={(e) => setRepayAmount(e.target.value)}
             placeholder="Amount"
-            className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            min="0.01"
-            step="0.01"
-          />
-          <button
-            onClick={() => onPartialRepayment(Number(loanId))}
+                  className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  min="0.01"
+                  step="0.01"
+                />
+                <button
+                  onClick={() => onPartialRepayment(Number(loanId))}
             disabled={isLoading || !repayAmount || !isActive}
-            className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-          >
+                  className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                >
             {isLoading ? "..." : "Repay"}
-          </button>
+                </button>
         </div>
         
         <button

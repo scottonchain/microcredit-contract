@@ -4,6 +4,20 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "forge-std/console.sol";
 
+/**
+ * @title DecentralizedMicrocredit
+ * @dev DEMO CONTRACT - This contract includes demo-only features for demonstration purposes.
+ * 
+ * DEMO-ONLY FEATURES:
+ * - PageRank computation happens automatically after each attestation
+ * - In production with oracle, PageRank computation will be handled off-chain
+ * - Time-based interest calculation (interest accrues based on actual time elapsed)
+ * 
+ * PRODUCTION NOTES:
+ * - PageRank computation should be moved off-chain for gas efficiency
+ * - Oracle will handle credit score updates and PageRank computation
+ * - Interest calculation may be optimized for production use
+ */
 contract DecentralizedMicrocredit {
     // NOTE: Variable-rate parameters removed in favour of fixed-rate design.
     // uint256 public rMin;
@@ -26,7 +40,7 @@ contract DecentralizedMicrocredit {
      *
      *  These variables drive the new weighted PageRank teleportation mechanism
      *  as well as the base interest-rate economics introduced in this upgrade.
-     *  All values are denominated in USDC’s 6-decimal format to keep consistency
+     *  All values are denominated in USDC's 6-decimal format to keep consistency
      *  with deposits, then normalized to PR_SCALE (100 000) for PageRank maths.
      *
      *  ‣ basePersonalization     :   Non-zero weight given to every address so
@@ -66,6 +80,7 @@ contract DecentralizedMicrocredit {
         address borrower;
         uint256 interestRate;
         bool isActive;
+        uint256 createdAt; // Timestamp when loan was created
     }
     struct Attestation {
         address attester;
@@ -131,7 +146,7 @@ contract DecentralizedMicrocredit {
         effrRate = _effrRate;
         riskPremium = _riskPremium;
         maxLoanAmount = _maxLoanAmount;
-        basePersonalization = 100 * 1e6; // $100 in 6-decimals
+        basePersonalization = 0; // Set to 0 as requested
         kycBonus = 100 * 1e6; // $100 bonus for KYC
         personalizationCap = 100 * 1e6; // Cap funding contribution at $100
 
@@ -284,7 +299,7 @@ contract DecentralizedMicrocredit {
         interestRate = effrRate + riskPremium;
         uint256 interest = (principal * interestRate * repaymentPeriod) /
             (BASIS_POINTS * SECONDS_PER_YEAR);
-        payment = (principal + interest) / (repaymentPeriod / 30 days);
+        payment = (principal + interest) / (repaymentPeriod / 7 days); // Weekly payment instead of monthly
     }
 
     function requestLoan(uint256 amount) external returns (uint256 loanId) {
@@ -328,8 +343,8 @@ contract DecentralizedMicrocredit {
 
         loanId = nextLoanId++;
         uint256 rate = effrRate + riskPremium;
-        uint256 interest = (amount * rate) / BASIS_POINTS;
-        loans[loanId] = Loan(amount, amount + interest, msg.sender, rate, true);
+        // Initialize with principal only - interest will be calculated when repaid
+        loans[loanId] = Loan(amount, amount, msg.sender, rate, true, block.timestamp);
 
         // ───── enumeration bookkeeping ─────
         _allLoanIds.push(loanId);
@@ -340,38 +355,58 @@ contract DecentralizedMicrocredit {
         _borrowerLoans[msg.sender].push(loanId);
     }
 
-function disburseLoan(uint256 loanId) external {
-    Loan storage loan = loans[loanId];
-    require(loan.isActive, "Loan inactive");
+    function disburseLoan(uint256 loanId) external {
+        Loan storage loan = loans[loanId];
+        require(loan.isActive, "Loan inactive");
 
-    // Move principal from reserved to lent-out balance
-    reservedLiquidity -= loan.principal;
-    totalLentOut += loan.principal;
+        // Move principal from reserved to lent-out balance
+        reservedLiquidity -= loan.principal;
+        totalLentOut += loan.principal;
 
-    bool success = usdc.transfer(loan.borrower, loan.principal);
-    if (!success) {
-        revert("Transfer failed");
+        bool success = usdc.transfer(loan.borrower, loan.principal);
+        if (!success) {
+            revert("Transfer failed");
+        }
     }
-}
 
+    /**
+     * @notice Get the current outstanding amount for a loan including accrued interest
+     * @param loanId The ID of the loan
+     * @return The current outstanding amount including accrued interest
+     */
+    function getCurrentOutstandingAmount(uint256 loanId) public view returns (uint256) {
+        Loan storage loan = loans[loanId];
+        require(loan.isActive, "Loan inactive");
+        
+        uint256 timeElapsed = block.timestamp - loan.createdAt;
+        uint256 annualInterest = (loan.principal * loan.interestRate) / BASIS_POINTS;
+        uint256 accruedInterest = (annualInterest * timeElapsed) / SECONDS_PER_YEAR;
+        
+        return loan.principal + accruedInterest;
+    }
 
     function repayLoan(uint256 loanId, uint256 amount) external {
         Loan storage loan = loans[loanId];
         require(loan.isActive, "Loan inactive");
         require(msg.sender == loan.borrower, "Borrower only");
         require(amount > 0, "Amount > 0");
+        
+        // Calculate current outstanding amount including accrued interest
+        uint256 currentOutstanding = getCurrentOutstandingAmount(loanId);
+        
         require(usdc.transferFrom(msg.sender, address(this), amount), "Transfer failed");
-        if (amount >= loan.outstanding) {
+        
+        if (amount >= currentOutstanding) {
             // Loan fully repaid – free up utilised principal
             totalLentOut -= loan.principal;
 
             loan.outstanding = 0;
             loan.isActive = false;
         } else {
-            loan.outstanding -= amount;
+            // Update outstanding amount to reflect the payment
+            loan.outstanding = currentOutstanding - amount;
         }
     }
-
 
     function addressToString(address _address) public pure returns (string memory) {
         bytes memory addressBytes = abi.encodePacked(_address);
@@ -398,29 +433,42 @@ function disburseLoan(uint256 loanId) external {
         }
     }
 
- function recordAttestation(address borrower, uint256 weight) external {
-    require(weight <= SCALE, "Weight too high");
-    require(borrower != msg.sender, "Self-attestation");
+    /**
+     * @notice Record an attestation for a borrower
+     * @dev DEMO ONLY: Automatically computes PageRank after each attestation
+     *      In production with oracle, PageRank computation will be handled off-chain
+     * @param borrower The address of the borrower being attested
+     * @param weight The weight/confidence of the attestation (0 to SCALE)
+     */
+    function recordAttestation(address borrower, uint256 weight) external {
+        require(weight <= SCALE, "Weight too high");
+        require(borrower != msg.sender, "Self-attestation");
 
-    if (!_attesterSeen[msg.sender]) {
-        _attesterSeen[msg.sender] = true;
-        _attesters.push(msg.sender);
-    }
-
-    _addPagerankNode(msg.sender);
-    _addPagerankNode(borrower);
-    _addPagerankEdge(msg.sender, borrower, weight);
-
-    Attestation[] storage attests = borrowerAttestations[borrower];
-    for (uint256 i = 0; i < attests.length; i++) {
-        if (attests[i].attester == msg.sender) {
-            attests[i].weight = weight;
-            return;
+        if (!_attesterSeen[msg.sender]) {
+            _attesterSeen[msg.sender] = true;
+            _attesters.push(msg.sender);
         }
-    }
-    attests.push(Attestation(msg.sender, weight));
-}
 
+        _addPagerankNode(msg.sender);
+        _addPagerankNode(borrower);
+        _addPagerankEdge(msg.sender, borrower, weight);
+
+        Attestation[] storage attests = borrowerAttestations[borrower];
+        for (uint256 i = 0; i < attests.length; i++) {
+            if (attests[i].attester == msg.sender) {
+                attests[i].weight = weight;
+                // DEMO ONLY: Auto-compute PageRank after attestation update
+                // In production with oracle, this will be handled off-chain
+                _computePageRank(PR_ALPHA, 100, PR_TOL);
+                return;
+            }
+        }
+        attests.push(Attestation(msg.sender, weight));
+        
+        // DEMO ONLY: Auto-compute PageRank after new attestation
+        // In production with oracle, this will be handled off-chain
+        _computePageRank(PR_ALPHA, 100, PR_TOL);
+    }
 
     // ─────────────────────────────────────────────────────────────────────
     //  CREDIT SCORE
@@ -443,7 +491,7 @@ function disburseLoan(uint256 loanId) external {
     function getCreditScore(address user) public view returns (uint256) {
         // Converts PageRank score to credit score using a softplus-like curve:
         //   credit = (SCALE * x) / (x + 100), where x = (PR * 1000) / maxPageRank
-        // Produces a smooth 0 → SCALE output that breaks PageRank’s zero-sum nature.
+        // Produces a smooth 0 → SCALE output that breaks PageRank's zero-sum nature.
         uint256 pr = pagerankScores[user]; // 0 – maxPageRank
         uint256 maxPageRank = getMaxPageRankScore();
         
@@ -490,9 +538,10 @@ function disburseLoan(uint256 loanId) external {
         )
     {
         Loan storage loan = loans[loanId];
+        uint256 currentOutstanding = loan.isActive ? getCurrentOutstandingAmount(loanId) : loan.outstanding;
         return (
             loan.principal,
-            loan.outstanding,
+            currentOutstanding,
             loan.borrower,
             loan.interestRate,
             loan.isActive
@@ -519,6 +568,11 @@ function disburseLoan(uint256 loanId) external {
     }
 
     // PageRank functions
+    /**
+     * @notice Compute PageRank scores for all nodes in the graph
+     * @dev DEMO ONLY: In production with oracle, this will be handled off-chain
+     * @return iterations Number of iterations performed
+     */
     function computePageRank() external returns (uint256 iterations) {
         return _computePageRank(PR_ALPHA, 100, PR_TOL); // Adjusted maxIter and tol
     }
@@ -664,10 +718,11 @@ function disburseLoan(uint256 loanId) external {
         uint256[] memory personalizationVector
     ) internal returns (bool converged) {
         uint256 totalDelta = 0;
+        uint256 n = pagerankNodes.length;
 
         // Compute dangling sum (sum of scores from nodes with no outgoing edges)
         uint256 danglingSum = 0;
-        for (uint256 i = 0; i < pagerankNodes.length; i++) {
+        for (uint256 i = 0; i < n; i++) {
             address node = pagerankNodes[i];
             if (pagerankOutDegree[node] == 0) {
                 danglingSum += pagerankScores[node];
@@ -675,20 +730,20 @@ function disburseLoan(uint256 loanId) external {
         }
 
         // Store old scores in temporary array
-        uint256[] memory oldScores = new uint256[](pagerankNodes.length);
-        for (uint256 i = 0; i < pagerankNodes.length; i++) {
+        uint256[] memory oldScores = new uint256[](n);
+        for (uint256 i = 0; i < n; i++) {
             oldScores[i] = pagerankScores[pagerankNodes[i]];
         }
 
         // Process each node
-        for (uint256 i = 0; i < pagerankNodes.length; i++) {
+        for (uint256 i = 0; i < n; i++) {
             address node = pagerankNodes[i];
             uint256 oldScore = oldScores[i];
             uint256 incomingScore = 0;
 
             // Sum incoming scores from nodes that point to this node
             // This is the key part: we need to accumulate scores for the target node
-            for (uint256 j = 0; j < pagerankNodes.length; j++) {
+            for (uint256 j = 0; j < n; j++) {
                 address source = pagerankNodes[j];
                 uint256 weight = pagerankStochasticEdges[source][node];
                 if (weight > 0) {
@@ -706,9 +761,7 @@ function disburseLoan(uint256 loanId) external {
             if (danglingSum > 0) {
                 // NetworkX: x[n] += danglesum * dangling_weights.get(n, 0)
                 // Since we use uniform personalization, dangling_weights[n] = 1/N
-                uint256 danglingPerNode = (alpha * danglingSum) /
-                    (PR_SCALE * pagerankNodes.length);
-                danglingContribution = danglingPerNode;
+                danglingContribution = (alpha * danglingSum * personalizationVector[i]) / (PR_SCALE * PR_SCALE);
             }
 
             // Update score using weighted personalization vector
@@ -727,7 +780,7 @@ function disburseLoan(uint256 loanId) external {
             totalDelta += delta;
         }
 
-        return totalDelta < (tol * pagerankNodes.length);
+        return totalDelta < (tol * n);
     }
 
     function _calculateInterest(
@@ -739,7 +792,7 @@ function disburseLoan(uint256 loanId) external {
 
     /**
      * @notice Assemble & normalise the personalization vector for PageRank.
-     * @dev Each node’s raw weight = BASE + min(deposits, CAP) + (KYC? BONUS:0).
+     * @dev Each node's raw weight = BASE + min(deposits, CAP) + (KYC? BONUS:0).
      *      The array is then scaled so that Σp_i = PR_SCALE (1.0 in our units).
      */
     function _buildPersonalizationVector()

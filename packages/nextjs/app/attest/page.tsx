@@ -6,6 +6,7 @@ import { useAccount } from "wagmi";
 import { useSearchParams, useRouter } from "next/navigation";
 import { HandThumbUpIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
+import { toast } from "react-hot-toast";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
 import { getCreditScoreColor, formatPercent } from "~~/utils/format";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
@@ -55,6 +56,14 @@ const AttestPage: NextPage = () => {
         functionName: "recordAttestation",
         args: [borrowerAddress as `0x${string}`, weightBasisPoints],
       });
+      
+      // DEMO ONLY: Show PageRank computation effect
+      // In production with oracle, this will be handled off-chain
+      toast.success("Attestation recorded! Computing PageRank scores...", {
+        duration: 3000,
+        position: "top-center",
+      });
+      
       setBorrowerAddress("");
       setWeight(80);
     } catch (error) {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
+import { toast } from "react-hot-toast";
 import { formatUSDC, formatUSDCAllowance, getCreditScoreColor } from "~~/utils/format";
 import { BanknotesIcon, PlusIcon, EyeIcon, HandThumbUpIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
@@ -444,6 +445,14 @@ const LendPage: NextPage = () => {
         functionName: "recordAttestation",
         args: [attestBorrower as `0x${string}`, BigInt(attestWeight * 10000)],
       });
+      
+      // DEMO ONLY: Show PageRank computation effect
+      // In production with oracle, this will be handled off-chain
+      toast.success("Attestation recorded! Computing PageRank scores...", {
+        duration: 3000,
+        position: "top-center",
+      });
+      
       // Update local list (replace existing weight if borrower already attested)
       setAttestations(prev => {
         const existingIdx = prev.findIndex(a => a.borrower.toLowerCase() === attestBorrower.toLowerCase());

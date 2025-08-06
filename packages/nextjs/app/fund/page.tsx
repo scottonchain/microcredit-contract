@@ -43,6 +43,37 @@ export default function FundPage() {
     usdcAddress: USDC_ADDRESS
   });
 
+  // Check if RPC endpoint is accessible
+  useEffect(() => {
+    const checkRPC = async () => {
+      try {
+        const response = await fetch(RPC_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "eth_chainId",
+            params: [],
+          }),
+        });
+        
+        if (!response.ok) {
+          console.error("RPC endpoint not accessible:", response.status, response.statusText);
+          setStatus("❌ RPC endpoint not accessible. Make sure Anvil is running on port 8545.");
+        } else {
+          const data = await response.json();
+          console.log("RPC endpoint accessible, chain ID:", data.result);
+        }
+      } catch (error) {
+        console.error("Failed to connect to RPC endpoint:", error);
+        setStatus("❌ Failed to connect to RPC endpoint. Make sure Anvil is running on port 8545.");
+      }
+    };
+    
+    checkRPC();
+  }, []);
+
   // Function to fetch ETH balance
   const fetchEthBalance = useCallback(async (address: string) => {
     try {
@@ -182,9 +213,13 @@ export default function FundPage() {
           params: [connectedAddress, "latest"],
         }),
       }).then(res => res.json());
+      
       const currentBalance = BigInt(currentBalanceHex || "0x0");
       const newBalance = currentBalance + 1n * 10n ** 18n;
-      await fetch(RPC_URL, {
+      
+      console.log(`Setting balance for ${connectedAddress} from ${Number(currentBalance) / 1e18} ETH to ${Number(newBalance) / 1e18} ETH`);
+      
+      const response = await fetch(RPC_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -194,12 +229,145 @@ export default function FundPage() {
           params: [connectedAddress, toHex(newBalance)],
         }),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const responseData = await response.json();
+      if (responseData.error) {
+        throw new Error(`RPC error: ${responseData.error.message}`);
+      }
+      
+      console.log("Balance set successfully:", responseData);
+      
+      // Verify the balance was set correctly
+      const verifyResponse = await fetch(RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "eth_getBalance",
+          params: [connectedAddress, "latest"],
+        }),
+      });
+      
+      const verifyData = await verifyResponse.json();
+      const actualBalance = BigInt(verifyData.result || "0x0");
+      console.log(`Verified balance: ${Number(actualBalance) / 1e18} ETH`);
+      
+      if (actualBalance < newBalance) {
+        throw new Error(`Balance verification failed. Expected: ${Number(newBalance) / 1e18} ETH, Got: ${Number(actualBalance) / 1e18} ETH`);
+      }
+      
       setStatus("✅ Funded 1 ETH to your address");
       // Refresh ETH balance
       await fetchEthBalance(connectedAddress);
     } catch (err) {
-      console.error(err);
-      setStatus("❌ Failed to fund ETH");
+      console.error("ETH funding error:", err);
+      setStatus(`❌ Failed to fund ETH: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Test function to verify anvil_setBalance is working
+  const testAnvilSetBalance = async () => {
+    if (!connectedAddress) return;
+    setProcessing(true);
+    setStatus("🧪 Testing anvil_setBalance...");
+    try {
+      // Test with a simple balance setting
+      const testBalance = 5n * 10n ** 18n; // 5 ETH
+      
+      const response = await fetch(RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "anvil_setBalance",
+          params: [connectedAddress, toHex(testBalance)],
+        }),
+      });
+      
+      const responseData = await response.json();
+      console.log("Test anvil_setBalance response:", responseData);
+      
+      if (responseData.error) {
+        throw new Error(`Test failed: ${responseData.error.message}`);
+      }
+      
+      // Verify the test balance
+      const verifyResponse = await fetch(RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "eth_getBalance",
+          params: [connectedAddress, "latest"],
+        }),
+      });
+      
+      const verifyData = await verifyResponse.json();
+      const actualBalance = BigInt(verifyData.result || "0x0");
+      
+      if (actualBalance === testBalance) {
+        setStatus("✅ anvil_setBalance test passed! Balance set to 5 ETH");
+        await fetchEthBalance(connectedAddress);
+      } else {
+        throw new Error(`Test verification failed. Expected: 5 ETH, Got: ${Number(actualBalance) / 1e18} ETH`);
+      }
+    } catch (err) {
+      console.error("Test error:", err);
+      setStatus(`❌ Test failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Function to refresh wallet balance
+  const refreshWalletBalance = async () => {
+    setProcessing(true);
+    setStatus("🔄 Refreshing wallet balance...");
+    try {
+      // Trigger a small transaction to force wallet refresh
+      // We'll use a simple RPC call that doesn't change state but forces a refresh
+      await fetch(RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "eth_blockNumber",
+          params: [],
+        }),
+      });
+      
+      // Also try to trigger a wallet refresh by requesting account info
+      if (window.ethereum) {
+        try {
+          await window.ethereum.request({
+            method: 'eth_requestAccounts'
+          });
+          console.log("Wallet refresh triggered");
+        } catch (walletError) {
+          console.log("Wallet refresh failed, but that's okay:", walletError);
+        }
+      }
+      
+      setStatus("✅ Wallet refresh triggered. Check your wallet now!");
+      
+      // Refresh our local balance display
+      if (connectedAddress) {
+        await fetchEthBalance(connectedAddress);
+        await fetchUsdcBalance(connectedAddress);
+      }
+    } catch (err) {
+      console.error("Wallet refresh error:", err);
+      setStatus(`❌ Failed to refresh wallet: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setProcessing(false);
     }
@@ -217,7 +385,10 @@ export default function FundPage() {
         functionName: "balanceOf",
         args: [connectedAddress],
       });
+      
       const mintAmount = 10_000n * 1_000_000n;
+      console.log(`Current USDC balance: ${Number(currentUsdc) / 1e6}`);
+      console.log(`Minting ${Number(mintAmount) / 1e6} USDC to ${connectedAddress}`);
       
       // Ensure minter has sufficient ETH
       const minter = await ensureMinterEth();
@@ -231,13 +402,31 @@ export default function FundPage() {
         gas: 500_000n, // Reduced gas limit
       });
       
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      console.log("USDC mint transaction hash:", txHash);
+      
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+      console.log("USDC mint transaction receipt:", receipt);
+      
+      // Verify the mint was successful by checking the new balance
+      const newUsdcBalance = await publicClient.readContract({
+        address: USDC_ADDRESS,
+        abi: USDC_ABI,
+        functionName: "balanceOf",
+        args: [connectedAddress],
+      });
+      
+      console.log(`New USDC balance: ${Number(newUsdcBalance) / 1e6}`);
+      
+      if (newUsdcBalance < currentUsdc + mintAmount) {
+        throw new Error(`USDC mint verification failed. Expected: ${Number(currentUsdc + mintAmount) / 1e6}, Got: ${Number(newUsdcBalance) / 1e6}`);
+      }
+      
       setStatus("✅ Minted 10,000 USDC to your address");
       // Refresh USDC balance
       await fetchUsdcBalance(connectedAddress);
     } catch (err) {
       console.error("USDC minting error:", err);
-      setStatus("❌ Failed to mint USDC. Check console for details.");
+      setStatus(`❌ Failed to mint USDC: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setProcessing(false);
     }
@@ -262,6 +451,23 @@ export default function FundPage() {
       <p className="mb-4 text-sm text-gray-700 break-all">
         Connected Address: <span className="font-mono">{connectedAddress}</span>
       </p>
+      
+      {/* Wallet Balance Refresh Notice */}
+      <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <h3 className="text-lg font-semibold mb-2 text-yellow-800">💡 Wallet Balance Notice</h3>
+        <p className="text-sm text-yellow-700 mb-3">
+          After funding ETH or USDC, your wallet may not immediately show the updated balance due to caching. 
+          Use the &quot;Refresh Wallet Balance&quot; button below to force your wallet to update.
+        </p>
+        <div className="text-xs text-yellow-600">
+          <strong>Alternative solutions:</strong>
+          <ul className="mt-1 ml-4 list-disc">
+            <li>Switch networks in your wallet and switch back</li>
+            <li>Disconnect and reconnect your wallet</li>
+            <li>Make a small transaction to trigger a balance refresh</li>
+          </ul>
+        </div>
+      </div>
       
       {/* Current Balances */}
       <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -336,6 +542,20 @@ export default function FundPage() {
           className="btn btn-secondary w-full"
         >
           Mint 10,000 USDC
+        </button>
+        <button
+          onClick={testAnvilSetBalance}
+          disabled={processing}
+          className="btn btn-outline w-full"
+        >
+          🧪 Test anvil_setBalance
+        </button>
+        <button
+          onClick={refreshWalletBalance}
+          disabled={processing}
+          className="btn btn-ghost w-full"
+        >
+          🔄 Refresh Wallet Balance
         </button>
       </div>
       {status && <p className="mt-4 text-sm">{status}</p>}

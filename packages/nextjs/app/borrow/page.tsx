@@ -15,7 +15,8 @@ import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 
 const BorrowPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
-  const [amount, setAmount] = useState("");
+  const [loanAmount, setLoanAmount] = useState(""); // For loan requests
+  const [repayAmount, setRepayAmount] = useState(""); // For partial repayments
   const [repaymentPeriod, setRepaymentPeriod] = useState(7); // Default 1 week
   const [isLoading, setIsLoading] = useState(false);
 
@@ -47,6 +48,12 @@ const BorrowPage: NextPage = () => {
     functionName: "maxLoanAmount",
   });
 
+  // Helper function to round down to the nearest penny (0.01 USDC = 10000 wei)
+  const roundDownToNearestPenny = (amount: bigint): bigint => {
+    const pennyInWei = 10000n; // 0.01 USDC = 10000 wei
+    return (amount / pennyInWei) * pennyInWei;
+  };
+
   // Compute max eligible amount (BigInt, 6-decimals)
   // TODO: This should be made consistent with best practices for loan amount calculation
   // Current implementation reduces borrowable amount by 1% for each additional week beyond 1 week
@@ -59,19 +66,20 @@ const BorrowPage: NextPage = () => {
     
     // For 1 week, full amount is available. For each additional week, reduce by 1%
     if (weeks <= 1) {
-      return baseAmount;
+      return roundDownToNearestPenny(baseAmount);
     }
     
     // Calculate reduction factor: (0.99)^(weeks-1)
     const reductionFactor = Math.pow(0.99, weeks - 1);
-    return BigInt(Math.floor(Number(baseAmount) * reductionFactor));
+    const reducedAmount = BigInt(Math.floor(Number(baseAmount) * reductionFactor));
+    return roundDownToNearestPenny(reducedAmount);
   }, [creditScore, maxLoanAmount, repaymentPeriod]);
 
-  // Auto-update amount when repayment period changes
+  // Auto-update loan amount when repayment period changes
   useEffect(() => {
     if (maxEligibleAmount > 0n) {
       const maxAmountInUSDC = Number(maxEligibleAmount) / 1e6;
-      setAmount(maxAmountInUSDC.toString());
+      setLoanAmount(maxAmountInUSDC.toFixed(2));
     }
   }, [maxEligibleAmount]);
 
@@ -85,7 +93,21 @@ const BorrowPage: NextPage = () => {
     if (!val || val.trim() === "") return null;
     const num = parseFloat(val);
     if (isNaN(num) || num <= 0) return null;
-    return BigInt(Math.round(num * 1e6));
+    // Use string manipulation to avoid floating-point precision issues
+    const parts = val.split('.');
+    let amountInWei: bigint;
+    if (parts.length === 1) {
+      // No decimal part
+      amountInWei = BigInt(parseInt(parts[0]) * 1e6);
+    } else {
+      // Has decimal part
+      const whole = parts[0];
+      const decimal = parts[1].padEnd(6, '0').substring(0, 6); // Pad to 6 digits and truncate
+      amountInWei = BigInt(parseInt(whole) * 1e6 + parseInt(decimal));
+    }
+    
+    // Round down to the nearest penny to ensure borrowers can always repay
+    return roundDownToNearestPenny(amountInWei);
   };
 
   // Write contract functions
@@ -171,6 +193,10 @@ const BorrowPage: NextPage = () => {
 
       console.log("USDC Balance:", balance.toString());
       console.log("Required amount:", amount.toString());
+      console.log("Balance as number:", Number(balance));
+      console.log("Amount as number:", Number(amount));
+      console.log("Balance >= Amount:", balance >= amount);
+      console.log("Balance == Amount:", balance === amount);
 
       if (balance < amount) {
         throw new Error(`Insufficient USDC balance. You have ${formatUSDC(balance)} but need ${formatUSDC(amount)}`);
@@ -251,8 +277,8 @@ const BorrowPage: NextPage = () => {
     functionName: "previewLoanTerms",
     args: [
       connectedAddress as `0x${string}` | undefined,
-      connectedAddress && amount ? parseLoanAmount(amount) ?? undefined : undefined,
-      connectedAddress && amount ? BigInt(repaymentPeriod * 24 * 60 * 60) : undefined,
+      connectedAddress && loanAmount ? parseLoanAmount(loanAmount) ?? undefined : undefined,
+      connectedAddress && loanAmount ? BigInt(repaymentPeriod * 24 * 60 * 60) : undefined,
     ],
   });
 
@@ -279,11 +305,11 @@ const BorrowPage: NextPage = () => {
   const activeOutstanding: bigint | undefined = latestLoan && (latestLoan as any)[4] ? (latestLoan as any)[1] : undefined;
 
   const handleRequestLoan = async () => {
-    if (!amount || !connectedAddress) return;
+    if (!loanAmount || !connectedAddress) return;
     
     setIsLoading(true);
     try {
-      const principal = parseLoanAmount(amount);
+      const principal = parseLoanAmount(loanAmount);
       if (!principal) return;
       // 1) Request the loan (returns loanId in the tx logs)
       const hash = await writeContractAsync({
@@ -326,7 +352,7 @@ const BorrowPage: NextPage = () => {
       } catch (e) {
         console.error("Auto-disburse failed", e);
       }
-      setAmount("");
+      setLoanAmount("");
     } catch (error) {
       console.error("Error requesting loan:", error);
     } finally {
@@ -349,11 +375,11 @@ const BorrowPage: NextPage = () => {
   const hasCredit = creditScore && Number(creditScore) > 0;
 
   useEffect(() => {
-    if (hasCredit && maxEligibleAmount > 0n && amount === "") {
+    if (hasCredit && maxEligibleAmount > 0n && loanAmount === "") {
       const floorTwoDecimals = Math.floor(Number(maxEligibleAmount) / 1e4) / 100; // safe floor
-      setAmount(floorTwoDecimals.toFixed(2));
+      setLoanAmount(floorTwoDecimals.toFixed(2));
     }
-  }, [hasCredit, maxEligibleAmount, amount]);
+  }, [hasCredit, maxEligibleAmount, loanAmount]);
 
   // Whenever loanId changes, refetch its details once
   useEffect(() => {
@@ -364,7 +390,7 @@ const BorrowPage: NextPage = () => {
 
   // Ensure user-entered amount does not exceed maximum
   const isAmountTooHigh = () => {
-    const parsed = parseLoanAmount(amount);
+    const parsed = parseLoanAmount(loanAmount);
     return parsed !== null && parsed > maxEligibleAmount;
   };
 
@@ -563,8 +589,8 @@ const BorrowPage: NextPage = () => {
                 <label className="block text-sm font-medium mb-2">Loan Amount (USDC)</label>
                 <input
                   type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  value={loanAmount}
+                  onChange={(e) => setLoanAmount(e.target.value)}
                   placeholder="Enter amount in USDC"
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   min="1"
@@ -596,7 +622,7 @@ const BorrowPage: NextPage = () => {
               {/* Request Button */}
               <button
                 onClick={handleRequestLoan}
-                disabled={!amount || !connectedAddress || isLoading || !hasCredit || isAmountTooHigh()}
+                disabled={!loanAmount || !connectedAddress || isLoading || !hasCredit || isAmountTooHigh()}
                 className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-colors mb-4"
               >
                 {isLoading ? "Requesting Loan..." : "Request Loan"}
@@ -607,7 +633,7 @@ const BorrowPage: NextPage = () => {
               )}
 
               {/* Loan Terms Preview & Repayment Schedule */}
-              {amount && previewTermsData && (
+              {loanAmount && previewTermsData && (
                 <div className="bg-base-200 rounded-lg p-4">
                   <h3 className="font-medium mb-3 flex items-center">
                     <CalculatorIcon className="h-5 w-5 mr-2" />
@@ -621,7 +647,7 @@ const BorrowPage: NextPage = () => {
                       </div>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-600">Monthly Payment:</span>
+                      <span className="text-sm text-gray-600">Weekly Payment:</span>
                       <div className="text-lg font-bold text-green-500">
                         ${(Number(previewTermsData[1]) / 1e6).toFixed(2)} USDC
                       </div>
@@ -630,7 +656,7 @@ const BorrowPage: NextPage = () => {
                       <span className="text-sm text-gray-600">Total Interest:</span>
                       <div className="text-lg font-bold text-orange-500">
                         {(() => {
-                          const interest = Number(amount) * Number(previewTermsData[0]) / 10000;
+                          const interest = Number(loanAmount) * Number(previewTermsData[0]) / 10000;
                           return interest.toFixed(2);
                         })()} USDC
                       </div>
@@ -639,7 +665,7 @@ const BorrowPage: NextPage = () => {
                       <span className="text-sm text-gray-600">Total Repayment:</span>
                       <div className="text-lg font-bold text-purple-500">
                         {(() => {
-                          const total = Number(amount) * (1 + Number(previewTermsData[0]) / 10000);
+                          const total = Number(loanAmount) * (1 + Number(previewTermsData[0]) / 10000);
                           return total.toFixed(2);
                         })()} USDC
                       </div>
@@ -664,14 +690,20 @@ const BorrowPage: NextPage = () => {
                             const weekNumber = idx + 1;
                             const weeklyPayment = Number(previewTermsData[1]) / 1e6;
                             const totalWeeks = Math.ceil(repaymentPeriod / 7);
-                            const remainingBalance = Number(amount) * (1 + Number(previewTermsData[0]) / 10000) - (weeklyPayment * weekNumber);
+                            const totalAmount = Number(loanAmount) * (1 + Number(previewTermsData[0]) / 10000);
+                            const remainingBalance = totalAmount - (weeklyPayment * weekNumber);
+                            
+                            // For the final payment, ensure we pay exactly the remaining balance
+                            const isFinalPayment = weekNumber === totalWeeks;
+                            const paymentAmount = isFinalPayment ? Math.max(0, remainingBalance + weeklyPayment) : weeklyPayment;
+                            const finalRemainingBalance = isFinalPayment ? 0 : Math.max(0, remainingBalance);
                             
                             return (
                               <tr key={idx}>
                                 <td>{weekNumber}</td>
                                 <td>Week {weekNumber}</td>
-                                <td>{weeklyPayment.toFixed(2)}</td>
-                                <td>{Math.max(0, remainingBalance).toFixed(2)}</td>
+                                <td>{paymentAmount.toFixed(2)}</td>
+                                <td>{finalRemainingBalance.toFixed(2)}</td>
                               </tr>
                             );
                           })}
@@ -699,10 +731,6 @@ const BorrowPage: NextPage = () => {
                   <h3 className="font-medium mb-3">Loan Summary</h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Loan ID:</span>
-                      <span className="font-medium">#{latestLoanId?.toString()}</span>
-                    </div>
-                    <div className="flex justify-between">
                       <span className="text-gray-600">Principal:</span>
                       <span className="font-medium">{activePrincipal !== undefined ? formatUSDC(activePrincipal) : "-"}</span>
                     </div>
@@ -726,7 +754,7 @@ const BorrowPage: NextPage = () => {
                     <div className="flex justify-between">
                       <span className="text-gray-600">Weekly Payment:</span>
                       <span className="font-medium text-green-500">
-                        {previewTermsData && amount ? `${(Number(previewTermsData[1]) / 1e6).toFixed(2)} USDC` : "-"}
+                        {previewTermsData && loanAmount ? `${(Number(previewTermsData[1]) / 1e6).toFixed(2)} USDC` : "-"}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -810,8 +838,8 @@ const BorrowPage: NextPage = () => {
                     <div className="flex gap-2">
                       <input
                         type="number"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
+                        value={repayAmount}
+                        onChange={(e) => setRepayAmount(e.target.value)}
                         placeholder="Enter amount in USDC"
                         className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         min="0.01"
@@ -819,30 +847,30 @@ const BorrowPage: NextPage = () => {
                       />
                       <button
                         onClick={async () => {
-                          if (!latestLoanId || !amount) return;
-                          const repayAmount = parseLoanAmount(amount);
-                          if (!repayAmount) return;
+                          if (!latestLoanId || !repayAmount) return;
+                          const repayAmountBigInt = parseLoanAmount(repayAmount);
+                          if (!repayAmountBigInt) return;
                           setIsLoading(true);
                           try {
                             console.log("Starting partial repayment process...");
                             
                             // Check USDC balance first
                             console.log("Checking USDC balance for partial repayment...");
-                            await checkUSDCBalance(repayAmount as bigint);
+                            await checkUSDCBalance(repayAmountBigInt);
                             
                             // Ensure USDC allowance for partial amount
                             console.log("Ensuring USDC allowance for partial repayment...");
-                            await ensureAllowance(repayAmount as bigint);
+                            await ensureAllowance(repayAmountBigInt);
                             
                             // Execute partial repayment
                             console.log("Executing partial repayment...");
                             await writeContractAsync({
                               functionName: "repayLoan",
-                              args: [latestLoanId as bigint, repayAmount as bigint],
+                              args: [latestLoanId as bigint, repayAmountBigInt],
                             });
                             
                             console.log("Partial repayment completed successfully!");
-                            setAmount("");
+                            setRepayAmount("");
                             await refetchLatestLoan();
                           } catch (error) {
                             const errorType = handleTransferError(error);
@@ -867,7 +895,7 @@ const BorrowPage: NextPage = () => {
                             setIsLoading(false);
                           }
                         }}
-                        disabled={isLoading || !amount || !parseLoanAmount(amount)}
+                        disabled={isLoading || !repayAmount || !parseLoanAmount(repayAmount)}
                         className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
                       >
                         {isLoading ? "Processing..." : "Repay"}
