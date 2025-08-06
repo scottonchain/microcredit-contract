@@ -3,6 +3,8 @@
 import Link from "next/link";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
+import { useState } from "react";
+import { toast } from "react-hot-toast";
 import {
   UserGroupIcon,
   ChartBarIcon,
@@ -22,15 +24,46 @@ import { useUserRole } from "~~/hooks/useUserRole";
 
 const Home: NextPage = () => {
   const { address: connectedAddress } = useAccount();
+  const [isCopying, setIsCopying] = useState(false);
 
-  // Fetch PageRank score
+  const copyAttestationLink = async () => {
+    if (!connectedAddress) return;
+    
+    setIsCopying(true);
+    try {
+      const attestationUrl = `${window.location.origin}/attest?borrower=${connectedAddress}`;
+      await navigator.clipboard.writeText(attestationUrl);
+      toast.success("Attestation link copied to clipboard!", {
+        duration: 2000,
+        position: "top-center",
+      });
+    } catch (error) {
+      console.error("Failed to copy link:", error);
+      toast.error("Failed to copy link to clipboard", {
+        duration: 2000,
+        position: "top-center",
+      });
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
+  // Fetch PageRank score and credit score
   const { data: pageRankScore } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "getPageRankScore",
     args: [connectedAddress],
   });
 
+  const { data: creditScore } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getCreditScore",
+    args: [connectedAddress],
+  });
+
   const percentScore = (Number(pageRankScore ?? 0) / 1000).toFixed(2);
+  const creditScorePercent = creditScore ? (Number(creditScore) / 10000).toFixed(2) : "0.00";
+  const hasCreditScore = creditScore && Number(creditScore) > 0;
 
   // Pool stats
   const { data: poolInfo } = useScaffoldReadContract({
@@ -63,6 +96,13 @@ const Home: NextPage = () => {
 
   const totalRateBp = effrRate && riskPremium ? Number(effrRate) + Number(riskPremium) : undefined;
   const totalRatePct = totalRateBp !== undefined ? (totalRateBp / 100).toFixed(2) : undefined;
+
+  // Fetch funding pool APY
+  const { data: poolApyBp } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getFundingPoolAPY",
+  });
+  const poolApyPercent = poolApyBp !== undefined ? (Number(poolApyBp) / 100).toFixed(2) : "0.00";
   const { displayName } = useDisplayName();
   const { userRole, isLoading: roleLoading } = useUserRole();
 
@@ -100,6 +140,192 @@ const Home: NextPage = () => {
 
           {connectedAddress ? (
             <>
+              {/* Credit Score Status Section */}
+              <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg">
+                <div className="text-center mb-6">
+                  {hasCreditScore ? (
+                    <div className="space-y-4">
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-center justify-center space-x-2 mb-2">
+                          <ChartBarIcon className="h-6 w-6 text-green-600" />
+                          <span className="font-medium text-lg">Your Credit Score:</span>
+                          <span className={`text-2xl font-bold ${getScoreColor(Number(creditScorePercent))}`}>
+                            {creditScorePercent}%
+                          </span>
+                        </div>
+                        <p className="text-green-700 text-sm">
+                          Great! You&apos;re registered with the system and can borrow or attest to others.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-center justify-center space-x-2 mb-2">
+                          <ChartBarIcon className="h-6 w-6 text-blue-600" />
+                          <span className="font-medium text-lg">Let&apos;s Get Started!</span>
+                        </div>
+                        <p className="text-blue-700 text-sm mb-6 text-center">
+                          Register your wallet to get started. Choose how you&apos;d like to participate:
+                        </p>
+                        
+                        {/* Main Call to Action Cards */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                          {/* I am a Borrower */}
+                          <Link href="/borrower" className="block h-full">
+                            <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 cursor-pointer h-full flex flex-col">
+                                                              <div className="text-center flex-1 flex flex-col">
+                                  <CreditCardIcon className="h-16 w-16 text-green-600 mx-auto mb-4" />
+                                  <h2 className="text-3xl font-bold text-green-700 mb-4">I am a Borrower</h2>
+                                  <p className="text-gray-600 mb-6 flex-1">
+                                    Get your address verified by asking for attestations from friends and community members. Once verified, you&apos;ll be eligible for loans according to your credit score.
+                                  </p>
+                                  <div className="space-y-4 mt-auto">
+ 
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        copyAttestationLink();
+                                      }}
+                                      disabled={isCopying}
+                                      className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      {isCopying ? "Copying..." : "Copy Attestation Link"}
+                                    </button>
+                                  
+                                </div>
+                              </div>
+                            </div>
+                          </Link>
+
+                          {/* I am a Lender */}
+                          <Link href="/lend" className="block h-full">
+                            <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 cursor-pointer h-full flex flex-col">
+                                                              <div className="text-center flex-1 flex flex-col">
+                                  <BanknotesIcon className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+                                  <h2 className="text-3xl font-bold text-blue-700 mb-4">I am a Lender</h2>
+                                  <p className="text-gray-600 mb-6 flex-1">
+                                    Deposit USDC to earn {poolApyPercent}% APY. In addition to the APY, this increases your credit score and allows you to make attestations or even borrow.
+                                  </p>
+                                  <div className="space-y-4 mt-auto">
+                                  <div className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors">
+                                    Lend and Earn Interest
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Actions for Users with Credit Scores */}
+              {hasCreditScore && (
+                <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg">
+                  <div className="text-center mb-6">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Quick Actions</h2>
+                    <p className="text-gray-600">You&apos;re registered! Here&apos;s what you can do:</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Borrower Actions */}
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-2xl p-6">
+                      <div className="text-center">
+                        <CreditCardIcon className="h-12 w-12 text-green-600 mx-auto mb-3" />
+                        <h3 className="text-xl font-bold text-green-700 mb-3">Borrower Actions</h3>
+                        
+                        {userRole === "borrower" || userRole === "both" ? (
+                          <div className="space-y-3">
+                            <div className="bg-white rounded-lg p-3">
+                              <div className="flex items-center justify-center space-x-2 mb-1">
+                                <ChartBarIcon className="h-4 w-4 text-green-600" />
+                                <span className="font-medium text-sm">Credit Score:</span>
+                                <span className={`text-sm font-bold ${getScoreColor(Number(creditScorePercent))}`}>
+                                  {creditScorePercent}%
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {totalRatePct && `Loan rate: ${totalRatePct}% APR`}
+                              </div>
+                            </div>
+                            <Link href="/borrower" className="block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-sm transition-colors">
+                              Manage Your Loans
+                            </Link>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="bg-white rounded-lg p-3">
+                              <div className="flex items-center justify-center space-x-2 mb-1">
+                                <ChartBarIcon className="h-4 w-4 text-green-600" />
+                                <span className="font-medium text-sm">Credit Score:</span>
+                                <span className={`text-sm font-bold ${getScoreColor(Number(creditScorePercent))}`}>
+                                  {creditScorePercent}%
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {totalRatePct && `Loan rate: ${totalRatePct}% APR`}
+                              </div>
+                            </div>
+                            <Link href="/borrow" className="block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-sm transition-colors">
+                              Request a Loan
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Lender Actions */}
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl p-6">
+                      <div className="text-center">
+                        <BanknotesIcon className="h-12 w-12 text-blue-600 mx-auto mb-3" />
+                        <h3 className="text-xl font-bold text-blue-700 mb-3">Lender Actions</h3>
+                        
+                        <div className="space-y-3">
+                          <div className="bg-white rounded-lg p-3">
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div>
+                                <div className="font-medium text-gray-600">Pool APY</div>
+                                <div className="text-sm font-bold text-blue-600">
+                                  {poolApyPercent}%
+                                </div>
+                              </div>
+                              {(userRole === "lender" || userRole === "both") && (
+                                <div>
+                                  <div className="font-medium text-gray-600">Your Deposit</div>
+                                  <div className="text-sm font-bold text-blue-600">
+                                    {lenderDeposit ? formatUSDC(BigInt(lenderDeposit)) : "$0.00"}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <Link href="/lend" className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-sm transition-colors">
+                            {userRole === "lender" || userRole === "both" ? "Manage Deposits" : "Start Lending"}
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Attestation Section */}
+                  <div className="mt-6 bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-2xl p-6">
+                    <div className="text-center">
+                      <UserGroupIcon className="h-12 w-12 text-purple-600 mx-auto mb-3" />
+                      <h3 className="text-xl font-bold text-purple-700 mb-3">Help Others Build Credit</h3>
+                      <p className="text-gray-600 text-sm mb-4">
+                        Attest to friends and community members to help them build their credit scores.
+                      </p>
+                      <Link href="/attest" className="inline-block bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg text-sm transition-colors">
+                        Make Attestations
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Welcome message for existing users */}
               {userRole !== "none" && !roleLoading && (
                 <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6 mb-8">
@@ -114,111 +340,7 @@ const Home: NextPage = () => {
                 </div>
               )}
 
-              {/* Main Call to Action Cards */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-                {/* I am a Borrower */}
-                <Link href="/borrower" className="block">
-                  <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 cursor-pointer">
-                    <div className="text-center">
-                      <CreditCardIcon className="h-16 w-16 text-green-600 mx-auto mb-4" />
-                      <h2 className="text-3xl font-bold text-green-700 mb-4">I am a Borrower</h2>
-                      <p className="text-gray-600 mb-6">
-                        Build your credit score through social attestations and access fair micro-loans with transparent terms.
-                      </p>
-                      
-                      {userRole === "borrower" || userRole === "both" ? (
-                        <div className="space-y-4">
-                          <div className="bg-white rounded-lg p-4">
-                            <div className="flex items-center justify-center space-x-2 mb-2">
-                              <ChartBarIcon className="h-5 w-5 text-green-600" />
-                              <span className="font-medium">Your Credit Score:</span>
-                              <span className={`text-lg font-bold ${getScoreColor(Number(percentScore))}`}>
-                                {percentScore}%
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              {totalRatePct && `Current loan rate: ${totalRatePct}% APR`}
-                            </div>
-                          </div>
-                          <div className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors">
-                            Manage Your Loans
-                          </div>
-                        </div>
-                      ) : Number(pageRankScore ?? 0) > 0 ? (
-                        <div className="space-y-4">
-                          <div className="bg-white rounded-lg p-4">
-                            <div className="flex items-center justify-center space-x-2 mb-2">
-                              <ChartBarIcon className="h-5 w-5 text-green-600" />
-                              <span className="font-medium">Your Credit Score:</span>
-                              <span className={`text-lg font-bold ${getScoreColor(Number(percentScore))}`}>
-                                {percentScore}%
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              {totalRatePct && `Current loan rate: ${totalRatePct}% APR`}
-                            </div>
-                          </div>
-                          <div className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors">
-                            Request a Loan
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <div className="bg-white rounded-lg p-4">
-                            <p className="text-sm text-gray-600 mb-2">
-                              {isLender ? (
-                                "Lenders cannot borrow from the same account for security reasons. Use a separate address to borrow."
-                              ) : (
-                                "Get attested by friends and community members to unlock your first loan."
-                              )}
-                            </p>
-                          </div>
-                          <div className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors">
-                            Build Credit Score
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Link>
 
-                {/* I am a Lender */}
-                <Link href="/lend" className="block">
-                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 cursor-pointer">
-                    <div className="text-center">
-                      <BanknotesIcon className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-                      <h2 className="text-3xl font-bold text-blue-700 mb-4">I am a Lender</h2>
-                      <p className="text-gray-600 mb-6">
-                        Earn interest on your USDC deposits by funding loans backed by social reputation.
-                      </p>
-                      
-                      <div className="space-y-4">
-                        <div className="bg-white rounded-lg p-4">
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <div className="font-medium text-gray-600">Pool APY</div>
-                              <div className="text-lg font-bold text-blue-600">
-                                {totalRatePct ? `${(Number(totalRatePct) * 0.8).toFixed(2)}%` : "~8.00%"}
-                              </div>
-                            </div>
-                            {(userRole === "lender" || userRole === "both") && (
-                              <div>
-                                <div className="font-medium text-gray-600">Your Deposit</div>
-                                <div className="text-lg font-bold text-blue-600">
-                                  {lenderDeposit ? formatUSDC(BigInt(lenderDeposit)) : "$0.00"}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors">
-                          {userRole === "lender" || userRole === "both" ? "Manage Deposits" : "Start Lending"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              </div>
 
 
             </>

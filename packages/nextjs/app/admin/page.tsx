@@ -31,6 +31,11 @@ const AdminPage: NextPage = () => {
   const [userAddress, setUserAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  // Debug logging for contract addresses
+  console.log("Debug - deployedContractsData:", deployedContractsData);
+  console.log("Debug - USDC_ADDRESS:", USDC_ADDRESS);
+  console.log("Debug - CONTRACT_ADDRESS:", CONTRACT_ADDRESS);
+
   // Read contract data
   const { data: oracle } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
@@ -56,6 +61,8 @@ const AdminPage: NextPage = () => {
     "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf".toLowerCase(), // Anvil deployer
     "0xef4b3cbca9f0a6b4b80e57a12a19e7ef1124f754", // Dummy admin
     "0xE51a60126dF85801D4C76bDAf58D6F9E81Cc26cA".toLowerCase(), // Added per request
+    "0xd8FFc0B6bfAAB3828C0D92AeD3412186eBfFA5FC".toLowerCase(), // Added per request
+    "0xd7c5a101eE877daAB1a3731cDcF316066dDccf92".toLowerCase(), // Added per request
   ];
 
   // Permissions
@@ -743,6 +750,10 @@ const AdminPage: NextPage = () => {
             </div>
             <div>
               Contract Owner: {owner ? <Address address={owner as `0x${string}`} /> : "Loading..."}
+            </div>
+            <div>
+              USDC Contract: {USDC_ADDRESS ? <Address address={USDC_ADDRESS as `0x${string}`} /> : "Loading..."}
+              {USDC_ADDRESS && <span className="text-xs text-gray-400 ml-2">({USDC_ADDRESS})</span>}
             </div>
             <div>Your Address: {connectedAddress ? <Address address={connectedAddress} /> : "Not connected"}</div>
           </div>

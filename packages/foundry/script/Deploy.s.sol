@@ -104,8 +104,12 @@ contract DeployScript is Script {
         // Log deployment information
         console.logString(string.concat("DecentralizedMicrocredit deployed at: ", vm.toString(address(microcreditContract))));
         
-        // Provision 10 ETH to demo addresses
-        console.logString("--- Provisioning 10 ETH to demo addresses ---");
+        // Set basePersonalization to 0 as requested
+        microcreditContract.setBasePersonalization(0);
+        console.logString("Set basePersonalization to 0");
+        
+        // Provision ETH to demo addresses (excluding admin addresses that can fund themselves)
+        console.logString("--- Provisioning ETH to demo addresses ---");
         
         address[] memory demoAddresses = new address[](3);
         demoAddresses[0] = 0x455EB67473a5f8Da69dbFde7eDe1d1c008C31274;
@@ -119,6 +123,8 @@ contract DeployScript is Script {
             vm.deal(demoAddresses[i], ethAmount);
             console.logString(string.concat("Provisioned 10 ETH to: ", vm.toString(demoAddresses[i])));
         }
+        
+        console.logString("Note: Admin addresses can fund themselves using the /fund page");
         
         console.logString("--- Contracts deployed and demo addresses funded successfully ---");
         console.logString("Use the web interface to populate test data (lenders, borrowers, attestations)");

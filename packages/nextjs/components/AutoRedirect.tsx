@@ -14,8 +14,7 @@ import { AUTO_REDIRECT_CONFIG } from "~~/config/autoRedirect";
  * - Users with both roles are redirected to /borrower (default)
  * - New users (no role) are not redirected
  * 
- * The component shows loading and redirect notifications to provide
- * user feedback during the process.
+ * The component performs silent redirects without showing notifications.
  */
 
 interface AutoRedirectProps {
@@ -27,7 +26,7 @@ interface AutoRedirectProps {
 export const AutoRedirect: React.FC<AutoRedirectProps> = ({ 
   enabled = AUTO_REDIRECT_CONFIG.enabled, 
   redirectDelay = AUTO_REDIRECT_CONFIG.redirectDelay,
-  showNotifications = AUTO_REDIRECT_CONFIG.showNotifications
+  showNotifications = false // Changed default to false to disable notifications
 }) => {
   const { userRole, isLoading, redirectToAppropriatePage } = useUserRole();
   const pathname = usePathname();
@@ -62,7 +61,7 @@ export const AutoRedirect: React.FC<AutoRedirectProps> = ({
     }
   }, [userRole, isLoading, pathname, enabled, redirectDelay, redirectToAppropriatePage, needsRedirect]);
 
-  // Show loading indicator if checking user role
+  // Show loading indicator if checking user role (only if showNotifications is true)
   if (isLoading && showNotifications) {
     return (
       <div className="fixed top-4 right-4 z-50">
@@ -76,22 +75,6 @@ export const AutoRedirect: React.FC<AutoRedirectProps> = ({
     );
   }
 
-  // Show role indicator for debugging (can be removed in production)
-  if (enabled && needsRedirect && showNotifications) {
-    return (
-      <div className="fixed top-4 right-4 z-50">
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-          <div className="flex items-center">
-            <span className="text-sm">
-              {userRole === "borrower" && "Redirecting to borrower page..."}
-              {userRole === "lender" && "Redirecting to lender page..."}
-              {userRole === "both" && "Redirecting to lender page..."}
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // Removed the redirect notification display logic
   return null;
 }; 
