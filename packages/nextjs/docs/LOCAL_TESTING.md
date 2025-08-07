@@ -29,11 +29,11 @@ yarn dev
 
 ## 🔗 Network Configuration
 
-### Low Gas Fees (L2-like Experience)
-The local Anvil network is configured with extremely low gas fees to simulate modern L2 networks:
-- **Gas Price**: 100 wei (vs ~20 gwei on mainnet = 1/200,000th the cost)
-- **Base Fee**: 1 wei (vs ~20 gwei on mainnet)
-- **Transactions**: Nearly free, like modern L2s (Arbitrum, Optimism, etc.)
+### Completely Free Gas (Zero-Cost Transactions)
+The local Anvil network is configured with completely free gas to provide the best user experience:
+- **Gas Price**: 0 wei (completely free)
+- **Base Fee**: 0 wei (completely free)
+- **Transactions**: 100% free, no gas costs whatsoever
 
 ### Local Anvil Network
 - **Network Name**: Localhost (Foundry)
@@ -41,9 +41,9 @@ The local Anvil network is configured with extremely low gas fees to simulate mo
 - **RPC URL**: `http://127.0.0.1:8545`
 - **Currency**: ETH
 - **Block Explorer**: `http://127.0.0.1:8545`
-- **Gas Price**: 100 wei (extremely low - L2-like)
-- **Base Fee**: 1 wei (very low)
-- **Gas Limit**: 30M (high limit for complex transactions)
+- **Gas Price**: 0 wei (completely free)
+- **Base Fee**: 0 wei (completely free)
+- **Gas Limit**: 600M (very high limit for complex transactions)
 
 ### Wallet Configuration
 Add this network to your wallet:

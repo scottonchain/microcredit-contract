@@ -281,7 +281,7 @@ const LendPage: NextPage = () => {
       } else if (error?.message?.includes("Amount > 0")) {
         setErrorMessage("Please enter a valid deposit amount greater than 0.");
       } else if (error?.message?.includes("insufficient funds") || error?.message?.includes("gas") || error?.message?.includes("Gas")) {
-        setErrorMessage("Insufficient ETH for gas fees. You need ETH to pay for transaction costs. Please fund your wallet with more ETH.");
+        setErrorMessage("Transaction failed. This might be due to insufficient ETH balance or contract issues. Gas is free on this network.");
       } else {
         setErrorMessage(`Deposit failed: ${error?.message || "Unknown error"}`);
       }
