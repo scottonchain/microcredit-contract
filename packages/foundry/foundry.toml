@@ -35,7 +35,7 @@ pgnTestnet = "https://sepolia.publicgoods.network"
 
 localhost = "http://127.0.0.1:8545"
 
-[anvil]
+[profile.anvil]
 # Set very low gas fees to simulate modern L2s (1/100000 of current fees)
 gas_price = 0  # 0 wei per gas for demo purposes -simulate Eth L2 (base)
 gas_limit = 600000000  # 600M gas limit -simulate Eth L2 (base)

@@ -15,7 +15,10 @@ PORT=${ANVIL_PORT:-8545}
 # Add any extra anvil flags you normally use here
 EXTRA_FLAGS="${ANVIL_FLAGS:-}" # allow override via env
 
-BASE_ARGS=(--port "$PORT" $EXTRA_FLAGS)
+# Set gas price and base fee to 0 for free transactions (matching foundry.toml)
+GAS_ARGS=(--gas-price 0 --base-fee 0)
+
+BASE_ARGS=(--port "$PORT" "${GAS_ARGS[@]}" $EXTRA_FLAGS)
 
 if [ -f "$STATE_FILE" ]; then
   echo "🔄 Loading chain state from $STATE_FILE (and will dump on exit)"

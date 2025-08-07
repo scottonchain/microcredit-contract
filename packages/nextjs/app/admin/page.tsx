@@ -30,11 +30,84 @@ const AdminPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
   const [userAddress, setUserAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [gasPrice, setGasPrice] = useState<bigint | null>(null);
+  const [baseFee, setBaseFee] = useState<bigint | null>(null);
 
   // Debug logging for contract addresses
   console.log("Debug - deployedContractsData:", deployedContractsData);
   console.log("Debug - USDC_ADDRESS:", USDC_ADDRESS);
   console.log("Debug - CONTRACT_ADDRESS:", CONTRACT_ADDRESS);
+
+  // Fetch gas fees from the network
+  const fetchGasFees = async () => {
+    try {
+      const [gasPriceResult, latestBlock] = await Promise.all([
+        publicClient.getGasPrice(),
+        publicClient.getBlock({ blockTag: 'latest' })
+      ]);
+      
+      setGasPrice(gasPriceResult);
+      setBaseFee(latestBlock.baseFeePerGas || 0n);
+      
+      console.log("🔍 Gas Price:", gasPriceResult.toString(), "wei");
+      console.log("🔍 Base Fee:", (latestBlock.baseFeePerGas || 0n).toString(), "wei");
+    } catch (error) {
+      console.error("Error fetching gas fees:", error);
+    }
+  };
+
+  // Set gas price to zero via RPC
+  const setZeroGasPrice = async () => {
+    try {
+      console.log("🔧 Attempting to set gas price to zero...");
+      
+      // Try multiple methods to set gas price to zero
+      const methods = [
+        "anvil_setNextBlockBaseFeePerGas",
+        "anvil_setGasPrice", 
+        "anvil_setNextBlockGasPrice"
+      ];
+
+      for (const method of methods) {
+        try {
+          console.log(`🔧 Trying method: ${method}`);
+          
+          const response = await fetch(RPC_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              method: method,
+              params: ["0x0"]
+            })
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log(`✅ ${method} result:`, result);
+          }
+        } catch (error) {
+          console.log(`⚠️ ${method} failed:`, error);
+        }
+      }
+
+      // Wait a moment then refresh gas fees
+      setTimeout(fetchGasFees, 1000);
+    } catch (error) {
+      console.error("Error setting gas price to zero:", error);
+    }
+  };
+
+  // Fetch gas fees on component mount
+  useEffect(() => {
+    fetchGasFees();
+    // Try to set gas price to zero on mount
+    setZeroGasPrice();
+    // Refresh gas fees every 30 seconds
+    const interval = setInterval(fetchGasFees, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Read contract data
   const { data: oracle } = useScaffoldReadContract({
@@ -769,7 +842,7 @@ const AdminPage: NextPage = () => {
           <h1 className="text-3xl font-bold mb-6">🛠️ Admin Panel</h1>
 
           {/* Overview cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-base-100 p-6 rounded-lg shadow text-center">
               <div className="text-2xl font-bold text-green-500">
                 {poolInfo ? formatUSDC(poolInfo[0]) : "Loading…"}
@@ -788,6 +861,18 @@ const AdminPage: NextPage = () => {
               </div>
               <div className="text-sm text-gray-600">Active Lenders</div>
             </div>
+            <div className="bg-base-100 p-6 rounded-lg shadow text-center">
+              <div className="text-2xl font-bold text-purple-500">
+                {gasPrice !== null ? gasPrice.toString() : "Loading…"}
+              </div>
+              <div className="text-sm text-gray-600">Gas Price (wei)</div>
+              <div className="text-xs text-gray-500 mt-1">
+                Base Fee: {baseFee !== null ? baseFee.toString() : "Loading…"} wei
+              </div>
+              <div className="text-xs text-green-600 mt-1">
+                {gasPrice === 0n ? "✅ FREE" : "💰 PAID"}
+              </div>
+            </div>
           </div>
 
           {/* Navigation Links */}
@@ -798,7 +883,58 @@ const AdminPage: NextPage = () => {
             >
               🛠️ Populate Test Data
             </Link>
+          </div>
 
+          {/* Gas Fee Information */}
+          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+            <h2 className="text-xl font-semibold mb-4">⛽ Network Gas Fees</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center">
+                <div className="text-lg font-semibold text-purple-600">
+                  {gasPrice !== null ? gasPrice.toString() : "Loading…"}
+                </div>
+                <div className="text-sm text-gray-600">Gas Price (wei)</div>
+                <div className="text-xs text-gray-500">
+                  {gasPrice !== null ? `${(Number(gasPrice) / 1e9).toFixed(9)} Gwei` : ""}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-semibold text-blue-600">
+                  {baseFee !== null ? baseFee.toString() : "Loading…"}
+                </div>
+                <div className="text-sm text-gray-600">Base Fee (wei)</div>
+                <div className="text-xs text-gray-500">
+                  {baseFee !== null ? `${(Number(baseFee) / 1e9).toFixed(9)} Gwei` : ""}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className={`text-lg font-semibold ${gasPrice === 0n ? 'text-green-600' : 'text-red-600'}`}>
+                  {gasPrice === 0n ? "FREE" : "PAID"}
+                </div>
+                <div className="text-sm text-gray-600">Transaction Cost</div>
+                <div className="text-xs text-gray-500">
+                  {gasPrice === 0n ? "No gas fees" : "Gas fees apply"}
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 text-sm text-gray-600">
+              <p><strong>Network Status:</strong> {gasPrice === 0n ? "✅ Completely free transactions" : "⚠️ Gas fees are being charged"}</p>
+              <p><strong>Configuration:</strong> Anvil local network with gas_price=0, base_fee=0</p>
+              {gasPrice !== 0n && (
+                <div className="mt-2">
+                  <button
+                    onClick={setZeroGasPrice}
+                    className="btn btn-sm btn-warning"
+                    title="Force set gas price to zero"
+                  >
+                    🔧 Force Zero Gas
+                  </button>
+                  <span className="ml-2 text-xs text-gray-500">
+                    Click if gas price is not zero despite configuration
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* PageRank Computation - Moved to top */}
