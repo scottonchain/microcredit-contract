@@ -1,0 +1,50 @@
+{
+  "name": "@se-2/hardhat",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "account": "hardhat account",
+    "account:generate": "node scripts/generateKeystore.js",
+    "account:import": "node scripts/importAccount.js",
+    "account:reveal-pk": "node scripts/revealPK.js",
+    "chain": "node scripts/start-chain.js",
+    "clean": "hardhat clean",
+    "compile": "hardhat compile",
+    "deploy": "hardhat run scripts/deploy.js --network localhost",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "deploy:redeploy-usdc": "REDEPLOY_USDC=true hardhat run scripts/deploy.js --network localhost",
+    "flatten": "hardhat flatten",
+    "fork": "hardhat node --fork",
+    "format": "prettier --write .",
+    "postinstall": "shx cp -n .env.example .env",
+    "lint": "solhint 'contracts/**/*.sol'",
+    "lint-staged": "node scripts/lint-staged.cjs",
+    "test": "hardhat test",
+    "verify": "hardhat verify"
+  },
+  "dependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@openzeppelin/contracts": "^5.0.0",
+    "dotenv": "~16.3.1",
+    "envfile": "~6.18.0",
+    "ethers": "^6.8.0",
+    "prettier": "~2.8.8",
+    "qrcode": "~1.5.3"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.0.0",
+    "@types/chai": "^4.3.5",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "chai": "^4.3.7",
+    "eslint": "^9.30.1",
+    "hardhat": "^2.19.0",
+    "mocha": "^10.2.0",
+    "shx": "^0.3.4",
+    "solhint": "^4.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
