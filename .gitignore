@@ -30,3 +30,4 @@ lib/solidity-bytes-utils/
 .cursor/
 /chain-state.json*
 packages/foundry/deployment-config.json
+lib/forge-std

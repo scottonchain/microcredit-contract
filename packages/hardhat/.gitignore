@@ -1,0 +1,31 @@
+# Hardhat
+cache/
+artifacts/
+typechain-types/
+coverage/
+coverage.json
+
+# Environment variables
+#.env
+.env.local
+
+# Keystore files
+keystore/
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+
+# Deployment files
+deployment.json
+deployment-config.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db 

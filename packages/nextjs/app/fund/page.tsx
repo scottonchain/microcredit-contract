@@ -165,7 +165,7 @@ export default function FundPage() {
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
-        method: "anvil_setBalance",
+        method: "hardhat_setBalance",
         params: [minterAccount.address, toHex(50n * 10n ** 18n)],
       }),
     });
@@ -225,7 +225,7 @@ export default function FundPage() {
         body: JSON.stringify({
           jsonrpc: "2.0",
           id: 1,
-          method: "anvil_setBalance",
+          method: "hardhat_setBalance",
           params: [connectedAddress, toHex(newBalance)],
         }),
       });
@@ -272,11 +272,11 @@ export default function FundPage() {
     }
   };
 
-  // Test function to verify anvil_setBalance is working
+  // Test function to verify hardhat_setBalance is working
   const testAnvilSetBalance = async () => {
     if (!connectedAddress) return;
     setProcessing(true);
-    setStatus("🧪 Testing anvil_setBalance...");
+    setStatus("🧪 Testing hardhat_setBalance...");
     try {
       // Test with a simple balance setting
       const testBalance = 5n * 10n ** 18n; // 5 ETH
@@ -287,13 +287,13 @@ export default function FundPage() {
         body: JSON.stringify({
           jsonrpc: "2.0",
           id: 1,
-          method: "anvil_setBalance",
+          method: "hardhat_setBalance",
           params: [connectedAddress, toHex(testBalance)],
         }),
       });
       
       const responseData = await response.json();
-      console.log("Test anvil_setBalance response:", responseData);
+      console.log("Test hardhat_setBalance response:", responseData);
       
       if (responseData.error) {
         throw new Error(`Test failed: ${responseData.error.message}`);
@@ -315,7 +315,7 @@ export default function FundPage() {
       const actualBalance = BigInt(verifyData.result || "0x0");
       
       if (actualBalance === testBalance) {
-        setStatus("✅ anvil_setBalance test passed! Balance set to 5 ETH");
+        setStatus("✅ hardhat_setBalance test passed! Balance set to 5 ETH");
         await fetchEthBalance(connectedAddress);
       } else {
         throw new Error(`Test verification failed. Expected: 5 ETH, Got: ${Number(actualBalance) / 1e18} ETH`);
@@ -548,7 +548,7 @@ export default function FundPage() {
           disabled={processing}
           className="btn btn-outline w-full"
         >
-          🧪 Test anvil_setBalance
+          🧪 Test hardhat_setBalance
         </button>
         <button
           onClick={refreshWalletBalance}

@@ -141,7 +141,7 @@ export default function PopulatePage() {
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
-        method: "anvil_setBalance",
+        method: "hardhat_setBalance",
         params: [minterAccount.address, toHex(10n * 10n ** 18n)], // 10 ETH buffer
       }),
     });
@@ -155,7 +155,7 @@ export default function PopulatePage() {
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
-        method: "anvil_setBalance",
+        method: "hardhat_setBalance",
         params: [adminAccount.address, toHex(20n * 10n ** 18n)], // 20 ETH for gas
       }),
     });
@@ -258,7 +258,7 @@ export default function PopulatePage() {
           body: JSON.stringify({ 
             jsonrpc: "2.0", 
             id: 1, 
-            method: "anvil_setBalance", 
+            method: "hardhat_setBalance", 
             params: [L.address, toHex(10n * 10n ** 18n)] 
           }) 
         });
@@ -508,7 +508,7 @@ export default function PopulatePage() {
         body: JSON.stringify({ 
           jsonrpc: "2.0", 
           id: 1, 
-          method: "anvil_setBalance", 
+          method: "hardhat_setBalance", 
           params: [B.address, toHex(10n * 10n ** 18n)] 
         }) 
       });
