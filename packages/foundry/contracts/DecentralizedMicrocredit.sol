@@ -2,6 +2,8 @@
 pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "forge-std/console.sol";
 
 /**
@@ -18,7 +20,7 @@ import "forge-std/console.sol";
  * - Oracle will handle credit score updates and PageRank computation
  * - Interest calculation may be optimized for production use
  */
-contract DecentralizedMicrocredit {
+contract DecentralizedMicrocredit is EIP712 {
     // NOTE: Variable-rate parameters removed in favour of fixed-rate design.
     // uint256 public rMin;
     // uint256 public rMax;
@@ -121,6 +123,42 @@ contract DecentralizedMicrocredit {
     // Amount of pool liquidity committed to yet-undisbursed loans
     uint256 public reservedLiquidity;
 
+    // EIP-712 nonces mapping for replay protection
+    mapping(address => uint256) public nonces;
+    
+    // Optional relayer whitelist for meta-transactions
+    mapping(address => bool) public relayerWhitelist;
+    bool public relayerWhitelistEnabled;
+
+    // EIP-712 typehashes for meta-transactions
+    bytes32 private constant LOAN_REQUEST_TYPEHASH = keccak256(
+        "LoanRequest(address borrower,uint256 amount,uint256 nonce,uint256 deadline)"
+    );
+
+    bytes32 private constant DISBURSE_REQUEST_TYPEHASH = keccak256(
+        "DisburseRequest(address borrower,uint256 loanId,address to,uint256 nonce,uint256 deadline)"
+    );
+
+    // EIP-712 request structs
+    struct LoanRequest {
+        address borrower;
+        uint256 amount;
+        uint256 nonce;
+        uint256 deadline;
+    }
+
+    struct DisburseRequest {
+        address borrower;
+        uint256 loanId;
+        address to;
+        uint256 nonce;
+        uint256 deadline;
+    }
+
+    // Meta-transaction events
+    event MetaLoanRequested(address indexed borrower, uint256 amount, uint256 loanId);
+    event MetaLoanDisbursed(address indexed borrower, uint256 loanId, uint256 principal);
+    
     // PageRank storage
     address[] private pagerankNodes;
     mapping(address => bool) private pagerankNodeExists;
@@ -137,7 +175,7 @@ contract DecentralizedMicrocredit {
         uint256 _maxLoanAmount,
         address _usdc,
         address _oracle
-    ) {
+    ) EIP712("DecentralizedMicrocredit", "1") {
         require(_usdc != address(0) && _oracle != address(0), "Invalid addresses");
         usdc = IERC20(_usdc);
         owner = msg.sender;
@@ -206,6 +244,24 @@ contract DecentralizedMicrocredit {
     function setLendingUtilizationCap(uint256 cap) external onlyOwner {
         require(cap <= BASIS_POINTS, "Cap cannot exceed 100%");
         lendingUtilizationCap = cap;
+    }
+
+    /**
+     * @notice Enable or disable the relayer whitelist for meta-transactions
+     * @param enabled Whether the whitelist is enabled
+     */
+    function setRelayerWhitelistEnabled(bool enabled) external onlyOwner {
+        relayerWhitelistEnabled = enabled;
+    }
+
+    /**
+     * @notice Add or remove a relayer from the whitelist
+     * @param relayer The address of the relayer
+     * @param allowed Whether the relayer is allowed to submit meta-transactions
+     */
+    function setRelayerWhitelisted(address relayer, bool allowed) external onlyOwner {
+        require(relayer != address(0), "Invalid relayer address");
+        relayerWhitelist[relayer] = allowed;
     }
 
     /**
@@ -302,17 +358,23 @@ contract DecentralizedMicrocredit {
         payment = (principal + interest) / (repaymentPeriod / 7 days); // Weekly payment instead of monthly
     }
 
-    function requestLoan(uint256 amount) external returns (uint256 loanId) {
+    /**
+     * @notice Internal helper to handle loan request logic, used by both regular and meta functions
+     * @param borrower The address requesting the loan
+     * @param amount The amount of the loan
+     * @return loanId The ID of the created loan
+     */
+    function _requestLoanOnBehalf(address borrower, uint256 amount) internal returns (uint256 loanId) {
         require(amount > 0, "Amount > 0");
-        uint256 score = getCreditScore(msg.sender);
+        uint256 score = getCreditScore(borrower);
         require(score > 0, "Score > 0");
 
         // Enforce per-borrower loan cap proportional to credit score
         uint256 allowed = (maxLoanAmount / SCALE) * score;
 
-        // NEW: Sum all outstanding principal for this borrower
+        // Sum all outstanding principal for this borrower
         uint256 totalOutstanding = 0;
-        uint256[] storage borrowerLoans = _borrowerLoans[msg.sender];
+        uint256[] storage borrowerLoans = _borrowerLoans[borrower];
         for (uint256 i = 0; i < borrowerLoans.length; i++) {
             Loan storage l = loans[borrowerLoans[i]];
             if (l.isActive) {
@@ -344,29 +406,126 @@ contract DecentralizedMicrocredit {
         loanId = nextLoanId++;
         uint256 rate = effrRate + riskPremium;
         // Initialize with principal only - interest will be calculated when repaid
-        loans[loanId] = Loan(amount, amount, msg.sender, rate, true, block.timestamp);
+        loans[loanId] = Loan(amount, amount, borrower, rate, true, block.timestamp);
 
         // ───── enumeration bookkeeping ─────
         _allLoanIds.push(loanId);
-        if (!_borrowerSeen[msg.sender]) {
-            _borrowerSeen[msg.sender] = true;
-            _borrowers.push(msg.sender);
+        if (!_borrowerSeen[borrower]) {
+            _borrowerSeen[borrower] = true;
+            _borrowers.push(borrower);
         }
-        _borrowerLoans[msg.sender].push(loanId);
+        _borrowerLoans[borrower].push(loanId);
     }
 
-    function disburseLoan(uint256 loanId) external {
+    /**
+     * @notice Public function for requesting a loan directly (caller pays gas)
+     * @param amount The amount of the loan
+     * @return loanId The ID of the created loan
+     */
+    function requestLoan(uint256 amount) external returns (uint256 loanId) {
+        return _requestLoanOnBehalf(msg.sender, amount);
+    }
+
+    /**
+     * @notice Internal helper to handle loan disbursement logic
+     * @param loanId The ID of the loan to disburse
+     * @param to The address to send the funds to (must be the borrower)
+     */
+    function _disburseLoanTo(uint256 loanId, address to) internal {
         Loan storage loan = loans[loanId];
         require(loan.isActive, "Loan inactive");
+        require(to == loan.borrower, "Must disburse to borrower");
 
         // Move principal from reserved to lent-out balance
         reservedLiquidity -= loan.principal;
         totalLentOut += loan.principal;
 
-        bool success = usdc.transfer(loan.borrower, loan.principal);
+        bool success = usdc.transfer(to, loan.principal);
         if (!success) {
             revert("Transfer failed");
         }
+    }
+
+    /**
+     * @notice Public function for disbursing a loan directly (caller pays gas)
+     * @param loanId The ID of the loan to disburse
+     */
+    function disburseLoan(uint256 loanId) external {
+        // Preserve existing behavior: disburse to the recorded borrower
+        _disburseLoanTo(loanId, loans[loanId].borrower);
+    }
+
+    /**
+     * @notice Meta-transaction entry point for requesting a loan (relayer pays gas)
+     * @param req The loan request with borrower, amount, nonce, and deadline
+     * @param sig The EIP-712 signature from the borrower authorizing the loan request
+     * @return loanId The ID of the created loan
+     */
+    function requestLoanMeta(LoanRequest calldata req, bytes calldata sig)
+        external
+        returns (uint256 loanId)
+    {
+        // Check relayer whitelist if enabled
+        if (relayerWhitelistEnabled) {
+            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
+        }
+        
+        require(block.timestamp <= req.deadline, "Expired");
+        require(req.nonce == nonces[req.borrower]++, "Bad nonce");
+
+        bytes32 structHash = keccak256(abi.encode(
+            LOAN_REQUEST_TYPEHASH,
+            req.borrower,
+            req.amount,
+            req.nonce,
+            req.deadline
+        ));
+        bytes32 digest = _hashTypedDataV4(structHash);
+
+        // Supports EOAs and ERC1271 smart wallets
+        require(SignatureChecker.isValidSignatureNow(req.borrower, digest, sig), "Bad signature");
+
+        // Execute as borrower
+        loanId = _requestLoanOnBehalf(req.borrower, req.amount);
+
+        // Emit event for relayer and borrower tracking
+        emit MetaLoanRequested(req.borrower, req.amount, loanId);
+    }
+
+    /**
+     * @notice Meta-transaction entry point for disbursing a loan (relayer pays gas)
+     * @param req The disbursement request with borrower, loanId, to address, nonce, and deadline
+     * @param sig The EIP-712 signature from the borrower authorizing the disbursement
+     */
+    function disburseLoanMeta(DisburseRequest calldata req, bytes calldata sig)
+        external
+    {
+        // Check relayer whitelist if enabled
+        if (relayerWhitelistEnabled) {
+            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
+        }
+        
+        require(block.timestamp <= req.deadline, "Expired");
+        require(req.nonce == nonces[req.borrower]++, "Bad nonce");
+
+        bytes32 structHash = keccak256(abi.encode(
+            DISBURSE_REQUEST_TYPEHASH,
+            req.borrower,
+            req.loanId,
+            req.to,
+            req.nonce,
+            req.deadline
+        ));
+        bytes32 digest = _hashTypedDataV4(structHash);
+        require(SignatureChecker.isValidSignatureNow(req.borrower, digest, sig), "Bad signature");
+
+        // Only allow disbursement to the recorded borrower address
+        require(req.to == loans[req.loanId].borrower && req.to == req.borrower, "Must send to borrower");
+
+        _disburseLoanTo(req.loanId, req.to);
+        
+        // Emit event for relayer and borrower tracking
+        emit MetaLoanDisbursed(req.borrower, req.loanId, loans[req.loanId].principal);
     }
 
     /**

@@ -4,6 +4,8 @@ out = 'out'
 libs = ['../../lib']
 fs_permissions = [{ access = "read-write", path = "./"}]
 via_ir = true
+optimizer = true
+optimizer_runs = 200
 
 remappings = [
     '@openzeppelin/=../../lib/openzeppelin-contracts/',

@@ -52,6 +52,8 @@ rm -rf out cache artifacts deployments || true
 
 # Start local blockchain
 echo "🚀 Starting local blockchain..."
+# Ensure high code size limit is applied to anvil
+export ANVIL_CODE_SIZE_LIMIT=${ANVIL_CODE_SIZE_LIMIT:-100000000}
 yarn chain &
 
 CHAIN_PID=$!
@@ -68,7 +70,8 @@ sleep 5
 
 # Deploy contracts
 echo "📦 Deploying contracts..."
-yarn deploy
+# Set environment variables to avoid password prompt
+RPC_URL=localhost ETH_KEYSTORE_ACCOUNT="scaffold-eth-default" yarn deploy
 
 echo "✅ Deployment complete."
 echo "ℹ️ Chain PID: $CHAIN_PID, Frontend PID: $START_PID"

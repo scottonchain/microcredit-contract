@@ -192,14 +192,16 @@ const BorrowPage: NextPage = () => {
       });
 
       console.log("USDC Balance:", balance.toString());
-      console.log("Required amount:", amount.toString());
+      // Always compare with the required amount rounded down to the nearest penny
+      const required = roundDownToNearestPenny(amount);
+      console.log("Required amount (rounded to cent):", required.toString());
       console.log("Balance as number:", Number(balance));
-      console.log("Amount as number:", Number(amount));
-      console.log("Balance >= Amount:", balance >= amount);
-      console.log("Balance == Amount:", balance === amount);
+      console.log("Amount as number:", Number(required));
+      console.log("Balance >= Amount:", balance >= required);
+      console.log("Balance == Amount:", balance === required);
 
-      if (balance < amount) {
-        throw new Error(`Insufficient USDC balance. You have ${formatUSDC(balance)} but need ${formatUSDC(amount)}`);
+      if (balance < required) {
+        throw new Error(`Insufficient USDC balance. You have ${formatUSDC(balance)} but need ${formatUSDC(required)}`);
       }
 
       return balance;
@@ -541,7 +543,7 @@ const BorrowPage: NextPage = () => {
                 <div className="flex items-center gap-3">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-orange-500">
-                      {activeOutstanding !== undefined ? formatUSDC(activeOutstanding) : "-"}
+                      {activeOutstanding !== undefined ? formatUSDC(roundDownToNearestPenny(activeOutstanding)) : "-"}
                     </div>
                     <div className="text-sm text-gray-600">Payoff Amount</div>
                   </div>
@@ -736,7 +738,7 @@ const BorrowPage: NextPage = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Outstanding:</span>
-                      <span className="font-medium text-orange-500">{activeOutstanding !== undefined ? formatUSDC(activeOutstanding) : "-"}</span>
+                      <span className="font-medium text-orange-500">{activeOutstanding !== undefined ? formatUSDC(roundDownToNearestPenny(activeOutstanding)) : "-"}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Interest Rate:</span>
@@ -783,27 +785,28 @@ const BorrowPage: NextPage = () => {
                         setIsLoading(true);
                         try {
                           console.log("Starting full repayment process...");
-                          
+                           
                           // Check USDC balance first
                           console.log("Checking USDC balance...");
-                          await checkUSDCBalance(activeOutstanding as bigint);
-                          
+                          const amountToRepay = roundDownToNearestPenny(activeOutstanding as bigint);
+                          await checkUSDCBalance(amountToRepay);
+                           
                           // Ensure USDC allowance
                           console.log("Ensuring USDC allowance...");
-                          await ensureAllowance(activeOutstanding as bigint);
-                          
+                          await ensureAllowance(amountToRepay);
+                           
                           // Execute repayment
                           console.log("Executing repayment...");
                           await writeContractAsync({
                             functionName: "repayLoan",
-                            args: [latestLoanId as bigint, activeOutstanding as bigint],
+                            args: [latestLoanId as bigint, amountToRepay],
                           });
-                          
+                           
                           console.log("Repayment completed successfully!");
                           await refetchLatestLoan();
                         } catch (error) {
                           const errorType = handleTransferError(error);
-                          
+                           
                           switch (errorType) {
                             case "TRANSFER_FAILED":
                               console.error("USDC transfer failed. Please check your USDC balance and try again.");
@@ -827,7 +830,7 @@ const BorrowPage: NextPage = () => {
                       disabled={isLoading || !activeOutstanding}
                       className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
                     >
-                      {isLoading ? "Processing..." : `Pay ${activeOutstanding !== undefined ? formatUSDC(activeOutstanding) : "-"}`}
+                      {isLoading ? "Processing..." : `Pay ${activeOutstanding !== undefined ? formatUSDC(roundDownToNearestPenny(activeOutstanding)) : "-"}`}
                     </button>
                   </div>
 
