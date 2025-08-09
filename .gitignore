@@ -26,7 +26,12 @@ node_modules
 dist
 git-credential-manager
 
+lib/forge-std
 lib/solidity-bytes-utils/
 .cursor/
 /chain-state.json*
 packages/foundry/deployment-config.json
+
+
+node_modules
+chain-state.invalid-20250809-122920.json

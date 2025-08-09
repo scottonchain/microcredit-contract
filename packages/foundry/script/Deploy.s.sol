@@ -65,6 +65,11 @@ contract DeployScript is Script {
             MockUSDC usdc = new MockUSDC();
             usdcAddress = address(usdc);
             console.logString(string.concat("MockUSDC deployed at: ", vm.toString(usdcAddress)));
+            // Ensure code exists on-chain (broadcast must have succeeded)
+            if (usdcAddress.code.length == 0) {
+                console.logString("ERROR: MockUSDC bytecode missing on-chain after deployment. Aborting.");
+                revert("MockUSDC deployment failed (no code)");
+            }
             
             // Update the deployment config file with the new address
             string memory newConfig = string.concat(
@@ -81,6 +86,10 @@ contract DeployScript is Script {
                 MockUSDC usdc = new MockUSDC();
                 usdcAddress = address(usdc);
                 console.logString(string.concat("MockUSDC freshly deployed at: ", vm.toString(usdcAddress)));
+                if (usdcAddress.code.length == 0) {
+                    console.logString("ERROR: MockUSDC bytecode missing on-chain after re-deployment. Aborting.");
+                    revert("MockUSDC deployment failed (no code)");
+                }
                 // Overwrite the deployment config with the new valid address
                 string memory updatedConfig = string.concat(
                     '{\n',
@@ -103,6 +112,10 @@ contract DeployScript is Script {
 
         // Log deployment information
         console.logString(string.concat("DecentralizedMicrocredit deployed at: ", vm.toString(address(microcreditContract))));
+        if (address(microcreditContract).code.length == 0) {
+            console.logString("ERROR: DecentralizedMicrocredit bytecode missing on-chain after deployment. Aborting.");
+            revert("DecentralizedMicrocredit deployment failed (no code)");
+        }
         
         // Set basePersonalization to 0 as requested
         microcreditContract.setBasePersonalization(0);
@@ -129,11 +142,11 @@ contract DeployScript is Script {
         console.logString("--- Contracts deployed and demo addresses funded successfully ---");
         console.logString("Use the web interface to populate test data (lenders, borrowers, attestations)");
  
-        // Save deployment information
-        string memory json = "{}";
-        json = vm.serializeAddress(json, "DecentralizedMicrocredit", address(microcreditContract));
-        json = vm.serializeAddress(json, "USDC", usdcAddress);
-        vm.writeFile("deployment.json", json);
+        // Save deployment information (use a stable object key and writeJson)
+        string memory obj = "deploy";
+        vm.serializeAddress(obj, "DecentralizedMicrocredit", address(microcreditContract));
+        string memory jsonOut = vm.serializeAddress(obj, "USDC", usdcAddress);
+        vm.writeJson(jsonOut, "deployment.json");
     }
 
     function test() public {}

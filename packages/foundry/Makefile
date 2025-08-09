@@ -33,12 +33,12 @@ deploy:
 	fi
 	@if [ "$(RPC_URL)" = "localhost" ]; then \
 		if [ "$(ETH_KEYSTORE_ACCOUNT)" = "scaffold-eth-default" ]; then \
-			forge script $(DEPLOY_SCRIPT):DeployScript --rpc-url localhost --password localhost --broadcast --legacy --ffi --gas-limit $(GAS_LIMIT); \
+			FOUNDRY_AUTO_CONFIRM=1 forge script $(DEPLOY_SCRIPT):DeployScript --rpc-url localhost --password localhost --broadcast --legacy --ffi --gas-limit $(GAS_LIMIT); \
 		else \
-			forge script $(DEPLOY_SCRIPT):DeployScript --rpc-url localhost --broadcast --legacy --ffi --gas-limit $(GAS_LIMIT); \
+			FOUNDRY_AUTO_CONFIRM=1 forge script $(DEPLOY_SCRIPT):DeployScript --rpc-url localhost --broadcast --legacy --ffi --gas-limit $(GAS_LIMIT); \
 		fi \
 	else \
-		forge script $(DEPLOY_SCRIPT):DeployScript --rpc-url $(RPC_URL) --broadcast --legacy --ffi --gas-limit $(GAS_LIMIT); \
+		FOUNDRY_AUTO_CONFIRM=1 forge script $(DEPLOY_SCRIPT):DeployScript --rpc-url $(RPC_URL) --broadcast --legacy --ffi --gas-limit $(GAS_LIMIT); \
 	fi
 
 # Deploy and generate ABIs

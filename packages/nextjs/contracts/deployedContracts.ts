@@ -342,11 +342,11 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1754520329.json",
+      deploymentFile: "run-1754761026.json",
       deploymentScript: "Deploy.s.sol",
     },
     DecentralizedMicrocredit: {
-      address: "0xa15bb66138824a1c7167f5e85b957d04dd34e468",
+      address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
       abi: [
         {
           type: "constructor",
@@ -529,6 +529,51 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "disburseLoanMeta",
+          inputs: [
+            {
+              name: "req",
+              type: "tuple",
+              internalType: "struct DecentralizedMicrocredit.DisburseRequest",
+              components: [
+                {
+                  name: "borrower",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "loanId",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "to",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "nonce",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "deadline",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+              ],
+            },
+            {
+              name: "sig",
+              type: "bytes",
+              internalType: "bytes",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "effrRate",
           inputs: [],
           outputs: [
@@ -536,6 +581,49 @@ const deployedContracts = {
               name: "",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "eip712Domain",
+          inputs: [],
+          outputs: [
+            {
+              name: "fields",
+              type: "bytes1",
+              internalType: "bytes1",
+            },
+            {
+              name: "name",
+              type: "string",
+              internalType: "string",
+            },
+            {
+              name: "version",
+              type: "string",
+              internalType: "string",
+            },
+            {
+              name: "chainId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "verifyingContract",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "salt",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "extensions",
+              type: "uint256[]",
+              internalType: "uint256[]",
             },
           ],
           stateMutability: "view",
@@ -941,6 +1029,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "nonces",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "oracle",
           inputs: [],
           outputs: [
@@ -1064,6 +1171,38 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "relayerWhitelist",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "relayerWhitelistEnabled",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "repayLoan",
           inputs: [
             {
@@ -1088,6 +1227,52 @@ const deployedContracts = {
               name: "amount",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "loanId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "requestLoanMeta",
+          inputs: [
+            {
+              name: "req",
+              type: "tuple",
+              internalType: "struct DecentralizedMicrocredit.LoanRequest",
+              components: [
+                {
+                  name: "borrower",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "amount",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "nonce",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "deadline",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+              ],
+            },
+            {
+              name: "sig",
+              type: "bytes",
+              internalType: "bytes",
             },
           ],
           outputs: [
@@ -1218,6 +1403,37 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "setRelayerWhitelistEnabled",
+          inputs: [
+            {
+              name: "enabled",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setRelayerWhitelisted",
+          inputs: [
+            {
+              name: "relayer",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "allowed",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "setRiskPremium",
           inputs: [
             {
@@ -1281,9 +1497,81 @@ const deployedContracts = {
           outputs: [],
           stateMutability: "nonpayable",
         },
+        {
+          type: "event",
+          name: "EIP712DomainChanged",
+          inputs: [],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "MetaLoanDisbursed",
+          inputs: [
+            {
+              name: "borrower",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "loanId",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "principal",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "MetaLoanRequested",
+          inputs: [
+            {
+              name: "borrower",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "loanId",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "error",
+          name: "InvalidShortString",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "StringTooLong",
+          inputs: [
+            {
+              name: "str",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+        },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1754520329.json",
+      deploymentFile: "run-1754761837.json",
       deploymentScript: "Deploy.s.sol",
     },
   },
