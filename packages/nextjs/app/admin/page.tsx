@@ -1277,11 +1277,10 @@ const AdminPage: NextPage = () => {
             <ul className="list-disc ml-5 space-y-2 text-blue-600">
               <li><Link href="/">Home</Link></li>
               <li><Link href="/lend">Lender Portal</Link></li>
-              <li><Link href="/borrow">Borrower Portal</Link></li>
+              <li><Link href="/borrower">Borrower Portal</Link></li>
               <li><Link href="/scores">Credit Scores</Link></li>
               <li><Link href="/admin">Admin Panel</Link></li>
               <li><Link href="/populate_test_data">Populate Test Data</Link></li>
-
               <li><Link href="/debug">Debug Contract</Link></li>
               <li><Link href="/oracle-setup">Oracle Setup</Link></li>
             </ul>

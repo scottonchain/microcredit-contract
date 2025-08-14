@@ -1,0 +1,15 @@
+"use client";
+
+import type { NextPage } from "next";
+import BorrowPage from "../borrow/page";
+
+const Borrower: NextPage = () => {
+  return (
+    <>
+      {/* Borrow wizard / new loan */}
+      <BorrowPage />
+    </>
+  );
+};
+
+export default Borrower; 

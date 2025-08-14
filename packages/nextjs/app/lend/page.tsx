@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { toast } from "react-hot-toast";
@@ -20,8 +21,10 @@ const LendPage: NextPage = () => {
   const [selectedLoanId, setSelectedLoanId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [attestBorrower, setAttestBorrower] = useState("");
-  const [attestWeight, setAttestWeight] = useState<number>(50);
+  const [attestWeight, setAttestWeight] = useState<number>(80);
   const [attestLoading, setAttestLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const [arrivedViaAttestLink, setArrivedViaAttestLink] = useState(false);
   // Track attestations made by the connected lender (session-level + localStorage cache)
   const [attestations, setAttestations] = useState<{ borrower: `0x${string}`; weight: number }[]>([]);
   const [filterText, setFilterText] = useState("");
@@ -158,6 +161,77 @@ const LendPage: NextPage = () => {
     if (usdcBalanceData) setUsdcBalance(usdcBalanceData);
     if (usdcAllowanceData) setUsdcAllowance(usdcAllowanceData);
   }, [usdcBalanceData, usdcAllowanceData]);
+
+  // ────── Prefill attestation from query params ──────
+  useEffect(() => {
+    if (!searchParams) return;
+    const borrowerParam = searchParams.get("borrower");
+    const weightParam = searchParams.get("weight");
+    if (borrowerParam) {
+      setAttestBorrower(borrowerParam);
+      setArrivedViaAttestLink(true);
+      setShowForm(true);
+    }
+    if (weightParam) {
+      const w = Number(weightParam);
+      if (!Number.isNaN(w) && w >= 1 && w <= 100) setAttestWeight(w);
+    }
+  }, [searchParams]);
+
+  // ────── Persist attestation prefill across interactions/reloads ──────
+  useEffect(() => {
+    try {
+      // If no query borrower but we have a stored prefill, restore it
+      const hasQueryBorrower = !!searchParams?.get("borrower");
+      if (!hasQueryBorrower) {
+        const storedBorrower = window.sessionStorage.getItem("attest_prefill_borrower");
+        const storedWeight = window.sessionStorage.getItem("attest_prefill_weight");
+        if (storedBorrower && !attestBorrower) {
+          setAttestBorrower(storedBorrower);
+          setShowForm(true);
+        }
+        if (storedWeight) {
+          const w = Number(storedWeight);
+          if (!Number.isNaN(w) && w >= 1 && w <= 100) setAttestWeight(w);
+        }
+      }
+    } catch {}
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (attestBorrower) {
+        window.sessionStorage.setItem("attest_prefill_borrower", attestBorrower);
+      }
+    } catch {}
+  }, [attestBorrower]);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem("attest_prefill_weight", String(attestWeight));
+    } catch {}
+  }, [attestWeight]);
+
+  // ────── Attestation handlers ──────
+  const handleRecordAttestation = async () => {
+    if (!connectedAddress || !attestBorrower) return;
+    setAttestLoading(true);
+    try {
+      const weightBp = BigInt(Math.floor(attestWeight * 10000));
+      await writeContractAsync({
+        functionName: "recordAttestation",
+        args: [attestBorrower as `0x${string}`, weightBp],
+      });
+      toast.success("Attestation recorded", { position: "top-center" });
+    } catch (err: any) {
+      console.error("Attestation failed:", err);
+      toast.error(`Failed to attest: ${err?.message || "Unknown error"}`);
+    } finally {
+      setAttestLoading(false);
+    }
+  };
 
   const handleDeposit = async () => {
     if (!depositAmount || !connectedAddress || !usdcAddress) return;
@@ -465,7 +539,7 @@ const LendPage: NextPage = () => {
         return [...prev, { borrower: attestBorrower as `0x${string}`, weight: weightNum }];
       });
       setAttestBorrower("");
-      setAttestWeight(50);
+      setAttestWeight(80);
       setShowForm(false);
     } catch (err) {
       console.error("Attestation error", err);
@@ -485,6 +559,41 @@ const LendPage: NextPage = () => {
             <BanknotesIcon className="h-8 w-8 mr-3" />
             <h1 className="text-3xl font-bold">Lend Funds</h1>
           </div>
+
+          {/* Attestation Link Context */}
+          {arrivedViaAttestLink && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6">
+              {connectedAddress ? (
+                attestBorrower && connectedAddress.toLowerCase() === attestBorrower.toLowerCase() ? (
+                  <div className="text-blue-800">
+                    <h3 className="text-lg font-semibold mb-1">This is your attestation link</h3>
+                    <p>
+                      Share this page URL with friends or community members so they can attest to your
+                      creditworthiness. The attestation form below is pre-filled with your address.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-blue-800">
+                    <h3 className="text-lg font-semibold mb-1">You were invited to make an attestation</h3>
+                    <p>
+                      The form below is pre-filled to attest for
+                      {" "}
+                      <span className="font-mono break-all">{attestBorrower}</span>.
+                      Your attestation helps improve their on-chain credit score.
+                    </p>
+                  </div>
+                )
+              ) : (
+                <div className="text-blue-800">
+                  <h3 className="text-lg font-semibold mb-1">Attestation link detected</h3>
+                  <p>
+                    Connect your wallet to continue. The attestation form will be pre-filled so you can
+                    vouch for the borrower.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Welcome Section for Lenders */}
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 mb-8">
