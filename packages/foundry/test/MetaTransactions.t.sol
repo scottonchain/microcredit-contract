@@ -45,6 +45,15 @@ contract MetaTransactionsTest is Test {
         "DisburseRequest(address borrower,uint256 loanId,address to,uint256 nonce,uint256 deadline)"
     );
 
+    bytes32 private constant REPAY_REQUEST_TYPEHASH = keccak256(
+        "RepayRequest(address borrower,uint256 loanId,uint256 amount,uint256 nonce,uint256 deadline)"
+    );
+
+    // EIP-2612 permit typehash
+    bytes32 private constant PERMIT_TYPEHASH = keccak256(
+        "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+    );
+
     function setUp() public {
         // Setup test accounts with known private keys
         borrowerPrivateKey = 0xA11CE;
@@ -98,6 +107,68 @@ contract MetaTransactionsTest is Test {
     }
 
     /**
+     * @dev End-to-end test: borrower with 0 ETH repays via meta-tx using ERC20Permit
+     */
+    function testGaslessRepaymentWithPermit() public {
+        // Ensure borrower has USDC and no ETH
+        vm.deal(borrower, 0);
+        assertEq(borrower.balance, 0, "Borrower should have 0 ETH");
+
+        // Fund borrower with USDC for repayment
+        usdc.mint(borrower, LOAN_AMOUNT);
+
+        // Create a loan via meta path so there's something to repay
+        uint256 nonce1 = microcredit.nonces(borrower);
+        uint256 deadline1 = block.timestamp + DEADLINE_OFFSET;
+        bytes memory sig1 = signLoanRequest(borrowerPrivateKey, borrower, LOAN_AMOUNT, nonce1, deadline1);
+        vm.startPrank(relayer);
+        uint256 loanId = microcredit.requestLoanMeta(
+            DecentralizedMicrocredit.LoanRequest({ borrower: borrower, amount: LOAN_AMOUNT, nonce: nonce1, deadline: deadline1 }),
+            sig1
+        );
+        // Disburse to borrower
+        uint256 nonce2 = microcredit.nonces(borrower);
+        uint256 deadline2 = block.timestamp + DEADLINE_OFFSET;
+        bytes memory sig2 = signDisburseRequest(borrowerPrivateKey, borrower, loanId, borrower, nonce2, deadline2);
+        microcredit.disburseLoanMeta(
+            DecentralizedMicrocredit.DisburseRequest({ borrower: borrower, loanId: loanId, to: borrower, nonce: nonce2, deadline: deadline2 }),
+            sig2
+        );
+        vm.stopPrank();
+
+        // Prepare repay request (full amount)
+        uint256 repayAmount = LOAN_AMOUNT;
+        uint256 nonce3 = microcredit.nonces(borrower);
+        uint256 deadline3 = block.timestamp + DEADLINE_OFFSET;
+        bytes memory repaySig = signRepayRequest(borrowerPrivateKey, borrower, loanId, repayAmount, nonce3, deadline3);
+
+        // Prepare ERC20Permit for the contract to pull tokens
+        uint256 usdcNonce = usdc.nonces(borrower);
+        (uint8 v, bytes32 r, bytes32 s) = signPermit(
+            borrowerPrivateKey,
+            borrower,
+            address(microcredit),
+            repayAmount,
+            usdcNonce,
+            deadline3
+        );
+
+        // Execute meta-repay as relayer
+        vm.startPrank(relayer);
+        microcredit.repayLoanMeta(
+            DecentralizedMicrocredit.RepayRequest({ borrower: borrower, loanId: loanId, amount: repayAmount, nonce: nonce3, deadline: deadline3 }),
+            repaySig,
+            DecentralizedMicrocredit.PermitData({ value: repayAmount, deadline: deadline3, v: v, r: r, s: s })
+        );
+        vm.stopPrank();
+
+        // Verify loan closed and borrower USDC decreased accordingly
+        (, uint256 outstanding, , , bool isActive) = microcredit.getLoan(loanId);
+        assertEq(isActive, false, "Loan should be closed");
+        assertEq(outstanding, 0, "Outstanding should be zero");
+    }
+
+    /**
      * @dev Helper function to sign EIP-712 loan requests
      */
     function signLoanRequest(
@@ -133,6 +204,63 @@ contract MetaTransactionsTest is Test {
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
         return abi.encodePacked(r, s, v);
+    }
+
+    function signRepayRequest(
+        uint256 signerPrivateKey,
+        address borrowerAddress,
+        uint256 loanId,
+        uint256 amount,
+        uint256 nonce,
+        uint256 deadline
+    ) internal view returns (bytes memory) {
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                EIP712_DOMAIN_TYPEHASH,
+                keccak256("DecentralizedMicrocredit"),
+                keccak256("1"),
+                block.chainid,
+                address(microcredit)
+            )
+        );
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                REPAY_REQUEST_TYPEHASH,
+                borrowerAddress,
+                loanId,
+                amount,
+                nonce,
+                deadline
+            )
+        );
+
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
+        return abi.encodePacked(r, s, v);
+    }
+
+    function signPermit(
+        uint256 ownerPk,
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 nonce,
+        uint256 deadline
+    ) internal view returns (uint8 v, bytes32 r, bytes32 s) {
+        // Domain per ERC20Permit("USD Coin")
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                EIP712_DOMAIN_TYPEHASH,
+                keccak256("USD Coin"),
+                keccak256("1"),
+                block.chainid,
+                address(usdc)
+            )
+        );
+        bytes32 structHash = keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, nonce, deadline));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        (v, r, s) = vm.sign(ownerPk, digest);
     }
 
     /**

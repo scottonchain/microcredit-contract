@@ -269,7 +269,7 @@ const Home: NextPage = () => {
                                 {totalRatePct && `Loan rate: ${totalRatePct}% APR`}
                               </div>
                             </div>
-                            <Link href="/borrow" className="block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-sm transition-colors">
+                            <Link href="/borrower" className="block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-sm transition-colors">
                               Request a Loan
                             </Link>
                           </div>

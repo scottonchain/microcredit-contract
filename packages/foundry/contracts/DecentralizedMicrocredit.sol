@@ -2,6 +2,7 @@
 pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "forge-std/console.sol";
@@ -84,6 +85,65 @@ contract DecentralizedMicrocredit is EIP712 {
         bool isActive;
         uint256 createdAt; // Timestamp when loan was created
     }
+
+    /**
+     * @notice Meta-transaction entry point for repaying a loan (relayer pays gas). Optionally executes ERC20Permit.
+     * @param req RepayRequest signed by borrower via EIP-712
+     * @param sig Borrower signature over RepayRequest
+     * @param permit Optional ERC20Permit authorization; pass zeroed struct to skip
+     */
+    function repayLoanMeta(RepayRequest calldata req, bytes calldata sig, PermitData calldata permit) external {
+        // Check relayer whitelist if enabled
+        if (relayerWhitelistEnabled) {
+            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
+        }
+
+        require(block.timestamp <= req.deadline, "Expired");
+        require(req.nonce == nonces[req.borrower]++, "Bad nonce");
+
+        bytes32 structHash = keccak256(abi.encode(
+            REPAY_REQUEST_TYPEHASH,
+            req.borrower,
+            req.loanId,
+            req.amount,
+            req.nonce,
+            req.deadline
+        ));
+        bytes32 digest = _hashTypedDataV4(structHash);
+        require(SignatureChecker.isValidSignatureNow(req.borrower, digest, sig), "Bad signature");
+
+        Loan storage loan = loans[req.loanId];
+        require(loan.isActive, "Loan inactive");
+        require(loan.borrower == req.borrower, "Wrong borrower");
+        require(req.amount > 0, "Amount > 0");
+
+        // Execute permit if provided (deadline != 0 as sentinel)
+        if (permit.deadline != 0) {
+            IERC20Permit(address(usdc)).permit(
+                req.borrower,
+                address(this),
+                permit.value,
+                permit.deadline,
+                permit.v,
+                permit.r,
+                permit.s
+            );
+            require(permit.value >= req.amount, "Permit value too low");
+        }
+
+        uint256 currentOutstanding = getCurrentOutstandingAmount(req.loanId);
+        require(usdc.transferFrom(req.borrower, address(this), req.amount), "Transfer failed");
+
+        if (req.amount >= currentOutstanding) {
+            totalLentOut -= loan.principal;
+            loan.outstanding = 0;
+            loan.isActive = false;
+        } else {
+            loan.outstanding = currentOutstanding - req.amount;
+        }
+
+        emit MetaLoanRepaid(req.borrower, req.loanId, req.amount);
+    }
     struct Attestation {
         address attester;
         uint256 weight;
@@ -139,6 +199,10 @@ contract DecentralizedMicrocredit is EIP712 {
         "DisburseRequest(address borrower,uint256 loanId,address to,uint256 nonce,uint256 deadline)"
     );
 
+    bytes32 private constant REPAY_REQUEST_TYPEHASH = keccak256(
+        "RepayRequest(address borrower,uint256 loanId,uint256 amount,uint256 nonce,uint256 deadline)"
+    );
+
     // EIP-712 request structs
     struct LoanRequest {
         address borrower;
@@ -155,9 +219,26 @@ contract DecentralizedMicrocredit is EIP712 {
         uint256 deadline;
     }
 
+    struct RepayRequest {
+        address borrower;
+        uint256 loanId;
+        uint256 amount;
+        uint256 nonce;
+        uint256 deadline;
+    }
+
+    struct PermitData {
+        uint256 value;
+        uint256 deadline;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+
     // Meta-transaction events
     event MetaLoanRequested(address indexed borrower, uint256 amount, uint256 loanId);
     event MetaLoanDisbursed(address indexed borrower, uint256 loanId, uint256 principal);
+    event MetaLoanRepaid(address indexed borrower, uint256 indexed loanId, uint256 amount);
     
     // PageRank storage
     address[] private pagerankNodes;
