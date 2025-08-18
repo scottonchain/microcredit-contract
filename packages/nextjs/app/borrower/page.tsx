@@ -548,637 +548,458 @@ const BorrowPage: NextPage = () => {
   const attestationUrl = connectedAddress ? `${window.location.origin}/attest?borrower=${connectedAddress}` : "";
 
   return (
-      <div className="flex items-center flex-col grow pt-10">
-        <div className="px-5 w-full max-w-4xl">
-          <div className="flex items-center justify-center mb-8">
-            <CreditCardIcon className="h-8 w-8 mr-3" />
-            <h1 className="text-3xl font-bold">Request Loan</h1>
+  <div className="flex items-center flex-col grow pt-10">
+    <div className="px-5 w-full max-w-4xl">
+      <div className="flex items-center justify-center mb-8">
+        <CreditCardIcon className="h-8 w-8 mr-3" />
+        <h1 className="text-3xl font-bold">Request Loan</h1>
+      </div>
+
+      {/* Attestation Call-to-Action */}
+      {!loanIsActive && !hasCredit && (
+        <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+          <div className="flex items-center justify-center mb-4 gap-2">
+            <h2 className="text-lg font-semibold text-center">Attestation Link</h2>
+            <button
+              onClick={() => setShowInfo(true)}
+              className="text-info hover:text-info/80"
+              aria-label="What does this mean?"
+            >
+              <InformationCircleIcon className="h-5 w-5" />
+            </button>
           </div>
-
-          {/* Attestation Call-to-Action */}
-          {!hasCredit && (
-            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-              <div className="flex items-center justify-center mb-4 gap-2">
-                <h2 className="text-lg font-semibold text-center">Attestation Link</h2>
-                <button
-                  onClick={() => setShowInfo(true)}
-                  className="text-info hover:text-info/80"
-                  aria-label="What does this mean?"
-                >
-                  <InformationCircleIcon className="h-5 w-5" />
-                </button>
-              </div>
-              
-              <div className="flex items-start gap-6">
-                {/* QR Code on the left */}
-                <div className="flex-shrink-0">
-                  <div
-                    onClick={() => {
-                      navigator.clipboard.writeText(attestationUrl);
-                      alert("Attestation link copied! Share it with your community.");
-                    }}
-                    className="cursor-pointer flex flex-col items-center"
-                  >
-                    <QRCodeDisplay value={attestationUrl} size={80} />
-                    <span className="text-xs text-gray-500 mt-2">Click to copy</span>
-                  </div>
-                </div>
-                
-                {/* Instructions and link on the right */}
-                <div className="flex-1">
-                  <div className="mb-3">
-                    <p className="text-gray-700 mb-2">
-                      <strong>Share this link with people who know you well</strong>
-                    </p>
-                    <p className="text-sm text-gray-600 mb-2">
-                      You need at least one attestation to request a loan. Share your attestation link with trusted peers and build your credit score.
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Ask friends, family, or community members to vouch for your trustworthiness. 
-                      Each person who attests to you helps build your credit score.
-                    </p>
-                  </div>
-                  
-                  <div className="text-xs flex items-center gap-1 text-blue-600">
-                    <span
-                      className="underline truncate max-w-[300px] cursor-pointer"
-                      title={attestationUrl}
-                      onClick={() => { navigator.clipboard.writeText(attestationUrl); alert("Attestation link copied! Share it with your community."); }}
-                    >
-                      {attestationUrl}
-                    </span>
-                    <DocumentDuplicateIcon
-                      className="h-4 w-4 cursor-pointer flex-shrink-0"
-                      onClick={() => { navigator.clipboard.writeText(attestationUrl); alert("Attestation link copied! Share it with your community."); }}
-                    />
-                  </div>
-                </div>
+          <div className="flex items-start gap-6">
+            {/* QR Code on the left */}
+            <div className="flex-shrink-0">
+              <div
+                onClick={() => {
+                  navigator.clipboard.writeText(attestationUrl);
+                  alert("Attestation link copied! Share it with your community.");
+                }}
+                className="cursor-pointer flex flex-col items-center"
+              >
+                <QRCodeDisplay value={attestationUrl} size={80} />
+                <span className="text-xs text-gray-500 mt-2">Click to copy</span>
               </div>
             </div>
-          )}
-
-          {/* Welcome Section for Borrowers */}
-          <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-6 mb-8">
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-green-800 mb-3">Welcome to Social Borrowing</h2>
-              <p className="text-green-700 max-w-3xl mx-auto">
-                Access fair microloans based on your community&apos;s trust, not traditional credit scores. 
-                Your friends, family, and community members vouch for your reliability, creating a credit score that reflects your real-world reputation.
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-              <div className="bg-white rounded-lg p-4">
-                <div className="text-2xl font-bold text-green-600 mb-2">No Bank Required</div>
-                <div className="text-sm text-gray-600">No traditional credit history or bank account needed</div>
-              </div>
-              <div className="bg-white rounded-lg p-4">
-                <div className="text-2xl font-bold text-green-600 mb-2">Community Trust</div>
-                <div className="text-sm text-gray-600">Your credit score is built through social attestations</div>
-              </div>
-              <div className="bg-white rounded-lg p-4">
-                <div className="text-2xl font-bold text-green-600 mb-2">Fair Terms</div>
-                <div className="text-sm text-gray-600">Transparent loan terms based on your social reputation</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Your Account Profile - Full Width */}
-          {connectedAddress && hasCredit && (
-            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-              <h2 className="text-xl font-semibold mb-4">Your Account Profile{displayName && ` – ${displayName}`}</h2>
-
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                {/* Credit Score */}
-                <div className="flex items-center gap-3">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-green-500">
-                      {(Number(creditScore) / 10000).toFixed(2)}%
-                    </div>
-                    <div className="text-sm text-gray-600">Credit Score</div>
-                  </div>
-                </div>
-
-                {/* Eligible Amount */}
-                <div className="flex items-center gap-3">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-500">
-                      {maxEligibleAmount > 0n ? formatUSDC(maxEligibleAmount) : "-"}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {(() => {
-                        const weeks = Math.ceil(repaymentPeriod / 7);
-                        if (weeks <= 1) return "Eligible to Borrow";
-                        const reduction = ((1 - Math.pow(0.99, weeks - 1)) * 100).toFixed(1);
-                        return `Eligible (${reduction}% reduced)`;
-                      })()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Loan Principal */}
-                <div className="flex items-center gap-3">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-500">
-                      {activePrincipal !== undefined ? formatUSDC(activePrincipal) : "-"}
-                    </div>
-                    <div className="text-sm text-gray-600">Loan Principal</div>
-                  </div>
-                </div>
-
-                {/* Outstanding / Payoff */}
-                <div className="flex items-center gap-3">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-500">
-                      {displayOutstanding !== undefined ? formatUSDC(displayOutstanding) : "-"}
-                    </div>
-                    <div className="text-sm text-gray-600">Payoff Amount</div>
-                    <div className="text-xs text-gray-500 mt-1">Interest starts 24 hours after disbursement. You can repay immediately.</div>
-                  </div>
-                </div>
-
-                {/* Borrower APR */}
-                <div className="flex items-center gap-3">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-500">
-                      {borrowerAprPercent !== undefined ? `${borrowerAprPercent}%` : "-"}
-                    </div>
-                    <div className="text-sm text-gray-600">Borrower APR</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {showInfo && (
-            <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-              <div className="bg-base-100 rounded-lg p-6 max-w-md w-11/12 shadow-lg">
-                <h3 className="text-lg font-semibold mb-3">How LoanLink attestations work</h3>
+            {/* Instructions and link on the right */}
+            <div className="flex-1">
+              <div className="mb-3">
+                <p className="text-gray-700 mb-2">
+                  <strong>Share this link with people who know you well</strong>
+                </p>
                 <p className="text-sm mb-3">
                   LoanLink builds your credit score from trust attestations your friends and community members give you. Share the link or QR code on this page with people who know you. Each attestation lifts your score.
                 </p>
-                <p className="text-sm mb-3">
-                  Once your score is above zero, the loan request form unlocks and you can apply for your first loan.
-                </p>
-                <p className="text-sm mb-5">
-                  Need a deeper dive?&nbsp;
-                  <Link href="/help/borrow" className="link">Read the Borrower guide</Link>.
-                </p>
-                <button onClick={() => setShowInfo(false)} className="btn btn-primary w-full">Got it</button>
+              </div>
+              <div className="text-xs flex items-center gap-1 text-blue-600">
+                <span
+                  className="underline truncate max-w-[300px] cursor-pointer"
+                  title={attestationUrl}
+                  onClick={() => { navigator.clipboard.writeText(attestationUrl); alert("Attestation link copied! Share it with your community."); }}
+                >
+                  {attestationUrl}
+                </span>
               </div>
             </div>
-          )}
+          </div>
+        </div>
+      )}
 
-          {/* Loan Request Section */}
-          {hasCredit && (
-          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">Request New Loan</h2>
-            <div className="space-y-6">
-              {/* Loan Amount */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Loan Amount (USDC)</label>
-                <input
-                  type="number"
-                  value={loanAmount}
-                  onChange={(e) => setLoanAmount(e.target.value)}
-                  placeholder="Enter amount in USDC"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  min="1"
-                  max="1000000"
-                />
-              </div>
+      {/* Loan Request Form (shown after attestation when credit exists, and no active loan) */}
+      {!loanIsActive && hasCredit && (
+        <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            <CalculatorIcon className="h-5 w-5 mr-2" />
+            Loan Request
+          </h2>
 
-              {/* Repayment Period */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Repayment Period (Weekly Increments)</label>
-                <select
-                  value={repaymentPeriod}
-                  onChange={(e) => setRepaymentPeriod(Number(e.target.value))}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value={7}>1 Week</option>
-                  <option value={14}>2 Weeks</option>
-                  <option value={28}>4 Weeks</option>
-                  <option value={56}>8 Weeks</option>
-                  <option value={84}>12 Weeks</option>
-                  <option value={182}>26 Weeks</option>
-                  <option value={364}>52 Weeks</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Note: Borrowable amount decreases by 1% for each additional week beyond 1 week
-                </p>
-              </div>
-
-              {/* Request Button */}
-              <button
-                onClick={handleOneClickBorrow}
-                disabled={!loanAmount || !connectedAddress || isLoading || !hasCredit || isAmountTooHigh()}
-                className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-colors mb-4"
-              >
-                {isLoading ? "Processing..." : "One-Click Borrow — Sign Once, Get Funds"}
-              </button>
-              <p className="text-xs text-gray-600 -mt-2 mb-2 text-center">No gas fees — you’ll just sign messages; LoanLink pays gas.</p>
-
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Amount */}
+            <div className="bg-base-200 rounded-lg p-4">
+              <label className="block text-sm font-medium mb-2">Amount (USDC)</label>
+              <input
+                type="number"
+                value={loanAmount}
+                onChange={e => setLoanAmount(e.target.value)}
+                placeholder="0.00"
+                step="0.01"
+                min="0.01"
+                className="input input-bordered w-full"
+              />
               {isAmountTooHigh() && (
-                <p className="text-red-600 text-sm">Amount exceeds your maximum eligible loan. Lower the amount.</p>
+                <div className="text-xs text-error mt-2">
+                  Amount exceeds your current eligibility ({formatUSDC(maxEligibleAmount)} max)
+                </div>
               )}
+            </div>
 
-              {/* Loan Terms Preview & Repayment Schedule */}
-              {loanAmount && previewTermsData && (
-                <div className="bg-base-200 rounded-lg p-4">
-                  <h3 className="font-medium mb-3 flex items-center">
-                    <CalculatorIcon className="h-5 w-5 mr-2" />
-                    Loan Terms Preview
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <span className="text-sm text-gray-600">Interest Rate:</span>
-                      <div className="text-lg font-bold text-blue-500">
-                        {(Number(previewTermsData[0]) / 10000).toFixed(2)}% APR
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-sm text-gray-600">Weekly Payment:</span>
-                      <div className="text-lg font-bold text-green-500">
-                        ${(Number(previewTermsData[1]) / 1e6).toFixed(2)} USDC
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-sm text-gray-600">Total Interest:</span>
-                      <div className="text-lg font-bold text-orange-500">
-                        {(() => {
-                          const interest = Number(loanAmount) * Number(previewTermsData[0]) / 10000;
-                          return interest.toFixed(2);
-                        })()} USDC
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-sm text-gray-600">Total Repayment:</span>
-                      <div className="text-lg font-bold text-purple-500">
-                        {(() => {
-                          const total = Number(loanAmount) * (1 + Number(previewTermsData[0]) / 10000);
-                          return total.toFixed(2);
-                        })()} USDC
-                      </div>
-                    </div>
-                  </div>
+            {/* Repayment Period */}
+            <div className="bg-base-200 rounded-lg p-4">
+              <label className="block text-sm font-medium mb-2">Repayment Period</label>
+              <select
+                className="select select-bordered w-full"
+                value={repaymentPeriod}
+                onChange={e => setRepaymentPeriod(parseInt(e.target.value))}
+              >
+                {[7, 14, 28, 56, 84, 182, 364].map(days => (
+                  <option key={days} value={days}>{getPeriodLabel(days)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-                  {/* Repayment Schedule */}
-                  {repaymentPeriod && (
-                    <div className="mt-6 overflow-x-auto text-xs">
-                      <h4 className="font-medium mb-2">Weekly Repayment Schedule</h4>
-                      <table className="table w-full">
-                        <thead>
-                          <tr>
-                            <th>Week #</th>
-                            <th>Due Date</th>
-                            <th>Weekly Payment (USDC)</th>
-                            <th>Remaining Balance (USDC)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Array.from({ length: Math.ceil(repaymentPeriod / 7) }).map((_, idx) => {
-                            const weekNumber = idx + 1;
-                            const weeklyPayment = Number(previewTermsData[1]) / 1e6;
-                            const totalWeeks = Math.ceil(repaymentPeriod / 7);
-                            const totalAmount = Number(loanAmount) * (1 + Number(previewTermsData[0]) / 10000);
-                            const remainingBalance = totalAmount - (weeklyPayment * weekNumber);
-                            
-                            // For the final payment, ensure we pay exactly the remaining balance
-                            const isFinalPayment = weekNumber === totalWeeks;
-                            const paymentAmount = isFinalPayment ? Math.max(0, remainingBalance + weeklyPayment) : weeklyPayment;
-                            const finalRemainingBalance = isFinalPayment ? 0 : Math.max(0, remainingBalance);
-                            
-                            return (
-                              <tr key={idx}>
-                                <td>{weekNumber}</td>
-                                <td>Week {weekNumber}</td>
-                                <td>{paymentAmount.toFixed(2)}</td>
-                                <td>{finalRemainingBalance.toFixed(2)}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+          {/* Preview & Eligibility */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="bg-base-200 rounded-lg p-4">
+              <div className="text-xs text-gray-600">Eligible up to</div>
+              <div className="text-lg font-semibold">{formatUSDC(maxEligibleAmount)}</div>
+            </div>
+            <div className="bg-base-200 rounded-lg p-4">
+              <div className="text-xs text-gray-600">APR</div>
+              <div className="text-lg font-semibold">{borrowerAprPercent ? `${borrowerAprPercent}%` : '-'}</div>
+            </div>
+            <div className="bg-base-200 rounded-lg p-4">
+              <div className="text-xs text-gray-600">Est. Weekly Payment</div>
+              <div className="text-lg font-semibold">
+                {previewTermsData && loanAmount ? `${(Number(previewTermsData[1]) / 1e6).toFixed(2)} USDC` : '-'}
+              </div>
+            </div>
+          </div>
+
+          {/* Borrow CTA */}
+          <div className="mt-6">
+            <button
+              className="btn btn-primary w-full md:w-auto"
+              disabled={
+                isLoading ||
+                signingRef.current ||
+                !loanAmount ||
+                parseLoanAmount(loanAmount) === null ||
+                isAmountTooHigh()
+              }
+              onClick={handleOneClickBorrow}
+            >
+              {isLoading ? 'Processing…' : 'One-Click Borrow — Sign Once, Get Funds'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Active Loan & Repayment Section */}
+      {loanIsActive && (
+        <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            <CurrencyDollarIcon className="h-5 w-5 mr-2" />
+            Active Loan & Repayment
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Loan Summary */}
+            <div className="bg-base-200 rounded-lg p-4">
+              <h3 className="font-medium mb-3">Loan Summary</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Principal:</span>
+                  <span className="font-medium">{loanRes.isLoading ? <span className="skeleton h-4 w-24 inline-block" /> : (activePrincipal !== undefined ? formatUSDC(activePrincipal) : "-")}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Outstanding:</span>
+                  <span className="font-medium">{outRoundedRes.isLoading ? <span className="skeleton h-4 w-24 inline-block" /> : (displayOutstanding !== undefined ? formatUSDC(displayOutstanding) : "-")}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Status:</span>
+                  <span className="font-medium">{loanIsActive ? "Current" : "Closed"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Next Payment Due */}
+            <div className="bg-base-200 rounded-lg p-4">
+              <h3 className="font-medium mb-3">Next Payment Due</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Weekly Payment:</span>
+                  <span className="font-medium text-green-500">
+                    {previewTermsData && loanAmount ? `${(Number(previewTermsData[1]) / 1e6).toFixed(2)} USDC` : "-"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Due Date:</span>
+                  <span className="font-medium">Next Week</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Status:</span>
+                  <span className="font-medium text-green-500">Current</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Repayment Actions */}
+          <div className="mt-6 pt-4 border-t border-gray-300">
+            <h3 className="font-medium mb-3">Make a Payment</h3>
+            <p className="text-xs text-gray-600 mb-3">One approval, no gas. You’ll sign a permit; our relayer submits the repayment.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Full Repayment */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-medium text-green-800 mb-2">Full Repayment</h4>
+                <p className="text-sm text-green-600 mb-3">Pay off your entire outstanding balance</p>
+                <button
+                  disabled={
+                    isLoading ||
+                    signingRef.current ||
+                    activeLoanId === undefined ||
+                    !loanIsActive ||
+                    displayOutstanding === undefined
+                  }
+                  onClick={async () => {
+                    if (signingRef.current) return;
+                    if (!activeLoanId || !connectedAddress) return;
+                    signingRef.current = true;
+                    setIsLoading(true);
+                    try {
+                      setPermitError(null);
+                      console.log("Starting full repayment process (gasless meta)...");
+                      if (!CONTRACT_ADDRESS || !CONTRACT_ABI) throw new Error("Missing contracts");
+                      // Read canonical outstanding rounded to cent (contract view)
+                      const out = (await publicClient.readContract({
+                        address: CONTRACT_ADDRESS,
+                        abi: CONTRACT_ABI,
+                        functionName: "getOutstandingRoundedToCent",
+                        args: [activeLoanId as bigint],
+                      })) as bigint;
+                      const amountToRepay = out;
+
+                      // Check USDC balance first
+                      await checkUSDCBalance(amountToRepay);
+
+                      if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !USDC_ADDRESS || !USDC_ABI) throw new Error("Missing contracts");
+
+                      // 1) Build EIP-2612 permit for USDC (spender = micro contract). Permit is REQUIRED.
+                      let permitPayload: { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` };
+                      try {
+                        const usdcNonce = (await publicClient.readContract({
+                          address: USDC_ADDRESS,
+                          abi: USDC_ABI,
+                          functionName: "nonces",
+                          args: [connectedAddress],
+                        })) as bigint;
+                        const permitDeadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+                        const permitMsg = {
+                          owner: connectedAddress,
+                          spender: CONTRACT_ADDRESS,
+                          value: amountToRepay,
+                          nonce: usdcNonce,
+                          deadline: permitDeadline,
+                        } as const;
+                        console.count("permit:sign");
+                        signingRef.current = true;
+                        const permitSig = await signTypedDataAsync({
+                          domain: usdcPermitDomain as any,
+                          types: permitTypes as any,
+                          primaryType: "Permit",
+                          message: permitMsg as any,
+                        });
+                        const { v, r, s } = splitSignature(permitSig);
+                        permitPayload = {
+                          value: permitMsg.value.toString(),
+                          deadline: permitMsg.deadline.toString(),
+                          v,
+                          r,
+                          s,
+                        };
+                      } catch (e: any) {
+                        console.error("Permit signing failed:", e);
+                        setPermitError(e?.message?.includes("expired") || e?.message?.includes("nonce") ? "Permit expired or already used. Please try again." : "Permit required. This token must support ERC-2612.");
+                        return;
+                      }
+
+                      // 2) Call relayer API — single approval (permit only). amount: "0" => repay-all up to permit value
+                      const resp = await fetch("/api/meta/repay-one", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          chainId: CHAIN_ID,
+                          contractAddress: CONTRACT_ADDRESS,
+                          borrower: connectedAddress,
+                          loanId: (activeLoanId as bigint).toString(),
+                          amount: "0",
+                          permit: permitPayload,
+                        }),
+                      });
+                      if (!resp.ok) throw new Error(await resp.text());
+                      const result = await resp.json();
+                      console.log("Repayment submitted (gasless, single approval)", { txHash: result.txHash, amountUsed: result.amountUsed });
+
+                      // Transaction is mined. Refetch state in parallel.
+                      await refreshAfterMutation();
+                    } catch (error) {
+                      const errorType = handleTransferError(error);
+                      switch (errorType) {
+                        case "TRANSFER_FAILED":
+                          console.error("USDC transfer failed. Please check your USDC balance and try again.");
+                          break;
+                        case "ERC20_APPROVAL_NEEDED":
+                          console.error("ERC20 Allowance Error (should be handled via permit). Try again.");
+                          break;
+                        case "INSUFFICIENT_FUNDS":
+                          console.error("Insufficient funds for USDC balance.");
+                          break;
+                        case "USER_REJECTED":
+                          console.error("Signature was rejected by user.");
+                          break;
+                        default:
+                          console.error("Unknown error occurred:", error);
+                      }
+                    } finally {
+                      signingRef.current = false;
+                      setIsLoading(false);
+                    }
+                  }}
+                  className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                >
+                  {isLoading ? "Processing..." : loanIsActive && displayOutstanding !== undefined ? `Pay ${formatUSDC(displayOutstanding)}` : "Pay"}
+                </button>
+              </div>
+
+              {/* Partial Repayment */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-800 mb-2">Partial Repayment</h4>
+                <p className="text-sm text-blue-600 mb-3">Make a partial payment to reduce your balance</p>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={repayAmount}
+                    onChange={(e) => setRepayAmount(e.target.value)}
+                    placeholder="Enter amount in USDC"
+                    className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    min="0.01"
+                    step="0.01"
+                  />
+                  <button
+                    disabled={
+                      isLoading ||
+                      signingRef.current ||
+                      activeLoanId === undefined ||
+                      !loanIsActive ||
+                      !repayAmount ||
+                      !parseLoanAmount(repayAmount)
+                    }
+                    onClick={async () => {
+                      if (signingRef.current) return;
+                      if (!activeLoanId || !repayAmount || !connectedAddress) return;
+                      signingRef.current = true;
+                      const repayAmountBigInt = parseLoanAmount(repayAmount);
+                      if (!repayAmountBigInt) return;
+                      setIsLoading(true);
+                      try {
+                        console.log("Starting partial repayment process (gasless meta)...");
+
+                        // Check USDC balance first
+                        await checkUSDCBalance(repayAmountBigInt);
+
+                        if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !USDC_ADDRESS || !USDC_ABI) throw new Error("Missing contracts");
+
+                        // 1) Build USDC EIP-2612 permit (REQUIRED)
+                        let permitPayload: { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` };
+                        try {
+                          const usdcNonce = (await publicClient.readContract({
+                            address: USDC_ADDRESS,
+                            abi: USDC_ABI,
+                            functionName: "nonces",
+                            args: [connectedAddress],
+                          })) as bigint;
+                          const permitDeadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+                          const permitMsg = {
+                            owner: connectedAddress,
+                            spender: CONTRACT_ADDRESS,
+                            value: repayAmountBigInt,
+                            nonce: usdcNonce,
+                            deadline: permitDeadline,
+                          } as const;
+                          console.count("permit:sign");
+                          signingRef.current = true;
+                          const permitSig = await signTypedDataAsync({
+                            domain: usdcPermitDomain as any,
+                            types: permitTypes as any,
+                            primaryType: "Permit",
+                            message: permitMsg as any,
+                          });
+                          const { v, r, s } = splitSignature(permitSig);
+                          permitPayload = {
+                            value: permitMsg.value.toString(),
+                            deadline: permitMsg.deadline.toString(),
+                            v,
+                            r,
+                            s,
+                          };
+                        } catch (e: any) {
+                          console.error("Permit signing failed:", e);
+                          setPermitError(e?.message?.includes("expired") || e?.message?.includes("nonce") ? "Permit expired or already used. Please try again." : "Permit required. This token must support ERC-2612.");
+                          return;
+                        }
+                        // 2) Call relayer API — single approval (permit only)
+                        const resp = await fetch("/api/meta/repay-one", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            chainId: CHAIN_ID,
+                            contractAddress: CONTRACT_ADDRESS,
+                            borrower: connectedAddress,
+                            loanId: (activeLoanId as bigint).toString(),
+                            amount: repayAmountBigInt.toString(),
+                            permit: permitPayload,
+                          }),
+                        });
+                        if (!resp.ok) throw new Error(await resp.text());
+                        const result = await resp.json();
+                        console.log("Partial repayment submitted (gasless, single approval)", { txHash: result.txHash, amountUsed: result.amountUsed });
+                        setRepayAmount("");
+                        // Transaction is mined. Refetch state in parallel.
+                        await refreshAfterMutation();
+                      } catch (error) {
+                        const errorType = handleTransferError(error);
+                        switch (errorType) {
+                          case "TRANSFER_FAILED":
+                            console.error("USDC transfer failed. Please check your USDC balance and try again.");
+                            break;
+                          case "ERC20_APPROVAL_NEEDED":
+                            console.error("ERC20 Allowance Error (should be handled via permit). Try again.");
+                            break;
+                          case "INSUFFICIENT_FUNDS":
+                            console.error("Insufficient funds for USDC balance.");
+                            break;
+                          case "USER_REJECTED":
+                            console.error("Signature was rejected by user.");
+                            break;
+                          default:
+                            console.error("Unknown error occurred:", error);
+                        }
+                      } finally {
+                        signingRef.current = false;
+                        setIsLoading(false);
+                      }
+                    }}
+                    className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    {isLoading ? "Processing..." : "Repay"}
+                  </button>
+                </div>
+              </div>
+              {permitError && (
+                <div className="col-span-1 md:col-span-2 mt-2 p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
+                  {permitError}
                 </div>
               )}
             </div>
           </div>
-          )}
-
-          {/* Active Loan & Repayment Section (persistently mounted) */}
-          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <CurrencyDollarIcon className="h-5 w-5 mr-2" />
-                Active Loan & Repayment
-              </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Loan Summary */}
-                <div className="bg-base-200 rounded-lg p-4">
-                  <h3 className="font-medium mb-3">Loan Summary</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Principal:</span>
-                      <span className="font-medium">{loanRes.isLoading ? <span className="skeleton h-4 w-24 inline-block" /> : (activePrincipal !== undefined ? formatUSDC(activePrincipal) : "-")}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Outstanding:</span>
-                      <span className="font-medium">{outRoundedRes.isLoading ? <span className="skeleton h-4 w-24 inline-block" /> : (displayOutstanding !== undefined ? formatUSDC(displayOutstanding) : "-")}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Status:</span>
-                      <span className="font-medium">{loanIsActive ? "Current" : "Closed"}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Next Payment Due */}
-                <div className="bg-base-200 rounded-lg p-4">
-                  <h3 className="font-medium mb-3">Next Payment Due</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Weekly Payment:</span>
-                      <span className="font-medium text-green-500">
-                        {previewTermsData && loanAmount ? `${(Number(previewTermsData[1]) / 1e6).toFixed(2)} USDC` : "-"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Due Date:</span>
-                      <span className="font-medium">Next Week</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Status:</span>
-                      <span className="font-medium text-green-500">Current</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Repayment Actions */}
-              <div className="mt-6 pt-4 border-t border-gray-300">
-                <h3 className="font-medium mb-3">Make a Payment</h3>
-                <p className="text-xs text-gray-600 mb-3">One approval, no gas. You’ll sign a permit; our relayer submits the repayment.</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Full Repayment */}
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <h4 className="font-medium text-green-800 mb-2">Full Repayment</h4>
-                    <p className="text-sm text-green-600 mb-3">Pay off your entire outstanding balance</p>
-                    <button
-                      disabled={
-                        isLoading ||
-                        signingRef.current ||
-                        activeLoanId === undefined ||
-                        !loanIsActive ||
-                        displayOutstanding === undefined
-                      }
-                      onClick={async () => {
-                        if (signingRef.current) return;
-                        if (!activeLoanId || !connectedAddress) return;
-                        signingRef.current = true;
-                        setIsLoading(true);
-                        try {
-                          setPermitError(null);
-                          console.log("Starting full repayment process (gasless meta)...");
-                          if (!CONTRACT_ADDRESS || !CONTRACT_ABI) throw new Error("Missing contracts");
-                          // Read canonical outstanding rounded to cent (contract view)
-                          const out = (await publicClient.readContract({
-                            address: CONTRACT_ADDRESS,
-                            abi: CONTRACT_ABI,
-                            functionName: "getOutstandingRoundedToCent",
-                            args: [activeLoanId as bigint],
-                          })) as bigint;
-                          const amountToRepay = out;
-
-                          // Check USDC balance first
-                          await checkUSDCBalance(amountToRepay);
-
-                          if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !USDC_ADDRESS || !USDC_ABI) throw new Error("Missing contracts");
-
-                          // 1) Build EIP-2612 permit for USDC (spender = micro contract). Permit is REQUIRED.
-                          let permitPayload: { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` };
-                          try {
-                            const usdcNonce = (await publicClient.readContract({
-                              address: USDC_ADDRESS,
-                              abi: USDC_ABI,
-                              functionName: "nonces",
-                              args: [connectedAddress],
-                            })) as bigint;
-                            const permitDeadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
-                            const permitMsg = {
-                              owner: connectedAddress,
-                              spender: CONTRACT_ADDRESS,
-                              value: amountToRepay,
-                              nonce: usdcNonce,
-                              deadline: permitDeadline,
-                            } as const;
-                            console.count("permit:sign");
-                            signingRef.current = true;
-                            const permitSig = await signTypedDataAsync({
-                              domain: usdcPermitDomain as any,
-                              types: permitTypes as any,
-                              primaryType: "Permit",
-                              message: permitMsg as any,
-                            });
-                            const { v, r, s } = splitSignature(permitSig);
-                            permitPayload = {
-                              value: permitMsg.value.toString(),
-                              deadline: permitMsg.deadline.toString(),
-                              v,
-                              r,
-                              s,
-                            };
-                          } catch (e: any) {
-                            console.error("Permit signing failed:", e);
-                            setPermitError(e?.message?.includes("expired") || e?.message?.includes("nonce") ? "Permit expired or already used. Please try again." : "Permit required. This token must support ERC-2612.");
-                            return;
-                          }
-
-                          // 2) Call relayer API — single approval (permit only). amount: "0" => repay-all up to permit value
-                          const resp = await fetch("/api/meta/repay-one", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              chainId: CHAIN_ID,
-                              contractAddress: CONTRACT_ADDRESS,
-                              borrower: connectedAddress,
-                              loanId: (activeLoanId as bigint).toString(),
-                              amount: "0",
-                              permit: permitPayload,
-                            }),
-                          });
-                          if (!resp.ok) throw new Error(await resp.text());
-                          const result = await resp.json();
-                          console.log("Repayment submitted (gasless, single approval)", { txHash: result.txHash, amountUsed: result.amountUsed });
-
-                          // Transaction is mined. Refetch state in parallel.
-                          await refreshAfterMutation();
-                        } catch (error) {
-                          const errorType = handleTransferError(error);
-                          switch (errorType) {
-                            case "TRANSFER_FAILED":
-                              console.error("USDC transfer failed. Please check your USDC balance and try again.");
-                              break;
-                            case "ERC20_APPROVAL_NEEDED":
-                              console.error("ERC20 Allowance Error (should be handled via permit). Try again.");
-                              break;
-                            case "INSUFFICIENT_FUNDS":
-                              console.error("Insufficient funds for USDC balance.");
-                              break;
-                            case "USER_REJECTED":
-                              console.error("Signature was rejected by user.");
-                              break;
-                            default:
-                              console.error("Unknown error occurred:", error);
-                          }
-                        } finally {
-                          signingRef.current = false;
-                          setIsLoading(false);
-                        }
-                      }}
-                      className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                    >
-                      {isLoading ? "Processing..." : loanIsActive && displayOutstanding !== undefined ? `Pay ${formatUSDC(displayOutstanding)}` : "Pay"}
-                    </button>
-                  </div>
-
-                  {/* Partial Repayment */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-800 mb-2">Partial Repayment</h4>
-                    <p className="text-sm text-blue-600 mb-3">Make a partial payment to reduce your balance</p>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        value={repayAmount}
-                        onChange={(e) => setRepayAmount(e.target.value)}
-                        placeholder="Enter amount in USDC"
-                        className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        min="0.01"
-                        step="0.01"
-                      />
-                      <button
-                        disabled={
-                          isLoading ||
-                          signingRef.current ||
-                          activeLoanId === undefined ||
-                          !loanIsActive ||
-                          !repayAmount ||
-                          !parseLoanAmount(repayAmount)
-                        }
-                        onClick={async () => {
-                          if (signingRef.current) return;
-                          if (!activeLoanId || !repayAmount || !connectedAddress) return;
-                          signingRef.current = true;
-                          const repayAmountBigInt = parseLoanAmount(repayAmount);
-                          if (!repayAmountBigInt) return;
-                          setIsLoading(true);
-                          try {
-                            console.log("Starting partial repayment process (gasless meta)...");
-
-                            // Check USDC balance first
-                            await checkUSDCBalance(repayAmountBigInt);
-
-                            if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !USDC_ADDRESS || !USDC_ABI) throw new Error("Missing contracts");
-
-                            // 1) Build USDC EIP-2612 permit (REQUIRED)
-                            let permitPayload: { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` };
-                            try {
-                              const usdcNonce = (await publicClient.readContract({
-                                address: USDC_ADDRESS,
-                                abi: USDC_ABI,
-                                functionName: "nonces",
-                                args: [connectedAddress],
-                              })) as bigint;
-                              const permitDeadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
-                              const permitMsg = {
-                                owner: connectedAddress,
-                                spender: CONTRACT_ADDRESS,
-                                value: repayAmountBigInt,
-                                nonce: usdcNonce,
-                                deadline: permitDeadline,
-                              } as const;
-                              console.count("permit:sign");
-                              signingRef.current = true;
-                              const permitSig = await signTypedDataAsync({
-                                domain: usdcPermitDomain as any,
-                                types: permitTypes as any,
-                                primaryType: "Permit",
-                                message: permitMsg as any,
-                              });
-                              const { v, r, s } = splitSignature(permitSig);
-                              permitPayload = {
-                                value: permitMsg.value.toString(),
-                                deadline: permitMsg.deadline.toString(),
-                                v,
-                                r,
-                                s,
-                              };
-                            } catch (e: any) {
-                              console.error("Permit signing failed:", e);
-                              setPermitError(e?.message?.includes("expired") || e?.message?.includes("nonce") ? "Permit expired or already used. Please try again." : "Permit required. This token must support ERC-2612.");
-                              return;
-                            }
-                            // 2) Call relayer API — single approval (permit only)
-                            const resp = await fetch("/api/meta/repay-one", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                chainId: CHAIN_ID,
-                                contractAddress: CONTRACT_ADDRESS,
-                                borrower: connectedAddress,
-                                loanId: (activeLoanId as bigint).toString(),
-                                amount: repayAmountBigInt.toString(),
-                                permit: permitPayload,
-                              }),
-                            });
-                            if (!resp.ok) throw new Error(await resp.text());
-                            const result = await resp.json();
-                            console.log("Partial repayment submitted (gasless, single approval)", { txHash: result.txHash, amountUsed: result.amountUsed });
-                            setRepayAmount("");
-                            // Transaction is mined. Refetch state in parallel.
-                            await refreshAfterMutation();
-                          } catch (error) {
-                            const errorType = handleTransferError(error);
-                            switch (errorType) {
-                              case "TRANSFER_FAILED":
-                                console.error("USDC transfer failed. Please check your USDC balance and try again.");
-                                break;
-                              case "ERC20_APPROVAL_NEEDED":
-                                console.error("ERC20 Allowance Error (should be handled via permit). Try again.");
-                                break;
-                              case "INSUFFICIENT_FUNDS":
-                                console.error("Insufficient funds for USDC balance.");
-                                break;
-                              case "USER_REJECTED":
-                                console.error("Signature was rejected by user.");
-                                break;
-                              default:
-                                console.error("Unknown error occurred:", error);
-                            }
-                          } finally {
-                            signingRef.current = false;
-                            setIsLoading(false);
-                          }
-                        }}
-                        className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                      >
-                        {isLoading ? "Processing..." : "Repay"}
-                      </button>
-                    </div>
-                  </div>
-                  {permitError && (
-                    <div className="col-span-1 md:col-span-2 mt-2 p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
-                      {permitError}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
         </div>
-      </div>
-  );
+      )}
+    </div>
+  </div>
+);
+
 };
 
-export default BorrowPage; 
+export default BorrowPage;

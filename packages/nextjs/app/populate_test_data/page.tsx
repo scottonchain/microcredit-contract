@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAccount, useWalletClient } from "wagmi";
+import { useState } from "react";
+import { useAccount } from "wagmi";
 import {
   createPublicClient,
   http,
   createWalletClient,
-  custom,
   parseUnits,
   toHex,
 } from "viem";
@@ -15,21 +14,15 @@ import { localhost } from "viem/chains";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import deployedContracts from "~~/contracts/deployedContracts";
 import Link from "next/link";
+import { useIsAdmin } from "~~/hooks/useIsAdmin";
 
 const RPC_URL = "http://127.0.0.1:8545";
 const CHAIN_ID = 31337; // Anvil's default chain ID
 
-// Keep only deployer & dedicated admin
-const ADDITIONAL_ADMINS = [
-  "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf".toLowerCase(), // Anvil default deployer
-  "0xef4b3cbca9f0a6b4b80e57a12a19e7ef1124f754", // dedicated admin
-  "0xd7c5a101eE877daAB1a3731cDcF316066dDccf92".toLowerCase(), // Added per request
-];
-
 export default function PopulatePage() {
   const { address: connectedAddress } = useAccount();
-  const { data: walletClient } = useWalletClient();
-  const [hasAccess, setHasAccess] = useState(false);
+  const { admin, loading } = useIsAdmin();
+  const hasAccess = !!admin;
   const [status, setStatus] = useState("");
   const [progress, setProgress] = useState(0);
   const [totalSteps, setTotalSteps] = useState(0);
@@ -62,62 +55,6 @@ export default function PopulatePage() {
     functionName: "oracle",
   });
 
-  useEffect(() => {
-    
-    if (!CONTRACT_ADDRESS || !USDC_ADDRESS) {
-      setStatus("❌ Contracts not deployed");
-      setHasAccess(false);
-      return;
-    }
-
-    if (!connectedAddress) {
-      setStatus("❌ Wallet not connected");
-      setHasAccess(false);
-      return;
-    }
-
-    const me = connectedAddress.toLowerCase();
-    
-    // Check whitelist first (this doesn't depend on contract data)
-    const isWhitelisted = ADDITIONAL_ADMINS.includes(me);
-    
-    if (isWhitelisted) {
-      setHasAccess(true);
-      setStatus("✅ Access granted - Ready to populate test data");
-      return;
-    }
-    
-    // If not whitelisted, we need to check owner/oracle, but they might still be loading
-    if (!owner || !oracle) {
-      setStatus("⏳ Loading contract data...");
-      setHasAccess(false);
-      return;
-    }
-    
-    const isOwner = me === owner.toLowerCase();
-    const isOracle = me === oracle.toLowerCase();
-    
-    const accessDebug = { 
-      connectedAddress, 
-      me, 
-      owner: owner?.toLowerCase(), 
-      oracle: oracle?.toLowerCase(),
-      ADDITIONAL_ADMINS,
-      isOwner, 
-      isOracle, 
-      isWhitelisted 
-    };
-    console.log("Access debug:", accessDebug);
-    
-    const hasAccessNow = isOwner || isOracle || isWhitelisted;
-    setHasAccess(hasAccessNow);
-    
-    if (hasAccessNow) {
-      setStatus("✅ Access granted - Ready to populate test data");
-    } else {
-      setStatus("❌ No access - You need to be owner, oracle, or whitelisted admin");
-    }
-  }, [connectedAddress, walletClient, CONTRACT_ADDRESS, USDC_ADDRESS, owner, oracle]);
 
   async function populate() {
     console.log("Starting populate function");
@@ -625,8 +562,14 @@ export default function PopulatePage() {
   setStatus(`🎉 Population complete! Created ${numLenders} lenders (total deposits: $${totalDeposited.toFixed(2)}), ${numBorrowers} borrowers, ${totalAttestationsCreated} attestations (${actualLenderToBorrowerAttestations} lender-to-borrower at ${attestationProbability}% probability${includeLenderAttestations ? `, ${lenderToLenderAttestationsCreated} lender-to-lender` : ''}), and ${loanRequestsCreated} loan requests (all disbursed).`);
   }
 
+  if (loading) return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8">🛠️ Admin: Populate Test Data</h1>
+      <div className="bg-base-200 border border-base-300 rounded-lg p-6 text-gray-600">Checking admin access…</div>
+    </div>
+  );
   if (!connectedAddress) return <p>🔌 Connect wallet…</p>;
-  if (!hasAccess) return (
+  if (!admin) return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">🛠️ Admin: Populate Test Data</h1>
       <div className="bg-red-50 border border-red-200 rounded-lg p-6">
@@ -646,14 +589,6 @@ export default function PopulatePage() {
             <p><strong>USDC Address:</strong> {USDC_ADDRESS || "Not deployed"}</p>
             <p><strong>Owner:</strong> {owner || "Loading..."}</p>
             <p><strong>Oracle:</strong> {oracle || "Loading..."}</p>
-            <p><strong>Whitelisted Admins:</strong></p>
-            <ul className="ml-4 list-disc">
-              {ADDITIONAL_ADMINS.map((admin, index) => (
-                <li key={index} className={admin === connectedAddress?.toLowerCase() ? "font-bold text-green-700" : ""}>
-                  {admin} {admin === connectedAddress?.toLowerCase() ? "← This is you!" : ""}
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
       </div>
@@ -794,7 +729,7 @@ export default function PopulatePage() {
       <div className="flex gap-4" style={{ marginTop: "1rem" }}>
         <button
           onClick={populate}
-          disabled={!hasAccess}
+          disabled={!admin}
           className="btn btn-primary"
         >
           Populate Test Data

@@ -11,6 +11,7 @@ import { createPublicClient, http } from "viem";
 import { localhost } from "viem/chains";
 import deployedContracts from "~~/contracts/deployedContracts";
 import Link from "next/link";
+import { useIsAdmin } from "~~/hooks/useIsAdmin";
 
 // Constants for contract interaction
 const CHAIN_ID = 31337; // Localhost chain ID
@@ -28,6 +29,7 @@ const publicClient = createPublicClient({
 
 const AdminPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
+  const { admin, loading } = useIsAdmin();
   const [userAddress, setUserAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [gasPrice, setGasPrice] = useState<bigint | null>(null);
@@ -129,20 +131,8 @@ const AdminPage: NextPage = () => {
   const [pageRankLoading, setPageRankLoading] = useState(false);
   const [pageRankResult, setPageRankResult] = useState<string>("");
 
-  // Additional whitelisted admin addresses
-  const ADDITIONAL_ADMINS = [
-    "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf".toLowerCase(), // Anvil deployer
-    "0xef4b3cbca9f0a6b4b80e57a12a19e7ef1124f754", // Dummy admin
-    "0xE51a60126dF85801D4C76bDAf58D6F9E81Cc26cA".toLowerCase(), // Added per request
-    "0xd8FFc0B6bfAAB3828C0D92AeD3412186eBfFA5FC".toLowerCase(), // Added per request
-    "0xd7c5a101eE877daAB1a3731cDcF316066dDccf92".toLowerCase(), // Added per request
-  ];
-
-  // Permissions
-  const isOwner = connectedAddress && owner && connectedAddress.toLowerCase() === owner.toLowerCase();
-  const isOracle = oracle && connectedAddress && connectedAddress.toLowerCase() === oracle.toLowerCase();
-  const isWhitelisted = connectedAddress ? ADDITIONAL_ADMINS.includes(connectedAddress.toLowerCase()) : false;
-  const hasAccess = isOwner || isOracle || isWhitelisted;
+  // Centralized permissions
+  const hasAccess = !!admin;
 
   // Pool info for overview stats
   const { data: poolInfo, refetch: refetchPoolInfo } = useScaffoldReadContract({
@@ -808,6 +798,14 @@ const AdminPage: NextPage = () => {
   // ────────────────────────────────────────────────────────────────────────────
   //  RENDER
   // ────────────────────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center text-gray-600">Checking admin access…</div>
+      </div>
+    );
+  }
+
   if (!hasAccess) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -1211,7 +1209,13 @@ const AdminPage: NextPage = () => {
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                     <span>
-                      Role: {isOwner ? "Owner" : isOracle ? "Oracle" : isWhitelisted ? "Whitelisted" : "None"}
+                      {(() => {
+                        const me = connectedAddress?.toLowerCase();
+                        const isOwnerDisplay = me && owner && me === owner.toLowerCase();
+                        const isOracleDisplay = me && oracle && me === oracle.toLowerCase();
+                        const role = isOwnerDisplay ? "Owner" : isOracleDisplay ? "Oracle" : hasAccess ? "Whitelisted" : "None";
+                        return <>Role: {role}</>;
+                      })()}
                     </span>
                   </div>
                 </div>

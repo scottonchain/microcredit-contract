@@ -172,31 +172,27 @@ const Home: NextPage = () => {
                         {/* Main Call to Action Cards */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                           {/* I am a Borrower */}
-                          <Link href="/borrower" className="block h-full">
-                            <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 cursor-pointer h-full flex flex-col">
-                                                              <div className="text-center flex-1 flex flex-col">
+                          <div className="h-full">
+                            <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 h-full flex flex-col">
+                                                               <div className="text-center flex-1 flex flex-col">
                                   <CreditCardIcon className="h-16 w-16 text-green-600 mx-auto mb-4" />
                                   <h2 className="text-3xl font-bold text-green-700 mb-4">I am a Borrower</h2>
                                   <p className="text-gray-600 mb-6 flex-1">
                                     Get your address verified by asking for attestations from friends and community members. Once verified, you&apos;ll be eligible for loans according to your credit score.
                                   </p>
                                   <div className="space-y-4 mt-auto">
- 
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        copyAttestationLink();
-                                      }}
-                                      disabled={isCopying}
-                                      className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+
+                                    <Link
+                                      href="/borrower"
+                                      className="block w-full text-center bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors"
                                     >
-                                      {isCopying ? "Copying..." : "Copy Attestation Link"}
-                                    </button>
+                                      Go to Borrower Page
+                                    </Link>
                                   
                                 </div>
                               </div>
                             </div>
-                          </Link>
+                          </div>
 
                           {/* I am a Lender */}
                           <Link href="/lend" className="block h-full">
