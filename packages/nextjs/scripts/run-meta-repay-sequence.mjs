@@ -57,13 +57,7 @@ const TYPES = {
     { name: "nonce", type: "uint256" },
     { name: "deadline", type: "uint256" },
   ],
-  RepayRequest: [
-    { name: "borrower", type: "address" },
-    { name: "loanId", type: "uint256" },
-    { name: "amount", type: "uint256" },
-    { name: "nonce", type: "uint256" },
-    { name: "deadline", type: "uint256" },
-  ],
+  // RepayRequest removed — repayment uses permit-only flow via API /api/meta/repay-one
   Permit: [
     { name: "owner", type: "address" },
     { name: "spender", type: "address" },
@@ -128,15 +122,7 @@ async function signDisburseRequest(loanId, to, nonce, deadline) {
   });
 }
 
-async function signRepayRequest(loanId, amount, nonce, deadline) {
-  return signTyped(borrower, MICRO_DOMAIN(MICRO_ADDRESS), TYPES, "RepayRequest", {
-    borrower: borrower.address,
-    loanId,
-    amount,
-    nonce,
-    deadline,
-  });
-}
+// No signRepayRequest — not needed anymore
 
 async function signPermit(value, deadline) {
   const tokenName = await publicClient.readContract({ address: USDC_ADDRESS, abi: USDC_ABI_MIN, functionName: "name", args: [] });
@@ -238,28 +224,21 @@ async function main() {
   if (!resp.ok) throw new Error(`disburse-loan failed: ${res2.error || JSON.stringify(res2)}`);
   console.log("disburse-loan ok ->", res2.txHash || res2.hash || "");
 
-  // Step 3: repay loan (meta) with permit
-  const nonce3 = await publicClient.readContract({ address: MICRO_ADDRESS, abi: MICRO_ABI_MIN, functionName: "nonces", args: [borrower.address] });
+  // Step 3: repay loan (permit-only via /api/meta/repay-one)
   const deadline3 = now + ttl;
-  const repaySig = await signRepayRequest(loanId, amount, nonce3, deadline3);
   const permit = await signPermit(amount, deadline3);
-  const req3Body = {
+  const repayReq = {
     chainId: CHAIN_ID,
     contractAddress: MICRO_ADDRESS,
-    req: {
-      borrower: borrower.address,
-      loanId: loanId.toString(),
-      amount: amount.toString(),
-      nonce: nonce3.toString(),
-      deadline: deadline3.toString(),
-    },
-    signature: repaySig,
+    borrower: borrower.address,
+    loanId: loanId.toString(),
+    amount: amount.toString(), // use "0" to repay-all up to permit value if desired
     permit: { value: permit.value.toString(), deadline: permit.deadline.toString(), v: permit.v, r: permit.r, s: permit.s },
   };
-  resp = await fetch(`${API_BASE}/api/meta/repay-loan`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req3Body) });
+  resp = await fetch(`${API_BASE}/api/meta/repay-one`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(repayReq) });
   const res3 = await resp.json();
-  if (!resp.ok) throw new Error(`repay-loan failed: ${res3.error || JSON.stringify(res3)}`);
-  console.log("repay-loan ok ->", res3.txHash || res3.hash || "");
+  if (!resp.ok) throw new Error(`repay-one failed: ${res3.error || JSON.stringify(res3)}`);
+  console.log("repay-one ok ->", res3.txHash || res3.hash || "");
 
   // Verify on-chain state
   const loan = await publicClient.readContract({ address: MICRO_ADDRESS, abi: MICRO_ABI_MIN, functionName: "getLoan", args: [loanId] });

@@ -31,7 +31,18 @@ contract DecentralizedMicrocredit is EIP712 {
     uint256 public constant SCALE = 1e6; // Used for credit score scaling
     uint256 public constant BASIS_POINTS = 10000; // Interest-rate scaling (1e4 = 100%)
     uint256 public constant SECONDS_PER_YEAR = 365 days;
+    // Cent and grace constants for cent-consistent math and UX
+    uint256 private constant CENT = 10_000; // 0.01 USDC in 6-decimals
+    uint256 private constant GRACE_PERIOD = 1 days;
     uint256 private nextLoanId = 1;
+
+    // ─────────────── LIQUIDITY GUARDS ───────────────
+    // Fraction of totalDeposits to keep uncommitted as a safety buffer (in BASIS_POINTS)
+    uint256 public liquidityBuffer; // e.g. 500 = 5%
+    // Absolute minimum liquid USDC (6 decimals) to keep in the pool at all times
+    uint256 public liquidityThreshold; // e.g. 50e6 = 50 USDC
+
+    event LiquidityLimitsUpdated(uint256 bufferBp, uint256 threshold);
 
     // PageRank constants (using smaller scale to avoid overflow)
     uint256 constant PR_SCALE = 100000; // 1.0 = 100,000 (smaller scale)
@@ -86,6 +97,13 @@ contract DecentralizedMicrocredit is EIP712 {
         uint256 createdAt; // Timestamp when loan was created
     }
 
+    // Rounds to the nearest cent (half-up) for display and UI/relayer parity
+    function _roundToCent(uint256 x) internal pure returns (uint256) {
+        unchecked {
+            return ((x + 5_000) / 10_000) * 10_000;
+        }
+    }
+
     /**
      * @notice Meta-transaction entry point for repaying a loan (relayer pays gas). Optionally executes ERC20Permit.
      * @param req RepayRequest signed by borrower via EIP-712
@@ -101,6 +119,7 @@ contract DecentralizedMicrocredit is EIP712 {
         require(block.timestamp <= req.deadline, "Expired");
         require(req.nonce == nonces[req.borrower]++, "Bad nonce");
 
+        // EIP-712 verification (unchanged)
         bytes32 structHash = keccak256(abi.encode(
             REPAY_REQUEST_TYPEHASH,
             req.borrower,
@@ -115,7 +134,17 @@ contract DecentralizedMicrocredit is EIP712 {
         Loan storage loan = loans[req.loanId];
         require(loan.isActive, "Loan inactive");
         require(loan.borrower == req.borrower, "Wrong borrower");
-        require(req.amount > 0, "Amount > 0");
+
+        uint256 out = getCurrentOutstandingAmount(req.loanId);
+
+        // Dust forgiveness: close if < 1 cent and do not transfer
+        if (out < CENT) {
+            totalLentOut -= loan.principal;
+            loan.outstanding = 0;
+            loan.isActive = false;
+            emit MetaLoanRepaid(req.borrower, req.loanId, 0);
+            return;
+        }
 
         // Execute permit if provided (deadline != 0 as sentinel)
         if (permit.deadline != 0) {
@@ -128,21 +157,36 @@ contract DecentralizedMicrocredit is EIP712 {
                 permit.r,
                 permit.s
             );
-            require(permit.value >= req.amount, "Permit value too low");
+            require(permit.value >= out, "Permit value too low");
         }
 
-        uint256 currentOutstanding = getCurrentOutstandingAmount(req.loanId);
-        require(usdc.transferFrom(req.borrower, address(this), req.amount), "Transfer failed");
+        if (req.amount == 0) {
+            // Repay-all: pull exactly canonical outstanding
+            require(usdc.transferFrom(req.borrower, address(this), out), "Transfer failed");
+            totalLentOut -= loan.principal;
+            loan.outstanding = 0;
+            loan.isActive = false;
+            emit MetaLoanRepaid(req.borrower, req.loanId, out);
+            return;
+        }
 
-        if (req.amount >= currentOutstanding) {
+        // Exact amount path with ±1 cent tolerance; always pull canonical 'out'
+        if (req.amount < out) {
+            require(out - req.amount <= CENT, "OUTSTANDING_CHANGED");
+        }
+        require(usdc.transferFrom(req.borrower, address(this), out), "Transfer failed");
+
+        // Apply repayment (close since we pulled 'out')
+        if (out >= loan.outstanding) {
             totalLentOut -= loan.principal;
             loan.outstanding = 0;
             loan.isActive = false;
         } else {
-            loan.outstanding = currentOutstanding - req.amount;
+            // Safety branch if cached outstanding is used elsewhere
+            loan.outstanding = loan.outstanding - out;
         }
 
-        emit MetaLoanRepaid(req.borrower, req.loanId, req.amount);
+        emit MetaLoanRepaid(req.borrower, req.loanId, out);
     }
     struct Attestation {
         address attester;
@@ -203,6 +247,23 @@ contract DecentralizedMicrocredit is EIP712 {
         "RepayRequest(address borrower,uint256 loanId,uint256 amount,uint256 nonce,uint256 deadline)"
     );
 
+    bytes32 private constant BORROW_AND_DISBURSE_TYPEHASH = keccak256(
+        "BorrowAndDisburse(address borrower,uint256 amount,address to,uint256 repaymentPeriod,uint256 maxAprBps,uint256 nonce,uint256 deadline)"
+    );
+
+    bytes32 private constant DEPOSIT_REQUEST_TYPEHASH = keccak256(
+        "DepositRequest(address lender,uint256 amount,address receiver,uint256 nonce,uint256 deadline)"
+    );
+
+    bytes32 private constant REQUEST_WITHDRAWAL_TYPEHASH = keccak256(
+        "RequestWithdrawal(address lender,uint256 amount,address to,uint256 nonce,uint256 deadline)"
+    );
+
+    // Attestation meta-transaction typehash (gasless attestations)
+    bytes32 private constant ATTEST_REQUEST_TYPEHASH = keccak256(
+        "AttestRequest(address attester,address borrower,uint256 weight,uint256 nonce,uint256 deadline)"
+    );
+
     // EIP-712 request structs
     struct LoanRequest {
         address borrower;
@@ -227,6 +288,41 @@ contract DecentralizedMicrocredit is EIP712 {
         uint256 deadline;
     }
 
+    struct BorrowAndDisburse {
+        address borrower;
+        uint256 amount;
+        address to;
+        uint256 repaymentPeriod;
+        uint256 maxAprBps;
+        uint256 nonce;
+        uint256 deadline;
+    }
+
+    struct DepositRequest {
+        address lender;
+        uint256 amount;
+        address receiver;
+        uint256 nonce;
+        uint256 deadline;
+    }
+
+    struct RequestWithdrawal {
+        address lender;
+        uint256 amount;
+        address to;
+        uint256 nonce;
+        uint256 deadline;
+    }
+
+    // EIP-712 request for recording an attestation via relayer (gasless)
+    struct AttestRequest {
+        address attester;
+        address borrower;
+        uint256 weight;
+        uint256 nonce;
+        uint256 deadline;
+    }
+
     struct PermitData {
         uint256 value;
         uint256 deadline;
@@ -237,9 +333,18 @@ contract DecentralizedMicrocredit is EIP712 {
 
     // Meta-transaction events
     event MetaLoanRequested(address indexed borrower, uint256 amount, uint256 loanId);
-    event MetaLoanDisbursed(address indexed borrower, uint256 loanId, uint256 principal);
+    event MetaLoanDisbursed(address indexed borrower, uint256 indexed loanId, uint256 amount);
     event MetaLoanRepaid(address indexed borrower, uint256 indexed loanId, uint256 amount);
+    event MetaLoanCreated(address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 interestRate, uint256 repaymentPeriod);
+    event MetaDeposit(address indexed lender, uint256 amount, address indexed receiver, uint256 sharesMinted);
+    event MetaWithdrawalRequested(address indexed lender, uint256 indexed queueId, uint256 amount, address indexed to);
+    event MetaWithdrawalFilled(uint256 indexed queueId, uint256 amountFilled);
+    // Meta attestation event (emitted when a relayer records an attestation on-chain)
+    event MetaAttested(address indexed attester, address indexed borrower, uint256 weight);
     
+    // Regular transaction events
+    event LoanRepaid(address indexed borrower, uint256 indexed loanId, uint256 amount);
+
     // PageRank storage
     address[] private pagerankNodes;
     mapping(address => bool) private pagerankNodeExists;
@@ -247,6 +352,17 @@ contract DecentralizedMicrocredit is EIP712 {
     mapping(address => uint256) private pagerankOutDegree;
     // Exposed as public to enable off-chain inspection and simplify tests.
     mapping(address => uint256) public pagerankScores;
+
+    // ─────────────── Withdrawal Queue (FIFO) ───────────────
+    struct WithdrawalQueueItem {
+        address lender;
+        address to;
+        uint256 remaining; // amount remaining to be paid (USDC 6-decimals)
+        bool active;
+    }
+    WithdrawalQueueItem[] private withdrawalQueue;
+    uint256 private withdrawalHead; // index of next item to attempt fill
+    uint256 private nextWithdrawalId; // queueId is the index when enqueued
     mapping(address => mapping(address => uint256))
         private pagerankStochasticEdges;
 
@@ -271,6 +387,10 @@ contract DecentralizedMicrocredit is EIP712 {
 
         // Initialise utilisation cap at 90 %
         lendingUtilizationCap = 9000; // 90 % in BASIS_POINTS
+
+        // Default liquidity guards: 5% buffer, 0 absolute threshold
+        liquidityBuffer = 500;
+        liquidityThreshold = 0;
     }
 
     modifier onlyOwner() {
@@ -325,6 +445,18 @@ contract DecentralizedMicrocredit is EIP712 {
     function setLendingUtilizationCap(uint256 cap) external onlyOwner {
         require(cap <= BASIS_POINTS, "Cap cannot exceed 100%");
         lendingUtilizationCap = cap;
+    }
+
+    /**
+     * @notice Update liquidity buffer and absolute threshold.
+     * @param bufferBp New buffer in BASIS_POINTS of totalDeposits (0-10000)
+     * @param threshold Absolute USDC amount (6 decimals) to keep liquid
+     */
+    function setLiquidityLimits(uint256 bufferBp, uint256 threshold) external onlyOwner {
+        require(bufferBp <= BASIS_POINTS, "Buffer > 100%");
+        liquidityBuffer = bufferBp;
+        liquidityThreshold = threshold;
+        emit LiquidityLimitsUpdated(bufferBp, threshold);
     }
 
     /**
@@ -394,9 +526,11 @@ contract DecentralizedMicrocredit is EIP712 {
         );
 
         uint256 liquidBalance = usdc.balanceOf(address(this));
+        // Enforce post-withdrawal liquidity guards
+        uint256 bufferRequiredW = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
         require(
-            liquidBalance - reservedLiquidity >= amount,
-            "Insufficient liquidity"
+            liquidBalance - reservedLiquidity - amount >= bufferRequiredW + liquidityThreshold,
+            "LIQUIDITY_BELOW_THRESHOLD"
         );
 
         lenderDeposits[msg.sender] -= amount;
@@ -619,10 +753,70 @@ contract DecentralizedMicrocredit is EIP712 {
         require(loan.isActive, "Loan inactive");
         
         uint256 timeElapsed = block.timestamp - loan.createdAt;
+        // 24h grace period: no interest accrues in the first day
+        if (timeElapsed < GRACE_PERIOD) {
+            return loan.principal;
+        }
         uint256 annualInterest = (loan.principal * loan.interestRate) / BASIS_POINTS;
         uint256 accruedInterest = (annualInterest * timeElapsed) / SECONDS_PER_YEAR;
         
         return loan.principal + accruedInterest;
+    }
+
+    // View helper for UI/relayer parity – returns outstanding rounded to the nearest cent (half-up)
+    function getOutstandingRoundedToCent(uint256 loanId) external view returns (uint256) {
+        return _roundToCent(getCurrentOutstandingAmount(loanId));
+    }
+
+    /**
+     * @notice Repay using a single EIP-2612 permit signature (ONE approval in wallet).
+     * @param borrower Borrower address whose USDC will be pulled
+     * @param loanId   Loan to repay
+     * @param amount   Amount to repay (0 => repay-all up to permit value)
+     * @param value    Permit allowance value (must be >= amount if amount > 0)
+     * @param deadline Permit deadline
+     * @param v r s    Permit signature parts
+     */
+    function repayWithPermit(
+        address borrower,
+        uint256 loanId,
+        uint256 amount,
+        uint256 value,
+        uint256 deadline,
+        uint8 v, bytes32 r, bytes32 s
+    ) external {
+        Loan storage loan = loans[loanId];
+        require(loan.isActive, "Loan inactive");
+        require(loan.borrower == borrower, "Wrong borrower");
+
+        // 1) Set allowance via permit (anyone can submit; signature proves consent)
+        IERC20Permit(address(usdc)).permit(borrower, address(this), value, deadline, v, r, s);
+
+        // 2) Compute spend = requested or outstanding (rounded to cent), capped by permit value
+        uint256 spend = amount;
+        if (spend == 0) {
+            spend = _roundToCent(getCurrentOutstandingAmount(loanId));
+        }
+        if (spend > value) {
+            spend = value; // never exceed what the user permitted
+        }
+        require(spend > 0, "Nothing to repay");
+
+        // 3) Pull funds & apply repayment
+        require(usdc.transferFrom(borrower, address(this), spend), "USDC transfer failed");
+
+        // Calculate current canonical outstanding for accounting
+        uint256 currentOutstanding = getCurrentOutstandingAmount(loanId);
+        if (spend >= currentOutstanding || currentOutstanding < CENT) {
+            // Close loan on full repay or dust-level remainder
+            totalLentOut -= loan.principal;
+            loan.outstanding = 0;
+            loan.isActive = false;
+        } else {
+            loan.outstanding = currentOutstanding - spend;
+        }
+
+        emit LoanRepaid(borrower, loanId, spend);
     }
 
     function repayLoan(uint256 loanId, uint256 amount) external {
@@ -646,6 +840,7 @@ contract DecentralizedMicrocredit is EIP712 {
             // Update outstanding amount to reflect the payment
             loan.outstanding = currentOutstanding - amount;
         }
+        emit LoanRepaid(msg.sender, loanId, amount);
     }
 
     function addressToString(address _address) public pure returns (string memory) {
@@ -708,6 +903,62 @@ contract DecentralizedMicrocredit is EIP712 {
         // DEMO ONLY: Auto-compute PageRank after new attestation
         // In production with oracle, this will be handled off-chain
         _computePageRank(PR_ALPHA, 100, PR_TOL);
+    }
+
+    /**
+     * @notice Gasless meta-attestation (relayer pays gas). Attester signs an EIP-712 AttestRequest.
+     * @param req EIP-712 request with attester, borrower, weight, nonce, deadline
+     * @param sig Attester's signature over the typed data
+     */
+    function attestMeta(AttestRequest calldata req, bytes calldata sig) external {
+        // Optional relayer whitelist
+        if (relayerWhitelistEnabled) {
+            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
+        }
+
+        require(block.timestamp <= req.deadline, "Expired");
+        require(req.nonce == nonces[req.attester]++, "Bad nonce");
+
+        // Verify signature per EIP-712
+        bytes32 structHash = keccak256(abi.encode(
+            ATTEST_REQUEST_TYPEHASH,
+            req.attester,
+            req.borrower,
+            req.weight,
+            req.nonce,
+            req.deadline
+        ));
+        bytes32 digest = _hashTypedDataV4(structHash);
+        require(SignatureChecker.isValidSignatureNow(req.attester, digest, sig), "Bad signature");
+
+        // Same validations as direct attestation
+        require(req.weight <= SCALE, "Weight too high");
+        require(req.borrower != req.attester, "Self-attestation");
+
+        // Enumeration and pagerank graph bookkeeping
+        if (!_attesterSeen[req.attester]) {
+            _attesterSeen[req.attester] = true;
+            _attesters.push(req.attester);
+        }
+
+        _addPagerankNode(req.attester);
+        _addPagerankNode(req.borrower);
+        _addPagerankEdge(req.attester, req.borrower, req.weight);
+
+        // Update or insert attestation record
+        Attestation[] storage attests = borrowerAttestations[req.borrower];
+        for (uint256 i = 0; i < attests.length; i++) {
+            if (attests[i].attester == req.attester) {
+                attests[i].weight = req.weight;
+                _computePageRank(PR_ALPHA, 100, PR_TOL); // DEMO ONLY
+                emit MetaAttested(req.attester, req.borrower, req.weight);
+                return;
+            }
+        }
+        attests.push(Attestation(req.attester, req.weight));
+
+        _computePageRank(PR_ALPHA, 100, PR_TOL); // DEMO ONLY
+        emit MetaAttested(req.attester, req.borrower, req.weight);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -1136,5 +1387,288 @@ contract DecentralizedMicrocredit is EIP712 {
         }
         
         return result;
+    }
+
+    
+
+    // O4: Combined borrow and disburse meta-transaction
+    /**
+     * @notice One-click borrow: creates and disburses loan in single meta-transaction (relayer pays gas)
+     * @param req The borrow and disburse request with all parameters
+     * @param sig The EIP-712 signature from the borrower authorizing the combined action
+     */
+    function borrowAndDisburseMeta(
+        BorrowAndDisburse calldata req,
+        bytes calldata sig
+    ) external {
+        // Check relayer whitelist if enabled
+        if (relayerWhitelistEnabled) {
+            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
+        }
+
+        // Basic validation
+        require(block.timestamp <= req.deadline, "Expired");
+        require(req.nonce == nonces[req.borrower]++, "Bad nonce");
+
+        // EIP-712 signature verification
+        bytes32 structHash = keccak256(abi.encode(
+            BORROW_AND_DISBURSE_TYPEHASH,
+            req.borrower,
+            req.amount,
+            req.to,
+            req.repaymentPeriod,
+            req.maxAprBps,
+            req.nonce,
+            req.deadline
+        ));
+        bytes32 digest = _hashTypedDataV4(structHash);
+        require(SignatureChecker.isValidSignatureNow(req.borrower, digest, sig), "Bad signature");
+
+        // Rate guard: ensure current APR is within borrower's tolerance
+        uint256 currentApr = effrRate + riskPremium;
+        require(currentApr <= req.maxAprBps, "APR changed");
+
+        // Credit score and eligibility check
+        uint256 score = getCreditScore(req.borrower);
+        require(score > 0, "Score > 0");
+        uint256 maxBorrow = (maxLoanAmount * score) / SCALE;
+        require(req.amount <= maxBorrow, "Over limit");
+
+        // Check existing outstanding loans for this borrower
+        uint256 totalOutstanding = 0;
+        uint256[] storage borrowerLoans = _borrowerLoans[req.borrower];
+        for (uint256 i = 0; i < borrowerLoans.length; i++) {
+            Loan storage l = loans[borrowerLoans[i]];
+            if (l.isActive) {
+                totalOutstanding += l.principal;
+            }
+        }
+        require(totalOutstanding + req.amount <= maxBorrow, "Outstanding loans exceed max");
+
+        // Liquidity gating: check utilization cap
+        uint256 newTotalCommitted = reservedLiquidity + totalLentOut + req.amount;
+        uint256 maxAllowedCommitment = (totalDeposits * lendingUtilizationCap) / BASIS_POINTS;
+        require(newTotalCommitted <= maxAllowedCommitment, "Pool utilisation cap exceeded");
+
+        // Liquidity buffer check
+        uint256 availableLiquidity = totalDeposits - reservedLiquidity - totalLentOut;
+        uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
+        require(availableLiquidity >= req.amount + bufferRequired + liquidityThreshold, "LIQUIDITY_BELOW_THRESHOLD");
+
+        // Create the loan
+        uint256 loanId = nextLoanId++;
+        loans[loanId] = Loan({
+            principal: req.amount,
+            outstanding: req.amount,
+            borrower: req.borrower,
+            interestRate: currentApr,
+            isActive: true,
+            createdAt: block.timestamp
+        });
+
+        // Add to borrower's loan list
+        _borrowerLoans[req.borrower].push(loanId);
+
+        // Reserve liquidity for this loan
+        reservedLiquidity += req.amount;
+
+        // Immediately disburse to the specified recipient
+        reservedLiquidity -= req.amount;
+        totalLentOut += req.amount;
+
+        bool success = usdc.transfer(req.to, req.amount);
+        require(success, "Transfer failed");
+
+        // Emit events
+        emit MetaLoanCreated(req.borrower, loanId, req.amount, currentApr, req.repaymentPeriod);
+        emit MetaLoanDisbursed(req.borrower, loanId, req.amount);
+    }
+
+    /**
+     * @notice Gasless deposit with optional ERC-2612 permit (relayer pays gas)
+     */
+    function depositWithPermitMeta(
+        DepositRequest calldata req,
+        bytes calldata sig,
+        PermitData calldata permit
+    ) external {
+        if (relayerWhitelistEnabled) {
+            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
+        }
+
+        require(block.timestamp <= req.deadline, "Expired");
+        require(req.nonce == nonces[req.lender]++, "Bad nonce");
+
+        // Verify EIP-712
+        bytes32 structHash = keccak256(abi.encode(
+            DEPOSIT_REQUEST_TYPEHASH,
+            req.lender,
+            req.amount,
+            req.receiver,
+            req.nonce,
+            req.deadline
+        ));
+        bytes32 digest = _hashTypedDataV4(structHash);
+        require(SignatureChecker.isValidSignatureNow(req.lender, digest, sig), "Bad signature");
+
+        // Optional permit
+        if (permit.deadline != 0) {
+            IERC20Permit(address(usdc)).permit(
+                req.lender,
+                address(this),
+                permit.value,
+                permit.deadline,
+                permit.v,
+                permit.r,
+                permit.s
+            );
+            require(permit.value >= req.amount, "Permit value too low");
+        }
+
+        require(usdc.transferFrom(req.lender, address(this), req.amount), "Transfer failed");
+
+        // Accounting (1:1 shares for now)
+        totalDeposits += req.amount;
+        lenderDeposits[req.lender] += req.amount;
+        if (!isLender[req.lender]) {
+            isLender[req.lender] = true;
+            lenderCount += 1;
+            _lenders.push(req.lender);
+        }
+
+        emit MetaDeposit(req.lender, req.amount, req.receiver, req.amount);
+
+        // Attempt to fill any queued withdrawals now that liquidity increased
+        _tryFillWithdrawalQueue();
+    }
+
+    /**
+     * @notice Gasless deposit using ONLY ERC-2612 permit (no EIP-712 DepositRequest). Relayer pays gas.
+     *         Pulls exactly the permitted value from `lender` and accounts deposit.
+     */
+    function depositPermitOnlyMeta(
+        address lender,
+        PermitData calldata permit
+    ) external {
+        if (relayerWhitelistEnabled) {
+            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
+        }
+
+        require(lender != address(0), "Bad lender");
+        require(permit.value > 0, "Zero amount");
+
+        // Execute permit so this contract is allowed to pull the exact amount
+        IERC20Permit(address(usdc)).permit(
+            lender,
+            address(this),
+            permit.value,
+            permit.deadline,
+            permit.v,
+            permit.r,
+            permit.s
+        );
+
+        uint256 amount = permit.value;
+        require(usdc.transferFrom(lender, address(this), amount), "Transfer failed");
+
+        // Accounting (mirror depositWithPermitMeta behavior; 1:1 shares for now)
+        totalDeposits += amount;
+        lenderDeposits[lender] += amount;
+        if (!isLender[lender]) {
+            isLender[lender] = true;
+            lenderCount += 1;
+            _lenders.push(lender);
+        }
+
+        emit MetaDeposit(lender, amount, lender, amount);
+
+        // Attempt to fill any queued withdrawals now that liquidity increased
+        _tryFillWithdrawalQueue();
+    }
+
+    /**
+     * @notice Gasless withdrawal request enqueue (relayer pays gas)
+     */
+    function requestWithdrawalMeta(
+        RequestWithdrawal calldata req,
+        bytes calldata sig
+    ) external {
+        if (relayerWhitelistEnabled) {
+            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
+        }
+
+        require(block.timestamp <= req.deadline, "Expired");
+        require(req.nonce == nonces[req.lender]++, "Bad nonce");
+
+        // Verify EIP-712
+        bytes32 structHash = keccak256(abi.encode(
+            REQUEST_WITHDRAWAL_TYPEHASH,
+            req.lender,
+            req.amount,
+            req.to,
+            req.nonce,
+            req.deadline
+        ));
+        bytes32 digest = _hashTypedDataV4(structHash);
+        require(SignatureChecker.isValidSignatureNow(req.lender, digest, sig), "Bad signature");
+
+        require(lenderDeposits[req.lender] >= req.amount, "Insufficient balance");
+
+        uint256 queueId = withdrawalQueue.length;
+        withdrawalQueue.push(WithdrawalQueueItem({
+            lender: req.lender,
+            to: req.to,
+            remaining: req.amount,
+            active: true
+        }));
+        emit MetaWithdrawalRequested(req.lender, queueId, req.amount, req.to);
+
+        // Attempt fills immediately if liquidity allows
+        _tryFillWithdrawalQueue();
+    }
+
+    // Try to fill withdrawals from head while respecting buffer and threshold
+    function _tryFillWithdrawalQueue() internal {
+        uint256 liquid = usdc.balanceOf(address(this));
+        // Calculate guard requirements
+        uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
+
+        // Iterate from head while we can fill at least a cent
+        while (withdrawalHead < withdrawalQueue.length) {
+            WithdrawalQueueItem storage item = withdrawalQueue[withdrawalHead];
+            if (!item.active || item.remaining == 0) {
+                item.active = false;
+                withdrawalHead++;
+                continue;
+            }
+
+            liquid = usdc.balanceOf(address(this));
+            if (liquid <= reservedLiquidity + bufferRequired + liquidityThreshold) {
+                // Cannot pay anything without violating guards
+                break;
+            }
+
+            uint256 available = liquid - reservedLiquidity - bufferRequired - liquidityThreshold;
+            if (available < CENT) {
+                break; // don't bother transferring dust
+            }
+
+            uint256 pay = item.remaining <= available ? item.remaining : available;
+
+            // Update accounting and transfer
+            lenderDeposits[item.lender] -= pay;
+            totalDeposits -= pay;
+            require(usdc.transfer(item.to, pay), "Transfer failed");
+            item.remaining -= pay;
+            emit MetaWithdrawalFilled(withdrawalHead, pay);
+
+            if (item.remaining == 0) {
+                item.active = false;
+                withdrawalHead++;
+            } else {
+                // Partial fill; stop to re-evaluate guards next time
+                break;
+            }
+        }
     }
 }

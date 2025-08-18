@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import type { NextPage } from "next";
-import { useAccount } from "wagmi";
+import { useAccount, useSignTypedData } from "wagmi";
 import { toast } from "react-hot-toast";
-import { formatUSDC, formatUSDCAllowance, getCreditScoreColor } from "~~/utils/format";
+import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
 import { BanknotesIcon, PlusIcon, EyeIcon, HandThumbUpIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
@@ -13,6 +13,9 @@ import HowItWorks from "~~/components/HowItWorks";
 // removed parseEther import because USDC uses 6 decimals
 import { AddressInput } from "~~/components/scaffold-eth";
 import deployedContracts from "~~/contracts/deployedContracts";
+import { createPublicClient, http } from "viem";
+import { localhost } from "viem/chains";
+import { MICRO_DOMAIN, TYPES, USDC_PERMIT_DOMAIN, splitSignature, roundDownToCent, AttestRequest } from "../../types/eip712";
 
 const LendPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -30,27 +33,28 @@ const LendPage: NextPage = () => {
   const [filterText, setFilterText] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState<bigint>(0n);
-  const [usdcAllowance, setUsdcAllowance] = useState<bigint>(0n);
-  const [approvalLoading, setApprovalLoading] = useState(false);
+  // Allowance no longer needed in permit-only flow
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [mintLoading, setMintLoading] = useState(false);
 
-  // Helper function to safely parse deposit amount to BigInt
+  // Helper function to safely parse deposit amount to BigInt (snap to cent)
   const parseDepositAmount = (amount: string): bigint | null => {
     if (!amount || amount.trim() === "") return null;
     const parsed = parseFloat(amount);
     if (isNaN(parsed) || parsed <= 0) return null;
-    return BigInt(Math.floor(parsed * 1e6));
+    const micros = BigInt(Math.floor(parsed * 1e6));
+    return roundDownToCent(micros);
   };
 
-  // Helper function to safely parse withdraw amount to BigInt
+  // Helper function to safely parse withdraw amount to BigInt (snap to cent)
   const parseWithdrawAmount = (amount: string): bigint | null => {
     if (!amount || amount.trim() === "") return null;
     const parsed = parseFloat(amount);
     if (isNaN(parsed) || parsed <= 0) return null;
-    return BigInt(Math.floor(parsed * 1e6));
+    const micros = BigInt(Math.floor(parsed * 1e6));
+    return roundDownToCent(micros);
   };
 
 
@@ -93,12 +97,26 @@ const LendPage: NextPage = () => {
     functionName: "usdc",
   });
 
-  // Resolve DecentralizedMicrocredit contract address from deployments
+  // Resolve DecentralizedMicrocredit & USDC contract data from deployments
   const CONTRACT_ADDRESS = deployedContracts[31337]?.DecentralizedMicrocredit?.address as `0x${string}`;
+  const CONTRACT_ABI = deployedContracts[31337]?.DecentralizedMicrocredit?.abi as any;
+  const USDC_ADDRESS_FROM_DEPLOY = deployedContracts[31337]?.MockUSDC?.address as `0x${string}` | undefined;
+  const USDC_ABI = deployedContracts[31337]?.MockUSDC?.abi as any;
 
   const { writeContractAsync: writeUSDCAsync } = useScaffoldWriteContract({
     contractName: "MockUSDC",
   });
+
+  // viem public client
+  const CHAIN_ID = 31337;
+  const RPC_URL = "http://localhost:8545";
+  const publicClient = useMemo(
+    () => createPublicClient({ chain: { ...localhost, id: CHAIN_ID }, transport: http(RPC_URL) }),
+    []
+  );
+
+  // EIP-712 signer
+  const { signTypedDataAsync } = useSignTypedData();
 
   // ────── Lender-specific data ──────
   const { data: lenderDeposit, refetch: refetchLenderDeposit } = useScaffoldReadContract({
@@ -150,17 +168,12 @@ const LendPage: NextPage = () => {
     args: [connectedAddress as `0x${string}` | undefined],
   });
 
-  const { data: usdcAllowanceData, refetch: refetchUsdcAllowance } = useScaffoldReadContract({
-    contractName: "MockUSDC",
-    functionName: "allowance",
-    args: [connectedAddress as `0x${string}` | undefined, CONTRACT_ADDRESS],
-  });
+  // Removed allowance reads for permit-only deposits
 
   // Update state when data changes
   useEffect(() => {
     if (usdcBalanceData) setUsdcBalance(usdcBalanceData);
-    if (usdcAllowanceData) setUsdcAllowance(usdcAllowanceData);
-  }, [usdcBalanceData, usdcAllowanceData]);
+  }, [usdcBalanceData]);
 
   // ────── Prefill attestation from query params ──────
   useEffect(() => {
@@ -214,24 +227,8 @@ const LendPage: NextPage = () => {
     } catch {}
   }, [attestWeight]);
 
-  // ────── Attestation handlers ──────
-  const handleRecordAttestation = async () => {
-    if (!connectedAddress || !attestBorrower) return;
-    setAttestLoading(true);
-    try {
-      const weightBp = BigInt(Math.floor(attestWeight * 10000));
-      await writeContractAsync({
-        functionName: "recordAttestation",
-        args: [attestBorrower as `0x${string}`, weightBp],
-      });
-      toast.success("Attestation recorded", { position: "top-center" });
-    } catch (err: any) {
-      console.error("Attestation failed:", err);
-      toast.error(`Failed to attest: ${err?.message || "Unknown error"}`);
-    } finally {
-      setAttestLoading(false);
-    }
-  };
+  // ────── Attestation handlers (Meta, gasless) ──────
+  const handleRecordAttestation = async () => {};
 
   const handleDeposit = async () => {
     if (!depositAmount || !connectedAddress || !usdcAddress) return;
@@ -244,129 +241,84 @@ const LendPage: NextPage = () => {
     
     setIsLoading(true);
     try {
-      
-      // Check if approval is needed and handle it properly
-      let currentAllowance = usdcAllowance;
-      if (currentAllowance < amountInt) {
-        setApprovalLoading(true);
-        try {
-          console.log("🔍 Approval needed. Current allowance:", formatUSDC(currentAllowance), "Required:", formatUSDC(amountInt));
-          
-          // Approve the exact amount needed
-          const approvalTx = await writeUSDCAsync({
-            functionName: "approve",
-            args: [CONTRACT_ADDRESS, amountInt],
-            gas: 200_000n, // Set explicit gas limit for approval
-          });
-          
-          console.log("🔍 Approval transaction sent, waiting for confirmation...");
-          
-          // Wait for the transaction to be mined
-          if (approvalTx) {
-            console.log("🔍 Waiting for approval transaction to be mined...");
-            // Wait for transaction receipt
-            await new Promise(resolve => setTimeout(resolve, 3000));
-          }
-          
-          // Refetch allowance after approval and get the new value
-          const { data: newAllowanceData } = await refetchUsdcAllowance();
-          currentAllowance = newAllowanceData || 0n;
-          console.log("🔍 New allowance after approval:", formatUSDC(currentAllowance));
-          
-          // If approval still failed, try with a larger amount
-          if (currentAllowance < amountInt) {
-            console.log("🔍 Approval may have failed, trying with larger amount...");
-            await writeUSDCAsync({
-              functionName: "approve",
-              args: [CONTRACT_ADDRESS, amountInt * 2n], // Approve double the amount
-              gas: 200_000n, // Set explicit gas limit for approval
-            });
-            
-            // Wait again and refetch
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            const { data: finalAllowanceData } = await refetchUsdcAllowance();
-            currentAllowance = finalAllowanceData || 0n;
-            console.log("🔍 Final allowance after second approval:", formatUSDC(currentAllowance));
-          }
-          
-        } catch (approvalError: any) {
-          console.error("🔍 Approval failed:", approvalError);
-          setErrorMessage(`Approval failed: ${approvalError?.message || "Unknown error"}`);
-          return;
-        } finally {
-          setApprovalLoading(false);
-        }
-      }
-      
-      // Final check before deposit using the updated allowance
-      if (currentAllowance < amountInt) {
-        setErrorMessage(`Approval is still insufficient. Current allowance: ${formatUSDC(currentAllowance)}, Required: ${formatUSDC(amountInt)}. Please try approving again or refresh the page.`);
-        return;
-      }
-      
-      await writeContractAsync({
-        functionName: "depositFunds",
-        args: [amountInt],
-        gas: 500_000n, // Set explicit gas limit
-      });
-      
-      // Refetch all relevant data after successful deposit
-      await Promise.all([
-        refetchPoolInfo(),
-        refetchLenderDeposit(),
-        refetchUsdcBalance(),
-        refetchUsdcAllowance()
-      ]);
+      if (!CONTRACT_ADDRESS || !CONTRACT_ABI) throw new Error("Contract not available");
+      const lender = connectedAddress as `0x${string}`;
+      const receiver = connectedAddress as `0x${string}`;
 
-      /* -------------------------------------------------------------
-         DEMO ONLY: trigger PageRank recomputation automatically
-         after every successful deposit so lenders immediately see
-         updated pool APR & credit-score effects in the UI.
-
-         This adds extra gas cost and should NOT be enabled in
-         production.  Simply delete the block (or wrap with a flag)
-         to revert to manual PageRank runs from the Admin panel.
-      --------------------------------------------------------------*/
+      // 1) Build & sign ERC-2612 Permit for USDC (required)
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+      let permitPayload: { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` } | undefined;
       try {
-        console.log("🔄 Auto-computing PageRank after deposit (demo mode)…");
-        await writeContractAsync({ functionName: "computePageRank" });
-        console.log("✅ PageRank recomputed");
-      } catch (prErr) {
-        console.warn("⚠️ Auto PageRank failed (safe to ignore in demo):", prErr);
+        const usdcAddr = (usdcAddress || USDC_ADDRESS_FROM_DEPLOY) as `0x${string}` | undefined;
+        if (!usdcAddr || !USDC_ABI) throw new Error("Missing USDC config");
+
+        const permitNonce = (await publicClient.readContract({
+          address: usdcAddr,
+          abi: USDC_ABI,
+          functionName: "nonces",
+          args: [lender],
+        })) as bigint;
+
+        // Try to read token name; fallback to USD Coin
+        let tokenName = "USD Coin";
+        try {
+          tokenName = (await publicClient.readContract({
+            address: usdcAddr,
+            abi: USDC_ABI,
+            functionName: "name",
+            args: [],
+          })) as string;
+        } catch {}
+
+        const permitMsg = {
+          owner: lender,
+          spender: CONTRACT_ADDRESS,
+          value: amountInt,
+          nonce: permitNonce,
+          deadline,
+        } as const;
+
+        const sigPermit = await signTypedDataAsync({
+          domain: USDC_PERMIT_DOMAIN(31337, usdcAddr, tokenName) as any,
+          types: { Permit: TYPES.Permit } as any,
+          primaryType: "Permit",
+          message: permitMsg as any,
+        });
+        const { v, r, s } = splitSignature(sigPermit);
+        permitPayload = { value: amountInt.toString(), deadline: deadline.toString(), v, r, s };
+      } catch (permitErr) {
+        console.error("Permit signing failed", permitErr);
+        throw new Error("Permit signature was rejected or failed. Please try again.");
       }
-      
+
+      // 2) Call relayer API with permit-only payload
+      const resp = await fetch("/api/meta/deposit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chainId: 31337,
+          contractAddress: CONTRACT_ADDRESS,
+          lender,
+          permit: permitPayload,
+        }),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text);
+      }
+      const j = await resp.json();
+      console.log("Deposit meta result:", j);
+
+      // Refresh state
+      await Promise.all([refetchPoolInfo(), refetchLenderDeposit(), refetchUsdcBalance()]);
+
       setDepositAmount("");
       setErrorMessage(null);
+      toast.success("Deposit submitted via relayer", { position: "top-center" });
     } catch (error: any) {
-      console.error("Error depositing funds:", error);
-      
-      // Provide more specific error messages based on common failure cases
-      if (error?.message?.includes("0xfb8f41b2")) {
-        // This is likely an ERC20 transfer failure - check balance and allowance
-        const balance = Number(usdcBalance) / 1e6;
-        const allowance = Number(usdcAllowance) / 1e6;
-        const requested = Number(amountInt) / 1e6;
-        
-        setErrorMessage(`USDC transfer failed (Error: 0xfb8f41b2).\n\nDebug info:\n- Your USDC Balance: ${balance.toFixed(2)} USDC\n- Contract Allowance: ${allowance.toFixed(2)} USDC\n- Requested Amount: ${requested.toFixed(2)} USDC\n\nPlease check:\n1. You have sufficient USDC balance (${balance.toFixed(2)} >= ${requested.toFixed(2)})\n2. You have approved the contract to spend your USDC (${allowance.toFixed(2)} >= ${requested.toFixed(2)})\n3. The amount is valid`);
-      } else if (error?.message?.includes("insufficient balance") || error?.message?.includes("ERC20: transfer amount exceeds balance")) {
-        setErrorMessage("Insufficient USDC balance. Please check your wallet balance.");
-      } else if (error?.message?.includes("ERC20: transfer amount exceeds allowance")) {
-        setErrorMessage("Insufficient allowance. Please approve the contract to spend your USDC first.");
-      } else if (error?.message?.includes("Amount > 0")) {
-        setErrorMessage("Please enter a valid deposit amount greater than 0.");
-      } else if (error?.message?.includes("insufficient funds") || error?.message?.includes("gas") || error?.message?.includes("Gas")) {
-        setErrorMessage("Transaction failed. This might be due to insufficient ETH balance or contract issues. Gas is free on this network.");
-      } else {
-        setErrorMessage(`Deposit failed: ${error?.message || "Unknown error"}`);
-      }
-      // Add user-friendly error for USDC transfer failure
-      if (
-        error?.message?.includes("0xfb8f41b2") ||
-        error?.message?.includes("Transfer failed")
-      ) {
-        setErrorMessage("USDC transfer failed. Please check your USDC balance and allowance, and try again.");
-        return;
-      }
+      console.error("Error depositing funds (meta):", error);
+      setErrorMessage(`Deposit failed: ${error?.message || "Unknown error"}`);
     } finally {
       setIsLoading(false);
     }
@@ -378,45 +330,62 @@ const LendPage: NextPage = () => {
 
   const handleWithdraw = async () => {
     if (!withdrawAmount || !connectedAddress) return;
-    
     const amountInt = parseWithdrawAmount(withdrawAmount);
     if (!amountInt) {
       setErrorMessage("Please enter a valid withdrawal amount greater than 0.");
       return;
     }
-    
     setWithdrawLoading(true);
     try {
-      await writeContractAsync({
-        functionName: "withdrawFunds",
-        args: [amountInt],
+      if (!CONTRACT_ADDRESS || !CONTRACT_ABI) throw new Error("Contract not available");
+      const lender = connectedAddress as `0x${string}`;
+      const to = connectedAddress as `0x${string}`;
+
+      const metaNonce = (await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "nonces",
+        args: [lender],
+      })) as bigint;
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+
+      const rq = { lender, amount: amountInt, to, nonce: metaNonce, deadline } as const;
+      const sig = await signTypedDataAsync({
+        domain: MICRO_DOMAIN(31337, CONTRACT_ADDRESS) as any,
+        types: { RequestWithdrawal: TYPES.RequestWithdrawal } as any,
+        primaryType: "RequestWithdrawal",
+        message: rq as any,
       });
-      
-      // Refetch all relevant data after successful withdrawal
-      await Promise.all([
-        refetchPoolInfo(),
-        refetchLenderDeposit(),
-        refetchUsdcBalance(),
-        refetchUsdcAllowance()
-      ]);
-      
+
+      const resp = await fetch("/api/meta/request-withdrawal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chainId: 31337,
+          contractAddress: CONTRACT_ADDRESS,
+          req: {
+            lender,
+            amount: amountInt.toString(),
+            to,
+            nonce: metaNonce.toString(),
+            deadline: deadline.toString(),
+          },
+          signature: sig,
+        }),
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      const j = await resp.json();
+      console.log("Withdrawal request meta result:", j);
+
+      await Promise.all([refetchPoolInfo(), refetchLenderDeposit(), refetchUsdcBalance()]);
       setWithdrawAmount("");
       setErrorMessage(null);
+      const filled = j?.amountFilledNow ? Number(BigInt(j.amountFilledNow)) / 1e6 : 0;
+      if (filled > 0) toast.success(`Filled immediately: ${filled.toFixed(2)} USDC`, { position: "top-center" });
+      if (j?.queueId) toast.success(`Queued with id ${j.queueId}`, { position: "top-center" });
     } catch (error: any) {
-      console.error("Error withdrawing funds:", error);
-      
-      // Provide more specific error messages based on common failure cases
-      if (error?.message?.includes("Insufficient balance")) {
-        setErrorMessage("Insufficient deposited balance. You can only withdraw what you have deposited.");
-      } else if (error?.message?.includes("Insufficient liquidity")) {
-        setErrorMessage("Insufficient liquidity in the pool. Some funds may be reserved for loans.");
-      } else if (error?.message?.includes("Amount > 0")) {
-        setErrorMessage("Please enter a valid withdrawal amount greater than 0.");
-      } else if (error?.message?.includes("Transfer failed")) {
-        setErrorMessage("USDC transfer failed. Please try again.");
-      } else {
-        setErrorMessage(`Withdrawal failed: ${error?.message || "Unknown error"}`);
-      }
+      console.error("Error withdrawing funds (meta):", error);
+      setErrorMessage(`Withdrawal failed: ${error?.message || "Unknown error"}`);
     } finally {
       setWithdrawLoading(false);
     }
@@ -434,20 +403,15 @@ const LendPage: NextPage = () => {
       console.log("🔍 Lender deposit from contract:", lenderDeposit);
       console.log("🔍 Pool info:", poolInfo);
       console.log("🔍 USDC balance:", usdcBalance);
-      console.log("🔍 USDC allowance:", usdcAllowance);
+      // allowance removed in permit-only flow
       
       // Force refetch all data
-      await Promise.all([
-        refetchPoolInfo(),
-        refetchLenderDeposit(),
-        refetchUsdcBalance(),
-        refetchUsdcAllowance()
-      ]);
+      await Promise.all([refetchPoolInfo(), refetchLenderDeposit(), refetchUsdcBalance()]);
       
       console.log("🔍 After refetch - Lender deposit:", lenderDeposit);
       console.log("🔍 After refetch - Pool info:", poolInfo);
       console.log("🔍 After refetch - USDC balance:", usdcBalance);
-      console.log("🔍 After refetch - USDC allowance:", usdcAllowance);
+      // console.log("🔍 After refetch - USDC allowance:", usdcAllowance);
       
       // Check if user has any USDC
       if (usdcBalance === 0n) {
@@ -457,13 +421,7 @@ const LendPage: NextPage = () => {
         console.log("🔍 User has USDC balance:", formatUSDC(usdcBalance));
       }
       
-      // Check allowance
-      if (usdcAllowance === 0n) {
-        console.log("🔍 User has no allowance. They need to approve USDC spending.");
-        setErrorMessage("You haven't approved the contract to spend your USDC. Please use the 'Approve Unlimited' button.");
-      } else {
-        console.log("🔍 User has allowance:", formatUSDC(usdcAllowance));
-      }
+      // Permit-only flow, no allowance needed
       
     } catch (error) {
       console.error("Debug error:", error);
@@ -496,7 +454,7 @@ const LendPage: NextPage = () => {
             functionName: "approve",
             args: [CONTRACT_ADDRESS, maxAmount],
           });
-          await refetchUsdcAllowance();
+          // no allowance in permit-only flow
           console.log("🔍 Auto-approval successful");
         } catch (approvalError) {
           console.log("🔍 Auto-approval failed, user can approve manually:", approvalError);
@@ -513,36 +471,69 @@ const LendPage: NextPage = () => {
 
   const handleAttestation = async () => {
     if (!attestBorrower || !connectedAddress) return;
+    setAttestLoading(true);
     try {
-      setAttestLoading(true);
-      await writeContractAsync({
-        functionName: "recordAttestation",
-        args: [attestBorrower as `0x${string}`, BigInt(attestWeight * 10000)],
+      if (!CONTRACT_ADDRESS || !CONTRACT_ABI) throw new Error("Contract not available");
+      const attester = connectedAddress as `0x${string}`;
+      const borrower = attestBorrower as `0x${string}`;
+      const weight = BigInt(attestWeight * 10000); // percent -> SCALE(1e6)
+
+      const metaNonce = (await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "nonces",
+        args: [attester],
+      })) as bigint;
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+
+      const rq: AttestRequest = { attester, borrower, weight, nonce: metaNonce, deadline };
+
+      const sig = await signTypedDataAsync({
+        domain: MICRO_DOMAIN(31337, CONTRACT_ADDRESS) as any,
+        types: { AttestRequest: TYPES.AttestRequest } as any,
+        primaryType: "AttestRequest",
+        message: rq as any,
       });
-      
-      // DEMO ONLY: Show PageRank computation effect
-      // In production with oracle, this will be handled off-chain
-      toast.success("Attestation recorded! Computing PageRank scores...", {
-        duration: 3000,
-        position: "top-center",
+
+      const resp = await fetch("/api/meta/attest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chainId: 31337,
+          contractAddress: CONTRACT_ADDRESS,
+          req: {
+            attester,
+            borrower,
+            weight: weight.toString(),
+            nonce: metaNonce.toString(),
+            deadline: deadline.toString(),
+          },
+          signature: sig,
+        }),
       });
-      
+      if (!resp.ok) throw new Error(await resp.text());
+      const j = await resp.json();
+      console.log("Meta attestation result:", j);
+
+      toast.success("Attestation submitted via relayer", { position: "top-center" });
+
       // Update local list (replace existing weight if borrower already attested)
       setAttestations(prev => {
-        const existingIdx = prev.findIndex(a => a.borrower.toLowerCase() === attestBorrower.toLowerCase());
+        const existingIdx = prev.findIndex(a => a.borrower.toLowerCase() === borrower.toLowerCase());
         const weightNum = attestWeight;
         if (existingIdx >= 0) {
           const copy = [...prev];
-          copy[existingIdx] = { borrower: attestBorrower as `0x${string}`, weight: weightNum };
+          copy[existingIdx] = { borrower, weight: weightNum };
           return copy;
         }
-        return [...prev, { borrower: attestBorrower as `0x${string}`, weight: weightNum }];
+        return [...prev, { borrower, weight: weightNum }];
       });
       setAttestBorrower("");
       setAttestWeight(80);
       setShowForm(false);
-    } catch (err) {
-      console.error("Attestation error", err);
+    } catch (err: any) {
+      console.error("Meta attestation error", err);
+      toast.error(`Failed to attest: ${err?.message || "Unknown error"}`);
     } finally {
       setAttestLoading(false);
     }
@@ -744,6 +735,9 @@ const LendPage: NextPage = () => {
               }
               return null;
             })()}
+
+            {/* Caption: one approval, no gas */}
+            <p className="text-xs text-gray-500 mt-2">One approval, no gas. We’ll ask you to approve this deposit; our relayer handles the transaction.</p>
 
             <p className="text-xs text-gray-500 mt-3">*Interest displayed is a simplified projection based on current pool APR.</p>
             
