@@ -586,31 +586,7 @@ const LendPage: NextPage = () => {
             </div>
           )}
 
-          {/* Welcome Section for Lenders */}
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 mb-8">
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-blue-800 mb-3">Welcome to Social Lending</h2>
-              <p className="text-blue-700 max-w-3xl mx-auto">
-                Support financial inclusion while earning returns. Your deposits fund microloans for borrowers 
-                who are vetted by their communities, not traditional banks. Help build stronger communities through social lending.
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-              <div className="bg-white rounded-lg p-4">
-                <div className="text-2xl font-bold text-blue-600 mb-2">Earn Returns</div>
-                <div className="text-sm text-gray-600">Competitive APY on your USDC deposits</div>
-              </div>
-              <div className="bg-white rounded-lg p-4">
-                <div className="text-2xl font-bold text-blue-600 mb-2">Social Impact</div>
-                <div className="text-sm text-gray-600">Support underserved communities and entrepreneurs</div>
-              </div>
-              <div className="bg-white rounded-lg p-4">
-                <div className="text-2xl font-bold text-blue-600 mb-2">Community Vetted</div>
-                <div className="text-sm text-gray-600">Borrowers are attested by their trusted networks</div>
-              </div>
-            </div>
-          </div>
+          
 
           {/* Pool & Attestations grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
@@ -853,15 +829,7 @@ const LendPage: NextPage = () => {
 
           {/* Pool Overview moved to Admin page */}
 
-          {/* How Lending Works */}
-          <HowItWorks
-            title="How Lending Works"
-            steps={[
-              { icon: null, title: "Deposit Funds", description: "Add USDC to the shared pool" },
-              { icon: null, title: "Automatic Allocation", description: "Protocol distributes liquidity to qualified borrowers" },
-              { icon: null, title: "Earn Interest", description: "Interest accrues to your share of the pool" },
-            ]}
-          />
+
         </div>
       </div>
     </>
