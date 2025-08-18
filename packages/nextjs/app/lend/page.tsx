@@ -1,21 +1,21 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+// Attestation flow moved to /attest; no need for search params here
 import type { NextPage } from "next";
 import { useAccount, useSignTypedData } from "wagmi";
 import { toast } from "react-hot-toast";
 import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
-import { BanknotesIcon, PlusIcon, EyeIcon, HandThumbUpIcon } from "@heroicons/react/24/outline";
+import { BanknotesIcon, PlusIcon, EyeIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import HowItWorks from "~~/components/HowItWorks";
 // removed parseEther import because USDC uses 6 decimals
-import { AddressInput } from "~~/components/scaffold-eth";
+// import { AddressInput } from "~~/components/scaffold-eth";
 import deployedContracts from "~~/contracts/deployedContracts";
 import { createPublicClient, http } from "viem";
 import { localhost } from "viem/chains";
-import { MICRO_DOMAIN, TYPES, USDC_PERMIT_DOMAIN, splitSignature, roundDownToCent, AttestRequest } from "../../types/eip712";
+import { MICRO_DOMAIN, TYPES, USDC_PERMIT_DOMAIN, splitSignature, roundDownToCent } from "../../types/eip712";
 
 const LendPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -23,15 +23,7 @@ const LendPage: NextPage = () => {
   const [depositAmount, setDepositAmount] = useState("1000");
   const [selectedLoanId, setSelectedLoanId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [attestBorrower, setAttestBorrower] = useState("");
-  const [attestWeight, setAttestWeight] = useState<number>(80);
-  const [attestLoading, setAttestLoading] = useState(false);
-  const searchParams = useSearchParams();
-  const [arrivedViaAttestLink, setArrivedViaAttestLink] = useState(false);
-  // Track attestations made by the connected lender (session-level + localStorage cache)
-  const [attestations, setAttestations] = useState<{ borrower: `0x${string}`; weight: number }[]>([]);
-  const [filterText, setFilterText] = useState("");
-  const [showForm, setShowForm] = useState(false);
+  // Attestation state removed; see /attest page
   const [usdcBalance, setUsdcBalance] = useState<bigint>(0n);
   // Allowance no longer needed in permit-only flow
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -57,34 +49,7 @@ const LendPage: NextPage = () => {
     return roundDownToCent(micros);
   };
 
-
-
-  // Load cached attestations from localStorage when wallet connects
-  useEffect(() => {
-    if (!connectedAddress) return;
-    const key = `attestations_${connectedAddress}`;
-    const stored = window.localStorage.getItem(key);
-    if (stored) {
-      try {
-        setAttestations(JSON.parse(stored));
-      } catch {
-        // ignore parse errors
-      }
-    }
-  }, [connectedAddress]);
-
-
-
-  // Persist whenever attestations change
-  useEffect(() => {
-    if (!connectedAddress) return;
-    const key = `attestations_${connectedAddress}`;
-    window.localStorage.setItem(key, JSON.stringify(attestations));
-  }, [attestations, connectedAddress]);
-
-  const filteredAttestations = attestations.filter(a =>
-    a.borrower.toLowerCase().includes(filterText.toLowerCase())
-  );
+  // Attestation cache removed
 
   // Contract hooks
   const { writeContractAsync } = useScaffoldWriteContract({
@@ -175,60 +140,7 @@ const LendPage: NextPage = () => {
     if (usdcBalanceData) setUsdcBalance(usdcBalanceData);
   }, [usdcBalanceData]);
 
-  // ────── Prefill attestation from query params ──────
-  useEffect(() => {
-    if (!searchParams) return;
-    const borrowerParam = searchParams.get("borrower");
-    const weightParam = searchParams.get("weight");
-    if (borrowerParam) {
-      setAttestBorrower(borrowerParam);
-      setArrivedViaAttestLink(true);
-      setShowForm(true);
-    }
-    if (weightParam) {
-      const w = Number(weightParam);
-      if (!Number.isNaN(w) && w >= 1 && w <= 100) setAttestWeight(w);
-    }
-  }, [searchParams]);
-
-  // ────── Persist attestation prefill across interactions/reloads ──────
-  useEffect(() => {
-    try {
-      // If no query borrower but we have a stored prefill, restore it
-      const hasQueryBorrower = !!searchParams?.get("borrower");
-      if (!hasQueryBorrower) {
-        const storedBorrower = window.sessionStorage.getItem("attest_prefill_borrower");
-        const storedWeight = window.sessionStorage.getItem("attest_prefill_weight");
-        if (storedBorrower && !attestBorrower) {
-          setAttestBorrower(storedBorrower);
-          setShowForm(true);
-        }
-        if (storedWeight) {
-          const w = Number(storedWeight);
-          if (!Number.isNaN(w) && w >= 1 && w <= 100) setAttestWeight(w);
-        }
-      }
-    } catch {}
-    // run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    try {
-      if (attestBorrower) {
-        window.sessionStorage.setItem("attest_prefill_borrower", attestBorrower);
-      }
-    } catch {}
-  }, [attestBorrower]);
-
-  useEffect(() => {
-    try {
-      window.sessionStorage.setItem("attest_prefill_weight", String(attestWeight));
-    } catch {}
-  }, [attestWeight]);
-
-  // ────── Attestation handlers (Meta, gasless) ──────
-  const handleRecordAttestation = async () => {};
+  // Attestation prefill and handlers removed
 
   const handleDeposit = async () => {
     if (!depositAmount || !connectedAddress || !usdcAddress) return;
@@ -469,75 +381,7 @@ const LendPage: NextPage = () => {
     }
   };
 
-  const handleAttestation = async () => {
-    if (!attestBorrower || !connectedAddress) return;
-    setAttestLoading(true);
-    try {
-      if (!CONTRACT_ADDRESS || !CONTRACT_ABI) throw new Error("Contract not available");
-      const attester = connectedAddress as `0x${string}`;
-      const borrower = attestBorrower as `0x${string}`;
-      const weight = BigInt(attestWeight * 10000); // percent -> SCALE(1e6)
-
-      const metaNonce = (await publicClient.readContract({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
-        functionName: "nonces",
-        args: [attester],
-      })) as bigint;
-      const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
-
-      const rq: AttestRequest = { attester, borrower, weight, nonce: metaNonce, deadline };
-
-      const sig = await signTypedDataAsync({
-        domain: MICRO_DOMAIN(31337, CONTRACT_ADDRESS) as any,
-        types: { AttestRequest: TYPES.AttestRequest } as any,
-        primaryType: "AttestRequest",
-        message: rq as any,
-      });
-
-      const resp = await fetch("/api/meta/attest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chainId: 31337,
-          contractAddress: CONTRACT_ADDRESS,
-          req: {
-            attester,
-            borrower,
-            weight: weight.toString(),
-            nonce: metaNonce.toString(),
-            deadline: deadline.toString(),
-          },
-          signature: sig,
-        }),
-      });
-      if (!resp.ok) throw new Error(await resp.text());
-      const j = await resp.json();
-      console.log("Meta attestation result:", j);
-
-      toast.success("Attestation submitted via relayer", { position: "top-center" });
-
-      // Update local list (replace existing weight if borrower already attested)
-      setAttestations(prev => {
-        const existingIdx = prev.findIndex(a => a.borrower.toLowerCase() === borrower.toLowerCase());
-        const weightNum = attestWeight;
-        if (existingIdx >= 0) {
-          const copy = [...prev];
-          copy[existingIdx] = { borrower, weight: weightNum };
-          return copy;
-        }
-        return [...prev, { borrower, weight: weightNum }];
-      });
-      setAttestBorrower("");
-      setAttestWeight(80);
-      setShowForm(false);
-    } catch (err: any) {
-      console.error("Meta attestation error", err);
-      toast.error(`Failed to attest: ${err?.message || "Unknown error"}`);
-    } finally {
-      setAttestLoading(false);
-    }
-  };
+  // Attestation submit removed
 
   // imported helpers handle color & formatting
 
@@ -551,49 +395,16 @@ const LendPage: NextPage = () => {
             <h1 className="text-3xl font-bold">Lend Funds</h1>
           </div>
 
-          {/* Attestation Link Context */}
-          {arrivedViaAttestLink && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6">
-              {connectedAddress ? (
-                attestBorrower && connectedAddress.toLowerCase() === attestBorrower.toLowerCase() ? (
-                  <div className="text-blue-800">
-                    <h3 className="text-lg font-semibold mb-1">This is your attestation link</h3>
-                    <p>
-                      Share this page URL with friends or community members so they can attest to your
-                      creditworthiness. The attestation form below is pre-filled with your address.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="text-blue-800">
-                    <h3 className="text-lg font-semibold mb-1">You were invited to make an attestation</h3>
-                    <p>
-                      The form below is pre-filled to attest for
-                      {" "}
-                      <span className="font-mono break-all">{attestBorrower}</span>.
-                      Your attestation helps improve their on-chain credit score.
-                    </p>
-                  </div>
-                )
-              ) : (
-                <div className="text-blue-800">
-                  <h3 className="text-lg font-semibold mb-1">Attestation link detected</h3>
-                  <p>
-                    Connect your wallet to continue. The attestation form will be pre-filled so you can
-                    vouch for the borrower.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Attestation link context removed; see /attest */}
 
           
 
-          {/* Pool & Attestations grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Pool grid (centered) */}
+          <div className="grid grid-cols-1 gap-8 mb-8 justify-center">
 
           {/* Your Pool Position */}
           {connectedAddress && (
-          <div className="bg-base-100 rounded-lg p-6 shadow-lg w-full">
+          <div className="bg-base-100 rounded-lg p-6 shadow-lg w-full max-w-3xl mx-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Your Pool Position</h2>
               <div className="flex gap-2">
@@ -755,81 +566,11 @@ const LendPage: NextPage = () => {
           </div>
           )}
 
-          {/* My Attestations */}
-          <div className="bg-base-100 rounded-lg p-6 shadow-lg w-full">
-            <h2 className="text-xl font-semibold mb-6 flex items-center">
-              <HandThumbUpIcon className="h-6 w-6 mr-2" />
-              Your Attestations
-            </h2>
-
-            {/* Filter & New Attestation Form */}
-            <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Filter borrowers */}
-              <input
-                type="text"
-                className="input input-bordered w-full md:col-span-2"
-                placeholder="Filter by borrower address..."
-                value={filterText}
-                onChange={e => setFilterText(e.target.value)}
-              />
-
-              {/* New attestation button toggles form visibility on small screens */}
-              <button
-                className="btn btn-primary w-full"
-                onClick={() => setShowForm(prev => !prev)}
-              >
-                {showForm ? "Close" : "New Attestation"}
-              </button>
-            </div>
-
-            {/* New Attestation Inline Form */}
-            {showForm && (
-            <div className="space-y-4 mb-8">
-              <div>
-                <label className="block text-sm font-medium mb-2">Borrower Address</label>
-                <AddressInput value={attestBorrower} onChange={setAttestBorrower} placeholder="0x..." />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Confidence Level: {attestWeight}%</label>
-                <input type="range" min="1" max="100" value={attestWeight} onChange={e=>setAttestWeight(Number(e.target.value))} className="w-full" />
-              </div>
-              <button onClick={handleAttestation} disabled={!attestBorrower || attestLoading} className="btn btn-primary w-full">
-                {attestLoading ? "Submitting..." : "Submit Attestation"}
-              </button>
-            </div>
-            )}
-
-            {/* Attestations Table */}
-            <div className="overflow-x-auto">
-              <table className="table w-full text-sm">
-                <thead>
-                  <tr>
-                    <th className="px-2 py-3 text-left">Borrower</th>
-                    <th className="px-2 py-3 text-left">Weight</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredAttestations.length === 0 && (
-                    <tr className="bg-base-200">
-                      <td colSpan={2} className="text-center py-6 text-gray-500 italic">No attestations yet</td>
-                    </tr>
-                  )}
-                  {filteredAttestations.map(({ borrower, weight }) => (
-                    <tr key={borrower} className="hover:bg-base-200">
-                      <td className="px-2 py-2 font-mono break-all"><Address address={borrower as `0x${string}`} /></td>
-                      <td className="px-2 py-2">{weight}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {/* Attestations section removed; moved to /attest */}
 
           </div> {/* end grid */}
 
           {/* Pool Overview moved to Admin page */}
-
-
         </div>
       </div>
     </>
