@@ -552,11 +552,11 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1755132726.json",
+      deploymentFile: "run-1755485946.json",
       deploymentScript: "Deploy.s.sol",
     },
     DecentralizedMicrocredit: {
-      address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
+      address: "0xa15bb66138824a1c7167f5e85b957d04dd34e468",
       abi: [
         {
           type: "constructor",
@@ -649,6 +649,51 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "attestMeta",
+          inputs: [
+            {
+              name: "req",
+              type: "tuple",
+              internalType: "struct DecentralizedMicrocredit.AttestRequest",
+              components: [
+                {
+                  name: "attester",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "borrower",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "weight",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "nonce",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "deadline",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+              ],
+            },
+            {
+              name: "sig",
+              type: "bytes",
+              internalType: "bytes",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "basePersonalization",
           inputs: [],
           outputs: [
@@ -659,6 +704,61 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "borrowAndDisburseMeta",
+          inputs: [
+            {
+              name: "req",
+              type: "tuple",
+              internalType: "struct DecentralizedMicrocredit.BorrowAndDisburse",
+              components: [
+                {
+                  name: "borrower",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "amount",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "to",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "repaymentPeriod",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "maxAprBps",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "nonce",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "deadline",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+              ],
+            },
+            {
+              name: "sig",
+              type: "bytes",
+              internalType: "bytes",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -719,6 +819,128 @@ const deployedContracts = {
               name: "amount",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "depositPermitOnlyMeta",
+          inputs: [
+            {
+              name: "lender",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "permit",
+              type: "tuple",
+              internalType: "struct DecentralizedMicrocredit.PermitData",
+              components: [
+                {
+                  name: "value",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "deadline",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "v",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "r",
+                  type: "bytes32",
+                  internalType: "bytes32",
+                },
+                {
+                  name: "s",
+                  type: "bytes32",
+                  internalType: "bytes32",
+                },
+              ],
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "depositWithPermitMeta",
+          inputs: [
+            {
+              name: "req",
+              type: "tuple",
+              internalType: "struct DecentralizedMicrocredit.DepositRequest",
+              components: [
+                {
+                  name: "lender",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "amount",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "receiver",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "nonce",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "deadline",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+              ],
+            },
+            {
+              name: "sig",
+              type: "bytes",
+              internalType: "bytes",
+            },
+            {
+              name: "permit",
+              type: "tuple",
+              internalType: "struct DecentralizedMicrocredit.PermitData",
+              components: [
+                {
+                  name: "value",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "deadline",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "v",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "r",
+                  type: "bytes32",
+                  internalType: "bytes32",
+                },
+                {
+                  name: "s",
+                  type: "bytes32",
+                  internalType: "bytes32",
+                },
+              ],
             },
           ],
           outputs: [],
@@ -1089,6 +1311,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getOutstandingRoundedToCent",
+          inputs: [
+            {
+              name: "loanId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "getPageRankScore",
           inputs: [
             {
@@ -1201,6 +1442,32 @@ const deployedContracts = {
         {
           type: "function",
           name: "lendingUtilizationCap",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "liquidityBuffer",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "liquidityThreshold",
           inputs: [],
           outputs: [
             {
@@ -1508,6 +1775,54 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "repayWithPermit",
+          inputs: [
+            {
+              name: "borrower",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "loanId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "value",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "deadline",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "v",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "r",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "s",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "requestLoan",
           inputs: [
             {
@@ -1569,6 +1884,51 @@ const deployedContracts = {
               internalType: "uint256",
             },
           ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "requestWithdrawalMeta",
+          inputs: [
+            {
+              name: "req",
+              type: "tuple",
+              internalType: "struct DecentralizedMicrocredit.RequestWithdrawal",
+              components: [
+                {
+                  name: "lender",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "amount",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "to",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "nonce",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "deadline",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+              ],
+            },
+            {
+              name: "sig",
+              type: "bytes",
+              internalType: "bytes",
+            },
+          ],
+          outputs: [],
           stateMutability: "nonpayable",
         },
         {
@@ -1642,6 +2002,24 @@ const deployedContracts = {
           inputs: [
             {
               name: "cap",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setLiquidityLimits",
+          inputs: [
+            {
+              name: "bufferBp",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "threshold",
               type: "uint256",
               internalType: "uint256",
             },
@@ -1792,6 +2170,143 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "LiquidityLimitsUpdated",
+          inputs: [
+            {
+              name: "bufferBp",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "threshold",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "LoanRepaid",
+          inputs: [
+            {
+              name: "borrower",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "loanId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "MetaAttested",
+          inputs: [
+            {
+              name: "attester",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "borrower",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "weight",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "MetaDeposit",
+          inputs: [
+            {
+              name: "lender",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "receiver",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "sharesMinted",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "MetaLoanCreated",
+          inputs: [
+            {
+              name: "borrower",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "loanId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "interestRate",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "repaymentPeriod",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "MetaLoanDisbursed",
           inputs: [
             {
@@ -1803,11 +2318,11 @@ const deployedContracts = {
             {
               name: "loanId",
               type: "uint256",
-              indexed: false,
+              indexed: true,
               internalType: "uint256",
             },
             {
-              name: "principal",
+              name: "amount",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -1866,6 +2381,56 @@ const deployedContracts = {
           anonymous: false,
         },
         {
+          type: "event",
+          name: "MetaWithdrawalFilled",
+          inputs: [
+            {
+              name: "queueId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "amountFilled",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "MetaWithdrawalRequested",
+          inputs: [
+            {
+              name: "lender",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "queueId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "to",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
           type: "error",
           name: "InvalidShortString",
           inputs: [],
@@ -1883,7 +2448,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1755138968.json",
+      deploymentFile: "run-1755485946.json",
       deploymentScript: "Deploy.s.sol",
     },
   },

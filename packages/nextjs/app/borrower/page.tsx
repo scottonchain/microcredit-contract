@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { createPublicClient, http } from "viem";
 import { localhost } from "viem/chains";
 import deployedContracts from "~~/contracts/deployedContracts";
@@ -8,10 +9,11 @@ import type { NextPage } from "next";
 import { useAccount, useSignTypedData } from "wagmi";
 import { CreditCardIcon, CalculatorIcon, InformationCircleIcon, DocumentDuplicateIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
-import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
+import { splitSignature } from "../../utils/usdc";
 
 const BorrowPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -19,6 +21,7 @@ const BorrowPage: NextPage = () => {
   const [repayAmount, setRepayAmount] = useState(""); // For partial repayments
   const [repaymentPeriod, setRepaymentPeriod] = useState(7); // Default 1 week
   const [isLoading, setIsLoading] = useState(false);
+  const [permitError, setPermitError] = useState<string | null>(null);
 
   // Fetch on-chain credit score (0 – 1e6)
   const { data: creditScore } = useScaffoldReadContract({
@@ -54,12 +57,19 @@ const BorrowPage: NextPage = () => {
     return (amount / pennyInWei) * pennyInWei;
   };
 
+  // (event-driven sync inserted below after dependencies)
+
+  // (moved) event-driven sync is defined below after dependencies are declared
+
   // Helper function to round up to the nearest penny (0.01 USDC = 10000 wei)
   const roundUpToNearestPenny = (amount: bigint): bigint => {
     const pennyInWei = 10000n;
     if (amount % pennyInWei === 0n) return amount;
     return ((amount / pennyInWei) + 1n) * pennyInWei;
   };
+
+  // Preferred display rounding (half-up) for parity with contract helper
+  const roundToCentHalfUp = (amount: bigint): bigint => ((amount + 5_000n) / 10_000n) * 10_000n;
 
   // Compute max eligible amount (BigInt, 6-decimals)
   // TODO: This should be made consistent with best practices for loan amount calculation
@@ -117,13 +127,6 @@ const BorrowPage: NextPage = () => {
     return roundDownToNearestPenny(amountInWei);
   };
 
-  // Write contract functions
-  // Note: All writes are routed via meta-tx relayer except this USDC approval fallback
-  // used only when permit is unavailable in dev/local environments.
-  const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({
-    contractName: "MockUSDC",
-  });
-
   // Contract configs
   const contracts = deployedContracts[31337];
   const USDC_ADDRESS = contracts?.MockUSDC?.address as `0x${string}` | undefined;
@@ -156,56 +159,16 @@ const BorrowPage: NextPage = () => {
     };
   }, [USDC_ADDRESS, USDC_ABI]);
 
-  // Helper function to check and handle USDC allowance
-  const ensureAllowance = async (amount: bigint) => {
-    if (!connectedAddress || !USDC_ADDRESS || !MICRO_ADDRESS) {
-      throw new Error("Missing required addresses");
-    }
-
-    try {
-      // Check current allowance
-      const currentAllowance = await publicClient.readContract({
-        address: USDC_ADDRESS,
-        abi: USDC_ABI,
-        functionName: "allowance",
-        args: [connectedAddress, MICRO_ADDRESS],
-      });
-
-      console.log("Current allowance:", currentAllowance.toString());
-      console.log("Required amount:", amount.toString());
-
-      // If allowance is insufficient, approve
-      if (currentAllowance < amount) {
-        console.log("Insufficient allowance, approving...");
-        await writeUsdcAsync({
-          functionName: "approve",
-          args: [MICRO_ADDRESS, amount],
-        });
-        
-        // Wait for approval to be processed
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // Verify the approval
-        const newAllowance = await publicClient.readContract({
-          address: USDC_ADDRESS,
-          abi: USDC_ABI,
-          functionName: "allowance",
-          args: [connectedAddress, MICRO_ADDRESS],
-        });
-        
-        console.log("New allowance:", newAllowance.toString());
-        
-        if (newAllowance < amount) {
-          throw new Error("Allowance approval failed");
-        }
-      } else {
-        console.log("Sufficient allowance already exists");
+  // Dev-only domain sanity: warn if token name differs
+  useEffect(() => {
+    if (usdcTokenName && process.env.NODE_ENV !== "production") {
+      if (usdcTokenName !== "USD Coin") {
+        console.warn(`[permit-domain] USDC token name is "${usdcTokenName}". Ensure relayer & client use the exact same domain name.`);
       }
-    } catch (error) {
-      console.error("Error in ensureAllowance:", error);
-      throw error;
     }
-  };
+  }, [usdcTokenName]);
+
+  // Note: No approval fallback. Repayments require ERC-2612 permit. Dev escape hatch is intentionally disabled by default.
 
   // Helper function to check USDC balance
   const checkUSDCBalance = async (amount: bigint) => {
@@ -318,34 +281,19 @@ const BorrowPage: NextPage = () => {
     [CHAIN_ID, CONTRACT_ADDRESS]
   );
 
-  const loanRequestTypes = {
-    LoanRequest: [
+  const borrowAndDisburseTypes = {
+    BorrowAndDisburse: [
       { name: "borrower", type: "address" },
       { name: "amount", type: "uint256" },
-      { name: "nonce", type: "uint256" },
-      { name: "deadline", type: "uint256" },
-    ],
-  } as const;
-
-  const disburseRequestTypes = {
-    DisburseRequest: [
-      { name: "borrower", type: "address" },
-      { name: "loanId", type: "uint256" },
       { name: "to", type: "address" },
+      { name: "repaymentPeriod", type: "uint256" },
+      { name: "maxAprBps", type: "uint256" },
       { name: "nonce", type: "uint256" },
       { name: "deadline", type: "uint256" },
     ],
   } as const;
 
-  const repayRequestTypes = {
-    RepayRequest: [
-      { name: "borrower", type: "address" },
-      { name: "loanId", type: "uint256" },
-      { name: "amount", type: "uint256" },
-      { name: "nonce", type: "uint256" },
-      { name: "deadline", type: "uint256" },
-    ],
-  } as const;
+  // Removed RepayRequest typed-data. Repay now uses only USDC Permit.
 
   // ERC-2612 Permit typed data domain for USDC
   // Use on-chain token name when available; default to "USD Coin" (MockUSDC constructor) to maintain compatibility
@@ -369,14 +317,7 @@ const BorrowPage: NextPage = () => {
     ],
   } as const;
 
-  // Helper: split 65-byte sig into {v,r,s}
-  const splitSignature = (sig: `0x${string}`) => {
-    const hex = sig.slice(2);
-    const r = ("0x" + hex.slice(0, 64)) as `0x${string}`;
-    const s = ("0x" + hex.slice(64, 128)) as `0x${string}`;
-    const v = Number("0x" + hex.slice(128, 130));
-    return { v, r, s } as const;
-  };
+  // Using splitSignature from utils/usdc.
 
   // Preview loan terms when amount or repayment period changes
   const { data: previewTermsData } = useScaffoldReadContract({
@@ -390,44 +331,122 @@ const BorrowPage: NextPage = () => {
   });
 
   // ───────────── Borrower current loan ─────────────
-  const { data: borrowerLoanIds, refetch: refetchBorrowerLoanIds } = useScaffoldReadContract({
+  const queryClient = useQueryClient();
+  const signingRef = useRef(false);
+
+  // Borrower loans (ids) — keep the full result object for queryKey/loading
+  const borrowerLoanIdsRes = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "getBorrowerLoanIds" as any,
     args: connectedAddress ? ([connectedAddress as `0x${string}`] as any) : undefined,
     watch: true,
+    query: { refetchOnMount: "always", refetchOnWindowFocus: "always", staleTime: 0, gcTime: 0 },
   });
+  const borrowerLoanIds = borrowerLoanIdsRes.data as bigint[] | undefined;
+  // Active id (newest) — deterministic within component
+  const activeLoanId = useMemo(() => {
+    if (!Array.isArray(borrowerLoanIds) || borrowerLoanIds.length === 0) return undefined;
+    return [...borrowerLoanIds].sort((a, b) => (a > b ? -1 : 1))[0];
+  }, [borrowerLoanIds]);
 
-  // There is at most one active loan per borrower; take first
-  const latestLoanId = borrowerLoanIds && Array.isArray(borrowerLoanIds) && borrowerLoanIds.length > 0 ? (borrowerLoanIds[0] as bigint) : undefined;
-
-  const { data: latestLoan, refetch: refetchLatestLoan } = useScaffoldReadContract({
+  // Loan details — keep result object
+  const loanRes = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "getLoan" as any,
-    args: latestLoanId !== undefined ? ([latestLoanId as bigint] as any) : undefined,
+    args: activeLoanId !== undefined ? ([activeLoanId as bigint] as any) : undefined,
     query: {
-      enabled: latestLoanId !== undefined,
+      enabled: activeLoanId !== undefined,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: "always",
+      staleTime: 0,
+      gcTime: 0,
     },
     watch: true,
   });
+  const activeLoan = loanRes.data as any | undefined;
+  const loanIsActive = !!activeLoan?.[4];
+  const activePrincipal: bigint | undefined = loanIsActive ? activeLoan?.[0] : undefined;
+  const activeOutstanding: bigint | undefined = loanIsActive ? activeLoan?.[1] : undefined;
 
-  const activePrincipal: bigint | undefined = latestLoan && (latestLoan as any)[4] ? (latestLoan as any)[0] : undefined;
-  const activeOutstanding: bigint | undefined = latestLoan && (latestLoan as any)[4] ? (latestLoan as any)[1] : undefined;
-
-  // Fetch live outstanding amount including accrued interest
-  const { data: liveOutstanding, refetch: refetchLiveOutstanding } = useScaffoldReadContract({
+  // Outstanding rounded — disable when inactive; keep result object
+  const outRoundedRes = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "getCurrentOutstandingAmount" as any,
-    args: latestLoanId !== undefined ? ([latestLoanId as bigint] as any) : undefined,
+    functionName: "getOutstandingRoundedToCent" as any,
+    args: activeLoanId !== undefined ? ([activeLoanId as bigint] as any) : undefined,
     query: {
-      enabled: latestLoanId !== undefined && latestLoan && (latestLoan as any)[4],
+      enabled: activeLoanId !== undefined && loanIsActive,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: "always",
+      staleTime: 0,
+      gcTime: 0,
     },
     watch: true,
   });
+  const roundedOutstanding = outRoundedRes.data as bigint | undefined;
+  // Use rounded outstanding if available, fallback to cached
+  const displayOutstanding: bigint = loanIsActive ? (roundedOutstanding ?? activeOutstanding ?? 0n) : 0n;
 
-  // Use live outstanding if available, fallback to cached
-  const displayOutstanding = liveOutstanding !== undefined ? (liveOutstanding as unknown as bigint) : activeOutstanding;
+  // Deterministic refresh after a repay/disburse mutation
+  const refreshAfterMutation = async () => {
+    // 1) Invalidate ids so activeLoanId can flip
+    if ((borrowerLoanIdsRes as any).queryKey) {
+      await queryClient.invalidateQueries({ queryKey: (borrowerLoanIdsRes as any).queryKey });
+    } else if (borrowerLoanIdsRes.refetch) {
+      await borrowerLoanIdsRes.refetch();
+    }
+    // 2) Allow activeLoanId to recompute
+    await Promise.resolve();
+    // 3) Invalidate/Refetch loan + outstanding for the (possibly new) id
+    const ops: Promise<any>[] = [];
+    if ((loanRes as any).queryKey) ops.push(queryClient.invalidateQueries({ queryKey: (loanRes as any).queryKey }));
+    else if (loanRes.refetch) ops.push(loanRes.refetch());
+    if ((outRoundedRes as any).queryKey) ops.push(queryClient.invalidateQueries({ queryKey: (outRoundedRes as any).queryKey }));
+    else if (outRoundedRes.refetch) ops.push(outRoundedRes.refetch());
+    await Promise.allSettled(ops);
+  };
 
-  const handleRequestLoan = async () => {
+  // Event-driven sync to avoid races after repayments/disbursements
+  useEffect(() => {
+    if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !connectedAddress) return;
+    const isMine = (a?: any) => a?.toLowerCase?.() === connectedAddress.toLowerCase();
+
+    const off1 = publicClient.watchContractEvent({
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      eventName: "LoanRepaid",
+      onLogs: (logs: any[]) => {
+        if (logs?.some?.(l => isMine((l as any)?.args?.borrower))) void refreshAfterMutation();
+      },
+    });
+    const off2 = publicClient.watchContractEvent({
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      eventName: "MetaLoanRepaid",
+      onLogs: (logs: any[]) => {
+        if (logs?.some?.(l => isMine((l as any)?.args?.borrower))) void refreshAfterMutation();
+      },
+    });
+    const off3 = publicClient.watchContractEvent({
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      eventName: "MetaLoanDisbursed",
+      onLogs: (logs: any[]) => {
+        if (logs?.some?.(l => isMine((l as any)?.args?.borrower))) void refreshAfterMutation();
+      },
+    });
+
+    return () => {
+      try {
+        off1?.();
+        off2?.();
+        off3?.();
+      } catch {
+        /* noop */
+      }
+    };
+  }, [CONTRACT_ADDRESS, CONTRACT_ABI, publicClient, connectedAddress]);
+
+  const handleOneClickBorrow = async () => {
     if (!loanAmount || !connectedAddress) return;
     
     setIsLoading(true);
@@ -435,121 +454,63 @@ const BorrowPage: NextPage = () => {
       const principal = parseLoanAmount(loanAmount);
       if (!principal) return;
       if (!CONTRACT_ADDRESS || !CONTRACT_ABI) throw new Error("Contract not available");
-
-      // === Meta: Request Loan ===
-      const nonce1 = (await publicClient.readContract({
+      // === One-Click Borrow (BorrowAndDisburse) ===
+      const nonce = (await publicClient.readContract({
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
         functionName: "nonces",
         args: [connectedAddress],
       })) as bigint;
-      const deadline1 = BigInt(Math.floor(Date.now() / 1000) + 3600);
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+      const repaymentPeriodSecs = BigInt(repaymentPeriod * 24 * 60 * 60);
 
-      const loanReq = {
+      // APR guard: use the current on-chain rate (basis points)
+      const maxAprBps = loanRateBp !== undefined ? BigInt(loanRateBp as bigint) : 10_000n; // default cap 100%
+
+      const borrowReq = {
         borrower: connectedAddress,
         amount: principal,
-        nonce: nonce1,
-        deadline: deadline1,
-      } as const;
-
-      const sig1 = await signTypedDataAsync({
-        domain: domain as any,
-        types: loanRequestTypes as any,
-        primaryType: "LoanRequest",
-        message: loanReq as any,
-      });
-
-      const req1 = await fetch("/api/meta/request-loan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chainId: CHAIN_ID,
-          contractAddress: CONTRACT_ADDRESS,
-          req: {
-            borrower: loanReq.borrower,
-            amount: loanReq.amount.toString(),
-            nonce: loanReq.nonce.toString(),
-            deadline: loanReq.deadline.toString(),
-          },
-          signature: sig1,
-        }),
-      });
-      if (!req1.ok) throw new Error(`Relayer request failed: ${await req1.text()}`);
-      const req1Json = await req1.json();
-      console.log("Loan request completed:", { txHash: req1Json.txHash, status: req1Json.status });
-      let loanIdStr = (req1Json as { loanId: string | null }).loanId ?? null;
-
-      // Fallback: derive latest loanId from chain if API couldn't determine it yet
-      if (!loanIdStr) {
-        try {
-          const ids = (await publicClient.readContract({
-            address: CONTRACT_ADDRESS,
-            abi: CONTRACT_ABI,
-            functionName: "getBorrowerLoanIds",
-            args: [connectedAddress],
-          })) as bigint[];
-          if (ids && ids.length > 0) {
-            loanIdStr = ids[ids.length - 1].toString();
-          }
-        } catch (e) {
-          console.warn("Failed to derive loanId from chain:", e);
-        }
-      }
-
-      if (!loanIdStr) {
-        throw new Error("Loan request submitted but loanId not available yet. Please try again in a moment.");
-      }
-
-      // === Meta: Disburse Loan ===
-      const nonce2 = (await publicClient.readContract({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
-        functionName: "nonces",
-        args: [connectedAddress],
-      })) as bigint;
-      const deadline2 = BigInt(Math.floor(Date.now() / 1000) + 3600);
-
-      const disburseReq = {
-        borrower: connectedAddress,
-        loanId: BigInt(loanIdStr),
         to: connectedAddress,
-        nonce: nonce2,
-        deadline: deadline2,
+        repaymentPeriod: repaymentPeriodSecs,
+        maxAprBps,
+        nonce,
+        deadline,
       } as const;
 
-      const sig2 = await signTypedDataAsync({
+      const sig = await signTypedDataAsync({
         domain: domain as any,
-        types: disburseRequestTypes as any,
-        primaryType: "DisburseRequest",
-        message: disburseReq as any,
+        types: borrowAndDisburseTypes as any,
+        primaryType: "BorrowAndDisburse",
+        message: borrowReq as any,
       });
 
-      const req2 = await fetch("/api/meta/disburse-loan", {
+      const resp = await fetch("/api/meta/borrow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chainId: CHAIN_ID,
           contractAddress: CONTRACT_ADDRESS,
           req: {
-            borrower: disburseReq.borrower,
-            loanId: disburseReq.loanId.toString(),
-            to: disburseReq.to,
-            nonce: disburseReq.nonce.toString(),
-            deadline: disburseReq.deadline.toString(),
+            borrower: borrowReq.borrower,
+            amount: borrowReq.amount.toString(),
+            to: borrowReq.to,
+            repaymentPeriod: borrowReq.repaymentPeriod.toString(),
+            maxAprBps: borrowReq.maxAprBps.toString(),
+            nonce: borrowReq.nonce.toString(),
+            deadline: borrowReq.deadline.toString(),
           },
-          signature: sig2,
+          signature: sig,
         }),
       });
-      if (!req2.ok) throw new Error(`Relayer disburse failed: ${await req2.text()}`);
-      const req2Json = await req2.json();
-      console.log("Loan disbursement completed:", { txHash: req2Json.txHash, status: req2Json.status });
+      if (!resp.ok) throw new Error(`Relayer borrow failed: ${await resp.text()}`);
+      const resJson = await resp.json();
+      console.log("One-click borrow completed:", { txHash: resJson.txHash, status: resJson.status, loanId: resJson.loanId });
 
-      // Refresh frontend state
-      await refetchBorrowerLoanIds();
-      await refetchLatestLoan();
+      // Refresh frontend state deterministically
+      await refreshAfterMutation();
       setLoanAmount("");
     } catch (error) {
-      console.error("Error requesting loan:", error);
+      console.error("Error in one-click borrow:", error);
     } finally {
       setIsLoading(false);
     }
@@ -569,19 +530,13 @@ const BorrowPage: NextPage = () => {
 
   const hasCredit = creditScore && Number(creditScore) > 0;
 
+  // Prefill amount when eligible known
   useEffect(() => {
     if (hasCredit && maxEligibleAmount > 0n && loanAmount === "") {
       const floorTwoDecimals = Math.floor(Number(maxEligibleAmount) / 1e4) / 100; // safe floor
       setLoanAmount(floorTwoDecimals.toFixed(2));
     }
   }, [hasCredit, maxEligibleAmount, loanAmount]);
-
-  // Whenever loanId changes, refetch its details once
-  useEffect(() => {
-    if (latestLoanId !== undefined) {
-      refetchLatestLoan();
-    }
-  }, [latestLoanId, refetchLatestLoan]);
 
   // Ensure user-entered amount does not exceed maximum
   const isAmountTooHigh = () => {
@@ -593,7 +548,6 @@ const BorrowPage: NextPage = () => {
   const attestationUrl = connectedAddress ? `${window.location.origin}/attest?borrower=${connectedAddress}` : "";
 
   return (
-    <>
       <div className="flex items-center flex-col grow pt-10">
         <div className="px-5 w-full max-w-4xl">
           <div className="flex items-center justify-center mb-8">
@@ -736,9 +690,10 @@ const BorrowPage: NextPage = () => {
                 <div className="flex items-center gap-3">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-orange-500">
-                      {displayOutstanding !== undefined ? formatUSDC(roundDownToNearestPenny(displayOutstanding)) : "-"}
+                      {displayOutstanding !== undefined ? formatUSDC(displayOutstanding) : "-"}
                     </div>
                     <div className="text-sm text-gray-600">Payoff Amount</div>
+                    <div className="text-xs text-gray-500 mt-1">Interest starts 24 hours after disbursement. You can repay immediately.</div>
                   </div>
                 </div>
 
@@ -816,12 +771,13 @@ const BorrowPage: NextPage = () => {
 
               {/* Request Button */}
               <button
-                onClick={handleRequestLoan}
+                onClick={handleOneClickBorrow}
                 disabled={!loanAmount || !connectedAddress || isLoading || !hasCredit || isAmountTooHigh()}
                 className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-colors mb-4"
               >
-                {isLoading ? "Requesting Loan..." : "Request Loan"}
+                {isLoading ? "Processing..." : "One-Click Borrow — Sign Once, Get Funds"}
               </button>
+              <p className="text-xs text-gray-600 -mt-2 mb-2 text-center">No gas fees — you’ll just sign messages; LoanLink pays gas.</p>
 
               {isAmountTooHigh() && (
                 <p className="text-red-600 text-sm">Amount exceeds your maximum eligible loan. Lower the amount.</p>
@@ -912,9 +868,8 @@ const BorrowPage: NextPage = () => {
           </div>
           )}
 
-          {/* Active Loan & Repayment Section */}
-          {latestLoan && (latestLoan as any)[4] && (
-            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+          {/* Active Loan & Repayment Section (persistently mounted) */}
+          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
               <h2 className="text-xl font-semibold mb-4 flex items-center">
                 <CurrencyDollarIcon className="h-5 w-5 mr-2" />
                 Active Loan & Repayment
@@ -927,17 +882,15 @@ const BorrowPage: NextPage = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Principal:</span>
-                      <span className="font-medium">{activePrincipal !== undefined ? formatUSDC(activePrincipal) : "-"}</span>
+                      <span className="font-medium">{loanRes.isLoading ? <span className="skeleton h-4 w-24 inline-block" /> : (activePrincipal !== undefined ? formatUSDC(activePrincipal) : "-")}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Outstanding:</span>
-                      <span className="font-medium text-orange-500">{displayOutstanding !== undefined ? formatUSDC(roundDownToNearestPenny(displayOutstanding)) : "-"}</span>
+                      <span className="font-medium">{outRoundedRes.isLoading ? <span className="skeleton h-4 w-24 inline-block" /> : (displayOutstanding !== undefined ? formatUSDC(displayOutstanding) : "-")}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Interest Rate:</span>
-                      <span className="font-medium text-blue-500">
-                        {latestLoan && (latestLoan as any)[3] ? `${(Number((latestLoan as any)[3]) / 100).toFixed(2)}% APR` : "-"}
-                      </span>
+                      <span className="text-gray-600">Status:</span>
+                      <span className="font-medium">{loanIsActive ? "Current" : "Closed"}</span>
                     </div>
                   </div>
                 </div>
@@ -967,34 +920,45 @@ const BorrowPage: NextPage = () => {
               {/* Repayment Actions */}
               <div className="mt-6 pt-4 border-t border-gray-300">
                 <h3 className="font-medium mb-3">Make a Payment</h3>
+                <p className="text-xs text-gray-600 mb-3">One approval, no gas. You’ll sign a permit; our relayer submits the repayment.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Full Repayment */}
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <h4 className="font-medium text-green-800 mb-2">Full Repayment</h4>
                     <p className="text-sm text-green-600 mb-3">Pay off your entire outstanding balance</p>
                     <button
+                      disabled={
+                        isLoading ||
+                        signingRef.current ||
+                        activeLoanId === undefined ||
+                        !loanIsActive ||
+                        displayOutstanding === undefined
+                      }
                       onClick={async () => {
-                        if (!latestLoanId || !displayOutstanding || !connectedAddress) return;
+                        if (signingRef.current) return;
+                        if (!activeLoanId || !connectedAddress) return;
+                        signingRef.current = true;
                         setIsLoading(true);
                         try {
+                          setPermitError(null);
                           console.log("Starting full repayment process (gasless meta)...");
                           if (!CONTRACT_ADDRESS || !CONTRACT_ABI) throw new Error("Missing contracts");
-                          // Always fetch the live outstanding including accrued interest and round UP to nearest cent
-                          const liveOutstanding = (await publicClient.readContract({
+                          // Read canonical outstanding rounded to cent (contract view)
+                          const out = (await publicClient.readContract({
                             address: CONTRACT_ADDRESS,
                             abi: CONTRACT_ABI,
-                            functionName: "getCurrentOutstandingAmount",
-                            args: [latestLoanId as bigint],
+                            functionName: "getOutstandingRoundedToCent",
+                            args: [activeLoanId as bigint],
                           })) as bigint;
-                          const amountToRepay = roundUpToNearestPenny(liveOutstanding);
+                          const amountToRepay = out;
 
                           // Check USDC balance first
                           await checkUSDCBalance(amountToRepay);
 
                           if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !USDC_ADDRESS || !USDC_ABI) throw new Error("Missing contracts");
 
-                          // 1) Try to build EIP-2612 permit for USDC (spender = micro contract). If it fails (e.g. stale USDC), fallback to allowance.
-                          let permitPayload: | { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` } | undefined;
+                          // 1) Build EIP-2612 permit for USDC (spender = micro contract). Permit is REQUIRED.
+                          let permitPayload: { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` };
                           try {
                             const usdcNonce = (await publicClient.readContract({
                               address: USDC_ADDRESS,
@@ -1010,6 +974,8 @@ const BorrowPage: NextPage = () => {
                               nonce: usdcNonce,
                               deadline: permitDeadline,
                             } as const;
+                            console.count("permit:sign");
+                            signingRef.current = true;
                             const permitSig = await signTypedDataAsync({
                               domain: usdcPermitDomain as any,
                               types: permitTypes as any,
@@ -1024,63 +990,31 @@ const BorrowPage: NextPage = () => {
                               r,
                               s,
                             };
-                          } catch (e) {
-                            console.warn("USDC permit unavailable, falling back to allowance path:", e);
-                            await ensureAllowance(amountToRepay);
-                            permitPayload = undefined;
+                          } catch (e: any) {
+                            console.error("Permit signing failed:", e);
+                            setPermitError(e?.message?.includes("expired") || e?.message?.includes("nonce") ? "Permit expired or already used. Please try again." : "Permit required. This token must support ERC-2612.");
+                            return;
                           }
 
-                          // 2) Build RepayRequest and signature
-                          const repayNonce = (await publicClient.readContract({
-                            address: CONTRACT_ADDRESS,
-                            abi: CONTRACT_ABI,
-                            functionName: "nonces",
-                            args: [connectedAddress],
-                          })) as bigint;
-                          const repayDeadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
-                          const repayReq = {
-                            borrower: connectedAddress,
-                            loanId: latestLoanId as bigint,
-                            amount: amountToRepay,
-                            nonce: repayNonce,
-                            deadline: repayDeadline,
-                          } as const;
-                          const repaySig = await signTypedDataAsync({
-                            domain: domain as any,
-                            types: repayRequestTypes as any,
-                            primaryType: "RepayRequest",
-                            message: repayReq as any,
-                          });
-
-                          // 3) Call relayer API
-                          const payload: any = {
+                          // 2) Call relayer API — single approval (permit only). amount: "0" => repay-all up to permit value
+                          const resp = await fetch("/api/meta/repay-one", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
                               chainId: CHAIN_ID,
                               contractAddress: CONTRACT_ADDRESS,
-                              req: {
-                                borrower: repayReq.borrower,
-                                loanId: repayReq.loanId.toString(),
-                                amount: repayReq.amount.toString(),
-                                nonce: repayReq.nonce.toString(),
-                                deadline: repayReq.deadline.toString(),
-                              },
-                              signature: repaySig,
-                              ...(permitPayload ? { permit: permitPayload } : {}),
+                              borrower: connectedAddress,
+                              loanId: (activeLoanId as bigint).toString(),
+                              amount: "0",
+                              permit: permitPayload,
                             }),
-                          };
-                          const resp = await fetch("/api/meta/repay-loan", payload);
+                          });
                           if (!resp.ok) throw new Error(await resp.text());
                           const result = await resp.json();
+                          console.log("Repayment submitted (gasless, single approval)", { txHash: result.txHash, amountUsed: result.amountUsed });
 
-                          console.log("Repayment completed successfully (gasless)!", { txHash: result.txHash, status: result.status });
-                          
-                          // Transaction is already mined (relayer waited for confirmation)
-                          // Now refetch state to reflect the changes
-                          await refetchBorrowerLoanIds();
-                          await refetchLatestLoan();
-                          await refetchLiveOutstanding();
+                          // Transaction is mined. Refetch state in parallel.
+                          await refreshAfterMutation();
                         } catch (error) {
                           const errorType = handleTransferError(error);
                           switch (errorType) {
@@ -1100,13 +1034,13 @@ const BorrowPage: NextPage = () => {
                               console.error("Unknown error occurred:", error);
                           }
                         } finally {
+                          signingRef.current = false;
                           setIsLoading(false);
                         }
                       }}
-                      disabled={isLoading || !displayOutstanding}
                       className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
                     >
-                      {isLoading ? "Processing..." : `Pay ${displayOutstanding !== undefined ? formatUSDC(roundUpToNearestPenny(displayOutstanding)) : "-"}`}
+                      {isLoading ? "Processing..." : loanIsActive && displayOutstanding !== undefined ? `Pay ${formatUSDC(displayOutstanding)}` : "Pay"}
                     </button>
                   </div>
 
@@ -1125,8 +1059,18 @@ const BorrowPage: NextPage = () => {
                         step="0.01"
                       />
                       <button
+                        disabled={
+                          isLoading ||
+                          signingRef.current ||
+                          activeLoanId === undefined ||
+                          !loanIsActive ||
+                          !repayAmount ||
+                          !parseLoanAmount(repayAmount)
+                        }
                         onClick={async () => {
-                          if (!latestLoanId || !repayAmount || !connectedAddress) return;
+                          if (signingRef.current) return;
+                          if (!activeLoanId || !repayAmount || !connectedAddress) return;
+                          signingRef.current = true;
                           const repayAmountBigInt = parseLoanAmount(repayAmount);
                           if (!repayAmountBigInt) return;
                           setIsLoading(true);
@@ -1138,8 +1082,8 @@ const BorrowPage: NextPage = () => {
 
                             if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !USDC_ADDRESS || !USDC_ABI) throw new Error("Missing contracts");
 
-                            // 1) Try USDC EIP-2612 permit; fallback to allowance if unavailable
-                            let permitPayload: | { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` } | undefined;
+                            // 1) Build USDC EIP-2612 permit (REQUIRED)
+                            let permitPayload: { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` };
                             try {
                               const usdcNonce = (await publicClient.readContract({
                                 address: USDC_ADDRESS,
@@ -1155,6 +1099,8 @@ const BorrowPage: NextPage = () => {
                                 nonce: usdcNonce,
                                 deadline: permitDeadline,
                               } as const;
+                              console.count("permit:sign");
+                              signingRef.current = true;
                               const permitSig = await signTypedDataAsync({
                                 domain: usdcPermitDomain as any,
                                 types: permitTypes as any,
@@ -1169,62 +1115,30 @@ const BorrowPage: NextPage = () => {
                                 r,
                                 s,
                               };
-                            } catch (e) {
-                              console.warn("USDC permit unavailable (partial), falling back to allowance path:", e);
-                              await ensureAllowance(repayAmountBigInt);
-                              permitPayload = undefined;
+                            } catch (e: any) {
+                              console.error("Permit signing failed:", e);
+                              setPermitError(e?.message?.includes("expired") || e?.message?.includes("nonce") ? "Permit expired or already used. Please try again." : "Permit required. This token must support ERC-2612.");
+                              return;
                             }
-
-                            // 2) RepayRequest signed by borrower
-                            const repayNonce = (await publicClient.readContract({
-                              address: CONTRACT_ADDRESS,
-                              abi: CONTRACT_ABI,
-                              functionName: "nonces",
-                              args: [connectedAddress],
-                            })) as bigint;
-                            const repayDeadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
-                            const repayReq = {
-                              borrower: connectedAddress,
-                              loanId: latestLoanId as bigint,
-                              amount: repayAmountBigInt,
-                              nonce: repayNonce,
-                              deadline: repayDeadline,
-                            } as const;
-                            const repaySig = await signTypedDataAsync({
-                              domain: domain as any,
-                              types: repayRequestTypes as any,
-                              primaryType: "RepayRequest",
-                              message: repayReq as any,
-                            });
-
-                            // 3) Call relayer API
-                            const resp = await fetch("/api/meta/repay-loan", {
+                            // 2) Call relayer API — single approval (permit only)
+                            const resp = await fetch("/api/meta/repay-one", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({
                                 chainId: CHAIN_ID,
                                 contractAddress: CONTRACT_ADDRESS,
-                                req: {
-                                  borrower: repayReq.borrower,
-                                  loanId: repayReq.loanId.toString(),
-                                  amount: repayReq.amount.toString(),
-                                  nonce: repayReq.nonce.toString(),
-                                  deadline: repayReq.deadline.toString(),
-                                },
-                                signature: repaySig,
-                                ...(permitPayload ? { permit: permitPayload } : {}),
+                                borrower: connectedAddress,
+                                loanId: (activeLoanId as bigint).toString(),
+                                amount: repayAmountBigInt.toString(),
+                                permit: permitPayload,
                               }),
                             });
                             if (!resp.ok) throw new Error(await resp.text());
                             const result = await resp.json();
-
-                            console.log("Partial repayment completed successfully (gasless)!", { txHash: result.txHash, status: result.status });
+                            console.log("Partial repayment submitted (gasless, single approval)", { txHash: result.txHash, amountUsed: result.amountUsed });
                             setRepayAmount("");
-                            // Transaction is already mined (relayer waited for confirmation)
-                            // Now refetch state to reflect the changes
-                            await refetchBorrowerLoanIds();
-                            await refetchLatestLoan();
-                            await refetchLiveOutstanding();
+                            // Transaction is mined. Refetch state in parallel.
+                            await refreshAfterMutation();
                           } catch (error) {
                             const errorType = handleTransferError(error);
                             switch (errorType) {
@@ -1244,25 +1158,26 @@ const BorrowPage: NextPage = () => {
                                 console.error("Unknown error occurred:", error);
                             }
                           } finally {
+                            signingRef.current = false;
                             setIsLoading(false);
                           }
                         }}
-                        disabled={isLoading || !repayAmount || !parseLoanAmount(repayAmount)}
                         className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
                       >
                         {isLoading ? "Processing..." : "Repay"}
                       </button>
                     </div>
                   </div>
+                  {permitError && (
+                    <div className="col-span-1 md:col-span-2 mt-2 p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
+                      {permitError}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          )}
-
-
         </div>
       </div>
-    </>
   );
 };
 

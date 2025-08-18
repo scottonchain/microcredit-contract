@@ -11,7 +11,8 @@ set -e
 # backed up and ignored.
 # --------------------------------------------
 
-STATE_FILE="./chain-state.json"
+# Allow override of state file via env (e.g., ANVIL_STATE_FILE=./chain-state-mytag.json)
+STATE_FILE="${ANVIL_STATE_FILE:-./chain-state.json}"
 PORT=${ANVIL_PORT:-8545}
 # Default high code size limit to avoid local EIP-170 prompts
 CODE_SIZE_LIMIT=${ANVIL_CODE_SIZE_LIMIT:-100000000}

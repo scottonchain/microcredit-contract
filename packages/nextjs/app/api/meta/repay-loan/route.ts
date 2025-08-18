@@ -11,12 +11,13 @@ function getRpcUrl(chainId: number): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { chainId, contractAddress, req: repayReqRaw, signature, permit } = body as {
+    const { chainId, contractAddress, req: repayReqRaw, signature, permit, mode } = body as {
       chainId: number;
       contractAddress: `0x${string}`;
       req: { borrower: `0x${string}`; loanId: string; amount: string; nonce: string; deadline: string };
       signature: `0x${string}`;
       permit?: { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` };
+      mode?: "ALL" | "EXACT";
     };
 
     if (!chainId || !contractAddress || !repayReqRaw || !signature) {
@@ -74,6 +75,8 @@ export async function POST(req: NextRequest) {
         }
       : { value: 0n, deadline: 0n, v: 0, r: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`, s: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}` };
 
+    const resolvedMode = mode === "ALL" ? "ALL" : "EXACT";
+
     console.log("[API repay-loan] Incoming:", {
       chainId,
       contractAddress,
@@ -83,6 +86,7 @@ export async function POST(req: NextRequest) {
       nonce: repayReq.nonce.toString(),
       deadline: repayReq.deadline.toString(),
       hasPermit: !!permit,
+      mode: resolvedMode,
       signature: signature.slice(0, 10) + "...",
     });
 
