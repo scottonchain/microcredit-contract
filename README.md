@@ -4,7 +4,7 @@
 
 ## Introduction (read first)
 
-This project delivers a full-stack **peer-to-peer micro-lending application** on the Ethereum network.  
+This project prototypes a full-stack **peer-to-peer micro-lending application** on an EVM network.  
 Lenders earn yield on USDC deposits while borrowers obtain collateral-free loans backed by their **social reputation**, not a traditional credit history.
 
 Key ideas for crypto-aware readers:
@@ -161,3 +161,4 @@ See `CONTRIBUTING.md` for guidelines.  Pull requests are welcome.
 - Industry standard loan-to-value ratios
 
 The current weekly reduction model is a simplified approach for demonstration purposes and should be enhanced for production use.
+
