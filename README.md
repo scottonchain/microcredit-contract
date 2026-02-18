@@ -19,7 +19,6 @@ Key ideas for crypto-aware readers:
 ## Feature Highlights
 
 • Social attestations and PageRank-based credit scoring (all on-chain)  
-• Request, approve, disburse and repay USDC loans at a fixed rate  
 • Unified lending pool with proportional yield distribution  
 • Oracle / admin panel to update EFFR, risk premium and other parameters  
 • Next.js 14 front-end with live pool statistics and user dashboards
@@ -84,21 +83,6 @@ The contract stores two basis-point values:
 
 The borrower’s APR is simply `effrRate + riskPremium`.
 
----
-
-## Wallet Support
-
-The application supports multiple wallet providers including:
-- **MetaMask** - Most popular browser extension
-- **WalletConnect** - Mobile/desktop bridge for any wallet
-- **Ledger** - Hardware wallet security
-- **Coinbase Wallet** - User-friendly mobile app
-- **Rainbow Wallet** - Beautiful mobile interface
-- **Rabby Wallet** - Security-focused browser extension
-- **Safe Wallet** - Multi-signature team wallets
-
-For detailed wallet setup and troubleshooting, see [Wallet Support Documentation](packages/nextjs/docs/WALLET_SUPPORT.md).
-
 ## User Guides
 
 ### Borrowers
@@ -145,20 +129,10 @@ See `CONTRIBUTING.md` for guidelines.  Pull requests are welcome.
 
 ---
 
-© 2024 — Licensed under the MIT License
+© 2026 — Licensed under the MIT License
 
 ---
 
-## Implementation Notes
 
-**TODO: Loan Amount Calculation** - The current implementation reduces the borrowable amount by 1% for each additional week beyond 1 week. This approach should be reviewed and made consistent with industry best practices for loan amount calculation, risk assessment, and borrower qualification criteria. Consider factors such as:
 
-- Risk-based pricing models
-- Borrower income verification
-- Debt-to-income ratios
-- Collateral requirements for longer-term loans
-- Regulatory compliance requirements
-- Industry standard loan-to-value ratios
-
-The current weekly reduction model is a simplified approach for demonstration purposes and should be enhanced for production use.
 
