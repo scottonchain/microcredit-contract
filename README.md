@@ -2,7 +2,7 @@
 
 ![Frontend Vision](front_end_vision.png)
 
-## Introduction (read first)
+## Introduction
 
 This project prototypes a full-stack **peer-to-peer micro-lending application** on an EVM network.  
 Lenders earn yield on USDC deposits while borrowers obtain collateral-free loans backed by their **social reputation**, not a traditional credit history.
@@ -132,6 +132,7 @@ See `CONTRIBUTING.md` for guidelines.  Pull requests are welcome.
 © 2026 — Licensed under the MIT License
 
 ---
+
 
 
 
