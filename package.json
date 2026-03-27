@@ -13,6 +13,8 @@
     "account:import": "yarn foundry:account-import",
     "account:reveal-pk": "yarn workspace @se-2/foundry account:reveal-pk",
     "chain": "bash scripts/start-anvil.sh",
+    "demo": "bash demo.sh",
+    "demo:fresh": "bash demo.sh --fresh",
     "compile": "yarn foundry:compile",
     "deploy": "yarn foundry:deploy",
     "flatten": "yarn foundry:flatten",

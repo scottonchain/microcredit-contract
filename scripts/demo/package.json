@@ -1,0 +1,12 @@
+{
+  "name": "microcredit-lending-demo",
+  "version": "1.0.0",
+  "description": "Playwright browser automation for the microcredit lending scenario demo",
+  "type": "module",
+  "scripts": {
+    "demo": "node lending-demo.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.50.0"
+  }
+}
