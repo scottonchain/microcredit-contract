@@ -8,6 +8,47 @@ set -e
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO"
 
+# On Windows, 'bash' from PowerShell may invoke WSL whose PATH lacks the
+# Windows Node.js install. Prepend common Windows Node locations so yarn/node
+# work regardless of which bash interpreter runs this script.
+if ! command -v node >/dev/null 2>&1; then
+  for _win_node_dir in \
+    "/c/Program Files/nodejs" \
+    "/mnt/c/Program Files/nodejs" \
+    "$APPDATA/../Local/Programs/nodejs" \
+    "$HOME/AppData/Local/Programs/nodejs"; do
+    if [[ -x "$_win_node_dir/node" || -x "$_win_node_dir/node.exe" ]]; then
+      export PATH="$_win_node_dir:$PATH"
+      break
+    fi
+  done
+  unset _win_node_dir
+fi
+
+# ── Pre-flight: verify node and yarn are available ────────────────────────────
+if ! command -v node >/dev/null 2>&1; then
+  echo ""
+  echo "ERROR: 'node' not found in PATH."
+  if grep -qi microsoft /proc/version 2>/dev/null; then
+    echo ""
+    echo "  You're running in WSL but Node.js isn't installed inside WSL."
+    echo "  Fix A — Install Node.js in WSL (recommended):"
+    echo "    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
+    echo "    sudo apt-get install -y nodejs"
+    echo ""
+    echo "  Fix B — Run from Git Bash instead of WSL bash:"
+    echo "    Open Git Bash in this folder and run:  bash demo.sh"
+  else
+    echo "  Install Node.js >= 20.18.3 from https://nodejs.org"
+  fi
+  exit 1
+fi
+if ! command -v yarn >/dev/null 2>&1 && ! command -v yarn.cmd >/dev/null 2>&1; then
+  echo ""
+  echo "ERROR: 'yarn' not found. Install it with:  npm install -g yarn"
+  exit 1
+fi
+
 CHAIN_PORT=8545
 NEXT_PORT=3000
 DEMO_DIR="$REPO/scripts/demo"
@@ -52,9 +93,23 @@ ANVIL_STATE_FILE="./chain-state-demo.json" yarn chain >"$REPO/logs/anvil-demo.lo
 CHAIN_PID=$!
 
 echo -n "  Waiting for port $CHAIN_PORT"
+_wait=0
 until curl -sf -X POST "http://localhost:$CHAIN_PORT" \
     -H "Content-Type: application/json" \
     -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' >/dev/null 2>&1; do
+  if ! kill -0 "$CHAIN_PID" 2>/dev/null; then
+    echo ""
+    echo "ERROR: Anvil process exited unexpectedly. Last log lines:"
+    tail -10 "$REPO/logs/anvil-demo.log" 2>/dev/null || true
+    exit 1
+  fi
+  (( _wait++ )) || true
+  if (( _wait > 75 )); then   # 30-second timeout
+    echo ""
+    echo "ERROR: Timed out waiting for Anvil on port $CHAIN_PORT. Last log lines:"
+    tail -10 "$REPO/logs/anvil-demo.log" 2>/dev/null || true
+    exit 1
+  fi
   echo -n "."; sleep 0.4
 done
 echo " ✓"
@@ -72,7 +127,21 @@ yarn start >"$REPO/logs/nextjs-demo.log" 2>&1 &
 NEXT_PID=$!
 
 echo -n "  Waiting for port $NEXT_PORT"
+_wait=0
 until curl -sf "http://localhost:$NEXT_PORT" >/dev/null 2>&1; do
+  if ! kill -0 "$NEXT_PID" 2>/dev/null; then
+    echo ""
+    echo "ERROR: Next.js process exited unexpectedly. Last log lines:"
+    tail -10 "$REPO/logs/nextjs-demo.log" 2>/dev/null || true
+    exit 1
+  fi
+  (( _wait++ )) || true
+  if (( _wait > 120 )); then   # 2-minute timeout
+    echo ""
+    echo "ERROR: Timed out waiting for Next.js on port $NEXT_PORT. Last log lines:"
+    tail -10 "$REPO/logs/nextjs-demo.log" 2>/dev/null || true
+    exit 1
+  fi
   echo -n "."; sleep 1
 done
 echo " ✓"
