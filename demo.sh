@@ -155,6 +155,22 @@ until curl -sf -X POST "http://localhost:$CHAIN_PORT" \
 done
 echo " ✓"
 
+# ── Ensure Solidity libraries are present ────────────────────────────────────
+# lib/forge-std is gitignored (must be cloned separately).
+# lib/openzeppelin-contracts is a git submodule that may not be initialized.
+if [[ ! -f "$REPO/lib/forge-std/src/Script.sol" ]]; then
+  echo "  Cloning forge-std library…"
+  git clone --depth 1 https://github.com/foundry-rs/forge-std \
+    "$REPO/lib/forge-std" >/dev/null 2>&1 && echo "  ✓ forge-std ready" || \
+    echo "  ⚠ forge-std clone failed — deploy may fail"
+fi
+if [[ ! -f "$REPO/lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol" ]]; then
+  echo "  Initializing openzeppelin-contracts submodule…"
+  git -C "$REPO" submodule update --init lib/openzeppelin-contracts >/dev/null 2>&1 && \
+    echo "  ✓ openzeppelin-contracts ready" || \
+    echo "  ⚠ submodule init failed — deploy may fail"
+fi
+
 # ── Deploy contracts ──────────────────────────────────────────────────────────
 echo ""
 echo "▶ Deploying contracts…"
