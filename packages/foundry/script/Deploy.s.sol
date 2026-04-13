@@ -131,12 +131,12 @@ contract DeployScript is Script {
         microcreditContract.depositFunds(poolSeed);
         console.logString("Seeded lending pool with 10,000 USDC");
 
-        // Pre-establish Bob's reputation so the demo opens with Bob already
+        // Pre-establish Brighton's reputation so the demo opens with Brighton already
         // having a credit score of 92%.  Alice (the admin/deployer) sets this
         // directly via score override — no PageRank computation needed.
         address bob = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; // Anvil account 2
         microcreditContract.setScoreOverride(bob, 920000); // 92% (scaled 1e6)
-        console.logString("Set Bob's credit score override to 92%");
+        console.logString("Set Brighton's credit score override to 92%");
 
         // Provision ETH to demo addresses (excluding admin addresses that can fund themselves)
         console.logString("--- Provisioning ETH to demo addresses ---");

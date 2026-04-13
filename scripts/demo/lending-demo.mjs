@@ -3,13 +3,13 @@
  *
  * Playwright script that walks through a complete microcredit lending scenario:
  *
- *   Step 1  — Bob attests to Charlie with 80% confidence (/attest)
- *             (Bob's score is shown on the attest page; PageRank auto-computed)
- *   Step 2  — View Charlie's credit score (/scores)
- *   Step 3  — Charlie requests a 50 USDC loan, 28-day term (/borrower)
- *             (gasless meta-transaction — Charlie needs no ETH)
+ *   Step 1  — Brighton attests to Casey with 80% confidence (/attest)
+ *             (Brighton's score is shown on the attest page; PageRank auto-computed)
+ *   Step 2  — View Casey's credit score (/scores)
+ *   Step 3  — Casey requests a 50 USDC loan, 28-day term (/borrower)
+ *             (gasless meta-transaction — Casey needs no ETH)
  *   Step 4  — View active loan details (/borrower)
- *   Step 5  — Charlie repays the loan in full (/borrower)
+ *   Step 5  — Casey repays the loan in full (/borrower)
  *
  * How wallet injection works
  * ──────────────────────────
@@ -38,17 +38,17 @@ const APP_URL = 'http://localhost:3000';
  */
 const ACCOUNTS = {
   admin: {
-    name: 'Alice (Admin)',
+    name: 'Avery (Admin)',
     // Anvil account 9 — the deployer (pk 0x2a871d…) that owns the contract
     // and seeded the pool with 10,000 USDC at deploy time.
     address: '0xa0Ee7A142d267C1f36714E4a8F75612F20a79720',
   },
   attester: {
-    name: 'Bob (Attester)',
+    name: 'Brighton (Attester)',
     address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', // Anvil account 2
   },
   borrower: {
-    name: 'Charlie (Borrower)',
+    name: 'Casey (Borrower)',
     address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906', // Anvil account 3
   },
 };
@@ -187,7 +187,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  */
 async function gotoAs(page, path, account) {
   console.log(`  → navigating to ${path} as ${account.name}`);
-  // Write the address before we navigate so the initScript reads it on load
+  // localStorage is inaccessible on about:blank; ensure we're on a real page first.
+  if (!page.url().startsWith(APP_URL)) {
+    await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
+  }
   await page.evaluate(
     (addr) => localStorage.setItem('__demoAccount', addr),
     account.address,
@@ -268,16 +271,16 @@ async function main() {
   await ctx.addInitScript(PROVIDER_INIT_SCRIPT);
 
   try {
-    // ── STEP 1: Bob attests to Charlie ────────────────────────────────────
-    // Bob already has a >90% credit score from deploy time (Alice gave him KYC
-    // and attested to him at 95%). The attest page shows Bob his score.
-    banner(1, `${ACCOUNTS.attester.name} attests to Charlie with 80% confidence`);
+    // ── STEP 1: Brighton attests to Casey ────────────────────────────────────
+    // Brighton already has a >90% credit score from deploy time (Avery gave him KYC
+    // and attested to him at 95%). The attest page shows Brighton his score.
+    banner(1, `${ACCOUNTS.attester.name} attests to Casey with 80% confidence`);
     // Pass borrower address via query param so the /attest page pre-fills it
     await gotoAs(page, `/attest?borrower=${ACCOUNTS.borrower.address}`, ACCOUNTS.attester);
     await connectWallet(page);
     await sleep(600);
 
-    console.log('  → borrower address (Charlie) pre-filled via URL param');
+    console.log('  → borrower address (Casey) pre-filled via URL param');
     await sleep(400);
 
     console.log('  → setting confidence slider to 80');
@@ -301,7 +304,7 @@ async function main() {
     await connectWallet(page);
     await sleep(800);
 
-    // Search for Charlie's address to show their score
+    // Search for Casey's address to show their score
     const searchInput = page.locator('input').first();
     if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await searchInput.fill(ACCOUNTS.borrower.address);
@@ -309,9 +312,9 @@ async function main() {
     }
     await sleep(STEP_PAUSE);
 
-    // ── STEP 3: Charlie requests a 50 USDC loan ───────────────────────────
+    // ── STEP 3: Casey requests a 50 USDC loan ───────────────────────────
     // All transactions are gasless meta-transactions paid by the relayer —
-    // Charlie does not need ETH.
+    // Casey does not need ETH.
     banner(3, `${ACCOUNTS.borrower.name} requests a 50 USDC loan — 28-day term`);
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
@@ -344,7 +347,7 @@ async function main() {
     // Just pause here so the viewer can read the loan details
     await sleep(STEP_PAUSE * 1.5);
 
-    // ── STEP 5: Charlie repays in full ────────────────────────────────────
+    // ── STEP 5: Casey repays in full ────────────────────────────────────
     banner(5, `${ACCOUNTS.borrower.name} repays the loan in full`);
 
     // The full-repayment button text is "Pay XX.XX USDC" (dynamic)
