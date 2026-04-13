@@ -171,6 +171,9 @@ if [[ ! -f "$REPO/lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol" ]]
     echo "  ⚠ submodule init failed — deploy may fail"
 fi
 
+# Ensure deployment-config.json exists (vm.readFile reverts on missing file)
+[[ -f "$REPO/packages/foundry/deployment-config.json" ]] || echo '{}' > "$REPO/packages/foundry/deployment-config.json"
+
 # ── Deploy contracts ──────────────────────────────────────────────────────────
 echo ""
 echo "▶ Deploying contracts…"
