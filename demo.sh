@@ -140,7 +140,20 @@ echo " ✓"
 # ── Deploy contracts ──────────────────────────────────────────────────────────
 echo ""
 echo "▶ Deploying contracts…"
-yarn deploy 2>&1 | grep -E "deployed|USDC|Error|error" || true
+if ! command -v make >/dev/null 2>&1; then
+  # 'make' not available (common in WSL without build-essential).
+  # Run the forge deploy and ABI generation steps directly.
+  _forge="${HOME}/.foundry/bin/forge"
+  [[ ! -x "$_forge" ]] && _forge="forge"
+  (cd "$REPO/packages/foundry" && \
+    FOUNDRY_AUTO_CONFIRM=1 "$_forge" script script/Deploy.s.sol:DeployScript \
+      --rpc-url localhost --password localhost --broadcast --legacy --ffi \
+      --gas-limit 100000000 2>&1 | grep -E "deployed|USDC|Error|error") || true
+  node "$REPO/packages/foundry/scripts-js/generateTsAbis.js" 2>&1 | grep -v "^$" || true
+  unset _forge
+else
+  yarn deploy 2>&1 | grep -E "deployed|USDC|Error|error" || true
+fi
 echo "  ✓ Contracts deployed"
 
 # ── Re-install deps when running in WSL (node_modules was built on Windows) ───
