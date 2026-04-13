@@ -413,7 +413,9 @@ async function main() {
       const btnText = await repayBtn.textContent();
       console.log(`  → clicking "${btnText?.trim()}"`);
       await repayBtn.click();
-      await waitForStatus(page, 'repaid|no active|success|✅', 45000);
+      // After repayment, the active loan section disappears and the
+      // "Loan Request" form reappears. Wait for that or any success signal.
+      await waitForStatus(page, 'Loan Request|repaid|no active|success|✅', 60000);
       await sleep(STEP_PAUSE);
     } else {
       console.log('  (repay button not visible — loan may still be processing from step 7)');
