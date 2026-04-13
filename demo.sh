@@ -163,21 +163,19 @@ unset _platform_sentinel _current_platform _last_platform
 # ── Start Next.js ─────────────────────────────────────────────────────────────
 echo ""
 echo "▶ Starting Next.js dev server…"
-# In WSL, yarn only creates .cmd shims (Windows) not Unix shell scripts, so
-# the 'next' binary can't be found via yarn start. Run it directly instead.
-# Also clear the .next build cache — it was compiled on Windows and won't work on Linux.
+# Always invoke the 'next' binary directly via node so that log redirection
+# works reliably across WSL, Git Bash, and other Windows bash environments.
+# 'yarn start' uses yarn.cmd on Windows, which doesn't survive the '>&' redirect.
 if grep -qi microsoft /proc/version 2>/dev/null; then
   if [[ -d "$REPO/packages/nextjs/.next" ]]; then
     echo "  Clearing Windows build cache for Linux rebuild…"
     rm -rf "$REPO/packages/nextjs/.next"
   fi
-  _next_bin="$REPO/node_modules/next/dist/bin/next"
-  [[ ! -f "$_next_bin" ]] && _next_bin="$REPO/packages/nextjs/node_modules/next/dist/bin/next"
-  (cd "$REPO/packages/nextjs" && node "$_next_bin" dev) >"$REPO/logs/nextjs-demo.log" 2>&1 &
-  unset _next_bin
-else
-  yarn start >"$REPO/logs/nextjs-demo.log" 2>&1 &
 fi
+_next_bin="$REPO/node_modules/next/dist/bin/next"
+[[ ! -f "$_next_bin" ]] && _next_bin="$REPO/packages/nextjs/node_modules/next/dist/bin/next"
+(cd "$REPO/packages/nextjs" && node "$_next_bin" dev) >"$REPO/logs/nextjs-demo.log" 2>&1 &
+unset _next_bin
 NEXT_PID=$!
 
 echo -n "  Waiting for port $NEXT_PORT"
