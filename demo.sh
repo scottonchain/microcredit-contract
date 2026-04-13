@@ -222,7 +222,7 @@ elif grep -qi microsoft /proc/version 2>/dev/null; then
   # Binary exists but system deps may be missing (installed without --with-deps).
   # install-deps is fast (no-op) if already satisfied.
   echo "  Verifying Chromium system dependencies…"
-  sudo npx playwright install-deps chromium 2>&1 | tail -3 || true
+  sudo -n npx playwright install-deps chromium 2>&1 | tail -3 || true
 fi
 unset _pw_chromium
 cd "$REPO"
