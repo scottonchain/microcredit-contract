@@ -15,6 +15,8 @@ import {
   PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import { BlockieAvatar, isENS } from "~~/components/scaffold-eth";
+import { PersonaAvatar } from "~~/components/scaffold-eth/PersonaAvatar";
+import { getPersona } from "~~/constants/demoPersonas";
 import { useCopyToClipboard, useOutsideClick } from "~~/hooks/scaffold-eth";
 import { getTargetNetworks } from "~~/utils/scaffold-eth";
 
@@ -83,15 +85,22 @@ export const AddressInfoDropdown = ({
     closeDropdown();
   };
 
+  const persona = getPersona(address);
+  // If a persona is known for this address, use it; otherwise fall back to
+  // whatever displayName was passed in (could be ENS or truncated address).
+  const resolvedName = persona ? `${persona.name} (${persona.role})` : displayName;
+
   useOutsideClick(dropdownRef, closeDropdown);
 
   return (
     <>
       <details ref={dropdownRef} className="dropdown dropdown-end leading-3">
         <summary className="btn btn-secondary btn-sm pl-0 pr-2 shadow-md dropdown-toggle gap-0 h-auto!">
-          <BlockieAvatar address={checkSumAddress} size={30} ensImage={ensAvatar} />
+          {persona
+            ? <PersonaAvatar address={checkSumAddress} size={30} />
+            : <BlockieAvatar address={checkSumAddress} size={30} ensImage={ensAvatar} />}
           <span className="ml-2 mr-1">
-            {displayName ? displayName : checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4)}
+            {resolvedName ? resolvedName : checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4)}
           </span>
           <ChevronDownIcon className="h-6 w-4 ml-2 sm:ml-0" />
         </summary>

@@ -6,6 +6,8 @@ import { Address as AddressType, getAddress, isAddress } from "viem";
 import { normalize } from "viem/ens";
 import { useEnsAvatar, useEnsName } from "wagmi";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
+import { PersonaAvatar } from "~~/components/scaffold-eth/PersonaAvatar";
+import { getPersona } from "~~/constants/demoPersonas";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-eth";
 
@@ -102,9 +104,11 @@ export const Address = ({
     },
   });
 
+  const persona = checkSumAddress ? getPersona(checkSumAddress) : undefined;
   const shortAddress = checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4);
-  const displayAddress = format === "long" ? checkSumAddress : shortAddress;
-  const displayEnsOrAddress = ens || displayAddress;
+  const displayAddress = persona ? persona.name : (format === "long" ? checkSumAddress : shortAddress);
+  // For known demo addresses show the persona name instead of the hex address
+  const displayEnsOrAddress = persona ? persona.name : (ens || displayAddress);
 
   const showSkeleton = !checkSumAddress || (!onlyEnsOrAddress && (ens || isEnsNameLoading));
 
@@ -145,11 +149,9 @@ export const Address = ({
   return (
     <div className="flex items-center shrink-0">
       <div className="shrink-0">
-        <BlockieAvatar
-          address={checkSumAddress}
-          ensImage={ensAvatar}
-          size={(blockieSizeMap[blockieSize] * 24) / blockieSizeMap["base"]}
-        />
+        {persona
+          ? <PersonaAvatar address={checkSumAddress} size={(blockieSizeMap[blockieSize] * 24) / blockieSizeMap["base"]} />
+          : <BlockieAvatar address={checkSumAddress} ensImage={ensAvatar} size={(blockieSizeMap[blockieSize] * 24) / blockieSizeMap["base"]} />}
       </div>
       <div className="flex flex-col">
         {showSkeleton &&
