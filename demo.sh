@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # demo.sh — Full lending scenario demo: starts chain + app, then runs browser automation.
 # Usage:
-#   ./demo.sh            # uses existing chain state
-#   ./demo.sh --fresh    # wipes chain state for a clean run
+#   ./demo.sh            # always starts fresh (recommended)
+#   ./demo.sh --reuse    # reload previous chain state instead of redeploying
 set -e
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -111,11 +111,14 @@ echo "║   Microcredit Protocol — Live Demo           ║"
 echo "╚══════════════════════════════════════════════╝"
 echo ""
 
-# ── Optional fresh start ──────────────────────────────────────────────────────
-if [[ "${1:-}" == "--fresh" ]]; then
-  echo "🗑  Wiping chain state for a fresh demo…"
-  rm -f chain-state-demo.json
+# ── Chain state ──────────────────────────────────────────────────────────────
+# Default: always wipe state so contracts are always deployed fresh.
+# Pass --reuse to skip the wipe and reload the previous chain state instead.
+if [[ "${1:-}" == "--reuse" ]]; then
+  echo "♻  Reusing existing chain state (chain-state-demo.json)…"
   echo ""
+else
+  rm -f chain-state-demo.json
 fi
 
 # ── Kill anything already on these ports ──────────────────────────────────────
