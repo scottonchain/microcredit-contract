@@ -10,25 +10,26 @@ bash demo.sh
 
 ## What the Demo Does
 
-The demo starts a local Anvil blockchain, deploys the contracts (including pre-seeding the lending pool with 10,000 USDC), boots the Next.js frontend, and then runs a Playwright browser script that walks through a complete end-to-end lending scenario with three personas:
+The demo starts a local Anvil blockchain, deploys the contracts (including pre-seeding the lending pool with 10,000 USDC and pre-establishing Bob's credit score), boots the Next.js frontend, and then runs a Playwright browser script that walks through a complete end-to-end lending scenario with two on-screen personas:
 
-- **Alice (Admin)** — Platform admin and trusted anchor of the reputation graph (Anvil account 9, the deployer). The pool is pre-funded by Alice at deploy time so the demo stays focused on credit and reputation.
-- **Bob (Attester)** — Community member who vouches for borrowers (Anvil account 2)
+- **Bob (Attester)** — Community member with an established credit score who vouches for borrowers (Anvil account 2)
 - **Charlie (Borrower)** — Loan applicant (Anvil account 3)
+
+Alice is the platform admin. Her actions (funding the pool, assigning Bob KYC status, and attesting to Bob) happen at deploy time — not through the UI.
 
 ---
 
 ## The Chain of Trust
 
-Credit scores are computed by on-chain PageRank over a directed attestation graph. For an attestation to carry weight, the attester must themselves have reputation. The demo establishes trust like this:
+Credit scores are computed by on-chain PageRank over a directed attestation graph. At deploy time, Alice gives Bob KYC status and attests to him at 95% confidence, establishing his score before the demo begins. The demo then shows:
 
 ```
-Alice (Admin, trusted anchor) → Bob → Charlie
+Alice (Admin, off-screen) → Bob (>90% score) → Charlie
 ```
 
-Alice is the trusted seed. When she vouches for Bob, Bob earns reputation. When Bob vouches for Charlie, that trust carries real weight through the graph — giving Charlie a meaningful credit score and loan eligibility.
+Bob's existing reputation is what makes his attestation to Charlie meaningful.
 
-PageRank is computed **automatically** by the contract each time an attestation is recorded. There is no separate admin step.
+PageRank is computed **automatically** by the contract each time an attestation is recorded — there is no separate admin step.
 
 ---
 
@@ -40,13 +41,13 @@ All user-facing transactions are **meta-transactions** (EIP-712 signed messages 
 
 ## Step-by-Step
 
-- **Step 1 — Alice (Admin) vouches for Bob with 90% confidence**: Alice navigates to `/attest?borrower=<Bob's address>` and submits an attestation at 90% confidence. This anchors the reputation graph — without Alice's vouching, Bob's later attestation to Charlie would propagate no credit. PageRank is auto-computed on-chain immediately.
+- **Step 1 — View Bob's credit score**: Bob navigates to `/scores`. His score (>90%) is already there from deployment — the result of Alice's admin-level attestation and Bob's KYC status.
 
-- **Step 2 — Bob attests to Charlie with 80% confidence**: Bob navigates to `/attest?borrower=<Charlie's address>`. The borrower field is pre-filled via URL param. Bob submits at 80% confidence, gasless via relayer. PageRank is auto-computed on-chain, assigning Charlie a credit score proportional to the trust flowing through Alice → Bob → Charlie.
+- **Step 2 — Bob attests to Charlie with 80% confidence**: Bob navigates to `/attest?borrower=<Charlie's address>`. The attest page shows Bob his own credit score before he vouches. The borrower field is pre-filled via URL param. Bob submits at 80% confidence, gasless via relayer. PageRank is auto-computed on-chain, giving Charlie a meaningful score based on the trust flowing through Bob.
 
 - **Step 3 — View Charlie's credit score**: Navigates to `/scores` as Charlie and displays the computed PageRank-based credit score, which determines the maximum loan amount.
 
-- **Step 4 — Charlie requests a 50 USDC loan (28-day term)**: Navigates to `/borrower`, enters 50 USDC, selects a 28-day repayment period, and clicks *One-Click Borrow*. This sends a signed EIP-712 meta-transaction to the relayer, which both requests and disburses the loan atomically in one transaction — drawing from Alice's pre-seeded pool. Charlie pays no gas.
+- **Step 4 — Charlie requests a 50 USDC loan (28-day term)**: Navigates to `/borrower`, enters 50 USDC, selects a 28-day repayment period, and clicks *One-Click Borrow*. This sends a signed EIP-712 meta-transaction to the relayer, which both requests and disburses the loan atomically in one transaction — drawing from the pre-seeded pool. Charlie pays no gas.
 
 - **Step 5 — View active loan details**: Navigates back to `/borrower` to show the active loan summary — principal, outstanding balance, and payment schedule.
 
