@@ -292,10 +292,8 @@ node "$DEMO_DIR/lending-demo.mjs"
 
 echo ""
 echo "╔══════════════════════════════════════════════╗"
-echo "║  Demo complete!                              ║"
-echo "║  Chain still running: http://localhost:8545  ║"
-echo "║  App  still running:  http://localhost:3000  ║"
-echo "║  Press Ctrl-C to stop both servers.          ║"
+echo "║  Demo complete! Stopping servers…            ║"
 echo "╚══════════════════════════════════════════════╝"
 echo ""
-wait
+# cleanup() is called by the EXIT trap; exit 0 triggers it.
+exit 0
