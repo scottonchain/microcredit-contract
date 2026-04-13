@@ -3,14 +3,13 @@
  *
  * Playwright script that walks through a complete microcredit lending scenario:
  *
- *   Step 1  — View Bob's credit score on /scores (Bob starts with >90% from deploy)
- *   Step 2  — Bob attests to Charlie with 80% confidence (/attest)
+ *   Step 1  — Bob attests to Charlie with 80% confidence (/attest)
  *             (Bob's score is shown on the attest page; PageRank auto-computed)
- *   Step 3  — View Charlie's credit score (/scores)
- *   Step 4  — Charlie requests a 50 USDC loan, 28-day term (/borrower)
+ *   Step 2  — View Charlie's credit score (/scores)
+ *   Step 3  — Charlie requests a 50 USDC loan, 28-day term (/borrower)
  *             (gasless meta-transaction — Charlie needs no ETH)
- *   Step 5  — View active loan details (/borrower)
- *   Step 6  — Charlie repays the loan in full (/borrower)
+ *   Step 4  — View active loan details (/borrower)
+ *   Step 5  — Charlie repays the loan in full (/borrower)
  *
  * How wallet injection works
  * ──────────────────────────
@@ -274,25 +273,10 @@ async function main() {
     await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
     await sleep(STEP_PAUSE);
 
-    // ── STEP 1: Show Bob's credit score ──────────────────────────────────
-    // Bob was given KYC status and an admin attestation at deploy time, so he
-    // already has a credit score >90% before the demo UI interaction begins.
-    banner(1, `View ${ACCOUNTS.attester.name}'s credit score`);
-    await gotoAs(page, '/scores', ACCOUNTS.attester);
-    await connectWallet(page);
-    await sleep(600);
-
-    // Search for Bob's address to display his pre-existing score
-    const bobSearchInput = page.locator('input').first();
-    if (await bobSearchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await bobSearchInput.fill(ACCOUNTS.attester.address);
-      await page.getByRole('button', { name: /search/i }).click().catch(() => {});
-    }
-    await sleep(STEP_PAUSE);
-
-    // ── STEP 2: Bob attests to Charlie ────────────────────────────────────
-    // The attest page shows Bob his own credit score before he vouches.
-    banner(2, `${ACCOUNTS.attester.name} attests to Charlie with 80% confidence`);
+    // ── STEP 1: Bob attests to Charlie ────────────────────────────────────
+    // Bob already has a >90% credit score from deploy time (Alice gave him KYC
+    // and attested to him at 95%). The attest page shows Bob his score.
+    banner(1, `${ACCOUNTS.attester.name} attests to Charlie with 80% confidence`);
     // Pass borrower address via query param so the /attest page pre-fills it
     await gotoAs(page, `/attest?borrower=${ACCOUNTS.borrower.address}`, ACCOUNTS.attester);
     await connectWallet(page);
@@ -314,10 +298,10 @@ async function main() {
     await waitForStatus(page, 'success|submitted|attested|0x[0-9a-f]{10}', 35000);
     await sleep(STEP_PAUSE);
 
-    // ── STEP 3: View credit scores ────────────────────────────────────────
+    // ── STEP 2: View credit scores ────────────────────────────────────────
     // PageRank is computed automatically by the contract when each attestation
     // is recorded — no separate admin step required.
-    banner(3, `View ${ACCOUNTS.borrower.name}'s credit score on /scores`);
+    banner(2, `View ${ACCOUNTS.borrower.name}'s credit score on /scores`);
     await gotoAs(page, '/scores', ACCOUNTS.borrower);
     await connectWallet(page);
     await sleep(800);
@@ -330,10 +314,10 @@ async function main() {
     }
     await sleep(STEP_PAUSE);
 
-    // ── STEP 4: Charlie requests a 50 USDC loan ───────────────────────────
+    // ── STEP 3: Charlie requests a 50 USDC loan ───────────────────────────
     // All transactions are gasless meta-transactions paid by the relayer —
     // Charlie does not need ETH.
-    banner(4, `${ACCOUNTS.borrower.name} requests a 50 USDC loan — 28-day term`);
+    banner(3, `${ACCOUNTS.borrower.name} requests a 50 USDC loan — 28-day term`);
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
     await sleep(1000);
@@ -358,15 +342,15 @@ async function main() {
     await waitForStatus(page, 'active|disbursed|success|✅|processing', 45000);
     await sleep(STEP_PAUSE);
 
-    // ── STEP 5: Show active loan ──────────────────────────────────────────
-    banner(5, 'Active loan — outstanding balance and payment schedule');
+    // ── STEP 4: Show active loan ──────────────────────────────────────────
+    banner(4, 'Active loan — outstanding balance and payment schedule');
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
     // Just pause here so the viewer can read the loan details
     await sleep(STEP_PAUSE * 1.5);
 
-    // ── STEP 6: Charlie repays in full ────────────────────────────────────
-    banner(6, `${ACCOUNTS.borrower.name} repays the loan in full`);
+    // ── STEP 5: Charlie repays in full ────────────────────────────────────
+    banner(5, `${ACCOUNTS.borrower.name} repays the loan in full`);
 
     // The full-repayment button text is "Pay XX.XX USDC" (dynamic)
     const repayBtn = page.getByRole('button', { name: /^Pay / }).first();

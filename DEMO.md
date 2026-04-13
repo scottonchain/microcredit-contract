@@ -41,17 +41,15 @@ All user-facing transactions are **meta-transactions** (EIP-712 signed messages 
 
 ## Step-by-Step
 
-- **Step 1 — View Bob's credit score**: Bob navigates to `/scores`. His score (>90%) is already there from deployment — the result of Alice's admin-level attestation and Bob's KYC status.
+- **Step 1 — Bob attests to Charlie with 80% confidence**: Bob navigates to `/attest?borrower=<Charlie's address>`. The attest page shows Bob his own credit score (>90%, pre-established at deploy time) before he vouches. The borrower field is pre-filled via URL param. Bob submits at 80% confidence, gasless via relayer. PageRank is auto-computed on-chain, giving Charlie a meaningful score based on the trust flowing through Bob.
 
-- **Step 2 — Bob attests to Charlie with 80% confidence**: Bob navigates to `/attest?borrower=<Charlie's address>`. The attest page shows Bob his own credit score before he vouches. The borrower field is pre-filled via URL param. Bob submits at 80% confidence, gasless via relayer. PageRank is auto-computed on-chain, giving Charlie a meaningful score based on the trust flowing through Bob.
+- **Step 2 — View Charlie's credit score**: Navigates to `/scores` as Charlie and displays the computed PageRank-based credit score, which determines the maximum loan amount.
 
-- **Step 3 — View Charlie's credit score**: Navigates to `/scores` as Charlie and displays the computed PageRank-based credit score, which determines the maximum loan amount.
+- **Step 3 — Charlie requests a 50 USDC loan (28-day term)**: Navigates to `/borrower`, enters 50 USDC, selects a 28-day repayment period, and clicks *One-Click Borrow*. This sends a signed EIP-712 meta-transaction to the relayer, which both requests and disburses the loan atomically in one transaction — drawing from the pre-seeded pool. Charlie pays no gas.
 
-- **Step 4 — Charlie requests a 50 USDC loan (28-day term)**: Navigates to `/borrower`, enters 50 USDC, selects a 28-day repayment period, and clicks *One-Click Borrow*. This sends a signed EIP-712 meta-transaction to the relayer, which both requests and disburses the loan atomically in one transaction — drawing from the pre-seeded pool. Charlie pays no gas.
+- **Step 4 — View active loan details**: Navigates back to `/borrower` to show the active loan summary — principal, outstanding balance, and payment schedule.
 
-- **Step 5 — View active loan details**: Navigates back to `/borrower` to show the active loan summary — principal, outstanding balance, and payment schedule.
-
-- **Step 6 — Charlie repays in full**: Still on `/borrower`, clicks the full-repayment button (*Pay $XX.XX*). Charlie signs a USDC EIP-2612 permit; the relayer pulls the exact outstanding balance from Charlie's wallet and closes the loan. The *Loan Request* form reappears, confirming the loan is closed.
+- **Step 5 — Charlie repays in full**: Still on `/borrower`, clicks the full-repayment button (*Pay $XX.XX*). Charlie signs a USDC EIP-2612 permit; the relayer pulls the exact outstanding balance from Charlie's wallet and closes the loan. The *Loan Request* form reappears, confirming the loan is closed.
 
 ---
 
