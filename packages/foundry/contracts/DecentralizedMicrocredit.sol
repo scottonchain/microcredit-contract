@@ -353,6 +353,10 @@ contract DecentralizedMicrocredit is EIP712 {
     // Exposed as public to enable off-chain inspection and simplify tests.
     mapping(address => uint256) public pagerankScores;
 
+    // Admin-assigned score overrides. When non-zero, getCreditScore returns
+    // this value directly instead of the PageRank-derived score.
+    mapping(address => uint256) public scoreOverrides;
+
     // ─────────────── Withdrawal Queue (FIFO) ───────────────
     struct WithdrawalQueueItem {
         address lender;
@@ -980,16 +984,31 @@ contract DecentralizedMicrocredit is EIP712 {
     }
 
     function getCreditScore(address user) public view returns (uint256) {
+        // Admin override takes precedence over PageRank-derived score.
+        if (scoreOverrides[user] != 0) return scoreOverrides[user];
+
         // Converts PageRank score to credit score using a softplus-like curve:
         //   credit = (SCALE * x) / (x + 100), where x = (PR * 1000) / maxPageRank
         // Produces a smooth 0 → SCALE output that breaks PageRank's zero-sum nature.
         uint256 pr = pagerankScores[user]; // 0 – maxPageRank
         uint256 maxPageRank = getMaxPageRankScore();
-        
+
         if (maxPageRank == 0) return 0; // No PageRank scores computed yet
-        
+
         uint256 x = (pr * 1000) / maxPageRank; // 0 – 1000
         return (SCALE * x) / (x + 100); // 0 – SCALE (1e6)
+    }
+
+    /**
+     * @notice Directly assign a credit score to a user, bypassing PageRank.
+     * @dev When set, this value is returned by getCreditScore regardless of
+     *      PageRank computation.  Set to 0 to revert to PageRank-derived score.
+     * @param user  The address to assign a score to
+     * @param score Score in SCALE units (1e6 = 100%)
+     */
+    function setScoreOverride(address user, uint256 score) external onlyOwner {
+        require(score <= SCALE, "Score exceeds SCALE");
+        scoreOverrides[user] = score;
     }
 
     /**
