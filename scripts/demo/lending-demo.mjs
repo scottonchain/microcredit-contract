@@ -271,6 +271,12 @@ async function main() {
   await ctx.addInitScript(PROVIDER_INIT_SCRIPT);
 
   try {
+    // Clear any stale __demoAccount from a previous run before the first step.
+    // gotoAs boots the page to APP_URL when on about:blank, and we don't want
+    // stale localStorage showing the wrong account's score during that flash.
+    await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
+    await page.evaluate(() => localStorage.removeItem('__demoAccount'));
+
     // ── STEP 1: Brighton attests to Casey ────────────────────────────────────
     // Brighton already has a >90% credit score from deploy time (Avery gave him KYC
     // and attested to him at 95%). The attest page shows Brighton his score.
@@ -371,8 +377,7 @@ async function main() {
 
     // ── DONE ──────────────────────────────────────────────────────────────
     banner('✓', 'Demo complete — all steps finished!');
-    await gotoAs(page, '/', ACCOUNTS.admin);
-    await sleep(3000);
+    await sleep(STEP_PAUSE);
 
   } catch (err) {
     console.error('\n❌  Demo error:', err.message);

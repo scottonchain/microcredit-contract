@@ -55,4 +55,4 @@ All user-facing transactions are **meta-transactions** (EIP-712 signed messages 
 
 ## After the Demo
 
-Servers (Anvil + Next.js) are stopped automatically when the Playwright script finishes. The final chain state is saved to `chain-state-demo.json` and will be reloaded on the next run (use `bash demo.sh --fresh` to start clean).
+Servers (Anvil + Next.js) are stopped automatically when the Playwright script finishes. The chain state is saved to `chain-state-demo.json`. By default the next run always deploys fresh — pass `--reuse` to reload the saved state instead.
