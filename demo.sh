@@ -25,6 +25,22 @@ if ! command -v node >/dev/null 2>&1; then
   unset _win_node_dir
 fi
 
+# ── Ensure Foundry (anvil/forge) is on PATH ──────────────────────────────────
+# foundryup installs to ~/.foundry/bin but only adds it to ~/.bashrc,
+# which non-interactive shells (like this one) never source.
+if ! command -v anvil >/dev/null 2>&1; then
+  for _foundry_dir in \
+    "$HOME/.foundry/bin" \
+    "/root/.foundry/bin" \
+    "/usr/local/bin"; do
+    if [[ -x "$_foundry_dir/anvil" ]]; then
+      export PATH="$_foundry_dir:$PATH"
+      break
+    fi
+  done
+  unset _foundry_dir
+fi
+
 # ── Pre-flight: verify node and yarn are available ────────────────────────────
 if ! command -v node >/dev/null 2>&1; then
   echo ""
@@ -46,6 +62,13 @@ fi
 if ! command -v yarn >/dev/null 2>&1 && ! command -v yarn.cmd >/dev/null 2>&1; then
   echo ""
   echo "ERROR: 'yarn' not found. Install it with:  npm install -g yarn"
+  exit 1
+fi
+if ! command -v anvil >/dev/null 2>&1; then
+  echo ""
+  echo "ERROR: 'anvil' not found. Install Foundry in WSL:"
+  echo "  curl -L https://foundry.paradigm.xyz | bash"
+  echo "  source ~/.bashrc && foundryup"
   exit 1
 fi
 
@@ -120,15 +143,46 @@ echo "▶ Deploying contracts…"
 yarn deploy 2>&1 | grep -E "deployed|USDC|Error|error" || true
 echo "  ✓ Contracts deployed"
 
+# ── Re-install deps when running in WSL (node_modules was built on Windows) ───
+# Yarn Berry refuses to run workspace commands if the lockfile/node_modules
+# don't match the current platform. Run "yarn install" once in WSL to fix this.
+# The sentinel file records the last platform so we only reinstall when needed.
+_platform_sentinel="$REPO/.yarn/.platform-install"
+_current_platform="$(uname -s)-$(uname -m)"
+_last_platform="$(cat "$_platform_sentinel" 2>/dev/null || true)"
+if [[ "$_current_platform" != "$_last_platform" ]]; then
+  echo "▶ Running yarn install for platform '$_current_platform'…"
+  echo "  (This is a one-time step when switching between Windows and WSL)"
+  yarn install 2>&1 | grep -E "YN0000|error|Error" | grep -v "peer" | tail -5 || true
+  echo "$_current_platform" > "$_platform_sentinel"
+  echo "  ✓ Dependencies ready"
+  echo ""
+fi
+unset _platform_sentinel _current_platform _last_platform
+
 # ── Start Next.js ─────────────────────────────────────────────────────────────
 echo ""
 echo "▶ Starting Next.js dev server…"
-yarn start >"$REPO/logs/nextjs-demo.log" 2>&1 &
+# In WSL, yarn only creates .cmd shims (Windows) not Unix shell scripts, so
+# the 'next' binary can't be found via yarn start. Run it directly instead.
+# Also clear the .next build cache — it was compiled on Windows and won't work on Linux.
+if grep -qi microsoft /proc/version 2>/dev/null; then
+  if [[ -d "$REPO/packages/nextjs/.next" ]]; then
+    echo "  Clearing Windows build cache for Linux rebuild…"
+    rm -rf "$REPO/packages/nextjs/.next"
+  fi
+  _next_bin="$REPO/node_modules/next/dist/bin/next"
+  [[ ! -f "$_next_bin" ]] && _next_bin="$REPO/packages/nextjs/node_modules/next/dist/bin/next"
+  (cd "$REPO/packages/nextjs" && node "$_next_bin" dev) >"$REPO/logs/nextjs-demo.log" 2>&1 &
+  unset _next_bin
+else
+  yarn start >"$REPO/logs/nextjs-demo.log" 2>&1 &
+fi
 NEXT_PID=$!
 
 echo -n "  Waiting for port $NEXT_PORT"
 _wait=0
-until curl -sf "http://localhost:$NEXT_PORT" >/dev/null 2>&1; do
+until [[ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$NEXT_PORT" 2>/dev/null)" =~ ^[1-5][0-9][0-9]$ ]]; do
   if ! kill -0 "$NEXT_PID" 2>/dev/null; then
     echo ""
     echo "ERROR: Next.js process exited unexpectedly. Last log lines:"
@@ -155,11 +209,24 @@ if [[ ! -d node_modules ]]; then
   echo "  Installing Playwright…"
   npm install --silent
 fi
-# Install browser binary if not already cached
-if ! npx playwright install --list 2>/dev/null | grep -q "chromium"; then
+# Install browser binary if the actual executable is missing
+_pw_chromium=$(node -e "
+  try {
+    const { chromium } = require('playwright');
+    const b = chromium.executablePath();
+    console.log(b);
+  } catch(e) { console.log(''); }
+" 2>/dev/null || true)
+if [[ -z "$_pw_chromium" || ! -f "$_pw_chromium" ]]; then
   echo "  Downloading Chromium browser…"
-  npx playwright install chromium --with-deps --quiet 2>/dev/null || true
+  npx playwright install chromium --with-deps 2>&1 | tail -3 || true
+elif grep -qi microsoft /proc/version 2>/dev/null; then
+  # Binary exists but system deps may be missing (installed without --with-deps).
+  # install-deps is fast (no-op) if already satisfied.
+  echo "  Verifying Chromium system dependencies…"
+  sudo npx playwright install-deps chromium 2>&1 | tail -3 || true
 fi
+unset _pw_chromium
 cd "$REPO"
 
 # ── Run the Playwright demo ───────────────────────────────────────────────────
