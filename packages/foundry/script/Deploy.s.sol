@@ -120,7 +120,17 @@ contract DeployScript is Script {
         // Set basePersonalization to 0 as requested
         microcreditContract.setBasePersonalization(0);
         console.logString("Set basePersonalization to 0");
-        
+
+        // Seed the lending pool so the demo starts with available liquidity.
+        // The deployer mints USDC to themselves, approves, then deposits — no
+        // front-end interaction required. Viewers see a "pre-funded pool" and
+        // the demo can focus on the credit / attestation story.
+        uint256 poolSeed = 10_000 * 1e6; // 10,000 USDC (6 decimals)
+        MockUSDC(usdcAddress).mint(vm.addr(deployerPrivateKey), poolSeed);
+        MockUSDC(usdcAddress).approve(address(microcreditContract), poolSeed);
+        microcreditContract.depositFunds(poolSeed);
+        console.logString("Seeded lending pool with 10,000 USDC");
+
         // Provision ETH to demo addresses (excluding admin addresses that can fund themselves)
         console.logString("--- Provisioning ETH to demo addresses ---");
         

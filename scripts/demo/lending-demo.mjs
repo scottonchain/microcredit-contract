@@ -40,14 +40,10 @@ const APP_URL = 'http://localhost:3000';
  */
 const ACCOUNTS = {
   admin: {
-    name: 'Admin',
-    // Anvil account 9 — the deployer (pk 0x2a871d…) that owns the contract.
-    // Using account 0 would fail the useIsAdmin check (not owner/oracle).
+    name: 'Alice (Admin)',
+    // Anvil account 9 — the deployer (pk 0x2a871d…) that owns the contract
+    // and seeded the pool with 10,000 USDC at deploy time.
     address: '0xa0Ee7A142d267C1f36714E4a8F75612F20a79720',
-  },
-  lender: {
-    name: 'Alice (Lender)',
-    address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', // Anvil account 1
   },
   attester: {
     name: 'Bob (Attester)',
@@ -279,44 +275,12 @@ async function main() {
     await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
     await sleep(STEP_PAUSE);
 
-    // ── STEP 1: Fund Alice ────────────────────────────────────────────────
-    banner(1, `Fund ${ACCOUNTS.lender.name} with ETH + USDC`);
-    await gotoAs(page, '/fund', ACCOUNTS.lender);
-    await connectWallet(page);
-
-    console.log('  → clicking Fund 1 ETH');
-    await page.getByRole('button', { name: 'Fund 1 ETH' }).click();
-    await waitForStatus(page, '✅|Funded');
-    await sleep(800);
-
-    console.log('  → clicking Mint 10,000 USDC');
-    await page.getByRole('button', { name: 'Mint 10,000 USDC' }).click();
-    await waitForStatus(page, 'Minted|✅');
-    await sleep(STEP_PAUSE);
-
-    // ── STEP 2: Alice deposits into the pool ──────────────────────────────
-    banner(2, `${ACCOUNTS.lender.name} deposits 1,000 USDC into the lending pool`);
-    await gotoAs(page, '/lend', ACCOUNTS.lender);
-    await connectWallet(page);
-    await sleep(600);
-
-    console.log('  → filling deposit amount: 1000');
-    // The deposit input is the first number input on the page
-    await page.locator('input[type="number"]').first().fill('1000');
-    await sleep(400);
-
-    console.log('  → clicking Deposit');
-    await page.getByRole('button', { name: 'Deposit' }).click();
-    await waitForStatus(page, 'submitted via relayer|Deposit submitted|deposited|success|✅', 35000);
-    await sleep(STEP_PAUSE);
-
-    // ── STEP 3: Admin vouches for Bob ─────────────────────────────────────
-    // Bob has no deposits, KYC, or prior attestations. Without this step
-    // his attestation to Charlie would carry no weight because the graph
-    // has no trusted seed. The Admin (contract owner) attests to Bob at
-    // 90% confidence, establishing the chain of trust:
-    //   Admin (trusted anchor) → Bob → Charlie
-    banner(3, `${ACCOUNTS.admin.name} vouches for ${ACCOUNTS.attester.name} with 90% confidence`);
+    // ── STEP 1: Alice (Admin) vouches for Bob ────────────────────────────
+    // Alice is the platform admin and the trusted anchor of the reputation
+    // graph. Bob has no deposits, KYC, or prior attestations — without this
+    // vouching his later attestation to Charlie would carry no weight.
+    // Chain of trust:  Alice (Admin, anchor) → Bob → Charlie
+    banner(1, `${ACCOUNTS.admin.name} vouches for ${ACCOUNTS.attester.name} with 90% confidence`);
     await gotoAs(page, `/attest?borrower=${ACCOUNTS.attester.address}`, ACCOUNTS.admin);
     await connectWallet(page);
     await sleep(600);
@@ -337,8 +301,8 @@ async function main() {
     await waitForStatus(page, 'success|submitted|attested|0x[0-9a-f]{10}', 35000);
     await sleep(STEP_PAUSE);
 
-    // ── STEP 4: Bob attests to Charlie ────────────────────────────────────
-    banner(4, `${ACCOUNTS.attester.name} attests to Charlie with 80% confidence`);
+    // ── STEP 2: Bob attests to Charlie ────────────────────────────────────
+    banner(2, `${ACCOUNTS.attester.name} attests to Charlie with 80% confidence`);
     // Pass borrower address via query param so the /attest page pre-fills it
     await gotoAs(page, `/attest?borrower=${ACCOUNTS.borrower.address}`, ACCOUNTS.attester);
     await connectWallet(page);
@@ -360,8 +324,8 @@ async function main() {
     await waitForStatus(page, 'success|submitted|attested|0x[0-9a-f]{10}', 35000);
     await sleep(STEP_PAUSE);
 
-    // ── STEP 5: Admin runs PageRank ───────────────────────────────────────
-    banner(5, 'Admin computes on-chain PageRank credit scores');
+    // ── STEP 3: Alice runs PageRank ───────────────────────────────────────
+    banner(3, 'Alice (Admin) computes on-chain PageRank credit scores');
     await gotoAs(page, '/admin', ACCOUNTS.admin);
     await connectWallet(page);
     await sleep(800);
@@ -371,8 +335,8 @@ async function main() {
     await waitForStatus(page, 'computed|success|✅|done', 90000);
     await sleep(STEP_PAUSE);
 
-    // ── STEP 6: View credit scores ────────────────────────────────────────
-    banner(6, `View ${ACCOUNTS.borrower.name}'s credit score on /scores`);
+    // ── STEP 4: View credit scores ────────────────────────────────────────
+    banner(4, `View ${ACCOUNTS.borrower.name}'s credit score on /scores`);
     await gotoAs(page, '/scores', ACCOUNTS.borrower);
     await connectWallet(page);
     await sleep(800);
@@ -385,8 +349,8 @@ async function main() {
     }
     await sleep(STEP_PAUSE);
 
-    // ── STEP 7: Fund Charlie with ETH ──────────────────────────────────────
-    banner(7, `Fund ${ACCOUNTS.borrower.name} with ETH`);
+    // ── STEP 5: Fund Charlie with ETH ──────────────────────────────────────
+    banner(5, `Fund ${ACCOUNTS.borrower.name} with ETH`);
     await gotoAs(page, '/fund', ACCOUNTS.borrower);
     await connectWallet(page);
     await sleep(600);
@@ -396,8 +360,8 @@ async function main() {
     await waitForStatus(page, '✅|Funded');
     await sleep(STEP_PAUSE);
 
-    // ── STEP 8: Charlie requests a 50 USDC loan ───────────────────────────
-    banner(8, `${ACCOUNTS.borrower.name} requests a 50 USDC loan — 28-day term`);
+    // ── STEP 6: Charlie requests a 50 USDC loan ───────────────────────────
+    banner(6, `${ACCOUNTS.borrower.name} requests a 50 USDC loan — 28-day term`);
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
     await sleep(1000);
@@ -422,15 +386,15 @@ async function main() {
     await waitForStatus(page, 'active|disbursed|success|✅|processing', 45000);
     await sleep(STEP_PAUSE);
 
-    // ── STEP 9: Show active loan ──────────────────────────────────────────
-    banner(9, 'Active loan — outstanding balance and payment schedule');
+    // ── STEP 7: Show active loan ──────────────────────────────────────────
+    banner(7, 'Active loan — outstanding balance and payment schedule');
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
     // Just pause here so the viewer can read the loan details
     await sleep(STEP_PAUSE * 1.5);
 
-    // ── STEP 10: Charlie repays in full ───────────────────────────────────
-    banner(10, `${ACCOUNTS.borrower.name} repays the loan in full`);
+    // ── STEP 8: Charlie repays in full ────────────────────────────────────
+    banner(8, `${ACCOUNTS.borrower.name} repays the loan in full`);
 
     // The full-repayment button text is "Pay XX.XX USDC" (dynamic)
     const repayBtn = page.getByRole('button', { name: /^Pay / }).first();
@@ -445,7 +409,7 @@ async function main() {
       await waitForStatus(page, 'Loan Request|repaid|no active|success|✅', 60000);
       await sleep(STEP_PAUSE);
     } else {
-      console.log('  (repay button not visible — loan may still be processing from step 8)');
+      console.log('  (repay button not visible — loan may still be processing from step 6)');
     }
 
     // ── DONE ──────────────────────────────────────────────────────────────
