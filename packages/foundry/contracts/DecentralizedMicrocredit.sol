@@ -1320,16 +1320,24 @@ contract DecentralizedMicrocredit is EIP712 {
         for (uint256 i = 0; i < n; i++) {
             address node = pagerankNodes[i];
 
-            uint256 weight = basePersonalization;
+            uint256 weight;
+            if (scoreOverrides[node] != 0) {
+                // Admin-assigned score override: use it directly as the
+                // personalization anchor so the node's attestations carry
+                // proportional trust in the PageRank graph.
+                weight = scoreOverrides[node]; // 0–SCALE (1e6)
+            } else {
+                weight = basePersonalization;
 
-            uint256 depositWeight = lenderDeposits[node];
-            if (depositWeight > personalizationCap) {
-                depositWeight = personalizationCap;
-            }
-            weight += depositWeight;
+                uint256 depositWeight = lenderDeposits[node];
+                if (depositWeight > personalizationCap) {
+                    depositWeight = personalizationCap;
+                }
+                weight += depositWeight;
 
-            if (isKYCVerified[node]) {
-                weight += kycBonus;
+                if (isKYCVerified[node]) {
+                    weight += kycBonus;
+                }
             }
 
             vector[i] = weight;
