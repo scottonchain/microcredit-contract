@@ -3,9 +3,9 @@
  *
  * Playwright script that walks through a complete microcredit lending scenario:
  *
- *   Step 1  — Alice (Admin) vouches for Bob with 90% confidence (/attest)
+ *   Step 1  — View Bob's credit score on /scores (Bob starts with >90% from deploy)
  *   Step 2  — Bob attests to Charlie with 80% confidence (/attest)
- *             (PageRank is auto-computed by the contract after each attestation)
+ *             (Bob's score is shown on the attest page; PageRank auto-computed)
  *   Step 3  — View Charlie's credit score (/scores)
  *   Step 4  — Charlie requests a 50 USDC loan, 28-day term (/borrower)
  *             (gasless meta-transaction — Charlie needs no ETH)
@@ -274,33 +274,24 @@ async function main() {
     await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
     await sleep(STEP_PAUSE);
 
-    // ── STEP 1: Alice (Admin) vouches for Bob ────────────────────────────
-    // Alice is the platform admin and the trusted anchor of the reputation
-    // graph. Bob has no deposits, KYC, or prior attestations — without this
-    // vouching his later attestation to Charlie would carry no weight.
-    // Chain of trust:  Alice (Admin, anchor) → Bob → Charlie
-    banner(1, `${ACCOUNTS.admin.name} vouches for ${ACCOUNTS.attester.name} with 90% confidence`);
-    await gotoAs(page, `/attest?borrower=${ACCOUNTS.attester.address}`, ACCOUNTS.admin);
+    // ── STEP 1: Show Bob's credit score ──────────────────────────────────
+    // Bob was given KYC status and an admin attestation at deploy time, so he
+    // already has a credit score >90% before the demo UI interaction begins.
+    banner(1, `View ${ACCOUNTS.attester.name}'s credit score`);
+    await gotoAs(page, '/scores', ACCOUNTS.attester);
     await connectWallet(page);
     await sleep(600);
 
-    console.log('  → borrower address (Bob) pre-filled via URL param');
-    await sleep(400);
-
-    console.log('  → setting confidence slider to 90');
-    await page.locator('input[type="range"]').evaluate((el) => {
-      el.value = '90';
-      el.dispatchEvent(new Event('input',  { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    await sleep(400);
-
-    console.log('  → clicking Submit Attestation');
-    await page.getByRole('button', { name: 'Submit Attestation' }).click();
-    await waitForStatus(page, 'success|submitted|attested|0x[0-9a-f]{10}', 35000);
+    // Search for Bob's address to display his pre-existing score
+    const bobSearchInput = page.locator('input').first();
+    if (await bobSearchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await bobSearchInput.fill(ACCOUNTS.attester.address);
+      await page.getByRole('button', { name: /search/i }).click().catch(() => {});
+    }
     await sleep(STEP_PAUSE);
 
     // ── STEP 2: Bob attests to Charlie ────────────────────────────────────
+    // The attest page shows Bob his own credit score before he vouches.
     banner(2, `${ACCOUNTS.attester.name} attests to Charlie with 80% confidence`);
     // Pass borrower address via query param so the /attest page pre-fills it
     await gotoAs(page, `/attest?borrower=${ACCOUNTS.borrower.address}`, ACCOUNTS.attester);
