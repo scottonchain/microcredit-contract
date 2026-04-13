@@ -431,9 +431,6 @@ async function main() {
     console.error(err.stack);
   }
 
-  // Keep the browser open so the viewer can explore, then close automatically.
-  console.log('\n  Browser will close in 45 seconds (Ctrl-C to exit now).\n');
-  await sleep(45000);
   await browser.close();
 }
 
