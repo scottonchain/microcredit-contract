@@ -3,15 +3,14 @@
  *
  * Playwright script that walks through a complete microcredit lending scenario:
  *
- *   Step 1  — Fund Alice (Lender) with ETH + USDC via the /fund faucet
- *   Step 2  — Alice deposits 1,000 USDC into the lending pool (/lend)
- *   Step 3  — Bob (Attester) attests to Charlie with 80% confidence (/attest)
- *   Step 4  — Admin computes on-chain PageRank credit scores (/admin)
- *   Step 5  — View Charlie's credit score (/scores)
- *   Step 6  — Fund Charlie (Borrower) with ETH via /fund
- *   Step 7  — Charlie requests a 50 USDC loan (28-day term) (/borrower)
- *   Step 8  — Pause to show the active loan details
- *   Step 9  — Charlie repays the loan in full (/borrower)
+ *   Step 1  — Alice (Admin) vouches for Bob with 90% confidence (/attest)
+ *   Step 2  — Bob attests to Charlie with 80% confidence (/attest)
+ *             (PageRank is auto-computed by the contract after each attestation)
+ *   Step 3  — View Charlie's credit score (/scores)
+ *   Step 4  — Charlie requests a 50 USDC loan, 28-day term (/borrower)
+ *             (gasless meta-transaction — Charlie needs no ETH)
+ *   Step 5  — View active loan details (/borrower)
+ *   Step 6  — Charlie repays the loan in full (/borrower)
  *
  * How wallet injection works
  * ──────────────────────────
@@ -324,19 +323,10 @@ async function main() {
     await waitForStatus(page, 'success|submitted|attested|0x[0-9a-f]{10}', 35000);
     await sleep(STEP_PAUSE);
 
-    // ── STEP 3: Alice runs PageRank ───────────────────────────────────────
-    banner(3, 'Alice (Admin) computes on-chain PageRank credit scores');
-    await gotoAs(page, '/admin', ACCOUNTS.admin);
-    await connectWallet(page);
-    await sleep(800);
-
-    console.log('  → clicking Compute PageRank');
-    await page.getByRole('button', { name: 'Compute PageRank' }).click();
-    await waitForStatus(page, 'computed|success|✅|done', 90000);
-    await sleep(STEP_PAUSE);
-
-    // ── STEP 4: View credit scores ────────────────────────────────────────
-    banner(4, `View ${ACCOUNTS.borrower.name}'s credit score on /scores`);
+    // ── STEP 3: View credit scores ────────────────────────────────────────
+    // PageRank is computed automatically by the contract when each attestation
+    // is recorded — no separate admin step required.
+    banner(3, `View ${ACCOUNTS.borrower.name}'s credit score on /scores`);
     await gotoAs(page, '/scores', ACCOUNTS.borrower);
     await connectWallet(page);
     await sleep(800);
@@ -349,19 +339,10 @@ async function main() {
     }
     await sleep(STEP_PAUSE);
 
-    // ── STEP 5: Fund Charlie with ETH ──────────────────────────────────────
-    banner(5, `Fund ${ACCOUNTS.borrower.name} with ETH`);
-    await gotoAs(page, '/fund', ACCOUNTS.borrower);
-    await connectWallet(page);
-    await sleep(600);
-
-    console.log('  → clicking Fund 1 ETH');
-    await page.getByRole('button', { name: 'Fund 1 ETH' }).click();
-    await waitForStatus(page, '✅|Funded');
-    await sleep(STEP_PAUSE);
-
-    // ── STEP 6: Charlie requests a 50 USDC loan ───────────────────────────
-    banner(6, `${ACCOUNTS.borrower.name} requests a 50 USDC loan — 28-day term`);
+    // ── STEP 4: Charlie requests a 50 USDC loan ───────────────────────────
+    // All transactions are gasless meta-transactions paid by the relayer —
+    // Charlie does not need ETH.
+    banner(4, `${ACCOUNTS.borrower.name} requests a 50 USDC loan — 28-day term`);
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
     await sleep(1000);
@@ -386,15 +367,15 @@ async function main() {
     await waitForStatus(page, 'active|disbursed|success|✅|processing', 45000);
     await sleep(STEP_PAUSE);
 
-    // ── STEP 7: Show active loan ──────────────────────────────────────────
-    banner(7, 'Active loan — outstanding balance and payment schedule');
+    // ── STEP 5: Show active loan ──────────────────────────────────────────
+    banner(5, 'Active loan — outstanding balance and payment schedule');
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
     // Just pause here so the viewer can read the loan details
     await sleep(STEP_PAUSE * 1.5);
 
-    // ── STEP 8: Charlie repays in full ────────────────────────────────────
-    banner(8, `${ACCOUNTS.borrower.name} repays the loan in full`);
+    // ── STEP 6: Charlie repays in full ────────────────────────────────────
+    banner(6, `${ACCOUNTS.borrower.name} repays the loan in full`);
 
     // The full-repayment button text is "Pay XX.XX USDC" (dynamic)
     const repayBtn = page.getByRole('button', { name: /^Pay / }).first();

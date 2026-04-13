@@ -28,27 +28,29 @@ Alice (Admin, trusted anchor) → Bob → Charlie
 
 Alice is the trusted seed. When she vouches for Bob, Bob earns reputation. When Bob vouches for Charlie, that trust carries real weight through the graph — giving Charlie a meaningful credit score and loan eligibility.
 
+PageRank is computed **automatically** by the contract each time an attestation is recorded. There is no separate admin step.
+
+---
+
+## Gasless Transactions
+
+All user-facing transactions are **meta-transactions** (EIP-712 signed messages submitted by the relayer). Charlie never needs ETH — loan requests, disbursements, and repayments are all paid by the relayer pool.
+
 ---
 
 ## Step-by-Step
 
-- **Step 0 — Home page**: Opens the app home page so the viewer sees the protocol overview. The lending pool is already funded (seeded at deploy time).
+- **Step 1 — Alice (Admin) vouches for Bob with 90% confidence**: Alice navigates to `/attest?borrower=<Bob's address>` and submits an attestation at 90% confidence. This anchors the reputation graph — without Alice's vouching, Bob's later attestation to Charlie would propagate no credit. PageRank is auto-computed on-chain immediately.
 
-- **Step 1 — Alice (Admin) vouches for Bob with 90% confidence**: Alice navigates to `/attest?borrower=<Bob's address>` and submits an attestation at 90% confidence. This anchors the reputation graph — without Alice's vouching, Bob's later attestation to Charlie would propagate no credit.
+- **Step 2 — Bob attests to Charlie with 80% confidence**: Bob navigates to `/attest?borrower=<Charlie's address>`. The borrower field is pre-filled via URL param. Bob submits at 80% confidence, gasless via relayer. PageRank is auto-computed on-chain, assigning Charlie a credit score proportional to the trust flowing through Alice → Bob → Charlie.
 
-- **Step 2 — Bob attests to Charlie with 80% confidence**: Bob navigates to `/attest?borrower=<Charlie's address>`. The borrower field is pre-filled via URL param. Bob submits at 80% confidence, gasless via relayer.
+- **Step 3 — View Charlie's credit score**: Navigates to `/scores` as Charlie and displays the computed PageRank-based credit score, which determines the maximum loan amount.
 
-- **Step 3 — Alice (Admin) computes on-chain PageRank credit scores**: Alice navigates to `/admin` and clicks *Compute PageRank*. The contract runs iterative PageRank over the graph (Alice → Bob → Charlie), assigning Charlie a credit score proportional to the trust flowing through the chain.
+- **Step 4 — Charlie requests a 50 USDC loan (28-day term)**: Navigates to `/borrower`, enters 50 USDC, selects a 28-day repayment period, and clicks *One-Click Borrow*. This sends a signed EIP-712 meta-transaction to the relayer, which both requests and disburses the loan atomically in one transaction — drawing from Alice's pre-seeded pool. Charlie pays no gas.
 
-- **Step 4 — View Charlie's credit score**: Navigates to `/scores` as Charlie and displays the computed PageRank-based credit score, which determines the maximum loan amount.
+- **Step 5 — View active loan details**: Navigates back to `/borrower` to show the active loan summary — principal, outstanding balance, and payment schedule.
 
-- **Step 5 — Fund Charlie with ETH**: Navigates to `/fund` as Charlie and clicks *Fund 1 ETH* so he has gas for any direct transactions.
-
-- **Step 6 — Charlie requests a 50 USDC loan (28-day term)**: Navigates to `/borrower`, enters 50 USDC, selects a 28-day repayment period, and clicks *One-Click Borrow*. This sends a signed EIP-712 meta-transaction to the relayer, which both requests and disburses the loan atomically in one transaction — drawing from Alice's pre-seeded pool.
-
-- **Step 7 — View active loan details**: Navigates back to `/borrower` to show the active loan summary — principal, outstanding balance, and payment schedule.
-
-- **Step 8 — Charlie repays in full**: Still on `/borrower`, clicks the full-repayment button (*Pay $XX.XX*). Charlie signs a USDC EIP-2612 permit; the relayer pulls the exact outstanding balance from Charlie's wallet and closes the loan. The *Loan Request* form reappears, confirming the loan is closed.
+- **Step 6 — Charlie repays in full**: Still on `/borrower`, clicks the full-repayment button (*Pay $XX.XX*). Charlie signs a USDC EIP-2612 permit; the relayer pulls the exact outstanding balance from Charlie's wallet and closes the loan. The *Loan Request* form reappears, confirming the loan is closed.
 
 ---
 
