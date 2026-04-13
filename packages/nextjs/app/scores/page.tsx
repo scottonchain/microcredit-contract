@@ -12,21 +12,21 @@ const ScoresPage: NextPage = () => {
   const [searchAddress, setSearchAddress] = useState("");
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
 
-  // Fetch PageRank score for connected user
-  const { data: userPageRankScore } = useScaffoldReadContract({
+  // Fetch credit score for connected user (respects admin overrides)
+  const { data: userCreditScore } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "getPageRankScore",
+    functionName: "getCreditScore",
     args: [connectedAddress],
   });
 
-  // PageRank score for searched address
-  const { data: searchedPageRankScore } = useScaffoldReadContract({
+  // Credit score for searched address
+  const { data: searchedCreditScore } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "getPageRankScore",
+    functionName: "getCreditScore",
     args: [selectedAddress as `0x${string}` | undefined],
   });
 
-  const toPercent = (score: bigint | undefined) => Number(score ?? 0) / 1000; // PR_SCALE=100000 => /1000 -> percent
+  const toPercent = (score: bigint | undefined) => Number(score ?? 0) / 10000; // SCALE=1e6 => /10000 -> percent
 
   const getCreditScoreColor = (score: number) => {
     if (score < 30) return "text-red-500";
@@ -94,12 +94,12 @@ const ScoresPage: NextPage = () => {
               <h2 className="text-xl font-semibold mb-4">Your Credit Profile</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="text-center">
-                  <div className={`text-5xl font-bold ${getCreditScoreColor(toPercent(userPageRankScore))}`}>
-                    {toPercent(userPageRankScore).toFixed(2)}%
+                  <div className={`text-5xl font-bold ${getCreditScoreColor(toPercent(userCreditScore))}`}>
+                    {toPercent(userCreditScore).toFixed(2)}%
                   </div>
                   <div className="text-sm text-gray-600">Credit Score</div>
                   <div className="text-lg font-medium mt-1">
-                    {getCreditScoreLabel(toPercent(userPageRankScore))}
+                    {getCreditScoreLabel(toPercent(userCreditScore))}
                   </div>
                 </div>
                 <div className="text-center">
@@ -121,7 +121,7 @@ const ScoresPage: NextPage = () => {
               <div className="mt-6">
                 <h3 className="font-medium mb-2">Score Description</h3>
                 <p className="text-gray-600">
-                  {getCreditScoreDescription(toPercent(userPageRankScore))}
+                  {getCreditScoreDescription(toPercent(userCreditScore))}
                 </p>
               </div>
             </div>
@@ -137,12 +137,12 @@ const ScoresPage: NextPage = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div className="text-center">
-                  <div className={`text-5xl font-bold ${getCreditScoreColor(toPercent(searchedPageRankScore))}`}>
-                    {toPercent(searchedPageRankScore).toFixed(2)}%
+                  <div className={`text-5xl font-bold ${getCreditScoreColor(toPercent(searchedCreditScore))}`}>
+                    {toPercent(searchedCreditScore).toFixed(2)}%
                   </div>
                   <div className="text-sm text-gray-600">Credit Score</div>
                   <div className="text-lg font-medium mt-1">
-                    {getCreditScoreLabel(toPercent(searchedPageRankScore))}
+                    {getCreditScoreLabel(toPercent(searchedCreditScore))}
                   </div>
                 </div>
                 <div className="text-center">

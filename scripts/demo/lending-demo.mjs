@@ -268,11 +268,6 @@ async function main() {
   await ctx.addInitScript(PROVIDER_INIT_SCRIPT);
 
   try {
-    // ── INTRO ──────────────────────────────────────────────────────────────
-    banner(0, 'Home — Microcredit Protocol overview');
-    await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
-    await sleep(STEP_PAUSE);
-
     // ── STEP 1: Bob attests to Charlie ────────────────────────────────────
     // Bob already has a >90% credit score from deploy time (Alice gave him KYC
     // and attested to him at 95%). The attest page shows Bob his score.
