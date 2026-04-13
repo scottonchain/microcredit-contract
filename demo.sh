@@ -25,6 +25,24 @@ if ! command -v node >/dev/null 2>&1; then
   unset _win_node_dir
 fi
 
+# ── Create scaffold-eth-default keystore if missing (needed by forge deploy) ─
+# foundryup does not create this keystore automatically. The deploy script
+# uses ETH_KEYSTORE_ACCOUNT=scaffold-eth-default (from .env) and forge will
+# error if the keystore file is absent, even when --private-key is provided.
+_ks="$HOME/.foundry/keystores/scaffold-eth-default"
+if [[ ! -f "$_ks" ]]; then
+  _cast="${HOME}/.foundry/bin/cast"
+  [[ ! -x "$_cast" ]] && _cast="cast"
+  if command -v "$_cast" >/dev/null 2>&1 || [[ -x "$_cast" ]]; then
+    mkdir -p "$HOME/.foundry/keystores"
+    "$_cast" wallet import scaffold-eth-default \
+      --private-key 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6 \
+      --unsafe-password localhost >/dev/null 2>&1 && \
+      echo "  ✓ Created deploy keystore (scaffold-eth-default)"
+  fi
+fi
+unset _ks _cast
+
 # ── Ensure Foundry (anvil/forge) is on PATH ──────────────────────────────────
 # foundryup installs to ~/.foundry/bin but only adds it to ~/.bashrc,
 # which non-interactive shells (like this one) never source.
