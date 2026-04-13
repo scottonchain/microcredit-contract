@@ -41,7 +41,9 @@ const APP_URL = 'http://localhost:3000';
 const ACCOUNTS = {
   admin: {
     name: 'Admin',
-    address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', // Anvil account 0
+    // Anvil account 9 — the deployer (pk 0x2a871d…) that owns the contract.
+    // Using account 0 would fail the useIsAdmin check (not owner/oracle).
+    address: '0xa0Ee7A142d267C1f36714E4a8F75612F20a79720',
   },
   lender: {
     name: 'Alice (Lender)',
