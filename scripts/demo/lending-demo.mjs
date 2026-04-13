@@ -318,7 +318,12 @@ async function main() {
     banner(3, `${ACCOUNTS.borrower.name} requests a 50 USDC loan — 28-day term`);
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
-    await sleep(1000);
+
+    // Wait for the loan form to appear — it only renders once getCreditScore
+    // resolves and confirms Casey has a non-zero credit score.
+    console.log('  → waiting for loan form to load…');
+    const borrowBtn = page.getByRole('button', { name: /one.click borrow/i });
+    await borrowBtn.waitFor({ state: 'visible', timeout: 30000 });
 
     // Fill the loan amount (number input)
     console.log('  → entering loan amount: 50');
@@ -334,9 +339,7 @@ async function main() {
     await sleep(400);
 
     console.log('  → clicking One-Click Borrow');
-    await page
-      .getByRole('button', { name: /one.click borrow/i })
-      .click({ timeout: 8000 });
+    await borrowBtn.click();
     await waitForStatus(page, 'active|disbursed|success|✅|processing', 45000);
     await sleep(STEP_PAUSE);
 
