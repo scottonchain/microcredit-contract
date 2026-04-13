@@ -226,11 +226,12 @@ echo "▶ Starting Next.js dev server…"
 # Always invoke the 'next' binary directly via node so that log redirection
 # works reliably across WSL, Git Bash, and other Windows bash environments.
 # 'yarn start' uses yarn.cmd on Windows, which doesn't survive the '>&' redirect.
-if grep -qi microsoft /proc/version 2>/dev/null; then
-  if [[ -d "$REPO/packages/nextjs/.next" ]]; then
-    echo "  Clearing Windows build cache for Linux rebuild…"
-    rm -rf "$REPO/packages/nextjs/.next"
-  fi
+# Always clear the Next.js build cache so it picks up the freshly generated
+# deployedContracts.ts (new contract addresses) rather than serving stale
+# cached pages with the old address.
+if [[ -d "$REPO/packages/nextjs/.next" ]]; then
+  echo "  Clearing Next.js build cache…"
+  rm -rf "$REPO/packages/nextjs/.next"
 fi
 _next_bin="$REPO/node_modules/next/dist/bin/next"
 [[ ! -f "$_next_bin" ]] && _next_bin="$REPO/packages/nextjs/node_modules/next/dist/bin/next"
