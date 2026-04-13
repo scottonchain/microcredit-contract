@@ -32,6 +32,21 @@ export default function AttestPage() {
   const [arrivedViaAttestLink, setArrivedViaAttestLink] = useState(false);
   const [submittedInfo, setSubmittedInfo] = useState<{ borrower: string; weight: number; txHash?: string } | null>(null);
 
+  // Connected user's own credit score
+  const [myScore, setMyScore] = useState<number | null>(null);
+  useEffect(() => {
+    if (!connectedAddress || !CONTRACT_ADDRESS || !CONTRACT_ABI) return;
+    publicClient
+      .readContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "getCreditScore",
+        args: [connectedAddress as `0x${string}`],
+      })
+      .then((score) => setMyScore(Number(score as bigint)))
+      .catch(() => setMyScore(null));
+  }, [connectedAddress, CONTRACT_ADDRESS, CONTRACT_ABI]);
+
   // Prefill from query params (?borrower=0x...&weight=80)
   useEffect(() => {
     if (!searchParams) return;
@@ -150,6 +165,23 @@ export default function AttestPage() {
                 <p>Connect your wallet to continue. The form will be pre-filled.</p>
               </div>
             )}
+          </div>
+        )}
+
+        {connectedAddress && myScore !== null && (
+          <div className="bg-base-200 border border-base-300 rounded-lg p-4 mb-6 flex items-center justify-between">
+            <div>
+              <div className="text-sm text-gray-500">Your credit score</div>
+              <div className="text-2xl font-bold">{(myScore / 10000).toFixed(1)}%</div>
+            </div>
+            <div
+              className={`radial-progress text-sm font-semibold ${
+                myScore >= 900000 ? "text-success" : myScore >= 600000 ? "text-warning" : "text-error"
+              }`}
+              style={{ "--value": String(Math.round(myScore / 10000)), "--size": "3.5rem" } as React.CSSProperties}
+            >
+              {Math.round(myScore / 10000)}%
+            </div>
           </div>
         )}
 
