@@ -305,18 +305,17 @@ async function main() {
 
     console.log('  → clicking Deposit');
     await page.getByRole('button', { name: 'Deposit' }).click();
-    await waitForStatus(page, 'success|deposited|✅|1,000', 35000);
+    await waitForStatus(page, 'submitted via relayer|Deposit submitted|deposited|success|✅', 35000);
     await sleep(STEP_PAUSE);
 
     // ── STEP 3: Bob attests to Charlie ────────────────────────────────────
     banner(3, `${ACCOUNTS.attester.name} attests to Charlie with 80% confidence`);
-    await gotoAs(page, '/attest', ACCOUNTS.attester);
+    // Pass borrower address via query param so the /attest page pre-fills it
+    await gotoAs(page, `/attest?borrower=${ACCOUNTS.borrower.address}`, ACCOUNTS.attester);
     await connectWallet(page);
     await sleep(600);
 
-    console.log('  → entering borrower address');
-    // AddressInput renders an <input> without type="number"
-    await page.locator('input').first().fill(ACCOUNTS.borrower.address);
+    console.log('  → borrower address pre-filled via URL param');
     await sleep(400);
 
     console.log('  → setting confidence slider to 80');
