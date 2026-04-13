@@ -131,6 +131,17 @@ contract DeployScript is Script {
         microcreditContract.depositFunds(poolSeed);
         console.logString("Seeded lending pool with 10,000 USDC");
 
+        // Pre-establish Bob's reputation so the demo opens with Bob already
+        // having a credit score >90%.  Alice (the admin/deployer) assigns Bob
+        // KYC status and attests to him at 95% confidence.  This is an
+        // administrative act that happens off-screen — the demo story begins
+        // with Bob showing his existing score to the viewer.
+        address bob = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; // Anvil account 2
+        microcreditContract.markKYCVerified(bob);
+        console.logString("Marked Bob as KYC-verified");
+        microcreditContract.recordAttestation(bob, 950000); // 95% confidence (scaled 1e6)
+        console.logString("Alice attested to Bob at 95% confidence — PageRank auto-computed");
+
         // Provision ETH to demo addresses (excluding admin addresses that can fund themselves)
         console.logString("--- Provisioning ETH to demo addresses ---");
         
