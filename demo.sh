@@ -147,7 +147,9 @@ if ! command -v make >/dev/null 2>&1; then
   [[ ! -x "$_forge" ]] && _forge="forge"
   (cd "$REPO/packages/foundry" && \
     FOUNDRY_AUTO_CONFIRM=1 "$_forge" script script/Deploy.s.sol:DeployScript \
-      --rpc-url localhost --password localhost --broadcast --legacy --ffi \
+      --rpc-url localhost \
+      --private-key 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6 \
+      --broadcast --legacy --ffi \
       --gas-limit 100000000 2>&1 | grep -E "deployed|USDC|Error|error") || true
   node "$REPO/packages/foundry/scripts-js/generateTsAbis.js" 2>&1 | grep -v "^$" || true
   unset _forge
