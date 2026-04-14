@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useAccount, useSignTypedData } from "wagmi";
 import { toast } from "react-hot-toast";
 import { AddressInput } from "~~/components/scaffold-eth";
+import { DocumentDuplicateIcon, CheckIcon } from "@heroicons/react/24/outline";
 import deployedContracts from "~~/contracts/deployedContracts";
 import { createPublicClient, http } from "viem";
 import { localhost } from "viem/chains";
@@ -31,6 +32,20 @@ export default function AttestPage() {
   const [attestLoading, setAttestLoading] = useState(false);
   const [arrivedViaAttestLink, setArrivedViaAttestLink] = useState(false);
   const [submittedInfo, setSubmittedInfo] = useState<{ borrower: string; weight: number; txHash?: string } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const copyAttestationLink = async () => {
+    if (!connectedAddress) return;
+    const url = `${window.location.origin}/attest?borrower=${connectedAddress}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      toast.success("Attestation link copied!", { position: "top-center", duration: 2000 });
+      setTimeout(() => setLinkCopied(false), 2500);
+    } catch {
+      toast.error("Could not copy link", { position: "top-center" });
+    }
+  };
 
   // Connected user's own credit score
   const [myScore, setMyScore] = useState<number | null>(null);
@@ -148,8 +163,18 @@ export default function AttestPage() {
             {connectedAddress ? (
               attestBorrower && connectedAddress.toLowerCase() === attestBorrower.toLowerCase() ? (
                 <div className="text-blue-800">
-                  <h3 className="text-lg font-semibold mb-1">This is your attestation link</h3>
-                  <p>Share this page URL so others can attest to you. The form is pre-filled with your address.</p>
+                  <h3 className="text-lg font-semibold mb-2">This is your attestation link</h3>
+                  <p className="mb-3">Share this URL so others can attest to your creditworthiness. The form is pre-filled with your address.</p>
+                  <button
+                    onClick={copyAttestationLink}
+                    className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                  >
+                    {linkCopied ? (
+                      <><CheckIcon className="h-4 w-4" /> Copied!</>
+                    ) : (
+                      <><DocumentDuplicateIcon className="h-4 w-4" /> Copy Attestation Link</>
+                    )}
+                  </button>
                 </div>
               ) : (
                 <div className="text-blue-800">
