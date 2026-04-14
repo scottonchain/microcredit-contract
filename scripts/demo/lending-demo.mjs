@@ -3,13 +3,17 @@
  *
  * Playwright script that walks through a complete microcredit lending scenario:
  *
- *   Step 1  — Brighton attests to Casey with 80% confidence (/attest)
- *             (Brighton's score is shown on the attest page; PageRank auto-computed)
- *   Step 2  — View Casey's credit score (/scores)
- *   Step 3  — Casey requests a 50 USDC loan, 28-day term (/borrower)
- *             (gasless meta-transaction — Casey needs no ETH)
- *   Step 4  — View active loan details (/borrower)
- *   Step 5  — Casey repays the loan in full (/borrower)
+ *   Step 1  — Show the lending pool and lending APY (visible on every page via
+ *             the PoolStatsBar widget).  We land on the home page so the viewer
+ *             can read the pool stats before anything happens.
+ *   Step 2  — Charlie gets his own attestation link.  He visits /attest with his
+ *             own address in the URL and sees "This is your attestation link" plus
+ *             a copy button.
+ *   Step 3  — Bob (Brighton) attests to Charlie with 80 % confidence (/attest).
+ *             PageRank is computed automatically by the contract.
+ *   Step 4  — Charlie requests a 50 USDC loan, 28-day term (/borrower).
+ *             Gasless meta-transaction — Charlie needs no ETH.
+ *   Step 5  — Charlie repays the loan in full (/borrower).
  *
  * How wallet injection works
  * ──────────────────────────
@@ -34,7 +38,7 @@ const APP_URL = 'http://localhost:3000';
  * Account 0 is the deployer/admin (set in Deploy.s.sol via private key
  * 0x2a871d...  which corresponds to address 0xa0Ee7A…)
  *
- * We use accounts 1–4 for the demo roles so they have no prior state.
+ * We use accounts 2–3 for the demo roles so they have no prior state.
  */
 const ACCOUNTS = {
   admin: {
@@ -44,11 +48,11 @@ const ACCOUNTS = {
     address: '0xa0Ee7A142d267C1f36714E4a8F75612F20a79720',
   },
   attester: {
-    name: 'Brighton (Attester)',
+    name: 'Bob (Brighton)',
     address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', // Anvil account 2
   },
   borrower: {
-    name: 'Casey (Borrower)',
+    name: 'Charlie (Casey)',
     address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906', // Anvil account 3
   },
 };
@@ -272,21 +276,65 @@ async function main() {
 
   try {
     // Clear any stale __demoAccount from a previous run before the first step.
-    // gotoAs boots the page to APP_URL when on about:blank, and we don't want
-    // stale localStorage showing the wrong account's score during that flash.
     await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => localStorage.removeItem('__demoAccount'));
 
-    // ── STEP 1: Brighton attests to Casey ────────────────────────────────────
-    // Brighton already has a >90% credit score from deploy time (Avery gave him KYC
-    // and attested to him at 95%). The attest page shows Brighton his score.
-    banner(1, `${ACCOUNTS.attester.name} attests to Casey with 80% confidence`);
-    // Pass borrower address via query param so the /attest page pre-fills it
-    await gotoAs(page, `/attest?borrower=${ACCOUNTS.borrower.address}`, ACCOUNTS.attester);
+    // ── STEP 1: Show the lending pool and APY ────────────────────────────────
+    // The PoolStatsBar widget is visible on every page under the header.
+    // We land on the home page as Avery (admin) so the viewer can read the
+    // pool stats (total deposits, available funds, lender APY) before anything
+    // else happens.
+    banner(1, 'Lending pool overview — pool size and APY');
+    await gotoAs(page, '/', ACCOUNTS.admin);
+    await connectWallet(page);
+    console.log('  → pool stats bar visible at top of every page');
+    // Let the viewer read the PoolStatsBar widget
+    await sleep(STEP_PAUSE * 1.5);
+
+    // ── STEP 2: Charlie gets his own attestation link ─────────────────────
+    // Charlie visits /attest with his own address pre-filled in the URL.
+    // The page detects that the connected address matches the borrower param
+    // and shows "This is your attestation link" with a copy button.
+    banner(2, `${ACCOUNTS.borrower.name} gets his attestation link`);
+    await gotoAs(
+      page,
+      `/attest?borrower=${ACCOUNTS.borrower.address}`,
+      ACCOUNTS.borrower,
+    );
+    await connectWallet(page);
+    await sleep(800);
+
+    // Wait for the "This is your attestation link" banner to appear
+    await waitForStatus(page, 'This is your attestation link', 10000);
+    console.log('  → "This is your attestation link" banner visible');
+    await sleep(STEP_PAUSE);
+
+    // Click the "Copy Attestation Link" button so the viewer sees the action
+    const copyBtn = page.getByRole('button', { name: /copy attestation link/i });
+    if (await copyBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      console.log('  → clicking Copy Attestation Link');
+      await copyBtn.click();
+      await sleep(1000);
+    }
+    await sleep(STEP_PAUSE);
+
+    // ── STEP 3: Bob (Brighton) attests to Charlie ─────────────────────────
+    // Bob visits the same URL Charlie shared — the form is pre-filled with
+    // Charlie's address.  Bob sets confidence to 80 % and submits.
+    // PageRank is re-computed automatically by the contract when the
+    // attestation is recorded — no separate admin step required.
+    banner(3, `${ACCOUNTS.attester.name} attests to Charlie with 80% confidence`);
+    await gotoAs(
+      page,
+      `/attest?borrower=${ACCOUNTS.borrower.address}`,
+      ACCOUNTS.attester,
+    );
     await connectWallet(page);
     await sleep(600);
 
-    console.log('  → borrower address (Casey) pre-filled via URL param');
+    // Wait for the "You were invited to make an attestation" banner
+    await waitForStatus(page, 'invited to make an attestation|pre-filled', 8000);
+    console.log("  → Bob sees Charlie's address pre-filled in the form");
     await sleep(400);
 
     console.log('  → setting confidence slider to 80');
@@ -302,31 +350,15 @@ async function main() {
     await waitForStatus(page, 'success|submitted|attested|0x[0-9a-f]{10}', 35000);
     await sleep(STEP_PAUSE);
 
-    // ── STEP 2: View credit scores ────────────────────────────────────────
-    // PageRank is computed automatically by the contract when each attestation
-    // is recorded — no separate admin step required.
-    banner(2, `View ${ACCOUNTS.borrower.name}'s credit score on /scores`);
-    await gotoAs(page, '/scores', ACCOUNTS.borrower);
-    await connectWallet(page);
-    await sleep(800);
-
-    // Search for Casey's address to show their score
-    const searchInput = page.locator('input').first();
-    if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await searchInput.fill(ACCOUNTS.borrower.address);
-      await page.getByRole('button', { name: /search/i }).click().catch(() => {});
-    }
-    await sleep(STEP_PAUSE);
-
-    // ── STEP 3: Casey requests a 50 USDC loan ───────────────────────────
+    // ── STEP 4: Charlie requests a 50 USDC loan ──────────────────────────
     // All transactions are gasless meta-transactions paid by the relayer —
-    // Casey does not need ETH.
-    banner(3, `${ACCOUNTS.borrower.name} requests a 50 USDC loan — 28-day term`);
+    // Charlie does not need ETH.
+    banner(4, `${ACCOUNTS.borrower.name} requests a 50 USDC loan — 28-day term`);
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
 
     // Wait for the loan form to appear — it only renders once getCreditScore
-    // resolves and confirms Casey has a non-zero credit score.
+    // resolves and confirms Charlie has a non-zero credit score.
     console.log('  → waiting for loan form to load…');
     const borrowBtn = page.getByRole('button', { name: /one.click borrow/i });
     await borrowBtn.waitFor({ state: 'visible', timeout: 30000 });
@@ -349,19 +381,17 @@ async function main() {
     await waitForStatus(page, 'active|disbursed|success|✅|processing', 45000);
     await sleep(STEP_PAUSE);
 
-    // ── STEP 4: Show active loan ──────────────────────────────────────────
-    banner(4, 'Active loan — outstanding balance and payment schedule');
+    // ── STEP 5: Charlie repays in full ───────────────────────────────────
+    banner(5, `${ACCOUNTS.borrower.name} repays the loan in full`);
+    // Reload the borrower page so the active loan details are fresh
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
-    // Just pause here so the viewer can read the loan details
-    await sleep(STEP_PAUSE * 1.5);
-
-    // ── STEP 5: Casey repays in full ────────────────────────────────────
-    banner(5, `${ACCOUNTS.borrower.name} repays the loan in full`);
+    // Give the page a moment to load the active loan state
+    await sleep(STEP_PAUSE);
 
     // The full-repayment button text is "Pay XX.XX USDC" (dynamic)
     const repayBtn = page.getByRole('button', { name: /^Pay / }).first();
-    const repayVisible = await repayBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    const repayVisible = await repayBtn.isVisible({ timeout: 10000 }).catch(() => false);
 
     if (repayVisible) {
       const btnText = await repayBtn.textContent();
@@ -372,7 +402,7 @@ async function main() {
       await waitForStatus(page, 'Loan Request|repaid|no active|success|✅', 60000);
       await sleep(STEP_PAUSE);
     } else {
-      console.log('  (repay button not visible — loan may still be processing from step 6)');
+      console.log('  (repay button not visible — loan may still be processing)');
     }
 
     // ── DONE ──────────────────────────────────────────────────────────────
