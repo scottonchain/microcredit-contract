@@ -121,19 +121,39 @@ contract DeployScript is Script {
         microcreditContract.setBasePersonalization(0);
         console.logString("Set basePersonalization to 0");
 
-        // Seed the lending pool so the demo starts with available liquidity.
-        // The deployer mints USDC to themselves, approves, then deposits — no
-        // front-end interaction required. Viewers see a "pre-funded pool" and
-        // the demo can focus on the credit / attestation story.
-        uint256 poolSeed = 10_000 * 1e6; // 10,000 USDC (6 decimals)
+        // ── Seed the lending pool ──────────────────────────────────────────────
+        // Use a non-round amount so the pool looks like real-world state.
+        // 11,247.50 USDC total deposited.
+        uint256 poolSeed = 11_247_500_000; // 11,247.50 USDC (6 decimals)
         MockUSDC(usdcAddress).mint(vm.addr(deployerPrivateKey), poolSeed);
         MockUSDC(usdcAddress).approve(address(microcreditContract), poolSeed);
         microcreditContract.depositFunds(poolSeed);
-        console.logString("Seeded lending pool with 10,000 USDC");
+        console.logString("Seeded lending pool with 11,247.50 USDC");
 
-        // Pre-establish Brighton's reputation so the demo opens with Brighton already
-        // having a credit score of 92%.  Alice (the admin/deployer) sets this
-        // directly via score override — no PageRank computation needed.
+        // ── Background borrower "Diana" ────────────────────────────────────────
+        // Create an active loan of 9,150 USDC so the pool shows realistic
+        // utilisation (~81 %) and a non-zero lender APY (~7.6 %) from the start.
+        // Steps:
+        //   1. Temporarily raise maxLoanAmount so Diana can borrow the full amount.
+        //   2. Give Diana a 100 % score override.
+        //   3. Prank Diana to request the loan.
+        //   4. Admin disburses the loan (no access control on disburseLoan).
+        //   5. Reset maxLoanAmount back to 100 USDC for the normal demo flow.
+        address diana = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65; // Anvil account 4
+        uint256 dianaLoan = 9_150_000_000; // 9,150 USDC
+        microcreditContract.setMaxLoanAmount(10_000 * 1e6); // raise cap temporarily
+        microcreditContract.setScoreOverride(diana, 1_000_000); // 100 %
+        vm.stopBroadcast();
+        vm.startBroadcast(diana); // prank as Diana
+        microcreditContract.requestLoan(dianaLoan); // loanId = 0
+        vm.stopBroadcast();
+        vm.startBroadcast(deployerPrivateKey); // back to deployer
+        microcreditContract.disburseLoan(0); // disburse Diana's loan
+        microcreditContract.setMaxLoanAmount(100 * 1e6); // reset to normal 100 USDC cap
+        console.logString("Background borrower Diana: 9,150 USDC loan active (utilisation ~81%, APY ~7.6%)");
+
+        // ── Pre-establish Brighton (Bob) ───────────────────────────────────────
+        // Brighton already has a 92 % credit score so he can attest credibly.
         address bob = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; // Anvil account 2
         microcreditContract.setScoreOverride(bob, 920000); // 92% (scaled 1e6)
         console.logString("Set Brighton's credit score override to 92%");
