@@ -75,6 +75,37 @@ The deployment script writes these addresses to `deployment.json`, which the fro
 
 ---
 
+## Wallet modes
+
+### Normal mode (default)
+The app uses the browser's injected wallet (MetaMask, Rabby, Coinbase Wallet) or the built-in burner wallet for local development.  No extra configuration needed.
+
+```
+# packages/nextjs/.env.local — omit this line entirely, or set it to false
+NEXT_PUBLIC_DEMO_WALLET=false
+```
+
+### Demo wallet mode
+A fake `window.ethereum` provider is injected that proxies all signing to the local Anvil node (which auto-signs with its unlocked accounts). A floating **⚠ DEMO MODE** switcher appears in the bottom-right corner so you can instantly switch between the seeded personas — **Avery** (admin), **Brighton / Bob** (attester), and **Casey / Charlie** (borrower) — without touching MetaMask or triggering any wallet pop-ups.
+
+**Enable:**
+```
+# packages/nextjs/.env.local
+NEXT_PUBLIC_DEMO_WALLET=true
+```
+Then restart the dev server (`yarn start`) — `NEXT_PUBLIC_*` variables are baked in at build time.
+
+**Disable / return to normal MetaMask:**
+```
+# packages/nextjs/.env.local
+NEXT_PUBLIC_DEMO_WALLET=false   # or delete the line
+```
+Restart the dev server. MetaMask and all real wallet paths are completely unchanged when the flag is off.
+
+> **Note:** Demo wallet mode requires a running Anvil node (`yarn chain`). The provider proxies every RPC call to `http://127.0.0.1:8545`.
+
+---
+
 ## Interest-Rate Source (EFFR)
 
 The contract stores two basis-point values:
