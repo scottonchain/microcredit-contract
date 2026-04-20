@@ -70,8 +70,16 @@ export function useDeployedContractInfo<TContractName extends ContractName>(
           return;
         }
         setStatus(ContractCodeStatus.DEPLOYED);
-      } catch (e) {
-        console.error(e);
+      } catch (e: unknown) {
+        // Silently treat connection failures as "not found" — this is expected
+        // when Anvil isn't running yet and produces noisy console spam otherwise.
+        const msg = e instanceof Error ? e.message : String(e);
+        const isConnErr =
+          msg.includes("NetworkError") ||
+          msg.includes("fetch") ||
+          msg.includes("timed out") ||
+          msg.includes("ECONNREFUSED");
+        if (!isConnErr) console.error(e);
         setStatus(ContractCodeStatus.NOT_FOUND);
       }
     };
