@@ -139,12 +139,14 @@ contract DeployScript is Script {
         //   3. Prank Diana to request the loan.
         //   4. Admin disburses the loan (no access control on disburseLoan).
         //   5. Reset maxLoanAmount back to 100 USDC for the normal demo flow.
-        address diana = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65; // Anvil account 4
+        // Anvil account 4 — address deterministic from default mnemonic
+        uint256 dianaPrivateKey = 0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926b;
+        address diana = vm.addr(dianaPrivateKey); // 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65
         uint256 dianaLoan = 9_150_000_000; // 9,150 USDC
         microcreditContract.setMaxLoanAmount(10_000 * 1e6); // raise cap temporarily
         microcreditContract.setScoreOverride(diana, 1_000_000); // 100 %
         vm.stopBroadcast();
-        vm.startBroadcast(diana); // prank as Diana
+        vm.startBroadcast(dianaPrivateKey); // broadcast as Diana
         uint256 dianaLoanId = microcreditContract.requestLoan(dianaLoan);
         vm.stopBroadcast();
         vm.startBroadcast(deployerPrivateKey); // back to deployer
