@@ -145,6 +145,7 @@ contract DeployScript is Script {
         uint256 dianaLoan = 9_150_000_000; // 9,150 USDC
         microcreditContract.setMaxLoanAmount(10_000 * 1e6); // raise cap temporarily
         microcreditContract.setScoreOverride(diana, 1_000_000); // 100 %
+        vm.deal(diana, 1 ether); // ensure Diana has gas money (chain-state may have drained her)
         vm.stopBroadcast();
         vm.startBroadcast(dianaPrivateKey); // broadcast as Diana
         uint256 dianaLoanId = microcreditContract.requestLoan(dianaLoan);
