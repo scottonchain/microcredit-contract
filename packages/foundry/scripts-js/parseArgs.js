@@ -153,6 +153,32 @@ The default account (scaffold-eth-default) can only be used for localhost deploy
   process.exit(0);
 }
 
+// For localhost deployments, verify Anvil is reachable before invoking forge
+if (network === "localhost") {
+  const port = 8545;
+  const anvilReachable = await new Promise((resolve) => {
+    const net = await import("net");
+    const socket = new net.default.Socket();
+    socket.setTimeout(1000);
+    socket
+      .once("connect", () => { socket.destroy(); resolve(true); })
+      .once("timeout", () => { socket.destroy(); resolve(false); })
+      .once("error", () => resolve(false))
+      .connect(port, "127.0.0.1");
+  });
+  if (!anvilReachable) {
+    console.error(`
+❌ Anvil is not running on localhost:${port}.
+
+Start the local chain in a separate terminal first:
+  yarn chain
+
+Then re-run your deploy command.
+`);
+    process.exit(1);
+  }
+}
+
 // Set environment variables for the make command
 process.env.DEPLOY_SCRIPT = `script/${fileName}`;
 process.env.RPC_URL = network;
