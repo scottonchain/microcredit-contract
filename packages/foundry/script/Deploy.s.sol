@@ -145,10 +145,10 @@ contract DeployScript is Script {
         microcreditContract.setScoreOverride(diana, 1_000_000); // 100 %
         vm.stopBroadcast();
         vm.startBroadcast(diana); // prank as Diana
-        microcreditContract.requestLoan(dianaLoan); // loanId = 0
+        uint256 dianaLoanId = microcreditContract.requestLoan(dianaLoan);
         vm.stopBroadcast();
         vm.startBroadcast(deployerPrivateKey); // back to deployer
-        microcreditContract.disburseLoan(0); // disburse Diana's loan
+        microcreditContract.disburseLoan(dianaLoanId); // disburse Diana's loan
         microcreditContract.setMaxLoanAmount(100 * 1e6); // reset to normal 100 USDC cap
         console.logString("Background borrower Diana: 9,150 USDC loan active (utilisation ~81%, APY ~7.6%)");
 
