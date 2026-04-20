@@ -16,28 +16,32 @@ export const wagmiConfig = createConfig({
   connectors: wagmiConnectors,
   ssr: true,
   client({ chain }) {
-    let rpcFallbacks = [http()];
+    const isLocal = chain.id === (hardhat as Chain).id;
+
+    // For the local Anvil chain use a short timeout and no retries so that
+    // "node not running" errors fail fast instead of spamming the console
+    // with repeated NetworkError / TimeoutError messages.
+    const localHttpOpts = isLocal ? { timeout: 2_000, retryCount: 0 } : {};
+
+    let rpcFallbacks = [http(undefined, localHttpOpts)];
 
     const rpcOverrideUrl = (scaffoldConfig.rpcOverrides as ScaffoldConfig["rpcOverrides"])?.[chain.id];
     if (rpcOverrideUrl) {
-      rpcFallbacks = [http(rpcOverrideUrl), http()];
+      rpcFallbacks = [http(rpcOverrideUrl, localHttpOpts), http(undefined, localHttpOpts)];
     } else {
       const alchemyHttpUrl = getAlchemyHttpUrl(chain.id);
       if (alchemyHttpUrl) {
         const isUsingDefaultKey = scaffoldConfig.alchemyApiKey === DEFAULT_ALCHEMY_API_KEY;
-        // If using default Scaffold-ETH 2 API key, we prioritize the default RPC
-        rpcFallbacks = isUsingDefaultKey ? [http(), http(alchemyHttpUrl)] : [http(alchemyHttpUrl), http()];
+        rpcFallbacks = isUsingDefaultKey
+          ? [http(undefined, localHttpOpts), http(alchemyHttpUrl)]
+          : [http(alchemyHttpUrl), http(undefined, localHttpOpts)];
       }
     }
 
     return createClient({
       chain,
       transport: fallback(rpcFallbacks),
-      ...(chain.id !== (hardhat as Chain).id
-        ? {
-            pollingInterval: scaffoldConfig.pollingInterval,
-          }
-        : {}),
+      ...(!isLocal ? { pollingInterval: scaffoldConfig.pollingInterval } : {}),
     });
   },
 });
