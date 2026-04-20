@@ -3,6 +3,7 @@ import { config } from "dotenv";
 import { join, dirname } from "path";
 import { readFileSync, existsSync } from "fs";
 import { parse } from "toml";
+import net from "net";
 import { fileURLToPath } from "url";
 import { selectOrCreateKeystore } from "./selectOrCreateKeystore.js";
 
@@ -157,8 +158,7 @@ The default account (scaffold-eth-default) can only be used for localhost deploy
 if (network === "localhost") {
   const port = 8545;
   const anvilReachable = await new Promise((resolve) => {
-    const net = await import("net");
-    const socket = new net.default.Socket();
+    const socket = new net.Socket();
     socket.setTimeout(1000);
     socket
       .once("connect", () => { socket.destroy(); resolve(true); })
