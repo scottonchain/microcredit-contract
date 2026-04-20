@@ -40,11 +40,9 @@ pgnTestnet = "https://sepolia.publicgoods.network"
 localhost = "http://127.0.0.1:8545"
 
 [profile.anvil]
-# Set very low gas fees to simulate modern L2s (1/100000 of current fees)
-gas_price = 0  # 0 wei per gas for demo purposes -simulate Eth L2 (base)
-gas_limit = 600000000  # 600M gas limit -simulate Eth L2 (base)
-block_time = 1  # 1 second block time
-base_fee = 0  # 0 wei base for demo purposes -simulate Eth L2 (base)
+# gas_price/gas_limit are passed as CLI flags in start-anvil.sh; only forge-recognised keys here
+gas_price = 0
+gas_limit = 600000000
 
 [etherscan]
 localhost = { url = "http://127.0.0.1:8545", key = "" }
