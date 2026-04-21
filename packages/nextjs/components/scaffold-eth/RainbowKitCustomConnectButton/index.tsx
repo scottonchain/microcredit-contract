@@ -3,10 +3,11 @@
 // @refresh reset
 import { Balance } from "../Balance";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { useBalance, useAccount } from "wagmi";
+import { useAccount } from "wagmi";
 import { AddressInfoDropdown } from "./AddressInfoDropdown";
 import { AddressQRCodeModal } from "./AddressQRCodeModal";
 import { WrongNetworkDropdown } from "./WrongNetworkDropdown";
+import { DemoModeDropdown } from "./DemoModeDropdown";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Address } from "viem";
 import { useNetworkColor } from "~~/hooks/scaffold-eth";
@@ -14,6 +15,8 @@ import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-eth";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 import { formatUSDC } from "~~/utils/format";
+
+const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_WALLET === "true";
 
 /**
  * Custom Wagmi Connect Button (watch balance + custom design)
@@ -54,9 +57,15 @@ export const RainbowKitCustomConnectButton = () => {
               if (!connected) {
                 return (
                   <button className="btn btn-primary btn-sm" onClick={openConnectModal} type="button">
-                    Connect Wallet
+                    {IS_DEMO ? "Start Demo" : "Connect Wallet"}
                   </button>
                 );
+              }
+
+              // In demo mode, replace both WrongNetworkDropdown and the normal
+              // address display with the persona-switcher dropdown.
+              if (IS_DEMO) {
+                return <DemoModeDropdown address={account.address} />;
               }
 
               if (chain.unsupported || chain.id !== targetNetwork.id) {
