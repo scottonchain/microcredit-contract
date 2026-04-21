@@ -552,11 +552,11 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1755493096.json",
+      deploymentFile: "run-1776722667196.json",
       deploymentScript: "Deploy.s.sol",
     },
     DecentralizedMicrocredit: {
-      address: "0xa15bb66138824a1c7167f5e85b957d04dd34e468",
+      address: "0x5621d0b4d8043524ac5837918d6a95b1050ef228",
       abi: [
         {
           type: "constructor",
@@ -1680,6 +1680,38 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "displayNames",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "setDisplayName",
+          inputs: [
+            {
+              name: "name",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "repayLoan",
           inputs: [
             {
@@ -1959,6 +1991,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "scoreOverrides",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "setBasePersonalization",
           inputs: [
             {
@@ -2103,6 +2154,24 @@ const deployedContracts = {
           inputs: [
             {
               name: "_riskPremium",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setScoreOverride",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "score",
               type: "uint256",
               internalType: "uint256",
             },
@@ -2448,7 +2517,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1755493096.json",
+      deploymentFile: "run-1776723714553.json",
       deploymentScript: "Deploy.s.sol",
     },
   },

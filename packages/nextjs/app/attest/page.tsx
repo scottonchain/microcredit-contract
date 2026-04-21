@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast";
 import { AddressInput } from "~~/components/scaffold-eth";
 import { DocumentDuplicateIcon, CheckIcon } from "@heroicons/react/24/outline";
 import deployedContracts from "~~/contracts/deployedContracts";
+import { useAddressDisplayName } from "~~/hooks/useAddressDisplayName";
 import { createPublicClient, http } from "viem";
 import { localhost } from "viem/chains";
 import { MICRO_DOMAIN, TYPES, AttestRequest } from "../../types/eip712";
@@ -33,6 +34,8 @@ export default function AttestPage() {
   const [arrivedViaAttestLink, setArrivedViaAttestLink] = useState(false);
   const [submittedInfo, setSubmittedInfo] = useState<{ borrower: string; weight: number; txHash?: string } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+
+  const borrowerDisplayName = useAddressDisplayName(attestBorrower || undefined);
 
   const copyAttestationLink = async () => {
     if (!connectedAddress) return;
@@ -180,7 +183,12 @@ export default function AttestPage() {
                 <div className="text-blue-800">
                   <h3 className="text-lg font-semibold mb-1">You were invited to make an attestation</h3>
                   <p>
-                    The form below is pre-filled to attest for <span className="font-mono break-all">{attestBorrower}</span>.
+                    The form below is pre-filled to attest for{" "}
+                    {borrowerDisplayName ? (
+                      <strong>{borrowerDisplayName}</strong>
+                    ) : (
+                      <span className="font-mono break-all">{attestBorrower}</span>
+                    )}.
                   </p>
                 </div>
               )
