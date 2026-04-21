@@ -96,11 +96,6 @@ const DEMO_WALLET_SCRIPT = `
 
 const isDemoWallet = process.env.NEXT_PUBLIC_DEMO_WALLET === "true";
 
-// Loaded lazily so it doesn't enter the server bundle when demo mode is off
-const DemoWalletSwitcher = isDemoWallet
-  ? require("~~/components/DemoWalletSwitcher").default
-  : null;
-
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   return (
     <html suppressHydrationWarning>
@@ -113,8 +108,6 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
           <ScaffoldEthAppWithProviders>
             <AutoRedirect />
             {children}
-            {/* Floating account-switcher overlay (demo mode only) */}
-            {isDemoWallet && DemoWalletSwitcher && <DemoWalletSwitcher />}
           </ScaffoldEthAppWithProviders>
         </ThemeProvider>
       </body>
