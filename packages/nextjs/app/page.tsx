@@ -128,12 +128,12 @@ const Home: NextPage = () => {
 
   return (
     <>
-      <div className="flex items-center flex-col grow pt-10">
-        <div className="px-5 w-full max-w-7xl">
+      <div className="flex items-center flex-col grow pt-4 sm:pt-10">
+        <div className="px-4 sm:px-5 w-full max-w-7xl">
           {/* Hero Section */}
-          <div className="text-center mb-12">
-            <h1 className="text-5xl font-bold text-green-600 mb-4">LoanLink</h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+          <div className="text-center mb-4 sm:mb-12">
+            <h1 className="text-3xl sm:text-5xl font-bold text-green-600 mb-2 sm:mb-4">LoanLink</h1>
+            <p className="text-sm sm:text-xl text-gray-600 mb-2 sm:mb-8 max-w-2xl mx-auto hidden sm:block">
               A social reputation-based lending platform powered by on-chain social underwriting
             </p>
           </div>
@@ -141,8 +141,8 @@ const Home: NextPage = () => {
           {connectedAddress ? (
             <>
               {/* Credit Score Status Section */}
-              <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg">
-                <div className="text-center mb-6">
+              <div className="bg-base-100 rounded-lg p-3 sm:p-6 mb-4 sm:mb-8 shadow-lg">
+                <div className="text-center mb-3 sm:mb-6">
                   {hasCreditScore ? (
                     <div className="space-y-4">
                       <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -159,36 +159,35 @@ const Home: NextPage = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div className="flex items-center justify-center space-x-2 mb-2">
-                          <ChartBarIcon className="h-6 w-6 text-blue-600" />
-                          <span className="font-medium text-lg">Let&apos;s Get Started!</span>
+                    <div className="space-y-3 sm:space-y-4">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+                        <div className="flex items-center justify-center space-x-2 mb-1 sm:mb-2">
+                          <ChartBarIcon className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+                          <span className="font-medium text-base sm:text-lg">Let&apos;s Get Started!</span>
                         </div>
-                        <p className="text-blue-700 text-sm mb-6 text-center">
-                          Register your wallet to get started. Choose how you&apos;d like to participate:
+                        <p className="text-blue-700 text-xs sm:text-sm mb-3 sm:mb-6 text-center">
+                          Choose how you&apos;d like to participate:
                         </p>
-                        
+
                         {/* Main Call to Action Cards */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-2 gap-3 sm:gap-8">
                           {/* I am a Borrower */}
                           <div className="h-full">
-                            <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 h-full flex flex-col">
-                                                               <div className="text-center flex-1 flex flex-col">
-                                  <CreditCardIcon className="h-16 w-16 text-green-600 mx-auto mb-4" />
-                                  <h2 className="text-3xl font-bold text-green-700 mb-4">I am a Borrower</h2>
-                                  <p className="text-gray-600 mb-6 flex-1">
-                                    Get your address verified by asking for attestations from friends and community members. Once verified, you&apos;ll be eligible for loans according to your credit score.
-                                  </p>
-                                  <div className="space-y-4 mt-auto">
-
-                                    <Link
-                                      href="/borrower"
-                                      className="block w-full text-center bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors"
-                                    >
-                                      Go to Borrower Page
-                                    </Link>
-                                  
+                            <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-2xl p-3 sm:p-8 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 h-full flex flex-col">
+                              <div className="text-center flex-1 flex flex-col">
+                                <CreditCardIcon className="h-8 w-8 sm:h-16 sm:w-16 text-green-600 mx-auto mb-2 sm:mb-4" />
+                                <h2 className="text-base sm:text-3xl font-bold text-green-700 mb-1 sm:mb-4">I&apos;m a Borrower</h2>
+                                <p className="text-gray-600 mb-3 sm:mb-6 flex-1 text-xs sm:text-base hidden sm:block">
+                                  Get your address verified by asking for attestations from friends and community members. Once verified, you&apos;ll be eligible for loans according to your credit score.
+                                </p>
+                                <div className="mt-auto">
+                                  <Link
+                                    href="/borrower"
+                                    className="block w-full text-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 sm:py-4 px-2 sm:px-6 rounded-lg text-xs sm:text-lg transition-colors"
+                                  >
+                                    <span className="hidden sm:inline">Go to Borrower Page</span>
+                                    <span className="sm:hidden">Get Started</span>
+                                  </Link>
                                 </div>
                               </div>
                             </div>
@@ -196,16 +195,17 @@ const Home: NextPage = () => {
 
                           {/* I am a Lender */}
                           <Link href="/lend" className="block h-full">
-                            <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 cursor-pointer h-full flex flex-col">
-                                                              <div className="text-center flex-1 flex flex-col">
-                                  <BanknotesIcon className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-                                  <h2 className="text-3xl font-bold text-blue-700 mb-4">I am a Lender</h2>
-                                  <p className="text-gray-600 mb-6 flex-1">
-                                    Deposit USDC to earn {poolApyPercent}% APY. In addition to the APY, this increases your credit score and allows you to make attestations or even borrow.
-                                  </p>
-                                  <div className="space-y-4 mt-auto">
-                                  <div className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors">
-                                    Lend and Earn Interest
+                            <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl p-3 sm:p-8 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 cursor-pointer h-full flex flex-col">
+                              <div className="text-center flex-1 flex flex-col">
+                                <BanknotesIcon className="h-8 w-8 sm:h-16 sm:w-16 text-blue-600 mx-auto mb-2 sm:mb-4" />
+                                <h2 className="text-base sm:text-3xl font-bold text-blue-700 mb-1 sm:mb-4">I&apos;m a Lender</h2>
+                                <p className="text-gray-600 mb-3 sm:mb-6 flex-1 text-xs sm:text-base hidden sm:block">
+                                  Deposit USDC to earn {poolApyPercent}% APY. In addition to the APY, this increases your credit score and allows you to make attestations or even borrow.
+                                </p>
+                                <div className="mt-auto">
+                                  <div className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 sm:py-4 px-2 sm:px-6 rounded-lg text-xs sm:text-lg transition-colors">
+                                    <span className="hidden sm:inline">Lend and Earn Interest</span>
+                                    <span className="sm:hidden">Earn {poolApyPercent}% APY</span>
                                   </div>
                                 </div>
                               </div>
