@@ -39,8 +39,8 @@ export const RainbowKitCustomConnectButton = () => {
   const { data: usdcBalanceData } = useScaffoldReadContract({
     contractName: "MockUSDC",
     functionName: "balanceOf",
-    args: usdcAddress && connectedAddress ? [connectedAddress as `0x${string}`] : [undefined],
-    query: { refetchInterval: 4000 },
+    args: [connectedAddress as `0x${string}`],
+    query: { refetchInterval: 4000, enabled: Boolean(usdcAddress && connectedAddress) },
   });
 
   return (
