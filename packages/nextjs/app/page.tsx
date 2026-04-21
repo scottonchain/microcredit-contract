@@ -23,7 +23,7 @@ const Home: NextPage = () => {
   });
 
   const creditScorePercent = creditScore ? (Number(creditScore) / 10000).toFixed(2) : "0.00";
-  const hasCreditScore = creditScore && Number(creditScore) > 0;
+  const hasCreditScore = creditScore !== undefined && Number(creditScore) > 0;
 
   const getScoreColor = (score: number) => {
     if (score < 30) return "text-red-500";
