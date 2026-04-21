@@ -234,6 +234,9 @@ contract DecentralizedMicrocredit is EIP712 {
     mapping(address => bool) public relayerWhitelist;
     bool public relayerWhitelistEnabled;
 
+    // On-chain display names — set by each user for themselves
+    mapping(address => string) public displayNames;
+
     // EIP-712 typehashes for meta-transactions
     bytes32 private constant LOAN_REQUEST_TYPEHASH = keccak256(
         "LoanRequest(address borrower,uint256 amount,uint256 nonce,uint256 deadline)"
@@ -344,6 +347,7 @@ contract DecentralizedMicrocredit is EIP712 {
     
     // Regular transaction events
     event LoanRepaid(address indexed borrower, uint256 indexed loanId, uint256 amount);
+    event DisplayNameSet(address indexed user, string name);
 
     // PageRank storage
     address[] private pagerankNodes;
@@ -504,6 +508,12 @@ contract DecentralizedMicrocredit is EIP712 {
         uint256 utilisationBp = (active * BASIS_POINTS) / totalDeposits; // 0-10000
         uint256 loanRateBp = effrRate + riskPremium;
         return (loanRateBp * utilisationBp) / BASIS_POINTS; // BASIS_POINTS output
+    }
+
+    function setDisplayName(string calldata name) external {
+        require(bytes(name).length <= 32, "Name too long");
+        displayNames[msg.sender] = name;
+        emit DisplayNameSet(msg.sender, name);
     }
 
     function depositFunds(uint256 amount) external {
