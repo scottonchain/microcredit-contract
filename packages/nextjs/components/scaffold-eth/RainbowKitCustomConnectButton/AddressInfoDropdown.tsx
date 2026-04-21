@@ -79,9 +79,15 @@ export const AddressInfoDropdown = ({
   };
 
   const { setDisplayName } = useDisplayName();
-  const editName = () => {
-    const name = window.prompt("Enter display name (demo only, not on-chain)", displayName);
-    if (name !== null) setDisplayName(name);
+  const editName = async () => {
+    const name = window.prompt("Set your on-chain display name (max 32 chars)", displayName);
+    if (name !== null) {
+      try {
+        await setDisplayName(name.slice(0, 32));
+      } catch (e) {
+        console.error("Failed to set display name", e);
+      }
+    }
     closeDropdown();
   };
 
