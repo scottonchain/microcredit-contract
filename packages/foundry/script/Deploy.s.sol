@@ -122,40 +122,47 @@ contract DeployScript is Script {
         console.logString("Set basePersonalization to 0");
 
         // ── Seed the lending pool ──────────────────────────────────────────────
-        // Use a non-round amount so the pool looks like real-world state.
-        // 11,247.50 USDC total deposited.
-        uint256 poolSeed = 11_247_500_000; // 11,247.50 USDC (6 decimals)
+        uint256 poolSeed = 10_000_000_000; // 10,000 USDC (6 decimals)
         MockUSDC(usdcAddress).mint(vm.addr(deployerPrivateKey), poolSeed);
         MockUSDC(usdcAddress).approve(address(microcreditContract), poolSeed);
         microcreditContract.depositFunds(poolSeed);
-        console.logString("Seeded lending pool with 11,247.50 USDC");
+        console.logString("Seeded lending pool with 10,000 USDC");
 
-        // ── Background borrower "Diana" ────────────────────────────────────────
-        // Create an active loan of 9,150 USDC so the pool shows realistic
-        // utilisation (~81 %) and a non-zero lender APY (~7.6 %) from the start.
-        // Steps:
-        //   1. Temporarily raise maxLoanAmount so Diana can borrow the full amount.
-        //   2. Give Diana a 100 % score override.
-        //   3. Prank Diana to request the loan.
-        //   4. Admin disburses the loan (no access control on disburseLoan).
-        //   5. Reset maxLoanAmount back to 100 USDC for the normal demo flow.
-        // Anvil account 4 — address deterministic from default mnemonic
+        // ── Background borrowers ───────────────────────────────────────────────
+        // Diana + Eve together bring utilisation to ~89% — the highest we can
+        // go while still leaving a $100 slot open for the Casey demo borrower
+        // (90% cap = $9,000; $8,899 lent + $100 Casey = $8,999 ≤ $9,000).
+        // Resulting lender APY ≈ 8.3% (= 9.33% loan rate × 89% utilisation).
+        microcreditContract.setMaxLoanAmount(10_000 * 1e6); // raise cap for seeding
+
+        // Diana — Anvil account 4
         uint256 dianaPrivateKey = 0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926b;
         address diana = vm.addr(dianaPrivateKey); // 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65
-        uint256 dianaLoan = 9_150_000_000; // 9,150 USDC
-        microcreditContract.setMaxLoanAmount(10_000 * 1e6); // raise cap temporarily
-        microcreditContract.setScoreOverride(diana, 1_000_000); // 100 %
-        // Fund Diana with ETH for gas via a real transfer (vm.deal is simulation-only)
-        (bool sent,) = payable(diana).call{value: 1 ether}("");
-        require(sent, "ETH transfer to Diana failed");
+        microcreditContract.setScoreOverride(diana, 1_000_000); // 100%
+        (bool sentDiana,) = payable(diana).call{value: 1 ether}("");
+        require(sentDiana, "ETH transfer to Diana failed");
         vm.stopBroadcast();
-        vm.startBroadcast(dianaPrivateKey); // broadcast as Diana
-        uint256 dianaLoanId = microcreditContract.requestLoan(dianaLoan);
+        vm.startBroadcast(dianaPrivateKey);
+        uint256 dianaLoanId = microcreditContract.requestLoan(6_500_000_000); // 6,500 USDC
         vm.stopBroadcast();
-        vm.startBroadcast(deployerPrivateKey); // back to deployer
-        microcreditContract.disburseLoan(dianaLoanId); // disburse Diana's loan
+        vm.startBroadcast(deployerPrivateKey);
+        microcreditContract.disburseLoan(dianaLoanId);
+
+        // Eve — Anvil account 5
+        uint256 evePrivateKey = 0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba;
+        address eve = vm.addr(evePrivateKey); // 0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc
+        microcreditContract.setScoreOverride(eve, 1_000_000); // 100%
+        (bool sentEve,) = payable(eve).call{value: 1 ether}("");
+        require(sentEve, "ETH transfer to Eve failed");
+        vm.stopBroadcast();
+        vm.startBroadcast(evePrivateKey);
+        uint256 eveLoanId = microcreditContract.requestLoan(2_399_000_000); // 2,399 USDC
+        vm.stopBroadcast();
+        vm.startBroadcast(deployerPrivateKey);
+        microcreditContract.disburseLoan(eveLoanId);
+
         microcreditContract.setMaxLoanAmount(100 * 1e6); // reset to normal 100 USDC cap
-        console.logString("Background borrower Diana: 9,150 USDC loan active (utilisation ~81%, APY ~7.6%)");
+        console.logString("Background borrowers: Diana $6,500 + Eve $2,399 = $8,899 lent (89%, APY ~8.3%)");
 
         // ── Pre-establish Brighton (Bob) ───────────────────────────────────────
         // Brighton already has a 92 % credit score so he can attest credibly.
