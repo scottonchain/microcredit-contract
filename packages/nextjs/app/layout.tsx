@@ -75,7 +75,30 @@ const DEMO_WALLET_SCRIPT = `
   };
 
   window.__demoEthereumProvider = provider;
-  window.ethereum = provider;
+
+  // Lock window.ethereum to the demo provider so real wallets (MetaMask etc.)
+  // cannot override it, even if their content script runs earlier.
+  try {
+    Object.defineProperty(window, 'ethereum', {
+      configurable: false,
+      enumerable: true,
+      get: function() { return provider; },
+      set: function() { /* demo lock — ignore override attempts */ },
+    });
+  } catch(e) {
+    window.ethereum = provider;
+  }
+
+  // Suppress EIP-6963 announcements from other wallets so RainbowKit's
+  // MetaMask connector only sees the demo provider.
+  var _origDispatch = window.dispatchEvent.bind(window);
+  window.dispatchEvent = function(ev) {
+    if (ev.type === 'eip6963:announceProvider' &&
+        ev.detail && ev.detail.provider !== provider) {
+      return true; // silently suppress competing wallet
+    }
+    return _origDispatch(ev);
+  };
 
   var info = {
     uuid: 'demo-wallet-0000-0000-0000-000000000000',
@@ -84,13 +107,13 @@ const DEMO_WALLET_SCRIPT = `
     rdns: 'io.metamask',
   };
   function announce() {
-    window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+    _origDispatch(new CustomEvent('eip6963:announceProvider', {
       detail: Object.freeze({ info: info, provider: provider }),
     }));
   }
   window.addEventListener('eip6963:requestProvider', announce);
   announce();
-  window.dispatchEvent(new Event('ethereum#initialized'));
+  _origDispatch(new Event('ethereum#initialized'));
 })();
 `;
 
