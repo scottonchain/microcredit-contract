@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# demo.sh — Full lending scenario demo: starts chain + app, then runs browser automation.
+# demo.sh — Start the demo environment (chain + contracts + app).
 # Usage:
-#   ./demo.sh            # always starts fresh (recommended)
-#   ./demo.sh --reuse    # reload previous chain state instead of redeploying
+#   ./demo.sh            # fresh deploy, then run Playwright automation
+#   ./demo.sh --manual   # fresh deploy, leave servers running for manual use
+#   ./demo.sh --reuse    # reload previous chain state, run Playwright automation
+#   ./demo.sh --manual --reuse   # reload previous state, leave servers running
 set -e
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -111,10 +113,19 @@ echo "║   Microcredit Protocol — Live Demo           ║"
 echo "╚══════════════════════════════════════════════╝"
 echo ""
 
+# ── Parse flags ──────────────────────────────────────────────────────────────
+REUSE=false
+MANUAL=false
+for _arg in "$@"; do
+  case "$_arg" in
+    --reuse)  REUSE=true ;;
+    --manual) MANUAL=true ;;
+  esac
+done
+unset _arg
+
 # ── Chain state ──────────────────────────────────────────────────────────────
-# Default: always wipe state so contracts are always deployed fresh.
-# Pass --reuse to skip the wipe and reload the previous chain state instead.
-if [[ "${1:-}" == "--reuse" ]]; then
+if [[ "$REUSE" == "true" ]]; then
   echo "♻  Reusing existing chain state (chain-state-demo.json)…"
   echo ""
 else
@@ -259,45 +270,55 @@ until [[ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$NEXT_PORT"
 done
 echo " ✓"
 
-# ── Install demo dependencies (first run only) ────────────────────────────────
-echo ""
-echo "▶ Preparing demo runner…"
-mkdir -p "$REPO/logs"
-cd "$DEMO_DIR"
-if [[ ! -d node_modules ]]; then
-  echo "  Installing Playwright…"
-  npm install --silent
-fi
-# Install browser binary if the actual executable is missing
-_pw_chromium=$(node -e "
-  try {
-    const { chromium } = require('playwright');
-    const b = chromium.executablePath();
-    console.log(b);
-  } catch(e) { console.log(''); }
-" 2>/dev/null || true)
-if [[ -z "$_pw_chromium" || ! -f "$_pw_chromium" ]]; then
-  echo "  Downloading Chromium browser…"
-  npx playwright install chromium --with-deps 2>&1 | tail -3 || true
-elif grep -qi microsoft /proc/version 2>/dev/null; then
-  # Binary exists but system deps may be missing (installed without --with-deps).
-  # install-deps is fast (no-op) if already satisfied.
-  echo "  Verifying Chromium system dependencies…"
-  sudo -n npx playwright install-deps chromium 2>&1 | tail -3 || true
-fi
-unset _pw_chromium
-cd "$REPO"
+if [[ "$MANUAL" == "true" ]]; then
+  # ── Manual mode: leave servers running, let the user explore ─────────────
+  echo ""
+  echo "╔══════════════════════════════════════════════╗"
+  echo "║   Demo ready — open in your browser         ║"
+  echo "╚══════════════════════════════════════════════╝"
+  echo ""
+  echo "  http://localhost:$NEXT_PORT"
+  echo ""
+  echo "  Press Ctrl+C to stop all servers."
+  echo ""
+  # Block until the user presses Ctrl+C (EXIT trap handles cleanup).
+  wait
+else
+  # ── Automated mode: install Playwright and run the scripted demo ──────────
+  echo ""
+  echo "▶ Preparing demo runner…"
+  mkdir -p "$REPO/logs"
+  cd "$DEMO_DIR"
+  if [[ ! -d node_modules ]]; then
+    echo "  Installing Playwright…"
+    npm install --silent
+  fi
+  _pw_chromium=$(node -e "
+    try {
+      const { chromium } = require('playwright');
+      const b = chromium.executablePath();
+      console.log(b);
+    } catch(e) { console.log(''); }
+  " 2>/dev/null || true)
+  if [[ -z "$_pw_chromium" || ! -f "$_pw_chromium" ]]; then
+    echo "  Downloading Chromium browser…"
+    npx playwright install chromium --with-deps 2>&1 | tail -3 || true
+  elif grep -qi microsoft /proc/version 2>/dev/null; then
+    echo "  Verifying Chromium system dependencies…"
+    sudo -n npx playwright install-deps chromium 2>&1 | tail -3 || true
+  fi
+  unset _pw_chromium
+  cd "$REPO"
 
-# ── Run the Playwright demo ───────────────────────────────────────────────────
-echo ""
-echo "▶ Launching browser demo…"
-echo ""
-node "$DEMO_DIR/lending-demo.mjs"
+  echo ""
+  echo "▶ Launching browser demo…"
+  echo ""
+  node "$DEMO_DIR/lending-demo.mjs"
 
-echo ""
-echo "╔══════════════════════════════════════════════╗"
-echo "║  Demo complete! Stopping servers…            ║"
-echo "╚══════════════════════════════════════════════╝"
-echo ""
-# cleanup() is called by the EXIT trap; exit 0 triggers it.
-exit 0
+  echo ""
+  echo "╔══════════════════════════════════════════════╗"
+  echo "║  Demo complete! Stopping servers…            ║"
+  echo "╚══════════════════════════════════════════════╝"
+  echo ""
+  exit 0
+fi
