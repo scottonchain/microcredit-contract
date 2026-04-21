@@ -2,16 +2,14 @@
 
 import React, { createContext, useContext } from "react";
 import { useAccount } from "wagmi";
-import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
 interface DisplayNameCtx {
   /** On-chain display name for the connected wallet, or empty string if unset. */
   displayName: string;
-  /** Write a new display name to the contract (sends a transaction). */
-  setDisplayName: (name: string) => Promise<void>;
 }
 
-const Ctx = createContext<DisplayNameCtx>({ displayName: "", setDisplayName: async () => {} });
+const Ctx = createContext<DisplayNameCtx>({ displayName: "" });
 
 export const DisplayNameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { address } = useAccount();
@@ -23,14 +21,8 @@ export const DisplayNameProvider: React.FC<{ children: React.ReactNode }> = ({ c
     query: { enabled: Boolean(address) },
   });
 
-  const { writeContractAsync } = useScaffoldWriteContract("DecentralizedMicrocredit");
-
-  const setDisplayName = async (name: string) => {
-    await writeContractAsync({ functionName: "setDisplayName", args: [name] });
-  };
-
   return (
-    <Ctx.Provider value={{ displayName: nameData || "", setDisplayName }}>
+    <Ctx.Provider value={{ displayName: nameData || "" }}>
       {children}
     </Ctx.Provider>
   );

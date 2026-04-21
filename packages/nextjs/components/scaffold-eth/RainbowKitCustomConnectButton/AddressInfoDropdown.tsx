@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
+import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { NetworkOptions } from "./NetworkOptions";
 import { getAddress } from "viem";
 import { Address } from "viem";
@@ -78,12 +79,13 @@ export const AddressInfoDropdown = ({
     dropdownRef.current?.removeAttribute("open");
   };
 
-  const { setDisplayName } = useDisplayName();
+  useDisplayName(); // ensure context subscription is maintained
+  const { writeContractAsync } = useScaffoldWriteContract("DecentralizedMicrocredit");
   const editName = async () => {
     const name = window.prompt("Set your on-chain display name (max 32 chars)", displayName);
     if (name !== null) {
       try {
-        await setDisplayName(name.slice(0, 32));
+        await writeContractAsync({ functionName: "setDisplayName", args: [name.slice(0, 32)] });
       } catch (e) {
         console.error("Failed to set display name", e);
       }
