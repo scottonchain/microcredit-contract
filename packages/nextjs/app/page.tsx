@@ -3,8 +3,6 @@
 import Link from "next/link";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import { useState } from "react";
-import { toast } from "react-hot-toast";
 import {
   UserGroupIcon,
   ChartBarIcon,
@@ -13,43 +11,10 @@ import {
 } from "@heroicons/react/24/outline";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { formatUSDC } from "~~/utils/format";
-import BorrowWizard from "~~/components/BorrowWizard";
-import LendWizard from "~~/components/LendWizard";
-import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 import { useUserRole } from "~~/hooks/useUserRole";
 
 const Home: NextPage = () => {
   const { address: connectedAddress } = useAccount();
-  const [isCopying, setIsCopying] = useState(false);
-
-  const copyAttestationLink = async () => {
-    if (!connectedAddress) return;
-    
-    setIsCopying(true);
-    try {
-      const attestationUrl = `${window.location.origin}/attest?borrower=${connectedAddress}`;
-      await navigator.clipboard.writeText(attestationUrl);
-      toast.success("Attestation link copied to clipboard!", {
-        duration: 2000,
-        position: "top-center",
-      });
-    } catch (error) {
-      console.error("Failed to copy link:", error);
-      toast.error("Failed to copy link to clipboard", {
-        duration: 2000,
-        position: "top-center",
-      });
-    } finally {
-      setIsCopying(false);
-    }
-  };
-
-  // Fetch PageRank score and credit score
-  const { data: pageRankScore } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "getPageRankScore",
-    args: [connectedAddress],
-  });
 
   const { data: creditScore } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
@@ -57,20 +22,8 @@ const Home: NextPage = () => {
     args: [connectedAddress],
   });
 
-  const percentScore = (Number(pageRankScore ?? 0) / 1000).toFixed(2);
   const creditScorePercent = creditScore ? (Number(creditScore) / 10000).toFixed(2) : "0.00";
   const hasCreditScore = creditScore && Number(creditScore) > 0;
-
-  // Pool stats
-  const { data: poolInfo } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "getPoolInfo",
-  });
-
-  const totalDeposits = poolInfo ? Number(poolInfo[0]) / 1e6 : 0;
-  const availableFunds = poolInfo ? Number(poolInfo[1]) / 1e6 : 0;
-  const reservedFunds = poolInfo ? Number(poolInfo[2]) / 1e6 : 0;
-  const activeLenders = poolInfo ? Number(poolInfo[3]) : 0;
 
   const getScoreColor = (score: number) => {
     if (score < 30) return "text-red-500";
@@ -80,7 +33,6 @@ const Home: NextPage = () => {
     return "text-green-500";
   };
 
-  // Interest rate bounds
   const { data: effrRate } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "effrRate" as any,
@@ -93,34 +45,19 @@ const Home: NextPage = () => {
   const totalRateBp = effrRate && riskPremium ? Number(effrRate) + Number(riskPremium) : undefined;
   const totalRatePct = totalRateBp !== undefined ? (totalRateBp / 100).toFixed(2) : undefined;
 
-  // Fetch funding pool APY
   const { data: poolApyBp } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "getFundingPoolAPY",
   });
   const poolApyPercent = poolApyBp !== undefined ? (Number(poolApyBp) / 100).toFixed(2) : "0.00";
-  const { displayName } = useDisplayName();
+
   const { userRole, isLoading: roleLoading } = useUserRole();
 
-  const { data: lentOut } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "totalLentOut" as any,
-  });
-  const { data: utilCapBp } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "lendingUtilizationCap" as any,
-  });
-
-  const utilizationPct = totalDeposits > 0 ? (((Number(lentOut ?? 0) + reservedFunds) / 1e6) / totalDeposits) * 100 : 0;
-  const capPct = utilCapBp ? Number(utilCapBp) / 100 : 0;
-
-  // Fetch lender deposit for connected address
   const { data: lenderDeposit } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "lenderDeposits",
     args: [connectedAddress],
   });
-  const isLender = lenderDeposit !== undefined && BigInt(lenderDeposit) > 0n;
 
   return (
     <>
@@ -128,9 +65,9 @@ const Home: NextPage = () => {
         <div className="px-4 sm:px-5 w-full max-w-7xl">
           {/* Hero Section */}
           <div className="text-center mb-4 sm:mb-12">
-            <h1 className="text-3xl sm:text-5xl font-bold text-green-600 mb-2 sm:mb-4">LoanLink</h1>
-            <p className="text-sm sm:text-xl text-gray-600 mb-2 sm:mb-8 max-w-2xl mx-auto hidden sm:block">
-              A social reputation-based lending platform powered by on-chain social underwriting
+            <h1 className="text-3xl sm:text-5xl font-bold text-green-600 mb-1 sm:mb-2">LoanLink</h1>
+            <p className="text-sm sm:text-base text-gray-500 mb-2 sm:mb-8">
+              Trust-Based Lending for Everyone
             </p>
           </div>
 
