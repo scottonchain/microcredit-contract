@@ -10,11 +10,7 @@ import {
   ChartBarIcon,
   CreditCardIcon,
   BanknotesIcon,
-  UserIcon,
-  CogIcon,
 } from "@heroicons/react/24/outline";
-import HowItWorks from "~~/components/HowItWorks";
-import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { formatUSDC } from "~~/utils/format";
 import BorrowWizard from "~~/components/BorrowWizard";
@@ -170,7 +166,7 @@ const Home: NextPage = () => {
                         </p>
 
                         {/* Main Call to Action Cards */}
-                        <div className="grid grid-cols-2 gap-3 sm:gap-8">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-8">
                           {/* I am a Borrower */}
                           <div className="h-full">
                             <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-2xl p-3 sm:p-8 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 h-full flex flex-col">
@@ -355,88 +351,6 @@ const Home: NextPage = () => {
             </div>
           )}
 
-          {/* Social Lending System Overview */}
-          <div className="bg-base-100 rounded-lg p-8 shadow-lg mt-8">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-800 mb-4">Welcome to Social Lending</h2>
-              <p className="text-lg text-gray-600 max-w-4xl mx-auto">
-                A revolutionary approach to microcredit that replaces traditional credit scores with community trust and social reputation.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* For Everyone */}
-              <div className="text-center">
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 mb-4">
-                  <UserGroupIcon className="h-12 w-12 text-purple-600 mx-auto mb-3" />
-                  <h3 className="text-xl font-semibold text-purple-800 mb-2">Community-Driven</h3>
-                  <p className="text-gray-700 text-sm">
-                    Instead of banks deciding who gets loans, your community vouches for your trustworthiness. 
-                    Friends, family, and community members attest to your reliability, building your credit score through social connections.
-                  </p>
-                </div>
-              </div>
-
-              {/* For Borrowers */}
-              <div className="text-center">
-                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 mb-4">
-                  <CreditCardIcon className="h-12 w-12 text-green-600 mx-auto mb-3" />
-                  <h3 className="text-xl font-semibold text-green-800 mb-2">For Borrowers</h3>
-                  <p className="text-gray-700 text-sm">
-                    No bank account or credit history required. Get attested by people who know you, 
-                    then access fair microloans with transparent terms. Every successful repayment improves your score and helps your attesters.
-                  </p>
-                </div>
-              </div>
-
-              {/* For Lenders */}
-              <div className="text-center">
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 mb-4">
-                  <BanknotesIcon className="h-12 w-12 text-blue-600 mx-auto mb-3" />
-                  <h3 className="text-xl font-semibold text-blue-800 mb-2">For Lenders</h3>
-                  <p className="text-gray-700 text-sm">
-                    Support financial inclusion while earning returns. Deposit funds that are automatically 
-                    distributed to qualified borrowers. Earn interest and help build stronger communities through social lending.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 p-6 bg-gray-50 rounded-xl">
-              <h3 className="text-xl font-semibold text-gray-800 mb-4 text-center">How Social Credit Works</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-semibold text-gray-700 mb-2">Building Trust</h4>
-                  <p className="text-gray-600 text-sm">
-                    Community members attest to your creditworthiness based on personal relationships and reputation. 
-                    These attestations form a trust network that determines your loan eligibility and terms.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-700 mb-2">Shared Responsibility</h4>
-                  <p className="text-gray-600 text-sm">
-                    When you repay a loan, both you and your attesters benefit from improved credit scores. 
-                    If you default, both scores are affected, encouraging careful attestations and responsible borrowing.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 text-center">
-              <p className="text-gray-600 text-sm">
-                <strong>Our Mission:</strong> To provide financial access to underserved communities through 
-                the power of social connections and blockchain technology, creating a more inclusive and transparent financial system.
-              </p>
-            </div>
-          </div>
-
-          {/* Call to Action */}
-          <div className="mt-16 text-center">
-            <h2 className="text-2xl font-bold mb-4">Ready to Get Started?</h2>
-            <p className="text-gray-600 mb-6">
-              Connect your wallet and start building your credit reputation today.
-            </p>
-          </div>
         </div>
       </div>
     </>
