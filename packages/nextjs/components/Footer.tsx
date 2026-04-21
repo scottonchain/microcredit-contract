@@ -18,7 +18,9 @@ export const Footer = () => {
         <div className="fixed flex justify-between items-center w-full z-10 p-4 bottom-0 left-0 pointer-events-none">
           {/* Removed price display, faucet, and block explorer buttons */}
           <div />
-          <SwitchTheme className={`pointer-events-auto ${isLocalNetwork ? "self-end md:self-auto" : ""}`} />
+          <div className="hidden sm:block">
+            <SwitchTheme className={`pointer-events-auto ${isLocalNetwork ? "self-end md:self-auto" : ""}`} />
+          </div>
         </div>
       </div>
       <div className="w-full">
