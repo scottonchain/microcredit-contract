@@ -7,7 +7,7 @@ import { localhost } from "viem/chains";
 import deployedContracts from "~~/contracts/deployedContracts";
 import type { NextPage } from "next";
 import { useAccount, useSignTypedData } from "wagmi";
-import { CreditCardIcon, CalculatorIcon, InformationCircleIcon, DocumentDuplicateIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
+import { CreditCardIcon, CalculatorIcon, DocumentDuplicateIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
@@ -544,8 +544,14 @@ const BorrowPage: NextPage = () => {
     return parsed !== null && parsed > maxEligibleAmount;
   };
 
-  const [showInfo, setShowInfo] = useState(false);
   const attestationUrl = connectedAddress ? `${window.location.origin}/attest?borrower=${connectedAddress}` : "";
+
+  const [copied, setCopied] = useState(false);
+  const copyAttestationUrl = () => {
+    navigator.clipboard.writeText(attestationUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
   <div className="flex items-center flex-col grow pt-10">
@@ -555,51 +561,65 @@ const BorrowPage: NextPage = () => {
         <h1 className="text-3xl font-bold">Request Loan</h1>
       </div>
 
-      {/* Attestation Call-to-Action */}
-      {!loanIsActive && !hasCredit && (
-        <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-          <div className="flex items-center justify-center mb-4 gap-2">
-            <h2 className="text-lg font-semibold text-center">Attestation Link</h2>
-            <button
-              onClick={() => setShowInfo(true)}
-              className="text-info hover:text-info/80"
-              aria-label="What does this mean?"
-            >
-              <InformationCircleIcon className="h-5 w-5" />
-            </button>
+      {/* ── Credit Stats (always visible) ─────────────────────────── */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-base-100 rounded-lg p-4 shadow text-center">
+          <div className="text-xs text-gray-500 mb-1">Credit Score</div>
+          <div className={`text-2xl font-bold ${getCreditScoreColor(Number(creditScore ?? 0))}`}>
+            {creditScore !== undefined ? (Number(creditScore) / 1e4).toFixed(0) : "—"}
           </div>
-          <div className="flex items-start gap-6">
-            {/* QR Code on the left */}
-            <div className="flex-shrink-0">
+          <div className="text-xs text-gray-400">out of 100</div>
+        </div>
+        <div className="bg-base-100 rounded-lg p-4 shadow text-center">
+          <div className="text-xs text-gray-500 mb-1">Max Loan</div>
+          <div className="text-2xl font-bold">
+            {maxEligibleAmount !== undefined ? formatUSDC(maxEligibleAmount) : "—"}
+          </div>
+          <div className="text-xs text-gray-400">USDC</div>
+        </div>
+        <div className="bg-base-100 rounded-lg p-4 shadow text-center">
+          <div className="text-xs text-gray-500 mb-1">APR</div>
+          <div className="text-2xl font-bold">
+            {borrowerAprPercent ? `${borrowerAprPercent}%` : "—"}
+          </div>
+          <div className="text-xs text-gray-400">fixed rate</div>
+        </div>
+      </div>
+
+      {/* ── Attestation CTA (shown when score is zero, no active loan) ── */}
+      {!loanIsActive && !hasCredit && (
+        <div className="bg-base-100 rounded-lg p-5 shadow-lg mb-6 border border-base-300">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 pt-0.5">
               <div
-                onClick={() => {
-                  navigator.clipboard.writeText(attestationUrl);
-                  alert("Attestation link copied! Share it with your community.");
-                }}
+                onClick={copyAttestationUrl}
                 className="cursor-pointer flex flex-col items-center"
+                title="Click to copy link"
               >
-                <QRCodeDisplay value={attestationUrl} size={80} />
-                <span className="text-xs text-gray-500 mt-2">Click to copy</span>
+                <QRCodeDisplay value={attestationUrl} size={72} />
+                <span className="text-xs text-gray-400 mt-1">scan or copy</span>
               </div>
             </div>
-            {/* Instructions and link on the right */}
-            <div className="flex-1">
-              <div className="mb-3">
-                <p className="text-gray-700 mb-2">
-                  <strong>Share this link with people who know you well</strong>
-                </p>
-                <p className="text-sm mb-3">
-                  LoanLink builds your credit score from trust attestations your friends and community members give you. Share the link or QR code on this page with people who know you. Each attestation lifts your score.
-                </p>
-              </div>
-              <div className="text-xs flex items-center gap-1 text-blue-600">
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold mb-1">Share your attestation link to build credit</p>
+              <p className="text-sm text-gray-500 mb-3">
+                Your credit score is built from trust attestations by people who know you. Send this link to friends or community members — each attestation raises your score and unlocks borrowing.
+              </p>
+              <div className="flex items-center gap-2">
                 <span
-                  className="underline truncate max-w-[300px] cursor-pointer"
+                  className="text-xs text-blue-600 underline truncate cursor-pointer"
                   title={attestationUrl}
-                  onClick={() => { navigator.clipboard.writeText(attestationUrl); alert("Attestation link copied! Share it with your community."); }}
+                  onClick={copyAttestationUrl}
                 >
                   {attestationUrl}
                 </span>
+                <button
+                  onClick={copyAttestationUrl}
+                  className="btn btn-xs btn-outline flex-shrink-0 gap-1"
+                >
+                  <DocumentDuplicateIcon className="h-3 w-3" />
+                  {copied ? "Copied!" : "Copy"}
+                </button>
               </div>
             </div>
           </div>
@@ -649,23 +669,13 @@ const BorrowPage: NextPage = () => {
             </div>
           </div>
 
-          {/* Preview & Eligibility */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-            <div className="bg-base-200 rounded-lg p-4">
-              <div className="text-xs text-gray-600">Eligible up to</div>
-              <div className="text-lg font-semibold">{formatUSDC(maxEligibleAmount)}</div>
+          {/* Est. weekly payment preview */}
+          {previewTermsData && loanAmount && (
+            <div className="bg-base-200 rounded-lg p-3 mt-4 text-sm">
+              <span className="text-gray-600">Est. weekly payment: </span>
+              <span className="font-semibold">{(Number(previewTermsData[1]) / 1e6).toFixed(2)} USDC</span>
             </div>
-            <div className="bg-base-200 rounded-lg p-4">
-              <div className="text-xs text-gray-600">APR</div>
-              <div className="text-lg font-semibold">{borrowerAprPercent ? `${borrowerAprPercent}%` : '-'}</div>
-            </div>
-            <div className="bg-base-200 rounded-lg p-4">
-              <div className="text-xs text-gray-600">Est. Weekly Payment</div>
-              <div className="text-lg font-semibold">
-                {previewTermsData && loanAmount ? `${(Number(previewTermsData[1]) / 1e6).toFixed(2)} USDC` : '-'}
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Borrow CTA */}
           <div className="mt-6">
