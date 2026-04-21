@@ -166,9 +166,23 @@ contract DeployScript is Script {
 
         // ── Pre-establish Brighton (Bob) ───────────────────────────────────────
         // Brighton already has a 92 % credit score so he can attest credibly.
-        address bob = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; // Anvil account 2
+        uint256 brightonPrivateKey = 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a;
+        address bob = vm.addr(brightonPrivateKey); // 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
         microcreditContract.setScoreOverride(bob, 920000); // 92% (scaled 1e6)
         console.logString("Set Brighton's credit score override to 92%");
+
+        // ── Set display names for demo personas ────────────────────────────────
+        uint256 caseyPrivateKey = 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6;
+        address casey = vm.addr(caseyPrivateKey); // 0x90F79bf6EB2c4f870365E785982E1f101E93b906
+        vm.stopBroadcast();
+        vm.startBroadcast(brightonPrivateKey);
+        microcreditContract.setDisplayName("Brighton");
+        vm.stopBroadcast();
+        vm.startBroadcast(caseyPrivateKey);
+        microcreditContract.setDisplayName("Casey");
+        vm.stopBroadcast();
+        vm.startBroadcast(deployerPrivateKey);
+        console.logString("Set display names: Brighton, Casey");
 
         // Provision ETH to demo addresses (excluding admin addresses that can fund themselves)
         console.logString("--- Provisioning ETH to demo addresses ---");
