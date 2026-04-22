@@ -158,11 +158,6 @@ export default function AttestPage() {
   return (
     <div className="flex items-center flex-col grow pt-10">
       <div className="px-5 w-full max-w-2xl">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold">Make an Attestation</h1>
-          <p className="text-gray-600 mt-2">No deposit required.</p>
-        </div>
-
         {arrivedViaAttestLink && !submittedInfo && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6">
             {connectedAddress ? (
@@ -183,15 +178,14 @@ export default function AttestPage() {
                 </div>
               ) : (
                 <div className="text-blue-800">
-                  <h3 className="text-lg font-semibold mb-1">You were invited to make an attestation</h3>
-                  <p>
-                    The form below is pre-filled to attest for{" "}
+                  <h3 className="text-lg font-semibold mb-1">
+                    You are invited to make an attestation for{" "}
                     {borrowerDisplayName ? (
                       <strong>{borrowerDisplayName}</strong>
                     ) : (
                       <span className="font-mono break-all">{attestBorrower}</span>
-                    )}.
-                  </p>
+                    )}
+                  </h3>
                 </div>
               )
             ) : (
