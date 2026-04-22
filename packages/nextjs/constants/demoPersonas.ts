@@ -25,19 +25,19 @@ export const DEMO_PERSONAS: Record<string, DemoPersona> = {
   },
   // Anvil account 2 — attester
   "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": {
-    name: "Brighton",
+    name: "Alexis",
     role: "Attester",
     color: "bg-blue-500",
     hex: "#3b82f6",
-    initial: "B",
+    initial: "A",
   },
   // Anvil account 3 — borrower
   "0x90F79bf6EB2c4f870365E785982E1f101E93b906": {
-    name: "Casey",
+    name: "Brighton",
     role: "Borrower",
     color: "bg-emerald-500",
     hex: "#10b981",
-    initial: "C",
+    initial: "B",
   },
 };
 
