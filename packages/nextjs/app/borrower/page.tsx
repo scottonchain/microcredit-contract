@@ -558,7 +558,7 @@ const BorrowPage: NextPage = () => {
     <div className="px-5 w-full max-w-4xl">
       <div className="flex items-center justify-center mb-8">
         <CreditCardIcon className="h-8 w-8 mr-3" />
-        <h1 className="text-3xl font-bold">Request Loan</h1>
+        <h1 className="text-3xl font-bold">{hasCredit ? "Request Loan" : "Build Credit"}</h1>
       </div>
 
       {/* ── Credit Stats (always visible) ─────────────────────────── */}
