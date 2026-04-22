@@ -86,7 +86,7 @@ NEXT_PUBLIC_DEMO_WALLET=false
 ```
 
 ### Demo wallet mode
-A fake `window.ethereum` provider is injected that proxies all signing to the local Anvil node (which auto-signs with its unlocked accounts). A floating **⚠ DEMO MODE** switcher appears in the bottom-right corner so you can instantly switch between the seeded personas — **Avery** (admin), **Brighton / Bob** (attester), and **Casey / Charlie** (borrower) — without touching MetaMask or triggering any wallet pop-ups.
+A fake `window.ethereum` provider is injected that proxies all signing to the local Anvil node (which auto-signs with its unlocked accounts). A floating **⚠ DEMO MODE** switcher appears in the bottom-right corner so you can instantly switch between the seeded personas — **Alexis** (admin), **Brighton / Bob** (attester), and **Casey / Charlie** (borrower) — without touching MetaMask or triggering any wallet pop-ups.
 
 **Enable:**
 ```
