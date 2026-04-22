@@ -49,7 +49,7 @@ const Home: NextPage = () => {
     contractName: "DecentralizedMicrocredit",
     functionName: "getFundingPoolAPY",
   });
-  const poolApyPercent = poolApyBp !== undefined ? (Number(poolApyBp) / 100).toFixed(2) : "0.00";
+  const apyDisplay = poolApyBp !== undefined ? `${(Number(poolApyBp) / 100).toFixed(2)}%` : "—";
 
   const { userRole, isLoading: roleLoading } = useUserRole();
 
@@ -133,12 +133,12 @@ const Home: NextPage = () => {
                                 <BanknotesIcon className="h-8 w-8 sm:h-16 sm:w-16 text-blue-600 mx-auto mb-2 sm:mb-4" />
                                 <h2 className="text-base sm:text-3xl font-bold text-blue-700 mb-1 sm:mb-4">I&apos;m a Lender</h2>
                                 <p className="text-gray-600 mb-3 sm:mb-6 flex-1 text-xs sm:text-base hidden sm:block">
-                                  Deposit USDC to earn {poolApyPercent}% APY. In addition to the APY, this increases your credit score and allows you to make attestations or even borrow.
+                                  Deposit USDC to earn {apyDisplay} APY. In addition to the APY, this increases your credit score and allows you to make attestations or even borrow.
                                 </p>
                                 <div className="mt-auto">
                                   <div className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 sm:py-4 px-2 sm:px-6 rounded-lg text-xs sm:text-lg transition-colors">
                                     <span className="hidden sm:inline">Lend and Earn Interest</span>
-                                    <span className="sm:hidden">Earn {poolApyPercent}% APY</span>
+                                    <span className="sm:hidden">Earn {apyDisplay} APY</span>
                                   </div>
                                 </div>
                               </div>
@@ -218,7 +218,7 @@ const Home: NextPage = () => {
                               <div>
                                 <div className="font-medium text-gray-600">Pool APY</div>
                                 <div className="text-sm font-bold text-blue-600">
-                                  {poolApyPercent}%
+                                  {apyDisplay}
                                 </div>
                               </div>
                               {(userRole === "lender" || userRole === "both") && (
