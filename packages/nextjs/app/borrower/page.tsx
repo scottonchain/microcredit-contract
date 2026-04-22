@@ -528,7 +528,7 @@ const BorrowPage: NextPage = () => {
     return `${weeks} Weeks`;
   };
 
-  const hasCredit = creditScore && Number(creditScore) > 0;
+  const hasCredit = creditScore !== undefined && Number(creditScore) > 0;
 
   // Prefill amount when eligible known
   useEffect(() => {
