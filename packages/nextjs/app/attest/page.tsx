@@ -33,7 +33,7 @@ export default function AttestPage() {
   const [attestWeight, setAttestWeight] = useState<number>(80);
   const [attestLoading, setAttestLoading] = useState(false);
   const [arrivedViaAttestLink, setArrivedViaAttestLink] = useState(false);
-  const [submittedInfo, setSubmittedInfo] = useState<{ borrower: string; weight: number; txHash?: string } | null>(null);
+  const [submittedInfo, setSubmittedInfo] = useState<{ attester: string; attesterName?: string; borrower: string; weight: number; txHash?: string } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
   const borrowerDisplayName = useAddressDisplayName(attestBorrower || undefined);
@@ -145,7 +145,7 @@ export default function AttestPage() {
       console.log("Meta attestation result:", j);
 
       const txHash = j?.txHash || j?.hash || j?.transactionHash || undefined;
-      setSubmittedInfo({ borrower, weight: Number(attestWeight), txHash });
+      setSubmittedInfo({ attester, attesterName: attesterDisplayName || undefined, borrower, weight: Number(attestWeight), txHash });
       toast.success("Attestation submitted via relayer", { position: "top-center" });
     } catch (err: any) {
       console.error("Meta attestation error", err);
@@ -242,10 +242,10 @@ export default function AttestPage() {
             <div className="space-y-3 text-sm">
               <div>
                 <div className="text-gray-600">Attester</div>
-                {attesterDisplayName ? (
-                  <div className="font-semibold">{attesterDisplayName}</div>
+                {submittedInfo.attesterName ? (
+                  <div className="font-semibold">{submittedInfo.attesterName}</div>
                 ) : null}
-                <div className="font-mono break-all text-xs text-gray-500">{connectedAddress}</div>
+                <div className="font-mono break-all text-xs text-gray-500">{submittedInfo.attester}</div>
               </div>
               <div>
                 <div className="text-gray-600">Borrower</div>
