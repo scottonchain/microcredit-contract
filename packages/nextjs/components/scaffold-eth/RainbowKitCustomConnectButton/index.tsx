@@ -35,6 +35,12 @@ export const RainbowKitCustomConnectButton = () => {
   // when the user switches demo personas (instead of flashing "Start Demo").
   const [hasConnectedOnce, setHasConnectedOnce] = useState(false);
 
+  useEffect(() => {
+    if (IS_DEMO && connectedAddress) {
+      setHasConnectedOnce(true);
+    }
+  }, [connectedAddress]);
+
   // USDC contract address (static) for balance display
   const { data: usdcAddress } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
@@ -60,10 +66,6 @@ export const RainbowKitCustomConnectButton = () => {
         return (
           <>
             {(() => {
-              if (connected && IS_DEMO && !hasConnectedOnce) {
-                setHasConnectedOnce(true);
-              }
-
               if (!connected) {
                 // In demo mode, if we've connected before (i.e. we're in a brief
                 // reconnecting phase during persona switch), show the dropdown
