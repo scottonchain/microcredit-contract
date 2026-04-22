@@ -8,6 +8,7 @@ import { AddressInput } from "~~/components/scaffold-eth";
 import { DocumentDuplicateIcon, CheckIcon } from "@heroicons/react/24/outline";
 import deployedContracts from "~~/contracts/deployedContracts";
 import { useAddressDisplayName } from "~~/hooks/useAddressDisplayName";
+import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 import { createPublicClient, http } from "viem";
 import { localhost } from "viem/chains";
 import { MICRO_DOMAIN, TYPES, AttestRequest } from "../../types/eip712";
@@ -36,6 +37,7 @@ export default function AttestPage() {
   const [linkCopied, setLinkCopied] = useState(false);
 
   const borrowerDisplayName = useAddressDisplayName(attestBorrower || undefined);
+  const { displayName: attesterDisplayName } = useDisplayName();
 
   const copyAttestationLink = async () => {
     if (!connectedAddress) return;
@@ -246,11 +248,17 @@ export default function AttestPage() {
             <div className="space-y-3 text-sm">
               <div>
                 <div className="text-gray-600">Attester</div>
-                <div className="font-mono break-all">{connectedAddress}</div>
+                {attesterDisplayName ? (
+                  <div className="font-semibold">{attesterDisplayName}</div>
+                ) : null}
+                <div className="font-mono break-all text-xs text-gray-500">{connectedAddress}</div>
               </div>
               <div>
                 <div className="text-gray-600">Borrower</div>
-                <div className="font-mono break-all">{submittedInfo.borrower}</div>
+                {borrowerDisplayName ? (
+                  <div className="font-semibold">{borrowerDisplayName}</div>
+                ) : null}
+                <div className="font-mono break-all text-xs text-gray-500">{submittedInfo.borrower}</div>
               </div>
               <div>
                 <div className="text-gray-600">Confidence</div>
@@ -259,7 +267,7 @@ export default function AttestPage() {
               {submittedInfo.txHash && (
                 <div>
                   <div className="text-gray-600">Transaction</div>
-                  <div className="font-mono break-all">{submittedInfo.txHash}</div>
+                  <div className="font-mono break-all text-xs text-gray-500">{submittedInfo.txHash}</div>
                 </div>
               )}
             </div>
