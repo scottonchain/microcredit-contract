@@ -9,7 +9,7 @@ interface PersonaAvatarProps {
 
 /**
  * Renders a colored circle with the persona's initial letter for known demo
- * addresses (Avery / Brighton / Casey).  Falls back to null so the caller
+ * addresses (Alexis / Brighton / Casey).  Falls back to null so the caller
  * can render a BlockieAvatar instead.
  */
 export const PersonaAvatar = ({ address, size = 30 }: PersonaAvatarProps) => {

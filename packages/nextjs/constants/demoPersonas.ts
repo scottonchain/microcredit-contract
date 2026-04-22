@@ -17,7 +17,7 @@ export interface DemoPersona {
 export const DEMO_PERSONAS: Record<string, DemoPersona> = {
   // Anvil account 9 — deployer / admin
   "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720": {
-    name: "Avery",
+    name: "Alexis",
     role: "Admin",
     color: "bg-purple-500",
     hex: "#a855f7",
@@ -25,7 +25,7 @@ export const DEMO_PERSONAS: Record<string, DemoPersona> = {
   },
   // Anvil account 2 — attester
   "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": {
-    name: "Alexis",
+    name: "Avery",
     role: "Attester",
     color: "bg-blue-500",
     hex: "#3b82f6",

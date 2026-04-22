@@ -15,16 +15,16 @@ The demo starts a local Anvil blockchain, deploys the contracts (including pre-s
 - **Brighton (Attester)** — Community member with an established credit score who vouches for borrowers (Anvil account 2)
 - **Casey (Borrower)** — Loan applicant (Anvil account 3)
 
-Avery is the platform admin. Her actions (funding the pool, assigning Brighton KYC status, and attesting to Brighton) happen at deploy time — not through the UI.
+Alexis is the platform admin. Her actions (funding the pool, assigning Brighton KYC status, and attesting to Brighton) happen at deploy time — not through the UI.
 
 ---
 
 ## The Chain of Trust
 
-Credit scores are computed by on-chain PageRank over a directed attestation graph. At deploy time, Avery gives Brighton KYC status and attests to him at 95% confidence, establishing his score before the demo begins. The demo then shows:
+Credit scores are computed by on-chain PageRank over a directed attestation graph. At deploy time, Alexis gives Brighton KYC status and attests to him at 95% confidence, establishing his score before the demo begins. The demo then shows:
 
 ```
-Avery (Admin, off-screen) → Brighton (>90% score) → Casey
+Alexis (Admin, off-screen) → Brighton (>90% score) → Casey
 ```
 
 Brighton's existing reputation is what makes his attestation to Casey meaningful.
