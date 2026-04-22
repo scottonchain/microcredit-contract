@@ -564,7 +564,7 @@ const BorrowPage: NextPage = () => {
       {/* ── Credit Stats (always visible) ─────────────────────────── */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-base-100 rounded-lg p-4 shadow text-center">
-          <div className="text-xs text-gray-500 mb-1">Credit Score</div>
+          <div className="text-xs text-gray-500 mb-1">Score</div>
           <div className={`text-2xl font-bold ${getCreditScoreColor(Number(creditScore ?? 0))}`}>
             {creditScore !== undefined ? (Number(creditScore) / 1e4).toFixed(0) : "—"}
           </div>
