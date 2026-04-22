@@ -18,7 +18,7 @@ export const DisplayNameProvider: React.FC<{ children: React.ReactNode }> = ({ c
     contractName: "DecentralizedMicrocredit",
     functionName: "displayNames",
     args: [address as `0x${string}`],
-    query: { enabled: Boolean(address) },
+    query: { enabled: Boolean(address), retry: false },
   });
 
   return (

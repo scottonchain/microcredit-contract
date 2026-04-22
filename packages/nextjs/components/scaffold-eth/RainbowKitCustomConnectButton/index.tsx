@@ -1,6 +1,7 @@
 "use client";
 
 // @refresh reset
+import { useEffect, useState } from "react";
 import { Balance } from "../Balance";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { useAccount } from "wagmi";
@@ -29,6 +30,11 @@ export const RainbowKitCustomConnectButton = () => {
   // Display name context (must be top-level hook)
   const { displayName } = useDisplayName();
 
+  // Track whether we've ever been connected in this session so we can keep
+  // the DemoModeDropdown visible during wagmi's brief reconnecting phase
+  // when the user switches demo personas (instead of flashing "Start Demo").
+  const [hasConnectedOnce, setHasConnectedOnce] = useState(false);
+
   // USDC contract address (static) for balance display
   const { data: usdcAddress } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
@@ -54,7 +60,21 @@ export const RainbowKitCustomConnectButton = () => {
         return (
           <>
             {(() => {
+              if (connected && IS_DEMO && !hasConnectedOnce) {
+                setHasConnectedOnce(true);
+              }
+
               if (!connected) {
+                // In demo mode, if we've connected before (i.e. we're in a brief
+                // reconnecting phase during persona switch), show the dropdown
+                // using the address directly from the demo provider so there's
+                // no "Start Demo" flash.
+                if (IS_DEMO && hasConnectedOnce) {
+                  const demoAddr =
+                    (typeof window !== "undefined" &&
+                      (window as any).__demoEthereumProvider?.selectedAddress) || "";
+                  if (demoAddr) return <DemoModeDropdown address={demoAddr} />;
+                }
                 return (
                   <button className="btn btn-primary btn-sm" onClick={openConnectModal} type="button">
                     {IS_DEMO ? "Start Demo" : "Connect Wallet"}

@@ -11,7 +11,7 @@ export function useAddressDisplayName(address: string | undefined): string | und
     contractName: "DecentralizedMicrocredit",
     functionName: "displayNames",
     args: [address as `0x${string}`],
-    query: { enabled: Boolean(address) },
+    query: { enabled: Boolean(address), retry: false },
   });
   return data || undefined;
 }
