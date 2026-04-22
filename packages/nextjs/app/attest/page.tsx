@@ -160,7 +160,7 @@ export default function AttestPage() {
       <div className="px-5 w-full max-w-2xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold">Make an Attestation</h1>
-          <p className="text-gray-600 mt-2">Vouch for a borrower’s creditworthiness. No deposit required.</p>
+          <p className="text-gray-600 mt-2">No deposit required.</p>
         </div>
 
         {arrivedViaAttestLink && !submittedInfo && (
