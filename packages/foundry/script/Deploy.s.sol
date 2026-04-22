@@ -164,25 +164,25 @@ contract DeployScript is Script {
         microcreditContract.setMaxLoanAmount(100 * 1e6); // reset to normal 100 USDC cap
         console.logString("Background borrowers: Diana $6,500 + Eve $2,399 = $8,899 lent (89%, APY ~8.3%)");
 
-        // ── Pre-establish Brighton (Bob) ───────────────────────────────────────
-        // Brighton already has a 92 % credit score so he can attest credibly.
-        uint256 brightonPrivateKey = 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a;
-        address bob = vm.addr(brightonPrivateKey); // 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
-        microcreditContract.setScoreOverride(bob, 920000); // 92% (scaled 1e6)
-        console.logString("Set Brighton's credit score override to 92%");
+        // ── Pre-establish Alexis (attester, account 2) ────────────────────────
+        // Alexis already has a 92 % credit score so she can attest credibly.
+        uint256 alexisPrivateKey = 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a;
+        address alexis = vm.addr(alexisPrivateKey); // 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+        microcreditContract.setScoreOverride(alexis, 920000); // 92% (scaled 1e6)
+        console.logString("Set Alexis's credit score override to 92%");
 
         // ── Set display names for demo personas ────────────────────────────────
-        uint256 caseyPrivateKey = 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6;
-        address casey = vm.addr(caseyPrivateKey); // 0x90F79bf6EB2c4f870365E785982E1f101E93b906
+        uint256 brightonPrivateKey = 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6;
+        address brighton = vm.addr(brightonPrivateKey); // 0x90F79bf6EB2c4f870365E785982E1f101E93b906
+        vm.stopBroadcast();
+        vm.startBroadcast(alexisPrivateKey);
+        microcreditContract.setDisplayName("Alexis");
         vm.stopBroadcast();
         vm.startBroadcast(brightonPrivateKey);
         microcreditContract.setDisplayName("Brighton");
         vm.stopBroadcast();
-        vm.startBroadcast(caseyPrivateKey);
-        microcreditContract.setDisplayName("Casey");
-        vm.stopBroadcast();
         vm.startBroadcast(deployerPrivateKey);
-        console.logString("Set display names: Brighton, Casey");
+        console.logString("Set display names: Alexis (attester), Brighton (borrower)");
 
         // Provision ETH to demo addresses (excluding admin addresses that can fund themselves)
         console.logString("--- Provisioning ETH to demo addresses ---");
