@@ -26,6 +26,11 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
     event MetaWithdrawalRequested(address indexed lender, uint256 indexed queueId, uint256 amount, address indexed to);
     event MetaWithdrawalFilled(uint256 indexed queueId, uint256 amountFilled);
     event MetaAttested(address indexed attester, address indexed borrower, uint256 weight);
+    event Deposited(address indexed lender, uint256 amount);
+    event Withdrawn(address indexed lender, address indexed to, uint256 amount);
+    event LoanRequested(address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 interestRate);
+    event LoanDisbursed(address indexed borrower, uint256 indexed loanId, address to, uint256 amount);
+    event Attested(address indexed attester, address indexed borrower, uint256 weight);
 
     function setUp() public {
         _deploy(433, 500, 100e6);
@@ -226,6 +231,25 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         assertEq(credit.nonces(lender), 1);
     }
 
+    function testDepositWithPermitMetaCreditsSignedReceiver() public {
+        address receiver = makeAddr("receiver");
+        usdc.mint(lender, 1_000e6);
+        DecentralizedMicrocredit.DepositRequest memory req = DecentralizedMicrocredit.DepositRequest({
+            lender: lender, amount: 1_000e6, receiver: receiver, nonce: 0, deadline: _deadline()
+        });
+        bytes memory sig = _signDepositRequest(lenderPk, req);
+        DecentralizedMicrocredit.PermitData memory permit = _signPermit(lenderPk, 1_000e6, _deadline());
+
+        vm.expectEmit(address(credit));
+        emit Deposited(receiver, 1_000e6);
+        vm.prank(relayer);
+        credit.depositWithPermitMeta(req, sig, permit);
+
+        assertEq(credit.lenderDeposits(receiver), 1_000e6);
+        assertEq(credit.lenderDeposits(lender), 0);
+        assertEq(usdc.balanceOf(lender), 0, "funds come from the signer");
+    }
+
     function testDepositWithPermitMetaRejectsShortPermit() public {
         usdc.mint(lender, 1_000e6);
         DecentralizedMicrocredit.DepositRequest memory req = DecentralizedMicrocredit.DepositRequest({
@@ -385,6 +409,77 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
     }
 
     // ───────────────────────────── repayLoanMeta ─────────────────────────────
+
+    // ───────────────────────────── permit front-running ─────────────────────────────
+
+    /// @dev Submitting a user's permit before the relayer does must not block the relayed call.
+    function _frontRun(DecentralizedMicrocredit.PermitData memory p, address holder) internal {
+        vm.prank(makeAddr("frontRunner"));
+        usdc.permit(holder, address(credit), p.value, p.deadline, p.v, p.r, p.s);
+    }
+
+    function testDepositPermitOnlySurvivesFrontRunPermit() public {
+        usdc.mint(lender, 500e6);
+        DecentralizedMicrocredit.PermitData memory permit = _signPermit(lenderPk, 500e6, _deadline());
+        _frontRun(permit, lender);
+
+        vm.prank(relayer);
+        credit.depositPermitOnlyMeta(lender, permit);
+        assertEq(credit.lenderDeposits(lender), 500e6);
+    }
+
+    function testRepayLoanMetaSurvivesFrontRunPermit() public {
+        uint256 loanId = _borrow(40e6);
+        DecentralizedMicrocredit.RepayRequest memory req = _repayRequest(loanId, 0);
+        bytes memory sig = _signRepayRequest(borrowerPk, req);
+        DecentralizedMicrocredit.PermitData memory permit = _signPermit(borrowerPk, 40e6, _deadline());
+        _frontRun(permit, borrower);
+
+        vm.prank(relayer);
+        credit.repayLoanMeta(req, sig, permit);
+        (,,,, bool active) = credit.getLoan(loanId);
+        assertFalse(active);
+    }
+
+    function testRepayWithPermitSurvivesFrontRunPermit() public {
+        uint256 loanId = _borrow(40e6);
+        DecentralizedMicrocredit.PermitData memory p = _signPermit(borrowerPk, 40e6, _deadline());
+        _frontRun(p, borrower);
+
+        vm.prank(relayer);
+        credit.repayWithPermit(borrower, loanId, 0, p.value, p.deadline, p.v, p.r, p.s);
+        (,,,, bool active) = credit.getLoan(loanId);
+        assertFalse(active);
+    }
+
+    function testInvalidPermitWithoutAllowanceStillReverts() public {
+        usdc.mint(lender, 500e6);
+        DecentralizedMicrocredit.PermitData memory permit = _signPermit(lenderPk, 500e6, _deadline());
+        permit.s = bytes32(uint256(permit.s) ^ 1);
+
+        vm.prank(relayer);
+        vm.expectRevert("Permit failed");
+        credit.depositPermitOnlyMeta(lender, permit);
+    }
+
+    // ───────────────────────────── events ─────────────────────────────
+
+    function testLifecycleEvents() public {
+        vm.expectEmit(address(credit));
+        emit Attested(attester, borrower, 700_000);
+        _attest(borrower, 700_000);
+
+        vm.expectEmit(address(credit));
+        emit LoanRequested(borrower, 1, 40e6, LOAN_APR);
+        vm.expectEmit(address(credit));
+        emit LoanDisbursed(borrower, 1, borrower, 40e6);
+        _borrow(40e6);
+
+        vm.expectEmit(address(credit));
+        emit Withdrawn(poolLender, poolLender, 100e6);
+        vm.prank(poolLender);
+        credit.withdrawFunds(100e6);
+    }
 
     function testRepayLoanMetaRepayAllPullsCurrentOutstanding() public {
         uint256 loanId = _borrow(40e6);

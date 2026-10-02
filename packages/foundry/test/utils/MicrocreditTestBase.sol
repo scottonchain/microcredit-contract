@@ -56,7 +56,7 @@ abstract contract MicrocreditTestBase is Test {
     }
 
     function _deadline() internal view returns (uint256) {
-        return block.timestamp + DEADLINE_OFFSET;
+        return vm.getBlockTimestamp() + DEADLINE_OFFSET;
     }
 
     // ───────────────────────────── EIP-712 signing ─────────────────────────────
