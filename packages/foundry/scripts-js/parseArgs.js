@@ -74,7 +74,7 @@ try {
   if (!parsedToml.rpc_endpoints[network]) {
     console.log(
       `\n❌ Error: Network '${network}' not found in foundry.toml!`,
-      "\nPlease check \`foundry.toml\` for available networks in the [rpc_endpoints] section or add a new network."
+      "\nPlease check `foundry.toml` for available networks in the [rpc_endpoints] section or add a new network."
     );
     process.exit(1);
   }
@@ -84,7 +84,8 @@ try {
 }
 
 if (
-  (process.env.LOCALHOST_KEYSTORE_ACCOUNT || "scaffold-eth-default") !== "scaffold-eth-default" &&
+  (process.env.LOCALHOST_KEYSTORE_ACCOUNT || "scaffold-eth-default") !==
+    "scaffold-eth-default" &&
   network === "localhost"
 ) {
   console.log(`
@@ -98,7 +99,8 @@ You can either:
 `);
 }
 
-let selectedKeystore = process.env.LOCALHOST_KEYSTORE_ACCOUNT || "scaffold-eth-default";
+let selectedKeystore =
+  process.env.LOCALHOST_KEYSTORE_ACCOUNT || "scaffold-eth-default";
 if (network !== "localhost") {
   if (keystoreArg) {
     // Use the keystore provided via command line argument
@@ -158,8 +160,14 @@ if (network === "localhost") {
     const socket = new net.Socket();
     socket.setTimeout(1000);
     socket
-      .once("connect", () => { socket.destroy(); resolve(true); })
-      .once("timeout", () => { socket.destroy(); resolve(false); })
+      .once("connect", () => {
+        socket.destroy();
+        resolve(true);
+      })
+      .once("timeout", () => {
+        socket.destroy();
+        resolve(false);
+      })
       .once("error", () => resolve(false))
       .connect(port, "127.0.0.1");
   });

@@ -52,7 +52,6 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         bool isActive;
         bool disbursed;
         uint256 createdAt; // interest accrues from here
-
     }
 
     struct Attestation {
@@ -470,9 +469,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             req.borrower,
             req.nonce,
             req.deadline,
-            keccak256(
-                abi.encode(DISBURSE_REQUEST_TYPEHASH, req.borrower, req.loanId, req.to, req.nonce, req.deadline)
-            ),
+            keccak256(abi.encode(DISBURSE_REQUEST_TYPEHASH, req.borrower, req.loanId, req.to, req.nonce, req.deadline)),
             sig
         );
         require(req.to == loans[req.loanId].borrower && req.to == req.borrower, "Must send to borrower");
@@ -606,7 +603,9 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         require(lenderDeposits[req.lender] >= req.amount, "Insufficient balance");
 
         uint256 queueId = withdrawalQueue.length;
-        withdrawalQueue.push(WithdrawalQueueItem({ lender: req.lender, to: req.to, remaining: req.amount, active: true }));
+        withdrawalQueue.push(
+            WithdrawalQueueItem({ lender: req.lender, to: req.to, remaining: req.amount, active: true })
+        );
         emit MetaWithdrawalRequested(req.lender, queueId, req.amount, req.to);
 
         _tryFillWithdrawalQueue();
@@ -660,7 +659,12 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     /// @return interestRate APR in BASIS_POINTS
     /// @return payment      Weekly payment over `repaymentPeriod` (seconds, at least 7 days)
-    function previewLoanTerms(address /* borrower */, uint256 principal, uint256 repaymentPeriod)
+    function previewLoanTerms(
+        address,
+        /* borrower */
+        uint256 principal,
+        uint256 repaymentPeriod
+    )
         external
         view
         returns (uint256 interestRate, uint256 payment)
@@ -756,9 +760,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     }
 
     function _permit(address holder, PermitData calldata permit) internal {
-        IERC20Permit(address(usdc)).permit(
-            holder, address(this), permit.value, permit.deadline, permit.v, permit.r, permit.s
-        );
+        IERC20Permit(address(usdc))
+            .permit(holder, address(this), permit.value, permit.deadline, permit.v, permit.r, permit.s);
     }
 
     function _pullUsdc(address from, uint256 amount) internal {

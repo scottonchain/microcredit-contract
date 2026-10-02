@@ -67,21 +67,13 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         returns (DecentralizedMicrocredit.RepayRequest memory)
     {
         return DecentralizedMicrocredit.RepayRequest({
-            borrower: borrower,
-            loanId: loanId,
-            amount: amount,
-            nonce: credit.nonces(borrower),
-            deadline: _deadline()
+            borrower: borrower, loanId: loanId, amount: amount, nonce: credit.nonces(borrower), deadline: _deadline()
         });
     }
 
     function _attest(address to, uint256 weight) internal {
         DecentralizedMicrocredit.AttestRequest memory req = DecentralizedMicrocredit.AttestRequest({
-            attester: attester,
-            borrower: to,
-            weight: weight,
-            nonce: credit.nonces(attester),
-            deadline: _deadline()
+            attester: attester, borrower: to, weight: weight, nonce: credit.nonces(attester), deadline: _deadline()
         });
         bytes memory sig = _signAttestRequest(attesterPk, req);
         vm.prank(relayer);

@@ -238,7 +238,10 @@ function main() {
   );
 
   console.log(
-    `📝 Updated TypeScript contract definition file on ${join(NEXTJS_TARGET_DIR, "deployedContracts.ts")}`
+    `📝 Updated TypeScript contract definition file on ${join(
+      NEXTJS_TARGET_DIR,
+      "deployedContracts.ts"
+    )}`
   );
 }
 
