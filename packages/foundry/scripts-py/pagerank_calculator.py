@@ -44,7 +44,7 @@ class PageRankCalculator:
         Compute PageRank scores for all nodes
         
         Args:
-            damping_factor: PageRank damping factor (default 0.7)
+            damping_factor: PageRank damping factor (default 0.85)
             max_iter: Maximum iterations
             tol: Convergence tolerance
             
