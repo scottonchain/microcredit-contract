@@ -1,273 +1,75 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity 0.8.33;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
-import "forge-std/console.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import { SignatureChecker } from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { PageRank } from "./PageRank.sol";
 
 /**
  * @title DecentralizedMicrocredit
- * @dev DEMO CONTRACT - This contract includes demo-only features for demonstration purposes.
- * 
- * DEMO-ONLY FEATURES:
- * - PageRank computation happens automatically after each attestation
- * - In production with oracle, PageRank computation will be handled off-chain
- * - Time-based interest calculation (interest accrues based on actual time elapsed)
- * 
- * PRODUCTION NOTES:
- * - PageRank computation should be moved off-chain for gas efficiency
- * - Oracle will handle credit score updates and PageRank computation
- * - Interest calculation may be optimized for production use
+ * @notice Single-pool, collateral-free USDC lending. Borrow limits come from a PageRank credit
+ *         score over attestations; every user action also has an EIP-712 meta-transaction entry
+ *         point so a relayer can pay gas.
+ * @dev DEMO CONTRACT. PageRank is recomputed on-chain after every attestation; in production
+ *      that work (and credit score updates) is meant to move to an off-chain oracle.
  */
-contract DecentralizedMicrocredit is EIP712 {
-    // NOTE: Variable-rate parameters removed in favour of fixed-rate design.
-    // uint256 public rMin;
-    // uint256 public rMax;
-    IERC20 public immutable usdc;
-    address public owner;
-    address public oracle;
-    uint256 public constant SCALE = 1e6; // Used for credit score scaling
-    uint256 public constant BASIS_POINTS = 10000; // Interest-rate scaling (1e4 = 100%)
+contract DecentralizedMicrocredit is EIP712, PageRank {
+    using SafeERC20 for IERC20;
+
+    // ───────────────────────────── constants ─────────────────────────────
+
+    uint256 public constant SCALE = 1e6; // credit scores and attestation weights (1e6 = 100%)
+    uint256 public constant BASIS_POINTS = 10000; // interest rates and pool ratios (1e4 = 100%)
     uint256 public constant SECONDS_PER_YEAR = 365 days;
-    // Cent and grace constants for cent-consistent math and UX
-    uint256 private constant CENT = 10_000; // 0.01 USDC in 6-decimals
-    uint256 private constant GRACE_PERIOD = 1 days;
-    uint256 private nextLoanId = 1;
+    uint256 private constant CENT = 10_000; // 0.01 USDC (6 decimals)
+    uint256 private constant GRACE_PERIOD = 1 days; // no interest accrues during the first day
+    uint256 private constant ATTESTER_REWARD_RATE = 50_000; // 5% of principal, in SCALE
 
-    // ─────────────── LIQUIDITY GUARDS ───────────────
-    // Fraction of totalDeposits to keep uncommitted as a safety buffer (in BASIS_POINTS)
-    uint256 public liquidityBuffer; // e.g. 500 = 5%
-    // Absolute minimum liquid USDC (6 decimals) to keep in the pool at all times
-    uint256 public liquidityThreshold; // e.g. 50e6 = 50 USDC
-
-    event LiquidityLimitsUpdated(uint256 bufferBp, uint256 threshold);
-
-    // PageRank constants (using smaller scale to avoid overflow)
-    uint256 constant PR_SCALE = 100000; // 1.0 = 100,000 (smaller scale)
-    uint256 constant PR_ALPHA = 85000; // 0.85 = 85,000
-    uint256 constant PR_TOL = 100; // 1e-6 * PR_SCALE
-
-    /* ─────────────────────────────────────────────────────────────────────────────
-     *  PERSONALIZATION & PRIME RATE PARAMETERS
-     *
-     *  These variables drive the new weighted PageRank teleportation mechanism
-     *  as well as the base interest-rate economics introduced in this upgrade.
-     *  All values are denominated in USDC's 6-decimal format to keep consistency
-     *  with deposits, then normalized to PR_SCALE (100 000) for PageRank maths.
-     *
-     *  ‣ basePersonalization     :   Non-zero weight given to every address so
-     *                                 even nodes without deposits/KYC receive a
-     *                                 small share of the teleportation mass.
-     *  ‣ kycBonus               :   Extra weight applied if `isKYCVerified`.
-     *  ‣ personalizationCap      :   Upper bound of deposit amount considered
-     *                                 for the funding component (prevents whales
-     *                                 from dominating teleportation weights).
-     *
-     *  PRIME RATE:  Traditional banking concept used here as a configurable
-     *  base APR.  The final loan rate is a simple fixed sum `primeRate +
-     *  riskPremium` – both set at the platform level, independent of user
-     *  credit score (score now only gates maximum borrow size).
-     * ────────────────────────────────────────────────────────────────────────────*/
-    uint256 public basePersonalization;
-    uint256 public kycBonus;
-    uint256 public personalizationCap;
-
-    // ────────────── FIXED INTEREST PARAMETERS ──────────────
-    // All interest-rate values are expressed in BASIS_POINTS (1e4 = 100%).
-    // EFFR (Effective Federal Funds Rate), currently set manually for testing.
-    // In production, this will be fetched from Pyth Network:
-    // https://www.pyth.network/price-feeds/rates-effr
-    uint256 public effrRate; // Base rate derived from EFFR (e.g. 750 = 7.5%)
-    uint256 public riskPremium; // Additional platform-wide premium (basis points)
-
-    // Maximum principal a borrower can request scaled in USDC (6-decimals)
-    uint256 public maxLoanAmount;
-
-    // Per-lender cumulative deposit tracker used when computing personalization
-    mapping(address => uint256) public lenderDeposits;
-
-    struct Loan {
-        uint256 principal;
-        uint256 outstanding;
-        address borrower;
-        uint256 interestRate;
-        bool isActive;
-        uint256 createdAt; // Timestamp when loan was created
-    }
-
-    // Rounds to the nearest cent (half-up) for display and UI/relayer parity
-    function _roundToCent(uint256 x) internal pure returns (uint256) {
-        unchecked {
-            return ((x + 5_000) / 10_000) * 10_000;
-        }
-    }
-
-    /**
-     * @notice Meta-transaction entry point for repaying a loan (relayer pays gas). Optionally executes ERC20Permit.
-     * @param req RepayRequest signed by borrower via EIP-712
-     * @param sig Borrower signature over RepayRequest
-     * @param permit Optional ERC20Permit authorization; pass zeroed struct to skip
-     */
-    function repayLoanMeta(RepayRequest calldata req, bytes calldata sig, PermitData calldata permit) external {
-        // Check relayer whitelist if enabled
-        if (relayerWhitelistEnabled) {
-            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
-        }
-
-        require(block.timestamp <= req.deadline, "Expired");
-        require(req.nonce == nonces[req.borrower]++, "Bad nonce");
-
-        // EIP-712 verification (unchanged)
-        bytes32 structHash = keccak256(abi.encode(
-            REPAY_REQUEST_TYPEHASH,
-            req.borrower,
-            req.loanId,
-            req.amount,
-            req.nonce,
-            req.deadline
-        ));
-        bytes32 digest = _hashTypedDataV4(structHash);
-        require(SignatureChecker.isValidSignatureNow(req.borrower, digest, sig), "Bad signature");
-
-        Loan storage loan = loans[req.loanId];
-        require(loan.isActive, "Loan inactive");
-        require(loan.borrower == req.borrower, "Wrong borrower");
-
-        uint256 out = getCurrentOutstandingAmount(req.loanId);
-
-        // Dust forgiveness: close if < 1 cent and do not transfer
-        if (out < CENT) {
-            totalLentOut -= loan.principal;
-            loan.outstanding = 0;
-            loan.isActive = false;
-            emit MetaLoanRepaid(req.borrower, req.loanId, 0);
-            return;
-        }
-
-        // Execute permit if provided (deadline != 0 as sentinel)
-        if (permit.deadline != 0) {
-            IERC20Permit(address(usdc)).permit(
-                req.borrower,
-                address(this),
-                permit.value,
-                permit.deadline,
-                permit.v,
-                permit.r,
-                permit.s
-            );
-            require(permit.value >= out, "Permit value too low");
-        }
-
-        if (req.amount == 0) {
-            // Repay-all: pull exactly canonical outstanding
-            require(usdc.transferFrom(req.borrower, address(this), out), "Transfer failed");
-            totalLentOut -= loan.principal;
-            loan.outstanding = 0;
-            loan.isActive = false;
-            emit MetaLoanRepaid(req.borrower, req.loanId, out);
-            return;
-        }
-
-        // Exact amount path with ±1 cent tolerance; always pull canonical 'out'
-        if (req.amount < out) {
-            require(out - req.amount <= CENT, "OUTSTANDING_CHANGED");
-        }
-        require(usdc.transferFrom(req.borrower, address(this), out), "Transfer failed");
-
-        // Apply repayment (close since we pulled 'out')
-        if (out >= loan.outstanding) {
-            totalLentOut -= loan.principal;
-            loan.outstanding = 0;
-            loan.isActive = false;
-        } else {
-            // Safety branch if cached outstanding is used elsewhere
-            loan.outstanding = loan.outstanding - out;
-        }
-
-        emit MetaLoanRepaid(req.borrower, req.loanId, out);
-    }
-    struct Attestation {
-        address attester;
-        uint256 weight;
-    }
-    mapping(uint256 => Loan) private loans;
-    mapping(address => Attestation[]) private borrowerAttestations;
-    // Tracks whether a borrower has completed KYC verification
-    mapping(address => bool) public isKYCVerified;
-
-    // Lending pool tracking
-    uint256 public totalDeposits; // Cumulative deposits into the pool (6-decimals like USDC)
-    uint256 public lenderCount; // Unique depositors count
-    mapping(address => bool) private isLender; // Tracks whether an address has deposited before
-
-    // ────────────── ENUMERATION STORAGE ──────────────
-    // All ever-created loan IDs
-    uint256[] private _allLoanIds;
-    // Unique borrowers and mapping to their loan IDs
-    address[] private _borrowers;
-    mapping(address => bool) private _borrowerSeen;
-    mapping(address => uint256[]) private _borrowerLoans;
-
-    // Unique lenders list (addresses that have deposited at least once)
-    address[] private _lenders;
-
-    // Unique attesters – filled when an address calls recordAttestation at least once
-    address[] private _attesters;
-    mapping(address => bool) private _attesterSeen;
-
-    // ────────────── LENDING UTILIZATION ──────────────
-    // Tracks how much of the pool is currently committed to loans (principal value)
-    uint256 public totalLentOut;
-
-    // Maximum utilisation ratio expressed in BASIS_POINTS (e.g. 9000 = 90 %).
-    uint256 public lendingUtilizationCap;
-
-    // Amount of pool liquidity committed to yet-undisbursed loans
-    uint256 public reservedLiquidity;
-
-    // EIP-712 nonces mapping for replay protection
-    mapping(address => uint256) public nonces;
-    
-    // Optional relayer whitelist for meta-transactions
-    mapping(address => bool) public relayerWhitelist;
-    bool public relayerWhitelistEnabled;
-
-    // On-chain display names — set by each user for themselves
-    mapping(address => string) public displayNames;
-
-    // EIP-712 typehashes for meta-transactions
-    bytes32 private constant LOAN_REQUEST_TYPEHASH = keccak256(
-        "LoanRequest(address borrower,uint256 amount,uint256 nonce,uint256 deadline)"
-    );
-
-    bytes32 private constant DISBURSE_REQUEST_TYPEHASH = keccak256(
-        "DisburseRequest(address borrower,uint256 loanId,address to,uint256 nonce,uint256 deadline)"
-    );
-
-    bytes32 private constant REPAY_REQUEST_TYPEHASH = keccak256(
-        "RepayRequest(address borrower,uint256 loanId,uint256 amount,uint256 nonce,uint256 deadline)"
-    );
-
+    bytes32 private constant LOAN_REQUEST_TYPEHASH =
+        keccak256("LoanRequest(address borrower,uint256 amount,uint256 nonce,uint256 deadline)");
+    bytes32 private constant DISBURSE_REQUEST_TYPEHASH =
+        keccak256("DisburseRequest(address borrower,uint256 loanId,address to,uint256 nonce,uint256 deadline)");
+    bytes32 private constant REPAY_REQUEST_TYPEHASH =
+        keccak256("RepayRequest(address borrower,uint256 loanId,uint256 amount,uint256 nonce,uint256 deadline)");
     bytes32 private constant BORROW_AND_DISBURSE_TYPEHASH = keccak256(
         "BorrowAndDisburse(address borrower,uint256 amount,address to,uint256 repaymentPeriod,uint256 maxAprBps,uint256 nonce,uint256 deadline)"
     );
+    bytes32 private constant DEPOSIT_REQUEST_TYPEHASH =
+        keccak256("DepositRequest(address lender,uint256 amount,address receiver,uint256 nonce,uint256 deadline)");
+    bytes32 private constant REQUEST_WITHDRAWAL_TYPEHASH =
+        keccak256("RequestWithdrawal(address lender,uint256 amount,address to,uint256 nonce,uint256 deadline)");
+    bytes32 private constant ATTEST_REQUEST_TYPEHASH =
+        keccak256("AttestRequest(address attester,address borrower,uint256 weight,uint256 nonce,uint256 deadline)");
 
-    bytes32 private constant DEPOSIT_REQUEST_TYPEHASH = keccak256(
-        "DepositRequest(address lender,uint256 amount,address receiver,uint256 nonce,uint256 deadline)"
-    );
+    // ───────────────────────────── types ─────────────────────────────
 
-    bytes32 private constant REQUEST_WITHDRAWAL_TYPEHASH = keccak256(
-        "RequestWithdrawal(address lender,uint256 amount,address to,uint256 nonce,uint256 deadline)"
-    );
+    struct Loan {
+        uint256 principal;
+        uint256 repaid; // cumulative repayments
+        address borrower;
+        uint256 interestRate; // APR in BASIS_POINTS, fixed at origination
+        bool isActive;
+        bool disbursed;
+        uint256 createdAt; // interest accrues from here
+    }
 
-    // Attestation meta-transaction typehash (gasless attestations)
-    bytes32 private constant ATTEST_REQUEST_TYPEHASH = keccak256(
-        "AttestRequest(address attester,address borrower,uint256 weight,uint256 nonce,uint256 deadline)"
-    );
+    struct Attestation {
+        address attester;
+        uint256 weight; // 0..SCALE
+    }
 
-    // EIP-712 request structs
+    struct WithdrawalQueueItem {
+        address lender;
+        address to;
+        uint256 remaining; // USDC still owed to this request
+        bool active;
+    }
+
+    // EIP-712 meta-transaction requests (field order must match the typehashes above).
     struct LoanRequest {
         address borrower;
         uint256 amount;
@@ -317,7 +119,6 @@ contract DecentralizedMicrocredit is EIP712 {
         uint256 deadline;
     }
 
-    // EIP-712 request for recording an attestation via relayer (gasless)
     struct AttestRequest {
         address attester;
         address borrower;
@@ -326,6 +127,7 @@ contract DecentralizedMicrocredit is EIP712 {
         uint256 deadline;
     }
 
+    /// @dev EIP-2612 permit; a zero `deadline` means "no permit" where permits are optional.
     struct PermitData {
         uint256 value;
         uint256 deadline;
@@ -334,132 +136,181 @@ contract DecentralizedMicrocredit is EIP712 {
         bytes32 s;
     }
 
-    // Meta-transaction events
+    // ───────────────────────────── state ─────────────────────────────
+
+    IERC20 public immutable usdc;
+    address public owner;
+    address public oracle;
+
+    // Interest: every loan's APR is fixed at effrRate + riskPremium when it is created.
+    // effrRate tracks the Effective Federal Funds Rate (set manually here; intended to come
+    // from Pyth: https://www.pyth.network/price-feeds/rates-effr).
+    uint256 public effrRate;
+    uint256 public riskPremium;
+    // Max principal (USDC, 6 decimals) at a 100% credit score; scales linearly with score.
+    uint256 public maxLoanAmount;
+
+    // PageRank personalization (teleportation) weights, in USDC units:
+    // weight = basePersonalization + min(lenderDeposits, personalizationCap) + (KYC ? kycBonus : 0)
+    uint256 public basePersonalization;
+    uint256 public kycBonus;
+    uint256 public personalizationCap;
+
+    // Pool liquidity
+    uint256 public totalDeposits; // principal deposited by lenders, net of withdrawals
+    uint256 public totalLentOut; // principal held by borrowers on active loans
+    uint256 public reservedLiquidity; // principal approved but not yet disbursed
+    uint256 public lendingUtilizationCap; // max (lent + reserved) / deposits, in BASIS_POINTS
+    uint256 public liquidityBuffer; // share of deposits kept liquid, in BASIS_POINTS
+    uint256 public liquidityThreshold; // absolute USDC kept liquid
+
+    // Lenders
+    mapping(address => uint256) public lenderDeposits;
+    uint256 public lenderCount;
+    mapping(address => bool) private isLender;
+    address[] private _lenders;
+
+    // Loans
+    uint256 private nextLoanId = 1;
+    mapping(uint256 => Loan) private loans;
+    uint256[] private _allLoanIds;
+    address[] private _borrowers;
+    mapping(address => bool) private _borrowerSeen;
+    mapping(address => uint256[]) private _borrowerLoans;
+
+    // Attestations and credit
+    mapping(address => Attestation[]) private borrowerAttestations;
+    address[] private _attesters;
+    mapping(address => bool) private _attesterSeen;
+    mapping(address => bool) public isKYCVerified;
+    // Admin-assigned scores. When non-zero, getCreditScore returns this instead of PageRank.
+    mapping(address => uint256) public scoreOverrides;
+    mapping(address => string) public displayNames;
+
+    // Meta-transactions
+    mapping(address => uint256) public nonces;
+    mapping(address => bool) public relayerWhitelist;
+    bool public relayerWhitelistEnabled;
+
+    // FIFO withdrawal queue (filled as liquidity returns)
+    WithdrawalQueueItem[] private withdrawalQueue;
+    uint256 private withdrawalHead;
+    mapping(address => uint256) public queuedWithdrawals; // per lender, still waiting in the queue
+
+    // ───────────────────────────── events ─────────────────────────────
+
+    event ParameterUpdated(bytes32 indexed parameter, uint256 value);
+    event LiquidityLimitsUpdated(uint256 bufferBp, uint256 threshold);
+    event OracleUpdated(address oracle);
+    event RelayerWhitelisted(address indexed relayer, bool allowed);
+    event ScoreOverrideSet(address indexed user, uint256 score);
+    event KycVerified(address indexed user);
+    event Deposited(address indexed lender, uint256 amount);
+    event Withdrawn(address indexed lender, address indexed to, uint256 amount);
+    event LoanRequested(address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 interestRate);
+    event LoanDisbursed(address indexed borrower, uint256 indexed loanId, address to, uint256 amount);
+    event Attested(address indexed attester, address indexed borrower, uint256 weight);
+    event DisplayNameSet(address indexed user, string name);
+    event LoanRepaid(address indexed borrower, uint256 indexed loanId, uint256 amount);
     event MetaLoanRequested(address indexed borrower, uint256 amount, uint256 loanId);
     event MetaLoanDisbursed(address indexed borrower, uint256 indexed loanId, uint256 amount);
     event MetaLoanRepaid(address indexed borrower, uint256 indexed loanId, uint256 amount);
-    event MetaLoanCreated(address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 interestRate, uint256 repaymentPeriod);
+    event MetaLoanCreated(
+        address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 interestRate, uint256 repaymentPeriod
+    );
     event MetaDeposit(address indexed lender, uint256 amount, address indexed receiver, uint256 sharesMinted);
     event MetaWithdrawalRequested(address indexed lender, uint256 indexed queueId, uint256 amount, address indexed to);
     event MetaWithdrawalFilled(uint256 indexed queueId, uint256 amountFilled);
-    // Meta attestation event (emitted when a relayer records an attestation on-chain)
     event MetaAttested(address indexed attester, address indexed borrower, uint256 weight);
-    
-    // Regular transaction events
-    event LoanRepaid(address indexed borrower, uint256 indexed loanId, uint256 amount);
-    event DisplayNameSet(address indexed user, string name);
 
-    // PageRank storage
-    address[] private pagerankNodes;
-    mapping(address => bool) private pagerankNodeExists;
-    mapping(address => mapping(address => uint256)) private pagerankEdges;
-    mapping(address => uint256) private pagerankOutDegree;
-    // Exposed as public to enable off-chain inspection and simplify tests.
-    mapping(address => uint256) public pagerankScores;
+    // ───────────────────────────── setup & access ─────────────────────────────
 
-    // Admin-assigned score overrides. When non-zero, getCreditScore returns
-    // this value directly instead of the PageRank-derived score.
-    mapping(address => uint256) public scoreOverrides;
-
-    // ─────────────── Withdrawal Queue (FIFO) ───────────────
-    struct WithdrawalQueueItem {
-        address lender;
-        address to;
-        uint256 remaining; // amount remaining to be paid (USDC 6-decimals)
-        bool active;
-    }
-    WithdrawalQueueItem[] private withdrawalQueue;
-    uint256 private withdrawalHead; // index of next item to attempt fill
-    uint256 private nextWithdrawalId; // queueId is the index when enqueued
-    mapping(address => mapping(address => uint256))
-        private pagerankStochasticEdges;
-
-    constructor(
-        uint256 _effrRate,
-        uint256 _riskPremium,
-        uint256 _maxLoanAmount,
-        address _usdc,
-        address _oracle
-    ) EIP712("DecentralizedMicrocredit", "1") {
+    constructor(uint256 _effrRate, uint256 _riskPremium, uint256 _maxLoanAmount, address _usdc, address _oracle)
+        EIP712("DecentralizedMicrocredit", "1")
+    {
         require(_usdc != address(0) && _oracle != address(0), "Invalid addresses");
         usdc = IERC20(_usdc);
         owner = msg.sender;
         oracle = _oracle;
-        // Initialise fixed-rate parameters
         effrRate = _effrRate;
         riskPremium = _riskPremium;
         maxLoanAmount = _maxLoanAmount;
-        basePersonalization = 0; // Set to 0 as requested
-        kycBonus = 100 * 1e6; // $100 bonus for KYC
-        personalizationCap = 100 * 1e6; // Cap funding contribution at $100
-
-        // Initialise utilisation cap at 90 %
-        lendingUtilizationCap = 9000; // 90 % in BASIS_POINTS
-
-        // Default liquidity guards: 5% buffer, 0 absolute threshold
-        liquidityBuffer = 500;
-        liquidityThreshold = 0;
+        kycBonus = 100 * 1e6;
+        personalizationCap = 100 * 1e6;
+        lendingUtilizationCap = 9000; // 90%
+        liquidityBuffer = 500; // 5%
     }
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Owner only");
         _;
     }
+
     modifier onlyOracle() {
         require(msg.sender == oracle, "Oracle only");
         _;
     }
 
-    // Note: variable-rate setter removed in the fixed-rate model.
+    modifier onlyOwnerOrOracle() {
+        require(msg.sender == owner || msg.sender == oracle, "Owner or oracle only");
+        _;
+    }
+
+    /// @dev Applies the optional relayer whitelist to meta-transaction entry points.
+    modifier onlyAllowedRelayer() {
+        if (relayerWhitelistEnabled) {
+            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
+        }
+        _;
+    }
+
+    // ───────────────────────────── admin ─────────────────────────────
+
     function setOracle(address _oracle) external onlyOwner {
         require(_oracle != address(0), "Invalid oracle");
         oracle = _oracle;
+        emit OracleUpdated(_oracle);
     }
 
-    // ─────────────── ADMIN SETTERS (UX helpers) ───────────────
-    // Simple owner-only mutators exposing each economic parameter individually.
-    // NOTE: no additional validation performed here besides implicit uint range;
-    // callers (the dApp) should supply sane values.
     function setKycBonus(uint256 _kycBonus) external onlyOwner {
         kycBonus = _kycBonus;
+        emit ParameterUpdated("kycBonus", _kycBonus);
     }
 
     function setBasePersonalization(uint256 _base) external onlyOwner {
         basePersonalization = _base;
+        emit ParameterUpdated("basePersonalization", _base);
     }
 
     function setPersonalizationCap(uint256 _cap) external onlyOwner {
         personalizationCap = _cap;
+        emit ParameterUpdated("personalizationCap", _cap);
     }
 
-    // Placeholder admin setter – will be replaced by oracle-powered update once
-    // EFFR is sourced directly from Pyth Network in production deployments.
     function setEffrRate(uint256 _effrRate) external onlyOwner {
         effrRate = _effrRate;
+        emit ParameterUpdated("effrRate", _effrRate);
     }
 
     function setRiskPremium(uint256 _riskPremium) external onlyOwner {
         riskPremium = _riskPremium;
+        emit ParameterUpdated("riskPremium", _riskPremium);
     }
 
     function setMaxLoanAmount(uint256 _maxLoanAmount) external onlyOwner {
         maxLoanAmount = _maxLoanAmount;
+        emit ParameterUpdated("maxLoanAmount", _maxLoanAmount);
     }
 
-    /**
-     * @notice Update the maximum portion of pool funds that can be lent out.
-     * @param cap New cap in BASIS_POINTS (10 000 = 100 %).
-     */
+    /// @param cap Max share of deposits that may be lent or reserved, in BASIS_POINTS.
     function setLendingUtilizationCap(uint256 cap) external onlyOwner {
         require(cap <= BASIS_POINTS, "Cap cannot exceed 100%");
         lendingUtilizationCap = cap;
+        emit ParameterUpdated("lendingUtilizationCap", cap);
     }
 
-    /**
-     * @notice Update liquidity buffer and absolute threshold.
-     * @param bufferBp New buffer in BASIS_POINTS of totalDeposits (0-10000)
-     * @param threshold Absolute USDC amount (6 decimals) to keep liquid
-     */
+    /// @param bufferBp Share of deposits to keep liquid, in BASIS_POINTS.
+    /// @param threshold Absolute USDC amount (6 decimals) to keep liquid.
     function setLiquidityLimits(uint256 bufferBp, uint256 threshold) external onlyOwner {
         require(bufferBp <= BASIS_POINTS, "Buffer > 100%");
         liquidityBuffer = bufferBp;
@@ -467,47 +318,29 @@ contract DecentralizedMicrocredit is EIP712 {
         emit LiquidityLimitsUpdated(bufferBp, threshold);
     }
 
-    /**
-     * @notice Enable or disable the relayer whitelist for meta-transactions
-     * @param enabled Whether the whitelist is enabled
-     */
     function setRelayerWhitelistEnabled(bool enabled) external onlyOwner {
         relayerWhitelistEnabled = enabled;
+        emit ParameterUpdated("relayerWhitelistEnabled", enabled ? 1 : 0);
     }
 
-    /**
-     * @notice Add or remove a relayer from the whitelist
-     * @param relayer The address of the relayer
-     * @param allowed Whether the relayer is allowed to submit meta-transactions
-     */
     function setRelayerWhitelisted(address relayer, bool allowed) external onlyOwner {
         require(relayer != address(0), "Invalid relayer address");
         relayerWhitelist[relayer] = allowed;
+        emit RelayerWhitelisted(relayer, allowed);
     }
 
-    /**
-     * ------------------------------------------------------------------------
-     *  VIEW HELPERS FOR FRONT-END
-     * ---------------------------------------------------------------------*/
-
-    /**
-     * @notice Borrower loan rate (EFFR + premium) expressed in BASIS_POINTS.
-     */
-    function getLoanRate() external view returns (uint256) {
-        return effrRate + riskPremium; // e.g. 1000 = 10 % APR
+    /// @notice Assign a credit score directly, bypassing PageRank. Set 0 to clear.
+    /// @param score Score in SCALE units (1e6 = 100%).
+    function setScoreOverride(address user, uint256 score) external onlyOwner {
+        require(score <= SCALE, "Score exceeds SCALE");
+        scoreOverrides[user] = score;
+        emit ScoreOverrideSet(user, score);
     }
 
-    /**
-     * @notice Projected APY for liquidity providers given current utilisation.
-     * @dev    Returns 0 when the pool is empty.
-     *         APY = LoanRate * Utilisation.
-     */
-    function getFundingPoolAPY() external view returns (uint256) {
-        if (totalDeposits == 0) return 0;
-        uint256 active = totalLentOut + reservedLiquidity; // principal accruing interest (includes yet-to-disburse)
-        uint256 utilisationBp = (active * BASIS_POINTS) / totalDeposits; // 0-10000
-        uint256 loanRateBp = effrRate + riskPremium;
-        return (loanRateBp * utilisationBp) / BASIS_POINTS; // BASIS_POINTS output
+    function markKYCVerified(address user) external onlyOracle {
+        require(!isKYCVerified[user], "Already verified");
+        isKYCVerified[user] = true;
+        emit KycVerified(user);
     }
 
     function setDisplayName(string calldata name) external {
@@ -516,280 +349,57 @@ contract DecentralizedMicrocredit is EIP712 {
         emit DisplayNameSet(msg.sender, name);
     }
 
+    // ───────────────────────────── lending pool ─────────────────────────────
+
     function depositFunds(uint256 amount) external {
         require(amount > 0, "Amount > 0");
-        require(usdc.transferFrom(msg.sender, address(this), amount), "Transfer failed");
-
-        // Update pool stats
-        totalDeposits += amount;
-        // Track individual deposits so we can compute funding-based weight in
-        // the PageRank personalization vector.
-        lenderDeposits[msg.sender] += amount;
-        if (!isLender[msg.sender]) {
-            isLender[msg.sender] = true;
-            lenderCount += 1;
-            _lenders.push(msg.sender);
-        }
+        _pullUsdc(msg.sender, amount);
+        _recordDeposit(msg.sender, amount);
+        _tryFillWithdrawalQueue();
     }
 
+    /// @notice Withdraw immediately. Queued withdrawals are paid first, and funds already queued
+    ///         cannot be withdrawn again here.
     function withdrawFunds(uint256 amount) external {
         require(amount > 0, "Amount > 0");
-        require(
-            lenderDeposits[msg.sender] >= amount,
-            "Insufficient balance"
-        );
+        require(lenderDeposits[msg.sender] - queuedWithdrawals[msg.sender] >= amount, "Insufficient balance");
+        _tryFillWithdrawalQueue();
 
-        uint256 liquidBalance = usdc.balanceOf(address(this));
-        // Enforce post-withdrawal liquidity guards
-        uint256 bufferRequiredW = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
+        uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
         require(
-            liquidBalance - reservedLiquidity - amount >= bufferRequiredW + liquidityThreshold,
+            usdc.balanceOf(address(this)) >= reservedLiquidity + amount + bufferRequired + liquidityThreshold,
             "LIQUIDITY_BELOW_THRESHOLD"
         );
 
-        lenderDeposits[msg.sender] -= amount;
-        totalDeposits -= amount;
-        require(usdc.transfer(msg.sender, amount), "Transfer failed");
+        _payOut(msg.sender, msg.sender, amount);
     }
 
-    /**
-     * @notice Return high-level pool statistics for front-end display
-     * @return _totalDeposits   Sum of all deposits ever made (USDC 6-decimals)
-     * @return _availableFunds  Liquid USDC available to lend/withdraw (excludes reserved)
-     * @return _reservedFunds   Funds committed to pending loan disbursements
-     * @return _lenderCount     Unique addresses that have deposited
-     */
-    function getPoolInfo()
-        external
-        view
-        returns (
-            uint256 _totalDeposits,
-            uint256 _availableFunds,
-            uint256 _reservedFunds,
-            uint256 _lenderCount
-        )
-    {
-        _totalDeposits = totalDeposits;
-        _reservedFunds = reservedLiquidity;
-        _availableFunds = usdc.balanceOf(address(this)) - _reservedFunds;
-        _lenderCount = lenderCount;
-    }
+    // ───────────────────────────── loans ─────────────────────────────
 
-    function previewLoanTerms(
-        address /* borrower */,
-        uint256 principal,
-        uint256 repaymentPeriod
-    ) external view returns (uint256 interestRate, uint256 payment) {
-        // Fixed global rate (prime + premium)
-        interestRate = effrRate + riskPremium;
-        uint256 interest = (principal * interestRate * repaymentPeriod) /
-            (BASIS_POINTS * SECONDS_PER_YEAR);
-        payment = (principal + interest) / (repaymentPeriod / 7 days); // Weekly payment instead of monthly
-    }
-
-    /**
-     * @notice Internal helper to handle loan request logic, used by both regular and meta functions
-     * @param borrower The address requesting the loan
-     * @param amount The amount of the loan
-     * @return loanId The ID of the created loan
-     */
-    function _requestLoanOnBehalf(address borrower, uint256 amount) internal returns (uint256 loanId) {
-        require(amount > 0, "Amount > 0");
-        uint256 score = getCreditScore(borrower);
-        require(score > 0, "Score > 0");
-
-        // Enforce per-borrower loan cap proportional to credit score
-        uint256 allowed = (maxLoanAmount / SCALE) * score;
-
-        // Sum all outstanding principal for this borrower
-        uint256 totalOutstanding = 0;
-        uint256[] storage borrowerLoans = _borrowerLoans[borrower];
-        for (uint256 i = 0; i < borrowerLoans.length; i++) {
-            Loan storage l = loans[borrowerLoans[i]];
-            if (l.isActive) {
-                totalOutstanding += l.principal;
-            }
-        }
-        require(totalOutstanding + amount <= allowed, "Outstanding loans exceed max");
-        require(amount <= allowed, "Amount exceeds maximum for score");
-
-        // ────────── Utilisation guard ──────────
-        uint256 newTotalCommitted = reservedLiquidity + totalLentOut + amount;
-        uint256 maxAllowedCommitment = (totalDeposits * lendingUtilizationCap) /
-            BASIS_POINTS;
-        require(
-            newTotalCommitted <= maxAllowedCommitment,
-            "Pool utilisation cap exceeded"
-        );
-
-        // Ensure sufficient unreserved liquidity in the pool
-        uint256 liquidBalance = usdc.balanceOf(address(this));
-        require(
-            amount <= liquidBalance - reservedLiquidity,
-            "Insufficient available liquidity"
-        );
-
-        // Reserve liquidity immediately upon loan approval; this counts towards utilisation via reservedLiquidity
-        reservedLiquidity += amount;
-
-        loanId = nextLoanId++;
-        uint256 rate = effrRate + riskPremium;
-        // Initialize with principal only - interest will be calculated when repaid
-        loans[loanId] = Loan(amount, amount, borrower, rate, true, block.timestamp);
-
-        // ───── enumeration bookkeeping ─────
-        _allLoanIds.push(loanId);
-        if (!_borrowerSeen[borrower]) {
-            _borrowerSeen[borrower] = true;
-            _borrowers.push(borrower);
-        }
-        _borrowerLoans[borrower].push(loanId);
-    }
-
-    /**
-     * @notice Public function for requesting a loan directly (caller pays gas)
-     * @param amount The amount of the loan
-     * @return loanId The ID of the created loan
-     */
+    /// @notice Request a loan as the caller. Liquidity is reserved until {disburseLoan}.
     function requestLoan(uint256 amount) external returns (uint256 loanId) {
-        return _requestLoanOnBehalf(msg.sender, amount);
+        return _originateLoan(msg.sender, amount);
     }
 
-    /**
-     * @notice Internal helper to handle loan disbursement logic
-     * @param loanId The ID of the loan to disburse
-     * @param to The address to send the funds to (must be the borrower)
-     */
-    function _disburseLoanTo(uint256 loanId, address to) internal {
-        Loan storage loan = loans[loanId];
-        require(loan.isActive, "Loan inactive");
-        require(to == loan.borrower, "Must disburse to borrower");
-
-        // Move principal from reserved to lent-out balance
-        reservedLiquidity -= loan.principal;
-        totalLentOut += loan.principal;
-
-        bool success = usdc.transfer(to, loan.principal);
-        if (!success) {
-            revert("Transfer failed");
-        }
-    }
-
-    /**
-     * @notice Public function for disbursing a loan directly (caller pays gas)
-     * @param loanId The ID of the loan to disburse
-     */
+    /// @notice Send a requested loan's principal to its borrower. Callable by anyone.
     function disburseLoan(uint256 loanId) external {
-        // Preserve existing behavior: disburse to the recorded borrower
-        _disburseLoanTo(loanId, loans[loanId].borrower);
+        _disburseLoan(loanId, loans[loanId].borrower);
+    }
+
+    /// @notice Repay up to `amount`; any excess over the outstanding balance is not pulled.
+    function repayLoan(uint256 loanId, uint256 amount) external {
+        Loan storage loan = _repayableLoan(loanId);
+        require(msg.sender == loan.borrower, "Borrower only");
+        require(amount > 0, "Amount > 0");
+
+        uint256 paid = _repay(loanId, loan, msg.sender, amount);
+        emit LoanRepaid(msg.sender, loanId, paid);
     }
 
     /**
-     * @notice Meta-transaction entry point for requesting a loan (relayer pays gas)
-     * @param req The loan request with borrower, amount, nonce, and deadline
-     * @param sig The EIP-712 signature from the borrower authorizing the loan request
-     * @return loanId The ID of the created loan
-     */
-    function requestLoanMeta(LoanRequest calldata req, bytes calldata sig)
-        external
-        returns (uint256 loanId)
-    {
-        // Check relayer whitelist if enabled
-        if (relayerWhitelistEnabled) {
-            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
-        }
-        
-        require(block.timestamp <= req.deadline, "Expired");
-        require(req.nonce == nonces[req.borrower]++, "Bad nonce");
-
-        bytes32 structHash = keccak256(abi.encode(
-            LOAN_REQUEST_TYPEHASH,
-            req.borrower,
-            req.amount,
-            req.nonce,
-            req.deadline
-        ));
-        bytes32 digest = _hashTypedDataV4(structHash);
-
-        // Supports EOAs and ERC1271 smart wallets
-        require(SignatureChecker.isValidSignatureNow(req.borrower, digest, sig), "Bad signature");
-
-        // Execute as borrower
-        loanId = _requestLoanOnBehalf(req.borrower, req.amount);
-
-        // Emit event for relayer and borrower tracking
-        emit MetaLoanRequested(req.borrower, req.amount, loanId);
-    }
-
-    /**
-     * @notice Meta-transaction entry point for disbursing a loan (relayer pays gas)
-     * @param req The disbursement request with borrower, loanId, to address, nonce, and deadline
-     * @param sig The EIP-712 signature from the borrower authorizing the disbursement
-     */
-    function disburseLoanMeta(DisburseRequest calldata req, bytes calldata sig)
-        external
-    {
-        // Check relayer whitelist if enabled
-        if (relayerWhitelistEnabled) {
-            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
-        }
-        
-        require(block.timestamp <= req.deadline, "Expired");
-        require(req.nonce == nonces[req.borrower]++, "Bad nonce");
-
-        bytes32 structHash = keccak256(abi.encode(
-            DISBURSE_REQUEST_TYPEHASH,
-            req.borrower,
-            req.loanId,
-            req.to,
-            req.nonce,
-            req.deadline
-        ));
-        bytes32 digest = _hashTypedDataV4(structHash);
-        require(SignatureChecker.isValidSignatureNow(req.borrower, digest, sig), "Bad signature");
-
-        // Only allow disbursement to the recorded borrower address
-        require(req.to == loans[req.loanId].borrower && req.to == req.borrower, "Must send to borrower");
-
-        _disburseLoanTo(req.loanId, req.to);
-        
-        // Emit event for relayer and borrower tracking
-        emit MetaLoanDisbursed(req.borrower, req.loanId, loans[req.loanId].principal);
-    }
-
-    /**
-     * @notice Get the current outstanding amount for a loan including accrued interest
-     * @param loanId The ID of the loan
-     * @return The current outstanding amount including accrued interest
-     */
-    function getCurrentOutstandingAmount(uint256 loanId) public view returns (uint256) {
-        Loan storage loan = loans[loanId];
-        require(loan.isActive, "Loan inactive");
-        
-        uint256 timeElapsed = block.timestamp - loan.createdAt;
-        // 24h grace period: no interest accrues in the first day
-        if (timeElapsed < GRACE_PERIOD) {
-            return loan.principal;
-        }
-        uint256 annualInterest = (loan.principal * loan.interestRate) / BASIS_POINTS;
-        uint256 accruedInterest = (annualInterest * timeElapsed) / SECONDS_PER_YEAR;
-        
-        return loan.principal + accruedInterest;
-    }
-
-    // View helper for UI/relayer parity – returns outstanding rounded to the nearest cent (half-up)
-    function getOutstandingRoundedToCent(uint256 loanId) external view returns (uint256) {
-        return _roundToCent(getCurrentOutstandingAmount(loanId));
-    }
-
-    /**
-     * @notice Repay using a single EIP-2612 permit signature (ONE approval in wallet).
-     * @param borrower Borrower address whose USDC will be pulled
-     * @param loanId   Loan to repay
-     * @param amount   Amount to repay (0 => repay-all up to permit value)
-     * @param value    Permit allowance value (must be >= amount if amount > 0)
-     * @param deadline Permit deadline
-     * @param v r s    Permit signature parts
+     * @notice Repay with a single EIP-2612 permit signature; anyone (e.g. a relayer) may submit.
+     * @param amount Amount to repay; 0 repays the cent-rounded outstanding balance.
+     *        The amount pulled never exceeds the permit `value`.
      */
     function repayWithPermit(
         address borrower,
@@ -797,281 +407,62 @@ contract DecentralizedMicrocredit is EIP712 {
         uint256 amount,
         uint256 value,
         uint256 deadline,
-        uint8 v, bytes32 r, bytes32 s
+        uint8 v,
+        bytes32 r,
+        bytes32 s
     ) external {
-        Loan storage loan = loans[loanId];
-        require(loan.isActive, "Loan inactive");
+        Loan storage loan = _repayableLoan(loanId);
         require(loan.borrower == borrower, "Wrong borrower");
 
-        // 1) Set allowance via permit (anyone can submit; signature proves consent)
-        IERC20Permit(address(usdc)).permit(borrower, address(this), value, deadline, v, r, s);
+        _permit(borrower, value, deadline, v, r, s);
 
-        // 2) Compute spend = requested or outstanding (rounded to cent), capped by permit value
-        uint256 spend = amount;
-        if (spend == 0) {
-            spend = _roundToCent(getCurrentOutstandingAmount(loanId));
-        }
+        uint256 spend = amount == 0 ? _roundToCent(getCurrentOutstandingAmount(loanId)) : amount;
         if (spend > value) {
-            spend = value; // never exceed what the user permitted
+            spend = value;
         }
         require(spend > 0, "Nothing to repay");
 
-        // 3) Pull funds & apply repayment
-        require(usdc.transferFrom(borrower, address(this), spend), "USDC transfer failed");
-
-        // Calculate current canonical outstanding for accounting
-        uint256 currentOutstanding = getCurrentOutstandingAmount(loanId);
-        if (spend >= currentOutstanding || currentOutstanding < CENT) {
-            // Close loan on full repay or dust-level remainder
-            totalLentOut -= loan.principal;
-            loan.outstanding = 0;
-            loan.isActive = false;
-        } else {
-            loan.outstanding = currentOutstanding - spend;
-        }
-
-        emit LoanRepaid(borrower, loanId, spend);
+        uint256 paid = _repay(loanId, loan, borrower, spend);
+        emit LoanRepaid(borrower, loanId, paid);
     }
 
-    function repayLoan(uint256 loanId, uint256 amount) external {
-        Loan storage loan = loans[loanId];
-        require(loan.isActive, "Loan inactive");
-        require(msg.sender == loan.borrower, "Borrower only");
-        require(amount > 0, "Amount > 0");
-        
-        // Calculate current outstanding amount including accrued interest
-        uint256 currentOutstanding = getCurrentOutstandingAmount(loanId);
-        
-        require(usdc.transferFrom(msg.sender, address(this), amount), "Transfer failed");
-        
-        if (amount >= currentOutstanding) {
-            // Loan fully repaid – free up utilised principal
-            totalLentOut -= loan.principal;
-
-            loan.outstanding = 0;
-            loan.isActive = false;
-        } else {
-            // Update outstanding amount to reflect the payment
-            loan.outstanding = currentOutstanding - amount;
-        }
-        emit LoanRepaid(msg.sender, loanId, amount);
-    }
-
-    function addressToString(address _address) public pure returns (string memory) {
-        bytes memory addressBytes = abi.encodePacked(_address);
-        bytes memory hexString = new bytes(42); // Length for '0x' + 40 hex chars
-
-        hexString[0] = '0';
-        hexString[1] = 'x';
-
-        for (uint i = 0; i < 20; i++) {
-            uint8 byteVal = uint8(addressBytes[i]);
-            hexString[2 + i * 2] = _byteToHexChar(byteVal >> 4);
-            hexString[3 + i * 2] = _byteToHexChar(byteVal & 0x0f);
-        }
-
-        return string(hexString);
-    }
-
-    // Helper function to convert a byte to its corresponding hex character
-    function _byteToHexChar(uint8 _byte) internal pure returns (bytes1) {
-        if (_byte < 10) {
-            return bytes1(_byte + 48); // ASCII code for '0' to '9'
-        } else {
-            return bytes1(_byte + 87); // ASCII code for 'a' to 'f'
-        }
-    }
+    // ───────────────────────────── attestations & credit ─────────────────────────────
 
     /**
-     * @notice Record an attestation for a borrower
-     * @dev DEMO ONLY: Automatically computes PageRank after each attestation
-     *      In production with oracle, PageRank computation will be handled off-chain
-     * @param borrower The address of the borrower being attested
-     * @param weight The weight/confidence of the attestation (0 to SCALE)
+     * @notice Vouch for `borrower` with confidence `weight` (0..SCALE). Re-attesting updates the
+     *         weight. PageRank is recomputed immediately (demo only).
      */
     function recordAttestation(address borrower, uint256 weight) external {
-        require(weight <= SCALE, "Weight too high");
-        require(borrower != msg.sender, "Self-attestation");
+        _recordAttestation(msg.sender, borrower, weight);
+    }
 
-        if (!_attesterSeen[msg.sender]) {
-            _attesterSeen[msg.sender] = true;
-            _attesters.push(msg.sender);
-        }
+    /// @notice Recompute PageRank over the current attestation graph.
+    function computePageRank() external returns (uint256 iterations) {
+        return _computePageRank();
+    }
 
-        _addPagerankNode(msg.sender);
-        _addPagerankNode(borrower);
-        _addPagerankEdge(msg.sender, borrower, weight);
-
-        Attestation[] storage attests = borrowerAttestations[borrower];
-        for (uint256 i = 0; i < attests.length; i++) {
-            if (attests[i].attester == msg.sender) {
-                attests[i].weight = weight;
-                // DEMO ONLY: Auto-compute PageRank after attestation update
-                // In production with oracle, this will be handled off-chain
-                _computePageRank(PR_ALPHA, 100, PR_TOL);
-                return;
-            }
-        }
-        attests.push(Attestation(msg.sender, weight));
-        
-        // DEMO ONLY: Auto-compute PageRank after new attestation
-        // In production with oracle, this will be handled off-chain
-        _computePageRank(PR_ALPHA, 100, PR_TOL);
+    /// @notice Remove the whole PageRank graph and all scores.
+    function clearPageRankState() external onlyOwnerOrOracle {
+        _clearPageRankState();
     }
 
     /**
-     * @notice Gasless meta-attestation (relayer pays gas). Attester signs an EIP-712 AttestRequest.
-     * @param req EIP-712 request with attester, borrower, weight, nonce, deadline
-     * @param sig Attester's signature over the typed data
+     * @notice Credit score in SCALE units: the admin override if set, otherwise PageRank mapped
+     *         through credit = SCALE * x / (x + 100), where x = 1000 * PR / max(PR).
+     * @dev The saturating curve keeps scores meaningful even though PageRank is zero-sum.
      */
-    function attestMeta(AttestRequest calldata req, bytes calldata sig) external {
-        // Optional relayer whitelist
-        if (relayerWhitelistEnabled) {
-            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
-        }
-
-        require(block.timestamp <= req.deadline, "Expired");
-        require(req.nonce == nonces[req.attester]++, "Bad nonce");
-
-        // Verify signature per EIP-712
-        bytes32 structHash = keccak256(abi.encode(
-            ATTEST_REQUEST_TYPEHASH,
-            req.attester,
-            req.borrower,
-            req.weight,
-            req.nonce,
-            req.deadline
-        ));
-        bytes32 digest = _hashTypedDataV4(structHash);
-        require(SignatureChecker.isValidSignatureNow(req.attester, digest, sig), "Bad signature");
-
-        // Same validations as direct attestation
-        require(req.weight <= SCALE, "Weight too high");
-        require(req.borrower != req.attester, "Self-attestation");
-
-        // Enumeration and pagerank graph bookkeeping
-        if (!_attesterSeen[req.attester]) {
-            _attesterSeen[req.attester] = true;
-            _attesters.push(req.attester);
-        }
-
-        _addPagerankNode(req.attester);
-        _addPagerankNode(req.borrower);
-        _addPagerankEdge(req.attester, req.borrower, req.weight);
-
-        // Update or insert attestation record
-        Attestation[] storage attests = borrowerAttestations[req.borrower];
-        for (uint256 i = 0; i < attests.length; i++) {
-            if (attests[i].attester == req.attester) {
-                attests[i].weight = req.weight;
-                _computePageRank(PR_ALPHA, 100, PR_TOL); // DEMO ONLY
-                emit MetaAttested(req.attester, req.borrower, req.weight);
-                return;
-            }
-        }
-        attests.push(Attestation(req.attester, req.weight));
-
-        _computePageRank(PR_ALPHA, 100, PR_TOL); // DEMO ONLY
-        emit MetaAttested(req.attester, req.borrower, req.weight);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────
-    //  CREDIT SCORE
-    //  Computed dynamically from PageRank so no storage is required.
-    //  Returns a value scaled to `SCALE` (1e6) for compatibility with the
-    //  previous fixed-score design.
-    // -------------------------------------------------------------------
-    function getMaxPageRankScore() public view returns (uint256) {
-        uint256 maxScore = 0;
-        for (uint256 i = 0; i < pagerankNodes.length; i++) {
-            address node = pagerankNodes[i];
-            uint256 score = pagerankScores[node];
-            if (score > maxScore) {
-                maxScore = score;
-            }
-        }
-        return maxScore;
-    }
-
     function getCreditScore(address user) public view returns (uint256) {
-        // Admin override takes precedence over PageRank-derived score.
         if (scoreOverrides[user] != 0) return scoreOverrides[user];
 
-        // Converts PageRank score to credit score using a softplus-like curve:
-        //   credit = (SCALE * x) / (x + 100), where x = (PR * 1000) / maxPageRank
-        // Produces a smooth 0 → SCALE output that breaks PageRank's zero-sum nature.
-        uint256 pr = pagerankScores[user]; // 0 – maxPageRank
         uint256 maxPageRank = getMaxPageRankScore();
+        if (maxPageRank == 0) return 0;
 
-        if (maxPageRank == 0) return 0; // No PageRank scores computed yet
-
-        uint256 x = (pr * 1000) / maxPageRank; // 0 – 1000
-        return (SCALE * x) / (x + 100); // 0 – SCALE (1e6)
+        uint256 x = (pagerankScores[user] * 1000) / maxPageRank; // 0..1000
+        return (SCALE * x) / (x + 100);
     }
 
-    /**
-     * @notice Directly assign a credit score to a user, bypassing PageRank.
-     * @dev When set, this value is returned by getCreditScore regardless of
-     *      PageRank computation.  Set to 0 to revert to PageRank-derived score.
-     * @param user  The address to assign a score to
-     * @param score Score in SCALE units (1e6 = 100%)
-     */
-    function setScoreOverride(address user, uint256 score) external onlyOwner {
-        require(score <= SCALE, "Score exceeds SCALE");
-        scoreOverrides[user] = score;
-    }
-
-    /**
-     * @notice Mark a user as having passed KYC verification
-     * @dev Can only be called by the oracle address set by the owner
-     * @param user The address of the user that has completed KYC
-     */
-    function markKYCVerified(address user) external onlyOracle {
-        require(!isKYCVerified[user], "Already verified");
-        isKYCVerified[user] = true;
-    }
-
-    /**
-     * @notice Register a borrower (for testing purposes)
-     * @dev Can only be called by the owner or oracle
-     * @param borrower The address of the borrower to register
-     */
-    function registerBorrower(address borrower) external {
-        require(msg.sender == owner || msg.sender == oracle, "Only owner or oracle can register borrowers");
-        if (!_borrowerSeen[borrower]) {
-            _borrowerSeen[borrower] = true;
-            _borrowers.push(borrower);
-        }
-    }
-
-    function getLoan(
-        uint256 loanId
-    )
-        external
-        view
-        returns (
-            uint256 principal,
-            uint256 outstanding,
-            address borrower,
-            uint256 interestRate,
-            bool isActive
-        )
-    {
-        Loan storage loan = loans[loanId];
-        uint256 currentOutstanding = loan.isActive ? getCurrentOutstandingAmount(loanId) : loan.outstanding;
-        return (
-            loan.principal,
-            currentOutstanding,
-            loan.borrower,
-            loan.interestRate,
-            loan.isActive
-        );
-    }
-
-    function computeAttesterReward(
-        uint256 loanId,
-        address attester
-    ) external view returns (uint256 reward) {
+    /// @notice Share of a 5%-of-principal reward pot owed to `attester`, by attestation weight.
+    function computeAttesterReward(uint256 loanId, address attester) external view returns (uint256 reward) {
         Loan storage loan = loans[loanId];
         Attestation[] storage attests = borrowerAttestations[loan.borrower];
         uint256 totalWeight = 0;
@@ -1083,292 +474,274 @@ contract DecentralizedMicrocredit is EIP712 {
             }
         }
         if (totalWeight == 0 || attesterWeight == 0) return 0;
-        uint256 totalReward = (loan.principal * 50000) / SCALE;
+        uint256 totalReward = (loan.principal * ATTESTER_REWARD_RATE) / SCALE;
         reward = (totalReward * attesterWeight) / totalWeight;
     }
 
-    // PageRank functions
-    /**
-     * @notice Compute PageRank scores for all nodes in the graph
-     * @dev DEMO ONLY: In production with oracle, this will be handled off-chain
-     * @return iterations Number of iterations performed
-     */
-    function computePageRank() external returns (uint256 iterations) {
-        return _computePageRank(PR_ALPHA, 100, PR_TOL); // Adjusted maxIter and tol
-    }
+    // ───────────────────────────── meta-transactions ─────────────────────────────
 
-    function getPageRankScore(address node) external view returns (uint256) {
-        return pagerankScores[node];
-    }
-
-    function getAllPageRankScores()
+    function requestLoanMeta(LoanRequest calldata req, bytes calldata sig)
         external
-        view
-        returns (address[] memory nodes, uint256[] memory scores)
+        onlyAllowedRelayer
+        returns (uint256 loanId)
     {
-        nodes = pagerankNodes;
-        scores = new uint256[](nodes.length);
-        for (uint256 i = 0; i < nodes.length; i++) {
-            scores[i] = pagerankScores[nodes[i]];
-        }
+        _verifyMeta(
+            req.borrower,
+            req.nonce,
+            req.deadline,
+            keccak256(abi.encode(LOAN_REQUEST_TYPEHASH, req.borrower, req.amount, req.nonce, req.deadline)),
+            sig
+        );
+        loanId = _originateLoan(req.borrower, req.amount);
+        emit MetaLoanRequested(req.borrower, req.amount, loanId);
     }
 
-    function clearPageRankState() external {
-        // Clear all PageRank data
-        for (uint256 i = 0; i < pagerankNodes.length; i++) {
-            address node = pagerankNodes[i];
-            pagerankNodeExists[node] = false;
-            pagerankScores[node] = 0;
-            pagerankOutDegree[node] = 0;
+    function disburseLoanMeta(DisburseRequest calldata req, bytes calldata sig) external onlyAllowedRelayer {
+        _verifyMeta(
+            req.borrower,
+            req.nonce,
+            req.deadline,
+            keccak256(abi.encode(DISBURSE_REQUEST_TYPEHASH, req.borrower, req.loanId, req.to, req.nonce, req.deadline)),
+            sig
+        );
+        require(req.to == loans[req.loanId].borrower && req.to == req.borrower, "Must send to borrower");
 
-            // Clear edges
-            for (uint256 j = 0; j < pagerankNodes.length; j++) {
-                address target = pagerankNodes[j];
-                pagerankEdges[node][target] = 0;
-                pagerankStochasticEdges[node][target] = 0;
-            }
-        }
-
-        // Clear arrays
-        delete pagerankNodes;
+        uint256 principal = _disburseLoan(req.loanId, req.to);
+        emit MetaLoanDisbursed(req.borrower, req.loanId, principal);
     }
 
-    /**
-     * @notice Clear PageRank state efficiently (gas-optimized version)
-     * @dev Only clears node data, not edge data (edges will be overwritten anyway)
-     */
-    function clearPageRankStateEfficient() external {
-        // Clear node data only (skip edge clearing to save gas)
-        for (uint256 i = 0; i < pagerankNodes.length; i++) {
-            address node = pagerankNodes[i];
-            pagerankNodeExists[node] = false;
-            pagerankScores[node] = 0;
-            pagerankOutDegree[node] = 0;
-        }
+    /// @notice One-click borrow: create and disburse a loan in one relayed transaction.
+    function borrowAndDisburseMeta(BorrowAndDisburse calldata req, bytes calldata sig) external onlyAllowedRelayer {
+        _verifyMeta(
+            req.borrower,
+            req.nonce,
+            req.deadline,
+            keccak256(
+                abi.encode(
+                    BORROW_AND_DISBURSE_TYPEHASH,
+                    req.borrower,
+                    req.amount,
+                    req.to,
+                    req.repaymentPeriod,
+                    req.maxAprBps,
+                    req.nonce,
+                    req.deadline
+                )
+            ),
+            sig
+        );
 
-        // Clear arrays
-        delete pagerankNodes;
-    }
+        uint256 currentApr = effrRate + riskPremium;
+        require(currentApr <= req.maxAprBps, "APR changed");
 
-    function _addPagerankNode(address node) internal {
-        if (!pagerankNodeExists[node]) {
-            pagerankNodes.push(node);
-            pagerankNodeExists[node] = true;
-        }
-    }
+        uint256 loanId = _originateLoan(req.borrower, req.amount);
+        _disburseLoan(loanId, req.to);
 
-    function _addPagerankEdge(
-        address from,
-        address to,
-        uint256 weight
-    ) internal {
-        pagerankEdges[from][to] = weight;
-        pagerankOutDegree[from] += weight;
-    }
-
-    function _computePageRank(
-        uint256 alpha,
-        uint256 maxIter,
-        uint256 tol
-    ) internal returns (uint256 iterations) {
-        if (pagerankNodes.length == 0) return 0;
-
-        // Initialize scores to 1.0 / numberOfNodes (scaled) - NetworkX default
-        uint256 initialScore = PR_SCALE / pagerankNodes.length;
-        for (uint256 i = 0; i < pagerankNodes.length; i++) {
-            address node = pagerankNodes[i];
-            pagerankScores[node] = initialScore;
-        }
-
-        // Create stochastic graph (normalize edge weights by out-degree)
-        _createStochasticGraph();
-
-        // >>>>>> BUILD PERSONALIZATION VECTOR BASED ON FUNDING & KYC <<<<<<
-        // Build node-specific teleportation weights (funding + KYC + base)
-        uint256[] memory personalizationVector = _buildPersonalizationVector();
-        // <<<<<< END ADDITION >>>>>>
-
-        // Run PageRank iterations
-        iterations = 0;
-        bool converged = false;
-
-        while (iterations < maxIter && !converged) {
-            converged = _pagerankIteration(alpha, tol, personalizationVector);
-            iterations++;
-        }
-
-        return iterations;
-    }
-
-    function _createStochasticGraph() internal {
-        // Clear previous stochastic weights
-        for (uint256 i = 0; i < pagerankNodes.length; i++) {
-            address node = pagerankNodes[i];
-            uint256 outDegree = pagerankOutDegree[node];
-
-            // Clear all stochastic edges for this node
-            for (uint256 j = 0; j < pagerankNodes.length; j++) {
-                address target = pagerankNodes[j];
-                pagerankStochasticEdges[node][target] = 0;
-            }
-
-            if (outDegree > 0) {
-                // Normalize edge weights by out-degree
-                for (uint256 j = 0; j < pagerankNodes.length; j++) {
-                    address target = pagerankNodes[j];
-                    uint256 originalWeight = pagerankEdges[node][target];
-                    if (originalWeight > 0) {
-                        // Normalize: weight / out_degree
-                        pagerankStochasticEdges[node][target] =
-                            (originalWeight * PR_SCALE) /
-                            outDegree;
-                    }
-                }
-            }
-        }
+        emit MetaLoanCreated(req.borrower, loanId, req.amount, currentApr, req.repaymentPeriod);
+        emit MetaLoanDisbursed(req.borrower, loanId, req.amount);
     }
 
     /**
-     * @dev One Gauss-Seidel style PageRank iteration using node-specific
-     *      personalization vector.  Returns `true` when L1 delta < tol * N.
+     * @notice Repay a loan in full via relayer, optionally executing an ERC-2612 permit first.
+     * @dev `req.amount == 0` repays everything. A non-zero amount must be within 1 cent of the
+     *      current outstanding balance; the canonical balance is pulled either way. Balances
+     *      under 1 cent are forgiven without a transfer.
      */
-    function _pagerankIteration(
-        uint256 alpha,
-        uint256 tol,
-        uint256[] memory personalizationVector
-    ) internal returns (bool converged) {
-        uint256 totalDelta = 0;
-        uint256 n = pagerankNodes.length;
+    function repayLoanMeta(RepayRequest calldata req, bytes calldata sig, PermitData calldata permit)
+        external
+        onlyAllowedRelayer
+    {
+        _verifyMeta(
+            req.borrower,
+            req.nonce,
+            req.deadline,
+            keccak256(
+                abi.encode(REPAY_REQUEST_TYPEHASH, req.borrower, req.loanId, req.amount, req.nonce, req.deadline)
+            ),
+            sig
+        );
 
-        // Compute dangling sum (sum of scores from nodes with no outgoing edges)
-        uint256 danglingSum = 0;
-        for (uint256 i = 0; i < n; i++) {
-            address node = pagerankNodes[i];
-            if (pagerankOutDegree[node] == 0) {
-                danglingSum += pagerankScores[node];
-            }
+        Loan storage loan = _repayableLoan(req.loanId);
+        require(loan.borrower == req.borrower, "Wrong borrower");
+
+        uint256 out = getCurrentOutstandingAmount(req.loanId);
+        if (out < CENT) {
+            _closeLoan(loan);
+            emit MetaLoanRepaid(req.borrower, req.loanId, 0);
+            return;
         }
 
-        // Store old scores in temporary array
-        uint256[] memory oldScores = new uint256[](n);
-        for (uint256 i = 0; i < n; i++) {
-            oldScores[i] = pagerankScores[pagerankNodes[i]];
+        if (permit.deadline != 0) {
+            _permit(req.borrower, permit);
+            require(permit.value >= out, "Permit value too low");
+        }
+        if (req.amount != 0 && req.amount < out) {
+            require(out - req.amount <= CENT, "OUTSTANDING_CHANGED");
         }
 
-        // Process each node
-        for (uint256 i = 0; i < n; i++) {
-            address node = pagerankNodes[i];
-            uint256 oldScore = oldScores[i];
-            uint256 incomingScore = 0;
-
-            // Sum incoming scores from nodes that point to this node
-            // This is the key part: we need to accumulate scores for the target node
-            for (uint256 j = 0; j < n; j++) {
-                address source = pagerankNodes[j];
-                uint256 weight = pagerankStochasticEdges[source][node];
-                if (weight > 0) {
-                    // NetworkX does: x[nbr] += alpha * xlast[n] * wt
-                    // So we accumulate for the target node (node) from source
-                    uint256 sourceScore = oldScores[j];
-                    uint256 contribution = (alpha * sourceScore * weight) /
-                        (PR_SCALE * PR_SCALE);
-                    incomingScore += contribution;
-                }
-            }
-
-            // Add dangling contribution (distributed according to personalization vector)
-            uint256 danglingContribution = 0;
-            if (danglingSum > 0) {
-                // NetworkX: x[n] += danglesum * dangling_weights.get(n, 0)
-                // Since we use uniform personalization, dangling_weights[n] = 1/N
-                danglingContribution = (alpha * danglingSum * personalizationVector[i]) / (PR_SCALE * PR_SCALE);
-            }
-
-            // Update score using weighted personalization vector
-            // Teleportation: (1 – α) * p[node]  (all values scaled by PR_SCALE)
-            uint256 teleportationContribution = ((PR_SCALE - alpha) *
-                personalizationVector[i]) / PR_SCALE;
-            uint256 newScore = incomingScore +
-                danglingContribution +
-                teleportationContribution;
-            pagerankScores[node] = newScore;
-
-            // Track convergence
-            uint256 delta = oldScore > newScore
-                ? oldScore - newScore
-                : newScore - oldScore;
-            totalDelta += delta;
-        }
-
-        return totalDelta < (tol * n);
+        _repay(req.loanId, loan, req.borrower, out);
+        emit MetaLoanRepaid(req.borrower, req.loanId, out);
     }
 
-    function _calculateInterest(
-        uint256 /*ignored*/
-    ) internal view returns (uint256 rate) {
-        // Fixed platform-wide rate independent of individual credit score.
+    /// @notice Gasless deposit of the signer's USDC, credited to `req.receiver`, with optional permit.
+    function depositWithPermitMeta(DepositRequest calldata req, bytes calldata sig, PermitData calldata permit)
+        external
+        onlyAllowedRelayer
+    {
+        _verifyMeta(
+            req.lender,
+            req.nonce,
+            req.deadline,
+            keccak256(
+                abi.encode(DEPOSIT_REQUEST_TYPEHASH, req.lender, req.amount, req.receiver, req.nonce, req.deadline)
+            ),
+            sig
+        );
+
+        if (permit.deadline != 0) {
+            _permit(req.lender, permit);
+            require(permit.value >= req.amount, "Permit value too low");
+        }
+
+        require(req.receiver != address(0), "Bad receiver");
+
+        _pullUsdc(req.lender, req.amount);
+        _recordDeposit(req.receiver, req.amount);
+        emit MetaDeposit(req.lender, req.amount, req.receiver, req.amount);
+
+        _tryFillWithdrawalQueue();
+    }
+
+    /// @notice Gasless deposit of exactly `permit.value`, authorized by the permit alone.
+    function depositPermitOnlyMeta(address lender, PermitData calldata permit) external onlyAllowedRelayer {
+        require(lender != address(0), "Bad lender");
+        require(permit.value > 0, "Zero amount");
+
+        _permit(lender, permit);
+        _pullUsdc(lender, permit.value);
+        _recordDeposit(lender, permit.value);
+        emit MetaDeposit(lender, permit.value, lender, permit.value);
+
+        _tryFillWithdrawalQueue();
+    }
+
+    /// @notice Queue a gasless withdrawal; it is paid immediately as far as liquidity allows.
+    function requestWithdrawalMeta(RequestWithdrawal calldata req, bytes calldata sig) external onlyAllowedRelayer {
+        _verifyMeta(
+            req.lender,
+            req.nonce,
+            req.deadline,
+            keccak256(abi.encode(REQUEST_WITHDRAWAL_TYPEHASH, req.lender, req.amount, req.to, req.nonce, req.deadline)),
+            sig
+        );
+        require(lenderDeposits[req.lender] - queuedWithdrawals[req.lender] >= req.amount, "Insufficient balance");
+        queuedWithdrawals[req.lender] += req.amount;
+
+        uint256 queueId = withdrawalQueue.length;
+        withdrawalQueue.push(
+            WithdrawalQueueItem({ lender: req.lender, to: req.to, remaining: req.amount, active: true })
+        );
+        emit MetaWithdrawalRequested(req.lender, queueId, req.amount, req.to);
+
+        _tryFillWithdrawalQueue();
+    }
+
+    /// @notice Gasless attestation signed by the attester.
+    function attestMeta(AttestRequest calldata req, bytes calldata sig) external onlyAllowedRelayer {
+        _verifyMeta(
+            req.attester,
+            req.nonce,
+            req.deadline,
+            keccak256(
+                abi.encode(ATTEST_REQUEST_TYPEHASH, req.attester, req.borrower, req.weight, req.nonce, req.deadline)
+            ),
+            sig
+        );
+        _recordAttestation(req.attester, req.borrower, req.weight);
+        emit MetaAttested(req.attester, req.borrower, req.weight);
+    }
+
+    // ───────────────────────────── views ─────────────────────────────
+
+    /// @notice Borrower APR (EFFR + premium) in BASIS_POINTS.
+    function getLoanRate() external view returns (uint256) {
         return effrRate + riskPremium;
     }
 
-    /**
-     * @notice Assemble & normalise the personalization vector for PageRank.
-     * @dev Each node's raw weight = BASE + min(deposits, CAP) + (KYC? BONUS:0).
-     *      The array is then scaled so that Σp_i = PR_SCALE (1.0 in our units).
-     */
-    function _buildPersonalizationVector()
-        internal
-        view
-        returns (uint256[] memory vector)
-    {
-        uint256 n = pagerankNodes.length;
-        vector = new uint256[](n);
-        if (n == 0) {
-            return vector;
-        }
-
-        uint256 totalWeight = 0;
-        for (uint256 i = 0; i < n; i++) {
-            address node = pagerankNodes[i];
-
-            uint256 weight;
-            if (scoreOverrides[node] != 0) {
-                // Admin-assigned score override: use it directly as the
-                // personalization anchor so the node's attestations carry
-                // proportional trust in the PageRank graph.
-                weight = scoreOverrides[node]; // 0–SCALE (1e6)
-            } else {
-                weight = basePersonalization;
-
-                uint256 depositWeight = lenderDeposits[node];
-                if (depositWeight > personalizationCap) {
-                    depositWeight = personalizationCap;
-                }
-                weight += depositWeight;
-
-                if (isKYCVerified[node]) {
-                    weight += kycBonus;
-                }
-            }
-
-            vector[i] = weight;
-            totalWeight += weight;
-        }
-
-        if (totalWeight == 0) {
-            for (uint256 i = 0; i < n; i++) {
-                vector[i] = PR_SCALE / n;
-            }
-        } else {
-            for (uint256 i = 0; i < n; i++) {
-                vector[i] = (vector[i] * PR_SCALE) / totalWeight;
-            }
-        }
+    /// @notice Projected lender APY in BASIS_POINTS: loan rate x pool utilisation.
+    function getFundingPoolAPY() external view returns (uint256) {
+        if (totalDeposits == 0) return 0;
+        uint256 utilisationBp = ((totalLentOut + reservedLiquidity) * BASIS_POINTS) / totalDeposits;
+        return ((effrRate + riskPremium) * utilisationBp) / BASIS_POINTS;
     }
 
     /**
-     * ------------------------------------------------------------------------
-     *  ENUMERATION GETTERS – used by Admin dashboard
-     * ---------------------------------------------------------------------*/
+     * @return _totalDeposits  Net lender deposits (USDC, 6 decimals)
+     * @return _availableFunds Liquid USDC not reserved for pending disbursements
+     * @return _reservedFunds  USDC reserved for approved, undisbursed loans
+     * @return _lenderCount    Unique depositors
+     */
+    function getPoolInfo()
+        external
+        view
+        returns (uint256 _totalDeposits, uint256 _availableFunds, uint256 _reservedFunds, uint256 _lenderCount)
+    {
+        _totalDeposits = totalDeposits;
+        _reservedFunds = reservedLiquidity;
+        _availableFunds = usdc.balanceOf(address(this)) - _reservedFunds;
+        _lenderCount = lenderCount;
+    }
+
+    /// @return interestRate APR in BASIS_POINTS
+    /// @return payment      Weekly payment over `repaymentPeriod` (one payment if under a week)
+    function previewLoanTerms(
+        address,
+        /* borrower */
+        uint256 principal,
+        uint256 repaymentPeriod
+    )
+        external
+        view
+        returns (uint256 interestRate, uint256 payment)
+    {
+        interestRate = effrRate + riskPremium;
+        uint256 interest = (principal * interestRate * repaymentPeriod) / (BASIS_POINTS * SECONDS_PER_YEAR);
+        uint256 payments = repaymentPeriod / 7 days;
+        payment = (principal + interest) / (payments == 0 ? 1 : payments);
+    }
+
+    function getLoan(uint256 loanId)
+        external
+        view
+        returns (uint256 principal, uint256 outstanding, address borrower, uint256 interestRate, bool isActive)
+    {
+        Loan storage loan = loans[loanId];
+        outstanding = loan.isActive ? getCurrentOutstandingAmount(loanId) : 0;
+        return (loan.principal, outstanding, loan.borrower, loan.interestRate, loan.isActive);
+    }
+
+    /**
+     * @notice Principal plus simple interest accrued since origination, less repayments.
+     * @dev No interest accrues during the first day. Interest keeps accruing on the original
+     *      principal until the loan closes; partial repayments reduce the balance, not the base.
+     */
+    function getCurrentOutstandingAmount(uint256 loanId) public view returns (uint256) {
+        Loan storage loan = loans[loanId];
+        require(loan.isActive, "Loan inactive");
+
+        uint256 owed = loan.principal;
+        uint256 timeElapsed = block.timestamp - loan.createdAt;
+        if (timeElapsed >= GRACE_PERIOD) {
+            uint256 annualInterest = (loan.principal * loan.interestRate) / BASIS_POINTS;
+            owed += (annualInterest * timeElapsed) / SECONDS_PER_YEAR;
+        }
+        return owed > loan.repaid ? owed - loan.repaid : 0;
+    }
+
+    /// @notice Outstanding balance rounded half-up to the cent, as shown in the UI.
+    function getOutstandingRoundedToCent(uint256 loanId) external view returns (uint256) {
+        return _roundToCent(getCurrentOutstandingAmount(loanId));
+    }
 
     function getAllLoanIds() external view returns (uint256[] memory) {
         return _allLoanIds;
@@ -1378,9 +751,7 @@ contract DecentralizedMicrocredit is EIP712 {
         return _borrowers;
     }
 
-    function getBorrowerLoanIds(
-        address borrower
-    ) external view returns (uint256[] memory) {
+    function getBorrowerLoanIds(address borrower) external view returns (uint256[] memory) {
         return _borrowerLoans[borrower];
     }
 
@@ -1392,223 +763,60 @@ contract DecentralizedMicrocredit is EIP712 {
         return _attesters;
     }
 
-    /**
-     * @notice Return all attestations received by a borrower for front-end use.
-     */
-    function getBorrowerAttestations(
-        address borrower
-    ) external view returns (Attestation[] memory) {
+    function getBorrowerAttestations(address borrower) external view returns (Attestation[] memory) {
         return borrowerAttestations[borrower];
     }
 
-    /**
-     * @notice Get all addresses that have received attestations (borrowers)
-     * @dev This returns addresses that have attestations, even if they haven't requested loans
-     */
-    function getBorrowersWithAttestations() external view returns (address[] memory) {
-        address[] memory borrowers = new address[](pagerankNodes.length);
+    /// @notice Every address that has received at least one attestation.
+    function getBorrowersWithAttestations() external view returns (address[] memory result) {
+        address[] storage nodes = _pagerankNodes();
+        address[] memory matches = new address[](nodes.length);
         uint256 count = 0;
-        
-        for (uint256 i = 0; i < pagerankNodes.length; i++) {
-            address node = pagerankNodes[i];
-            if (borrowerAttestations[node].length > 0) {
-                borrowers[count] = node;
-                count++;
+        for (uint256 i = 0; i < nodes.length; i++) {
+            if (borrowerAttestations[nodes[i]].length > 0) {
+                matches[count++] = nodes[i];
             }
         }
-        
-        // Resize array to actual count
-        address[] memory result = new address[](count);
+        result = new address[](count);
         for (uint256 i = 0; i < count; i++) {
-            result[i] = borrowers[i];
+            result[i] = matches[i];
         }
-        
-        return result;
     }
 
-    
+    // ───────────────────────────── internals ─────────────────────────────
 
-    // O4: Combined borrow and disburse meta-transaction
-    /**
-     * @notice One-click borrow: creates and disburses loan in single meta-transaction (relayer pays gas)
-     * @param req The borrow and disburse request with all parameters
-     * @param sig The EIP-712 signature from the borrower authorizing the combined action
-     */
-    function borrowAndDisburseMeta(
-        BorrowAndDisburse calldata req,
-        bytes calldata sig
-    ) external {
-        // Check relayer whitelist if enabled
-        if (relayerWhitelistEnabled) {
-            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
-        }
-
-        // Basic validation
-        require(block.timestamp <= req.deadline, "Expired");
-        require(req.nonce == nonces[req.borrower]++, "Bad nonce");
-
-        // EIP-712 signature verification
-        bytes32 structHash = keccak256(abi.encode(
-            BORROW_AND_DISBURSE_TYPEHASH,
-            req.borrower,
-            req.amount,
-            req.to,
-            req.repaymentPeriod,
-            req.maxAprBps,
-            req.nonce,
-            req.deadline
-        ));
-        bytes32 digest = _hashTypedDataV4(structHash);
-        require(SignatureChecker.isValidSignatureNow(req.borrower, digest, sig), "Bad signature");
-
-        // Rate guard: ensure current APR is within borrower's tolerance
-        uint256 currentApr = effrRate + riskPremium;
-        require(currentApr <= req.maxAprBps, "APR changed");
-
-        // Credit score and eligibility check
-        uint256 score = getCreditScore(req.borrower);
-        require(score > 0, "Score > 0");
-        uint256 maxBorrow = (maxLoanAmount * score) / SCALE;
-        require(req.amount <= maxBorrow, "Over limit");
-
-        // Check existing outstanding loans for this borrower
-        uint256 totalOutstanding = 0;
-        uint256[] storage borrowerLoans = _borrowerLoans[req.borrower];
-        for (uint256 i = 0; i < borrowerLoans.length; i++) {
-            Loan storage l = loans[borrowerLoans[i]];
-            if (l.isActive) {
-                totalOutstanding += l.principal;
-            }
-        }
-        require(totalOutstanding + req.amount <= maxBorrow, "Outstanding loans exceed max");
-
-        // Liquidity gating: check utilization cap
-        uint256 newTotalCommitted = reservedLiquidity + totalLentOut + req.amount;
-        uint256 maxAllowedCommitment = (totalDeposits * lendingUtilizationCap) / BASIS_POINTS;
-        require(newTotalCommitted <= maxAllowedCommitment, "Pool utilisation cap exceeded");
-
-        // Liquidity buffer check
-        uint256 availableLiquidity = totalDeposits - reservedLiquidity - totalLentOut;
-        uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
-        require(availableLiquidity >= req.amount + bufferRequired + liquidityThreshold, "LIQUIDITY_BELOW_THRESHOLD");
-
-        // Create the loan
-        uint256 loanId = nextLoanId++;
-        loans[loanId] = Loan({
-            principal: req.amount,
-            outstanding: req.amount,
-            borrower: req.borrower,
-            interestRate: currentApr,
-            isActive: true,
-            createdAt: block.timestamp
-        });
-
-        // Add to borrower's loan list
-        _borrowerLoans[req.borrower].push(loanId);
-
-        // Reserve liquidity for this loan
-        reservedLiquidity += req.amount;
-
-        // Immediately disburse to the specified recipient
-        reservedLiquidity -= req.amount;
-        totalLentOut += req.amount;
-
-        bool success = usdc.transfer(req.to, req.amount);
-        require(success, "Transfer failed");
-
-        // Emit events
-        emit MetaLoanCreated(req.borrower, loanId, req.amount, currentApr, req.repaymentPeriod);
-        emit MetaLoanDisbursed(req.borrower, loanId, req.amount);
+    /// @dev Checks deadline, consumes the signer's nonce, and verifies an EIP-712 signature
+    ///      (EOA or ERC-1271 wallet) over `structHash`.
+    function _verifyMeta(address signer, uint256 nonce, uint256 deadline, bytes32 structHash, bytes calldata sig)
+        internal
+    {
+        require(block.timestamp <= deadline, "Expired");
+        require(nonce == nonces[signer]++, "Bad nonce");
+        require(SignatureChecker.isValidSignatureNow(signer, _hashTypedDataV4(structHash), sig), "Bad signature");
     }
 
-    /**
-     * @notice Gasless deposit with optional ERC-2612 permit (relayer pays gas)
-     */
-    function depositWithPermitMeta(
-        DepositRequest calldata req,
-        bytes calldata sig,
-        PermitData calldata permit
-    ) external {
-        if (relayerWhitelistEnabled) {
-            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
-        }
-
-        require(block.timestamp <= req.deadline, "Expired");
-        require(req.nonce == nonces[req.lender]++, "Bad nonce");
-
-        // Verify EIP-712
-        bytes32 structHash = keccak256(abi.encode(
-            DEPOSIT_REQUEST_TYPEHASH,
-            req.lender,
-            req.amount,
-            req.receiver,
-            req.nonce,
-            req.deadline
-        ));
-        bytes32 digest = _hashTypedDataV4(structHash);
-        require(SignatureChecker.isValidSignatureNow(req.lender, digest, sig), "Bad signature");
-
-        // Optional permit
-        if (permit.deadline != 0) {
-            IERC20Permit(address(usdc)).permit(
-                req.lender,
-                address(this),
-                permit.value,
-                permit.deadline,
-                permit.v,
-                permit.r,
-                permit.s
-            );
-            require(permit.value >= req.amount, "Permit value too low");
-        }
-
-        require(usdc.transferFrom(req.lender, address(this), req.amount), "Transfer failed");
-
-        // Accounting (1:1 shares for now)
-        totalDeposits += req.amount;
-        lenderDeposits[req.lender] += req.amount;
-        if (!isLender[req.lender]) {
-            isLender[req.lender] = true;
-            lenderCount += 1;
-            _lenders.push(req.lender);
-        }
-
-        emit MetaDeposit(req.lender, req.amount, req.receiver, req.amount);
-
-        // Attempt to fill any queued withdrawals now that liquidity increased
-        _tryFillWithdrawalQueue();
+    function _permit(address holder, PermitData calldata permit) internal {
+        _permit(holder, permit.value, permit.deadline, permit.v, permit.r, permit.s);
     }
 
-    /**
-     * @notice Gasless deposit using ONLY ERC-2612 permit (no EIP-712 DepositRequest). Relayer pays gas.
-     *         Pulls exactly the permitted value from `lender` and accounts deposit.
-     */
-    function depositPermitOnlyMeta(
-        address lender,
-        PermitData calldata permit
-    ) external {
-        if (relayerWhitelistEnabled) {
-            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
+    /// @dev Anyone can submit a permit signature first (e.g. by watching the mempool), which makes
+    ///      the relayed permit() revert on a used nonce. Proceed when the allowance is already set.
+    function _permit(address holder, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) internal {
+        try IERC20Permit(address(usdc)).permit(holder, address(this), value, deadline, v, r, s) { }
+        catch {
+            require(usdc.allowance(holder, address(this)) >= value, "Permit failed");
         }
+    }
 
-        require(lender != address(0), "Bad lender");
-        require(permit.value > 0, "Zero amount");
+    function _pullUsdc(address from, uint256 amount) internal {
+        usdc.safeTransferFrom(from, address(this), amount);
+    }
 
-        // Execute permit so this contract is allowed to pull the exact amount
-        IERC20Permit(address(usdc)).permit(
-            lender,
-            address(this),
-            permit.value,
-            permit.deadline,
-            permit.v,
-            permit.r,
-            permit.s
-        );
+    function _pushUsdc(address to, uint256 amount) internal {
+        usdc.safeTransfer(to, amount);
+    }
 
-        uint256 amount = permit.value;
-        require(usdc.transferFrom(lender, address(this), amount), "Transfer failed");
-
-        // Accounting (mirror depositWithPermitMeta behavior; 1:1 shares for now)
+    function _recordDeposit(address lender, uint256 amount) internal {
         totalDeposits += amount;
         lenderDeposits[lender] += amount;
         if (!isLender[lender]) {
@@ -1616,61 +824,161 @@ contract DecentralizedMicrocredit is EIP712 {
             lenderCount += 1;
             _lenders.push(lender);
         }
+        emit Deposited(lender, amount);
+    }
 
-        emit MetaDeposit(lender, amount, lender, amount);
+    /// @dev Pays `amount` of `lender`'s deposit out to `to`.
+    function _payOut(address lender, address to, uint256 amount) internal {
+        lenderDeposits[lender] -= amount;
+        totalDeposits -= amount;
+        _pushUsdc(to, amount);
+        emit Withdrawn(lender, to, amount);
+    }
 
-        // Attempt to fill any queued withdrawals now that liquidity increased
-        _tryFillWithdrawalQueue();
+    /// @dev Sum of principal across the borrower's active loans.
+    function _activePrincipal(address borrower) internal view returns (uint256 total) {
+        uint256[] storage ids = _borrowerLoans[borrower];
+        for (uint256 i = 0; i < ids.length; i++) {
+            Loan storage loan = loans[ids[i]];
+            if (loan.isActive) {
+                total += loan.principal;
+            }
+        }
     }
 
     /**
-     * @notice Gasless withdrawal request enqueue (relayer pays gas)
+     * @dev Single origination path for requestLoan, requestLoanMeta and borrowAndDisburseMeta.
+     *      Enforces the score-based limit across the borrower's active loans, the pool
+     *      utilisation cap and the liquidity buffer, then reserves the principal.
      */
-    function requestWithdrawalMeta(
-        RequestWithdrawal calldata req,
-        bytes calldata sig
-    ) external {
-        if (relayerWhitelistEnabled) {
-            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
+    function _originateLoan(address borrower, uint256 amount) internal returns (uint256 loanId) {
+        require(amount > 0, "Amount > 0");
+        uint256 score = getCreditScore(borrower);
+        require(score > 0, "Score > 0");
+
+        uint256 limit = Math.mulDiv(maxLoanAmount, score, SCALE);
+        require(_activePrincipal(borrower) + amount <= limit, "Outstanding loans exceed max");
+
+        uint256 maxCommitment = (totalDeposits * lendingUtilizationCap) / BASIS_POINTS;
+        require(reservedLiquidity + totalLentOut + amount <= maxCommitment, "Pool utilisation cap exceeded");
+
+        uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
+        require(
+            usdc.balanceOf(address(this)) - reservedLiquidity >= amount + bufferRequired + liquidityThreshold,
+            "LIQUIDITY_BELOW_THRESHOLD"
+        );
+
+        reservedLiquidity += amount;
+
+        loanId = nextLoanId++;
+        loans[loanId] = Loan({
+            principal: amount,
+            repaid: 0,
+            borrower: borrower,
+            interestRate: effrRate + riskPremium,
+            isActive: true,
+            disbursed: false,
+            createdAt: block.timestamp
+        });
+
+        _allLoanIds.push(loanId);
+        if (!_borrowerSeen[borrower]) {
+            _borrowerSeen[borrower] = true;
+            _borrowers.push(borrower);
         }
+        _borrowerLoans[borrower].push(loanId);
+        emit LoanRequested(borrower, loanId, amount, effrRate + riskPremium);
+    }
 
-        require(block.timestamp <= req.deadline, "Expired");
-        require(req.nonce == nonces[req.lender]++, "Bad nonce");
+    /// @dev Moves a reserved loan's principal to `to`. Callers decide who may receive it.
+    function _disburseLoan(uint256 loanId, address to) internal returns (uint256 principal) {
+        Loan storage loan = loans[loanId];
+        require(loan.isActive, "Loan inactive");
+        require(!loan.disbursed, "Already disbursed");
+        loan.disbursed = true;
 
-        // Verify EIP-712
-        bytes32 structHash = keccak256(abi.encode(
-            REQUEST_WITHDRAWAL_TYPEHASH,
-            req.lender,
-            req.amount,
-            req.to,
-            req.nonce,
-            req.deadline
-        ));
-        bytes32 digest = _hashTypedDataV4(structHash);
-        require(SignatureChecker.isValidSignatureNow(req.lender, digest, sig), "Bad signature");
+        principal = loan.principal;
+        reservedLiquidity -= principal;
+        totalLentOut += principal;
+        _pushUsdc(to, principal);
+        emit LoanDisbursed(loan.borrower, loanId, to, principal);
+    }
 
-        require(lenderDeposits[req.lender] >= req.amount, "Insufficient balance");
+    function _repayableLoan(uint256 loanId) internal view returns (Loan storage loan) {
+        loan = loans[loanId];
+        require(loan.isActive, "Loan inactive");
+        require(loan.disbursed, "Not disbursed");
+    }
 
-        uint256 queueId = withdrawalQueue.length;
-        withdrawalQueue.push(WithdrawalQueueItem({
-            lender: req.lender,
-            to: req.to,
-            remaining: req.amount,
-            active: true
-        }));
-        emit MetaWithdrawalRequested(req.lender, queueId, req.amount, req.to);
-
-        // Attempt fills immediately if liquidity allows
+    /**
+     * @dev Pulls `min(amount, outstanding)` from `payer` and closes the loan once less than a
+     *      cent remains (sub-cent balances are forgiven). Returns the amount pulled.
+     */
+    function _repay(uint256 loanId, Loan storage loan, address payer, uint256 amount) internal returns (uint256 paid) {
+        uint256 owed = getCurrentOutstandingAmount(loanId);
+        paid = amount < owed ? amount : owed;
+        if (paid > 0) {
+            _pullUsdc(payer, paid);
+            loan.repaid += paid;
+        }
+        if (owed - paid < CENT) {
+            _closeLoan(loan);
+        }
         _tryFillWithdrawalQueue();
     }
 
-    // Try to fill withdrawals from head while respecting buffer and threshold
+    function _closeLoan(Loan storage loan) internal {
+        totalLentOut -= loan.principal;
+        loan.isActive = false;
+    }
+
+    function _recordAttestation(address attester, address borrower, uint256 weight) internal {
+        require(weight <= SCALE, "Weight too high");
+        require(borrower != attester, "Self-attestation");
+
+        if (!_attesterSeen[attester]) {
+            _attesterSeen[attester] = true;
+            _attesters.push(attester);
+        }
+
+        _addPagerankNode(attester);
+        _addPagerankNode(borrower);
+        _setPagerankEdge(attester, borrower, weight);
+
+        Attestation[] storage attests = borrowerAttestations[borrower];
+        bool updated = false;
+        for (uint256 i = 0; i < attests.length; i++) {
+            if (attests[i].attester == attester) {
+                attests[i].weight = weight;
+                updated = true;
+                break;
+            }
+        }
+        if (!updated) {
+            attests.push(Attestation({ attester: attester, weight: weight }));
+        }
+
+        emit Attested(attester, borrower, weight);
+        _computePageRank(); // DEMO ONLY: production moves this off-chain
+    }
+
+    /// @inheritdoc PageRank
+    function _personalizationWeight(address node) internal view override returns (uint256 weight) {
+        // An admin-assigned score anchors trust directly, so the node's attestations carry it.
+        if (scoreOverrides[node] != 0) return scoreOverrides[node];
+
+        uint256 deposits = lenderDeposits[node];
+        weight = basePersonalization + (deposits > personalizationCap ? personalizationCap : deposits);
+        if (isKYCVerified[node]) {
+            weight += kycBonus;
+        }
+    }
+
+    /// @dev Pays queued withdrawals in FIFO order while liquidity stays above the guards. Called
+    ///      from every path that adds liquidity, and before direct withdrawals.
     function _tryFillWithdrawalQueue() internal {
-        uint256 liquid = usdc.balanceOf(address(this));
-        // Calculate guard requirements
         uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
 
-        // Iterate from head while we can fill at least a cent
         while (withdrawalHead < withdrawalQueue.length) {
             WithdrawalQueueItem storage item = withdrawalQueue[withdrawalHead];
             if (!item.active || item.remaining == 0) {
@@ -1679,33 +987,25 @@ contract DecentralizedMicrocredit is EIP712 {
                 continue;
             }
 
-            liquid = usdc.balanceOf(address(this));
-            if (liquid <= reservedLiquidity + bufferRequired + liquidityThreshold) {
-                // Cannot pay anything without violating guards
-                break;
-            }
+            uint256 liquid = usdc.balanceOf(address(this));
+            uint256 locked = reservedLiquidity + bufferRequired + liquidityThreshold;
+            if (liquid <= locked || liquid - locked < CENT) break;
 
-            uint256 available = liquid - reservedLiquidity - bufferRequired - liquidityThreshold;
-            if (available < CENT) {
-                break; // don't bother transferring dust
-            }
-
+            uint256 available = liquid - locked;
             uint256 pay = item.remaining <= available ? item.remaining : available;
 
-            // Update accounting and transfer
-            lenderDeposits[item.lender] -= pay;
-            totalDeposits -= pay;
-            require(usdc.transfer(item.to, pay), "Transfer failed");
+            queuedWithdrawals[item.lender] -= pay;
             item.remaining -= pay;
+            _payOut(item.lender, item.to, pay);
             emit MetaWithdrawalFilled(withdrawalHead, pay);
 
-            if (item.remaining == 0) {
-                item.active = false;
-                withdrawalHead++;
-            } else {
-                // Partial fill; stop to re-evaluate guards next time
-                break;
-            }
+            if (item.remaining != 0) break; // partial fill; resume on the next liquidity event
+            item.active = false;
+            withdrawalHead++;
         }
+    }
+
+    function _roundToCent(uint256 x) internal pure returns (uint256) {
+        return ((x + CENT / 2) / CENT) * CENT;
     }
 }

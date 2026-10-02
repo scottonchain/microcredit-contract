@@ -1,32 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useAccount, useSignTypedData } from "wagmi";
+import { useAccount, usePublicClient, useSignTypedData } from "wagmi";
 import { toast } from "react-hot-toast";
 import { AddressInput } from "~~/components/scaffold-eth";
 import { DocumentDuplicateIcon, CheckIcon } from "@heroicons/react/24/outline";
-import deployedContracts from "~~/contracts/deployedContracts";
 import { useAddressDisplayName } from "~~/hooks/useAddressDisplayName";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
-import { createPublicClient, http } from "viem";
-import { localhost } from "viem/chains";
-import { MICRO_DOMAIN, TYPES, AttestRequest } from "../../types/eip712";
+import { AttestRequest, MICRO_DOMAIN, TYPES } from "~~/utils/eip712";
+import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS } from "~~/utils/microcredit";
 
+// useSearchParams() needs a Suspense boundary for the page to be prerendered at build time.
 export default function AttestPage() {
+  return (
+    <Suspense>
+      <AttestForm />
+    </Suspense>
+  );
+}
+
+function AttestForm() {
   const searchParams = useSearchParams();
   const { address: connectedAddress } = useAccount();
   const { signTypedDataAsync } = useSignTypedData();
 
-  // Contract config
-  const CONTRACT_ADDRESS = deployedContracts[31337]?.DecentralizedMicrocredit?.address as `0x${string}` | undefined;
-  const CONTRACT_ABI = deployedContracts[31337]?.DecentralizedMicrocredit?.abi as any;
-  const CHAIN_ID = 31337;
-  const RPC_URL = "http://localhost:8545";
-  const publicClient = useMemo(
-    () => createPublicClient({ chain: { ...localhost, id: CHAIN_ID }, transport: http(RPC_URL) }),
-    []
-  );
+  const publicClient = usePublicClient({ chainId: CHAIN_ID });
 
   // Attestation form state
   const [attestBorrower, setAttestBorrower] = useState<string>("");
@@ -55,17 +54,17 @@ export default function AttestPage() {
   // Connected user's own credit score
   const [myScore, setMyScore] = useState<number | null>(null);
   useEffect(() => {
-    if (!connectedAddress || !CONTRACT_ADDRESS || !CONTRACT_ABI) return;
+    if (!connectedAddress || !publicClient) return;
     publicClient
       .readContract({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
+        address: MICROCREDIT_ADDRESS,
+        abi: MICROCREDIT_ABI,
         functionName: "getCreditScore",
         args: [connectedAddress as `0x${string}`],
       })
       .then((score) => setMyScore(Number(score as bigint)))
       .catch(() => setMyScore(null));
-  }, [connectedAddress, CONTRACT_ADDRESS, CONTRACT_ABI]);
+  }, [connectedAddress, publicClient]);
 
   // Prefill from query params (?borrower=0x...&weight=80)
   useEffect(() => {
@@ -102,14 +101,14 @@ export default function AttestPage() {
     if (!attestBorrower || !connectedAddress) return;
     setAttestLoading(true);
     try {
-      if (!CONTRACT_ADDRESS || !CONTRACT_ABI) throw new Error("Contract not available");
+      if (!publicClient) throw new Error("Contract not available");
       const attester = connectedAddress as `0x${string}`;
       const borrower = attestBorrower as `0x${string}`;
       const weight = BigInt(attestWeight * 10000); // percent -> SCALE(1e6)
 
       const metaNonce = (await publicClient.readContract({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
+        address: MICROCREDIT_ADDRESS,
+        abi: MICROCREDIT_ABI,
         functionName: "nonces",
         args: [attester],
       })) as bigint;
@@ -118,7 +117,7 @@ export default function AttestPage() {
       const rq: AttestRequest = { attester, borrower, weight, nonce: metaNonce, deadline };
 
       const sig = await signTypedDataAsync({
-        domain: MICRO_DOMAIN(31337, CONTRACT_ADDRESS) as any,
+        domain: MICRO_DOMAIN(CHAIN_ID, MICROCREDIT_ADDRESS) as any,
         types: { AttestRequest: TYPES.AttestRequest } as any,
         primaryType: "AttestRequest",
         message: rq as any,
@@ -128,8 +127,8 @@ export default function AttestPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          chainId: 31337,
-          contractAddress: CONTRACT_ADDRESS,
+          chainId: CHAIN_ID,
+          contractAddress: MICROCREDIT_ADDRESS,
           req: {
             attester,
             borrower,

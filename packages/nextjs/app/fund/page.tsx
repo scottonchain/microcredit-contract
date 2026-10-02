@@ -11,13 +11,15 @@ import {
 } from "viem";
 import { localhost } from "viem/chains";
 import { privateKeyToAccount } from "viem/accounts";
-import deployedContracts from "~~/contracts/deployedContracts";
 import Link from "next/link";
 import { DocumentDuplicateIcon } from "@heroicons/react/24/outline";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
+import { ANVIL_RPC_URL, CHAIN_ID, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
 
-const RPC_URL = "http://127.0.0.1:8545";
-const CHAIN_ID = 31337;
+const publicClient = createPublicClient({
+  chain: { ...localhost, id: CHAIN_ID },
+  transport: http(ANVIL_RPC_URL),
+});
 
 export default function FundPage() {
   const { address: connectedAddress } = useAccount();
@@ -26,28 +28,12 @@ export default function FundPage() {
   const [ethBalance, setEthBalance] = useState<string>("0");
   const [usdcBalance, setUsdcBalance] = useState<string>("0");
 
-  // Resolve contract addresses & ABIs
-  const contracts = deployedContracts[31337];
-  const USDC_ADDRESS = contracts?.MockUSDC?.address as `0x${string}` | undefined;
-  const USDC_ABI = contracts?.MockUSDC?.abi;
-
-  const publicClient = createPublicClient({
-    chain: { ...localhost, id: CHAIN_ID },
-    transport: http(RPC_URL),
-  });
-
-  // Debug: Log the public client configuration
-  console.log("Public client configured with:", {
-    rpcUrl: RPC_URL,
-    chainId: CHAIN_ID,
-    usdcAddress: USDC_ADDRESS
-  });
 
   // Check if RPC endpoint is accessible
   useEffect(() => {
     const checkRPC = async () => {
       try {
-        const response = await fetch(RPC_URL, {
+        const response = await fetch(ANVIL_RPC_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -77,7 +63,7 @@ export default function FundPage() {
   // Function to fetch ETH balance
   const fetchEthBalance = useCallback(async (address: string) => {
     try {
-      const { result: balanceHex } = await fetch(RPC_URL, {
+      const { result: balanceHex } = await fetch(ANVIL_RPC_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -139,7 +125,7 @@ export default function FundPage() {
       });
       setUsdcBalance("0");
     }
-  }, [USDC_ADDRESS, USDC_ABI, publicClient, setUsdcBalance]);
+  }, [setUsdcBalance]);
 
   // Fetch balances when address changes
   useEffect(() => {
@@ -151,7 +137,7 @@ export default function FundPage() {
       setEthBalance("0");
       setUsdcBalance("0");
     }
-  }, [connectedAddress, USDC_ADDRESS, fetchEthBalance, fetchUsdcBalance]);
+  }, [connectedAddress, fetchEthBalance, fetchUsdcBalance]);
 
   const ensureMinterEth = async () => {
     // Use private key 0x01 as minting account (same as populate page)
@@ -159,7 +145,7 @@ export default function FundPage() {
     const minterAccount = privateKeyToAccount(MINTER_PK);
     
     // Set 50 ETH to ensure sufficient balance for gas
-    const response = await fetch(RPC_URL, {
+    const response = await fetch(ANVIL_RPC_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -175,7 +161,7 @@ export default function FundPage() {
     }
     
     // Verify the balance was set correctly
-    const balanceResponse = await fetch(RPC_URL, {
+    const balanceResponse = await fetch(ANVIL_RPC_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -192,7 +178,7 @@ export default function FundPage() {
     
     return createWalletClient({
       chain: { ...localhost, id: CHAIN_ID },
-      transport: http(RPC_URL),
+      transport: http(ANVIL_RPC_URL),
       account: minterAccount,
     });
   };
@@ -203,7 +189,7 @@ export default function FundPage() {
     setStatus("⛽ Funding ETH...");
     try {
       // Fetch current ETH balance
-      const { result: currentBalanceHex } = await fetch(RPC_URL, {
+      const { result: currentBalanceHex } = await fetch(ANVIL_RPC_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -219,7 +205,7 @@ export default function FundPage() {
       
       console.log(`Setting balance for ${connectedAddress} from ${Number(currentBalance) / 1e18} ETH to ${Number(newBalance) / 1e18} ETH`);
       
-      const response = await fetch(RPC_URL, {
+      const response = await fetch(ANVIL_RPC_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -242,7 +228,7 @@ export default function FundPage() {
       console.log("Balance set successfully:", responseData);
       
       // Verify the balance was set correctly
-      const verifyResponse = await fetch(RPC_URL, {
+      const verifyResponse = await fetch(ANVIL_RPC_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -281,7 +267,7 @@ export default function FundPage() {
       // Test with a simple balance setting
       const testBalance = 5n * 10n ** 18n; // 5 ETH
       
-      const response = await fetch(RPC_URL, {
+      const response = await fetch(ANVIL_RPC_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -300,7 +286,7 @@ export default function FundPage() {
       }
       
       // Verify the test balance
-      const verifyResponse = await fetch(RPC_URL, {
+      const verifyResponse = await fetch(ANVIL_RPC_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -335,7 +321,7 @@ export default function FundPage() {
     try {
       // Trigger a small transaction to force wallet refresh
       // We'll use a simple RPC call that doesn't change state but forces a refresh
-      await fetch(RPC_URL, {
+      await fetch(ANVIL_RPC_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -492,7 +478,7 @@ export default function FundPage() {
             {/* QR Code */}
             <div className="flex-shrink-0">
               <div
-                onClick={() => copyToClipboard(USDC_ADDRESS)}
+                onClick={() => copyToClipboard(USDC_ADDRESS!)}
                 className="cursor-pointer flex flex-col items-center"
               >
                 <QRCodeDisplay value={USDC_ADDRESS} size={80} />
@@ -507,7 +493,7 @@ export default function FundPage() {
                   {USDC_ADDRESS}
                 </p>
                 <button
-                  onClick={() => copyToClipboard(USDC_ADDRESS)}
+                  onClick={() => copyToClipboard(USDC_ADDRESS!)}
                   className="btn btn-sm btn-ghost"
                   title="Copy token address"
                 >

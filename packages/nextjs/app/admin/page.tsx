@@ -9,22 +9,13 @@ import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaf
 import { formatPercent, formatUSDC } from "~~/utils/format";
 import { createPublicClient, http } from "viem";
 import { localhost } from "viem/chains";
-import deployedContracts from "~~/contracts/deployedContracts";
 import Link from "next/link";
 import { useIsAdmin } from "~~/hooks/useIsAdmin";
-
-// Constants for contract interaction
-const CHAIN_ID = 31337; // Localhost chain ID
-const RPC_URL = "http://localhost:8545";
-
-// Read deployed addresses from the contracts file
-const deployedContractsData = deployedContracts[31337];
-const CONTRACT_ADDRESS = deployedContractsData?.DecentralizedMicrocredit?.address;
-const USDC_ADDRESS = deployedContractsData?.MockUSDC?.address;
+import { ANVIL_RPC_URL, CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, USDC_ADDRESS } from "~~/utils/microcredit";
 
 const publicClient = createPublicClient({
   chain: { ...localhost, id: CHAIN_ID },
-  transport: http(RPC_URL),
+  transport: http(ANVIL_RPC_URL),
 });
 
 const AdminPage: NextPage = () => {
@@ -34,11 +25,6 @@ const AdminPage: NextPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [gasPrice, setGasPrice] = useState<bigint | null>(null);
   const [baseFee, setBaseFee] = useState<bigint | null>(null);
-
-  // Debug logging for contract addresses
-  console.log("Debug - deployedContractsData:", deployedContractsData);
-  console.log("Debug - USDC_ADDRESS:", USDC_ADDRESS);
-  console.log("Debug - CONTRACT_ADDRESS:", CONTRACT_ADDRESS);
 
   // Fetch gas fees from the network
   const fetchGasFees = async () => {
@@ -74,7 +60,7 @@ const AdminPage: NextPage = () => {
         try {
           console.log(`🔧 Trying method: ${method}`);
           
-          const response = await fetch(RPC_URL, {
+          const response = await fetch(ANVIL_RPC_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -101,11 +87,9 @@ const AdminPage: NextPage = () => {
     }
   };
 
-  // Fetch gas fees on component mount
+  // Fetch gas fees on mount (scripts/start-anvil.sh already starts the chain with zero gas)
   useEffect(() => {
     fetchGasFees();
-    // Try to set gas price to zero on mount
-    setZeroGasPrice();
     // Refresh gas fees every 30 seconds
     const interval = setInterval(fetchGasFees, 30000);
     return () => clearInterval(interval);
@@ -395,8 +379,8 @@ const AdminPage: NextPage = () => {
         for (const loanId of loanIds) {
           try {
             const loan = await publicClient.readContract({
-              address: CONTRACT_ADDRESS as `0x${string}`,
-              abi: deployedContractsData.DecentralizedMicrocredit.abi,
+              address: MICROCREDIT_ADDRESS as `0x${string}`,
+              abi: MICROCREDIT_ABI,
               functionName: "getLoan",
               args: [loanId],
             });
@@ -638,8 +622,8 @@ const AdminPage: NextPage = () => {
           try {
             console.log(`Fetching attestations for borrower: ${borrower}`);
             const attests = await publicClient.readContract({
-              address: CONTRACT_ADDRESS as `0x${string}`,
-              abi: deployedContractsData.DecentralizedMicrocredit.abi,
+              address: MICROCREDIT_ADDRESS as `0x${string}`,
+              abi: MICROCREDIT_ABI,
               functionName: "getBorrowerAttestations",
               args: [borrower],
             });
@@ -876,7 +860,7 @@ const AdminPage: NextPage = () => {
           {/* Navigation Links */}
           <div className="flex justify-center mb-6">
             <Link 
-              href="/populate_test_data" 
+              href="/populate-test-data" 
               className="btn btn-primary btn-sm"
             >
               🛠️ Populate Test Data
@@ -1284,7 +1268,7 @@ const AdminPage: NextPage = () => {
               <li><Link href="/borrower">Borrower Portal</Link></li>
               <li><Link href="/scores">Credit Scores</Link></li>
               <li><Link href="/admin">Admin Panel</Link></li>
-              <li><Link href="/populate_test_data">Populate Test Data</Link></li>
+              <li><Link href="/populate-test-data">Populate Test Data</Link></li>
               <li><Link href="/debug">Debug Contract</Link></li>
               <li><Link href="/oracle-setup">Oracle Setup</Link></li>
             </ul>
