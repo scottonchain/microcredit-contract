@@ -552,7 +552,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1790959043653.json",
+      deploymentFile: "run-1790960286664.json",
       deploymentScript: "Deploy.s.sol",
     },
     DecentralizedMicrocredit: {
@@ -627,25 +627,6 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "addressToString",
-          inputs: [
-            {
-              name: "_address",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "string",
-              internalType: "string",
-            },
-          ],
-          stateMutability: "pure",
         },
         {
           type: "function",
@@ -763,13 +744,6 @@ const deployedContracts = {
         {
           type: "function",
           name: "clearPageRankState",
-          inputs: [],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "clearPageRankStateEfficient",
           inputs: [],
           outputs: [],
           stateMutability: "nonpayable",
@@ -1192,7 +1166,7 @@ const deployedContracts = {
           inputs: [],
           outputs: [
             {
-              name: "",
+              name: "result",
               type: "address[]",
               internalType: "address[]",
             },
@@ -1321,7 +1295,7 @@ const deployedContracts = {
           inputs: [],
           outputs: [
             {
-              name: "",
+              name: "maxScore",
               type: "uint256",
               internalType: "uint256",
             },
@@ -1647,19 +1621,6 @@ const deployedContracts = {
               name: "weight",
               type: "uint256",
               internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "registerBorrower",
-          inputs: [
-            {
-              name: "borrower",
-              type: "address",
-              internalType: "address",
             },
           ],
           outputs: [],
@@ -2536,7 +2497,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1790959043653.json",
+      deploymentFile: "run-1790960286664.json",
       deploymentScript: "Deploy.s.sol",
     },
   },
