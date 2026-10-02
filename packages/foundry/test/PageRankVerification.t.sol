@@ -114,6 +114,34 @@ contract PageRankVerificationTest is MicrocreditTestBase {
         assertApproxEqAbs(_totalScore(), PR_SCALE, TOLERANCE);
     }
 
+    function testReattestingReplacesEdgeWeight() public {
+        _attest(NODE1, NODE2, 800_000);
+        _attest(NODE1, NODE3, 300_000);
+        _attest(NODE1, NODE2, 300_000); // lower the first edge
+        uint256 updated2 = credit.getPageRankScore(NODE2);
+        uint256 updated3 = credit.getPageRankScore(NODE3);
+        assertApproxEqAbs(_totalScore(), PR_SCALE, TOLERANCE, "no mass leaks from stale out-degree");
+
+        _clear();
+        _attest(NODE1, NODE2, 300_000);
+        _attest(NODE1, NODE3, 300_000);
+        assertEq(updated2, credit.getPageRankScore(NODE2), "same as building the graph fresh");
+        assertEq(updated3, credit.getPageRankScore(NODE3));
+    }
+
+    function testClearPageRankStateIsAdminOnly() public {
+        _attest(NODE1, NODE2, 800_000);
+
+        vm.prank(makeAddr("stranger"));
+        vm.expectRevert("Owner or oracle only");
+        credit.clearPageRankState();
+
+        vm.prank(oracle);
+        credit.clearPageRankState();
+        vm.prank(owner);
+        credit.clearPageRankState();
+    }
+
     function testCreditScoreCurve() public {
         _attest(NODE1, NODE2, 800_000);
         _attest(NODE1, NODE3, 400_000);

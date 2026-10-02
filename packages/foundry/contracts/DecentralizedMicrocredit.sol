@@ -237,6 +237,11 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         _;
     }
 
+    modifier onlyOwnerOrOracle() {
+        require(msg.sender == owner || msg.sender == oracle, "Owner or oracle only");
+        _;
+    }
+
     /// @dev Applies the optional relayer whitelist to meta-transaction entry points.
     modifier onlyAllowedRelayer() {
         if (relayerWhitelistEnabled) {
@@ -410,7 +415,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     }
 
     /// @notice Remove the whole PageRank graph and all scores.
-    function clearPageRankState() external {
+    function clearPageRankState() external onlyOwnerOrOracle {
         _clearPageRankState();
     }
 
@@ -887,7 +892,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
         _addPagerankNode(attester);
         _addPagerankNode(borrower);
-        _addPagerankEdge(attester, borrower, weight);
+        _setPagerankEdge(attester, borrower, weight);
 
         Attestation[] storage attests = borrowerAttestations[borrower];
         bool updated = false;
