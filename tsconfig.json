@@ -11,7 +11,6 @@
   "include": [
     "packages/nextjs/**/*",
     "packages/foundry/scripts-js/**/*",
-    "packages/foundry/scripts/**/*",
     "packages/**/*.ts",
     "packages/**/*.tsx"
   ],

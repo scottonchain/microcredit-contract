@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# demo.sh — Start the demo environment (chain + contracts + app).
-# Usage:
-#   ./demo.sh            # fresh deploy, then run Playwright automation
-#   ./demo.sh --manual   # fresh deploy, leave servers running for manual use
-#   ./demo.sh --reuse    # reload previous chain state, run Playwright automation
-#   ./demo.sh --manual --reuse   # reload previous state, leave servers running
+# scripts/demo.sh — Start the demo environment (chain + contracts + app).
+# Usage (from the repo root):
+#   yarn demo                       # fresh deploy, then run Playwright automation
+#   yarn demo --manual              # fresh deploy, leave servers running for manual use
+#   yarn demo --reuse               # reload previous chain state, run Playwright automation
+#   yarn demo --manual --reuse      # reload previous state, leave servers running
 set -e
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
+mkdir -p "$REPO/logs"
 
 # On Windows, 'bash' from PowerShell may invoke WSL whose PATH lacks the
 # Windows Node.js install. Prepend common Windows Node locations so yarn/node
@@ -287,7 +288,6 @@ else
   # ── Automated mode: install Playwright and run the scripted demo ──────────
   echo ""
   echo "▶ Preparing demo runner…"
-  mkdir -p "$REPO/logs"
   cd "$DEMO_DIR"
   if [[ ! -d node_modules ]]; then
     echo "  Installing Playwright…"

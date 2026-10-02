@@ -14,13 +14,6 @@ setup-anvil-wallet:
 chain: setup-anvil-wallet
 	anvil --gas-price 0 --base-fee 0 --gas-limit 600000000 --block-time 1
 
-# Set gas price to zero after Anvil starts
-set-zero-gas:
-	node scripts-js/setZeroGas.js
-
-# Start chain and set zero gas
-chain-zero: chain set-zero-gas
-
 # Start a fork
 fork: setup-anvil-wallet
 	anvil --fork-url ${FORK_URL} --chain-id 31337

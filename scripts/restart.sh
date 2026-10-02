@@ -1,22 +1,22 @@
 #!/bin/bash
 
-# restart.sh
+# scripts/restart.sh
 # --------------------------------------------
 # DEFAULT: reset local chain state and redeploy (removes ./chain-state.json)
-#   ./restart.sh
+#   yarn restart
 # Start from a previously saved state tag (keeps ./chain-state-<tag>.json):
-#   ./restart.sh --tag myteam
+#   yarn restart --tag myteam
 # Preserve default state without reset:
-#   ./restart.sh --keep-state
+#   yarn restart --keep-state
 # Kill processes only:
-#   ./restart.sh --kill
+#   yarn restart --kill
 # Kill and keep state:
-#   ./restart.sh --kill --keep-state
-#
-#
+#   yarn restart --kill --keep-state
 
 # Exit on error
 set -e
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 # Handle flags (default: DELETE_STATE=true)
 KILL_ONLY=false
@@ -77,10 +77,6 @@ else
   echo "♻️  Keeping $STATE_FILE (preserve state)"
 fi
 
-# Clean build artifacts
-echo "🧹 Cleaning previous build artifacts..."
-rm -rf out cache artifacts deployments || true
-
 # Start local blockchain
 echo "🚀 Starting local blockchain..."
 # Ensure high code size limit is applied to anvil
@@ -97,9 +93,15 @@ yarn start &
 
 START_PID=$!
 
-# Wait for chain to boot up
+# Wait for chain to accept RPC calls
 echo "⏳ Waiting for chain to boot up..."
-sleep 5
+for _ in $(seq 1 60); do
+  if curl -sf -X POST http://localhost:8545 -H "Content-Type: application/json" \
+      -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.5
+done
 
 # Deploy contracts
 echo "📦 Deploying contracts..."
