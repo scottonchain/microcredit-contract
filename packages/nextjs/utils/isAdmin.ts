@@ -5,7 +5,7 @@ export const ADDITIONAL_ADMINS = new Set<string>([
   "0xd8ffc0b6bfaab3828c0d92aed3412186ebffa5fc",
 ]);
 
-export const ADMIN_PATHS = ["/admin", "/populate", "/populate_test_data"] as const;
+export const ADMIN_PATHS = ["/admin", "/populate-test-data"] as const;
 
 export function isWhitelisted(addr?: string) {
   return !!addr && ADDITIONAL_ADMINS.has(addr.toLowerCase());

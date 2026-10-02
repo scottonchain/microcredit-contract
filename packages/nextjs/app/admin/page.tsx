@@ -860,7 +860,7 @@ const AdminPage: NextPage = () => {
           {/* Navigation Links */}
           <div className="flex justify-center mb-6">
             <Link 
-              href="/populate_test_data" 
+              href="/populate-test-data" 
               className="btn btn-primary btn-sm"
             >
               🛠️ Populate Test Data
@@ -1268,7 +1268,7 @@ const AdminPage: NextPage = () => {
               <li><Link href="/borrower">Borrower Portal</Link></li>
               <li><Link href="/scores">Credit Scores</Link></li>
               <li><Link href="/admin">Admin Panel</Link></li>
-              <li><Link href="/populate_test_data">Populate Test Data</Link></li>
+              <li><Link href="/populate-test-data">Populate Test Data</Link></li>
               <li><Link href="/debug">Debug Contract</Link></li>
               <li><Link href="/oracle-setup">Oracle Setup</Link></li>
             </ul>
