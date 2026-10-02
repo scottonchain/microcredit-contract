@@ -184,8 +184,6 @@ function processAllDeployments(broadcastPath) {
         address: deployment.address,
         abi: artifact.abi,
         inheritedFunctions: getInheritedFunctions(artifact),
-        deploymentFile: deployment.deploymentFile,
-        deploymentScript: deployment.deploymentScript,
       };
     }
   });
