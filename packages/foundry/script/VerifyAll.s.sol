@@ -2,24 +2,12 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Script.sol";
-import "forge-std/Vm.sol";
-import "solidity-bytes-utils/BytesLib.sol";
 
 /**
- * @dev Temp Vm implementation
- * @notice calls the tryffi function on the Vm contract
- * @notice will be deleted once the forge/std is updated
+ * @notice Submits every contract created by the latest Deploy.s.sol broadcast
+ *         on the current chain to the block explorer for verification.
+ * @dev Usage: yarn verify --network <network>
  */
-struct FfiResult {
-    int32 exit_code;
-    bytes stdout;
-    bytes stderr;
-}
-
-interface tempVm {
-    function tryFfi(string[] calldata) external returns (FfiResult memory);
-}
-
 contract VerifyAll is Script {
     uint96 currTransactionIdx;
 
@@ -52,8 +40,7 @@ contract VerifyAll is Script {
             abi.decode(vm.parseJson(content, searchStr(currTransactionIdx, "transaction.input")), (bytes));
         bytes memory compiledBytecode =
             abi.decode(vm.parseJson(_getCompiledBytecode(contractName), ".bytecode.object"), (bytes));
-        bytes memory constructorArgs =
-            BytesLib.slice(deployedBytecode, compiledBytecode.length, deployedBytecode.length - compiledBytecode.length);
+        bytes memory constructorArgs = _tail(deployedBytecode, compiledBytecode.length);
 
         string[] memory inputs = new string[](9);
         inputs[0] = "forge";
@@ -66,7 +53,7 @@ contract VerifyAll is Script {
         inputs[7] = vm.toString(constructorArgs);
         inputs[8] = "--watch";
 
-        FfiResult memory f = tempVm(address(vm)).tryFfi(inputs);
+        VmSafe.FfiResult memory f = vm.tryFfi(inputs);
 
         if (f.stderr.length != 0) {
             console.logString(string.concat("Submitting verification for contract: ", vm.toString(contractAddr)));
@@ -74,7 +61,6 @@ contract VerifyAll is Script {
         } else {
             console.logString(string(f.stdout));
         }
-        return;
     }
 
     function nextTransaction(string memory content) external view returns (bool) {
@@ -97,5 +83,13 @@ contract VerifyAll is Script {
 
     function searchStr(uint96 idx, string memory searchKey) internal pure returns (string memory) {
         return string.concat(".transactions[", vm.toString(idx), "].", searchKey);
+    }
+
+    /// @dev Returns `data[start:]` (the ABI-encoded constructor args appended to creation code).
+    function _tail(bytes memory data, uint256 start) internal pure returns (bytes memory out) {
+        out = new bytes(data.length - start);
+        for (uint256 i = 0; i < out.length; i++) {
+            out[i] = data[start + i];
+        }
     }
 }

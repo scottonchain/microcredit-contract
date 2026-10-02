@@ -28,24 +28,6 @@ if ! command -v node >/dev/null 2>&1; then
   unset _win_node_dir
 fi
 
-# ── Create scaffold-eth-default keystore if missing (needed by forge deploy) ─
-# foundryup does not create this keystore automatically. The deploy script
-# uses ETH_KEYSTORE_ACCOUNT=scaffold-eth-default (from .env) and forge will
-# error if the keystore file is absent, even when --private-key is provided.
-_ks="$HOME/.foundry/keystores/scaffold-eth-default"
-if [[ ! -f "$_ks" ]]; then
-  _cast="${HOME}/.foundry/bin/cast"
-  [[ ! -x "$_cast" ]] && _cast="cast"
-  if command -v "$_cast" >/dev/null 2>&1 || [[ -x "$_cast" ]]; then
-    mkdir -p "$HOME/.foundry/keystores"
-    "$_cast" wallet import scaffold-eth-default \
-      --private-key 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6 \
-      --unsafe-password localhost >/dev/null 2>&1 && \
-      echo "  ✓ Created deploy keystore (scaffold-eth-default)"
-  fi
-fi
-unset _ks _cast
-
 # ── Ensure Foundry (anvil/forge) is on PATH ──────────────────────────────────
 # foundryup installs to ~/.foundry/bin but only adds it to ~/.bashrc,
 # which non-interactive shells (like this one) never source.
@@ -171,48 +153,18 @@ done
 echo " ✓"
 
 # ── Ensure Solidity libraries are present ────────────────────────────────────
-# lib/forge-std is gitignored (must be cloned separately).
-# lib/openzeppelin-contracts is a git submodule that may not be initialized.
-if [[ ! -f "$REPO/lib/forge-std/src/Script.sol" ]]; then
-  echo "  Cloning forge-std library…"
-  git clone --depth 1 https://github.com/foundry-rs/forge-std \
-    "$REPO/lib/forge-std" >/dev/null 2>&1 && echo "  ✓ forge-std ready" || \
-    echo "  ⚠ forge-std clone failed — deploy may fail"
-fi
-if [[ ! -f "$REPO/lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol" ]]; then
-  echo "  Initializing openzeppelin-contracts submodule…"
-  git -C "$REPO" submodule update --init lib/openzeppelin-contracts >/dev/null 2>&1 && \
-    echo "  ✓ openzeppelin-contracts ready" || \
+# OpenZeppelin is a git submodule; forge-std is vendored inside it.
+if [[ ! -f "$REPO/lib/openzeppelin-contracts/lib/forge-std/src/Script.sol" ]]; then
+  echo "  Initializing git submodules…"
+  git -C "$REPO" submodule update --init --recursive >/dev/null 2>&1 && \
+    echo "  ✓ Solidity libraries ready" || \
     echo "  ⚠ submodule init failed — deploy may fail"
 fi
-
-# Ensure deployment-config.json exists (vm.readFile reverts on missing file)
-[[ -f "$REPO/packages/foundry/deployment-config.json" ]] || echo '{}' > "$REPO/packages/foundry/deployment-config.json"
 
 # ── Deploy contracts ──────────────────────────────────────────────────────────
 echo ""
 echo "▶ Deploying contracts…"
-if ! command -v make >/dev/null 2>&1; then
-  # 'make' not available (common in WSL without build-essential).
-  # Run the forge deploy and ABI generation steps directly.
-  _forge="${HOME}/.foundry/bin/forge"
-  [[ ! -x "$_forge" ]] && _forge="forge"
-  # Use --account + --password so forge reads the keystore non-interactively.
-  # Using only --private-key alongside ETH_KEYSTORE_ACCOUNT (set in .env)
-  # causes forge to wait for an interactive keystore-password prompt that
-  # never arrives when stdin is a pipe, hanging indefinitely.
-  (cd "$REPO/packages/foundry" && \
-    FOUNDRY_AUTO_CONFIRM=1 "$_forge" script script/Deploy.s.sol:DeployScript \
-      --rpc-url localhost \
-      --account scaffold-eth-default \
-      --password localhost \
-      --broadcast --legacy --ffi \
-      --gas-limit 100000000 2>&1 | grep -E "deployed|USDC|Error|error") || true
-  node "$REPO/packages/foundry/scripts-js/generateTsAbis.js" 2>&1 | grep -v "^$" || true
-  unset _forge
-else
-  yarn deploy 2>&1 | grep -E "deployed|USDC|Error|error" || true
-fi
+yarn deploy 2>&1 | grep -E "deployed|USDC|Error|error" || true
 echo "  ✓ Contracts deployed"
 
 # ── Re-install deps when running in WSL (node_modules was built on Windows) ───
