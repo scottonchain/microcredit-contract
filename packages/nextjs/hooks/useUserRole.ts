@@ -1,8 +1,6 @@
-import { useAccount } from "wagmi";
-import { useScaffoldReadContract } from "./scaffold-eth";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AUTO_REDIRECT_CONFIG } from "~~/config/autoRedirect";
+import { useAccount } from "wagmi";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
 /**
  * User role types for the microcredit platform
@@ -13,21 +11,9 @@ import { AUTO_REDIRECT_CONFIG } from "~~/config/autoRedirect";
  */
 export type UserRole = "borrower" | "lender" | "both" | "none";
 
-/**
- * Custom hook to determine user role and provide redirection functionality
- * 
- * This hook checks if the connected address is:
- * - A borrower (has active loans)
- * - A lender (has deposits)
- * - Both borrower and lender
- * - Neither (new user)
- * 
- * It provides utilities for automatic redirection to appropriate pages
- * based on the user's role.
- */
+/** Classifies the connected address as borrower, lender, both or neither from on-chain state. */
 export const useUserRole = () => {
   const { address: connectedAddress } = useAccount();
-  const router = useRouter();
   const [userRole, setUserRole] = useState<UserRole>("none");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -68,32 +54,10 @@ export const useUserRole = () => {
     setIsLoading(false);
   }, [connectedAddress, lenderDeposit, borrowerLoanIds]);
 
-  const redirectToAppropriatePage = () => {
-    if (!connectedAddress || isLoading) return;
-
-    switch (userRole) {
-      case "borrower":
-        router.push(AUTO_REDIRECT_CONFIG.redirectPages.borrower);
-        break;
-      case "lender":
-        router.push(AUTO_REDIRECT_CONFIG.redirectPages.lender);
-        break;
-      case "both":
-        // Use configured default page for users with both roles
-        const defaultPage = AUTO_REDIRECT_CONFIG.redirectPages[AUTO_REDIRECT_CONFIG.defaultPageForBoth];
-        router.push(defaultPage);
-        break;
-      case "none":
-        // Stay on current page (likely home page)
-        break;
-    }
-  };
-
   return {
     userRole,
     isLoading,
     isBorrower: userRole === "borrower" || userRole === "both",
     isLender: userRole === "lender" || userRole === "both",
-    redirectToAppropriatePage,
   };
 }; 
