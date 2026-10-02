@@ -55,3 +55,6 @@ jobs:
 
       - name: Check typings on nextjs
         run: yarn next:check-types
+
+      - name: Build nextjs
+        run: yarn next:build

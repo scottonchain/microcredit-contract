@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAccount, usePublicClient, useSignTypedData } from "wagmi";
 import { toast } from "react-hot-toast";
@@ -11,7 +11,16 @@ import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 import { AttestRequest, MICRO_DOMAIN, TYPES } from "~~/utils/eip712";
 import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS } from "~~/utils/microcredit";
 
+// useSearchParams() needs a Suspense boundary for the page to be prerendered at build time.
 export default function AttestPage() {
+  return (
+    <Suspense>
+      <AttestForm />
+    </Suspense>
+  );
+}
+
+function AttestForm() {
   const searchParams = useSearchParams();
   const { address: connectedAddress } = useAccount();
   const { signTypedDataAsync } = useSignTypedData();
