@@ -2,18 +2,16 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { createPublicClient, http } from "viem";
-import { localhost } from "viem/chains";
-import deployedContracts from "~~/contracts/deployedContracts";
 import type { NextPage } from "next";
-import { useAccount, useSignTypedData } from "wagmi";
+import { useAccount, usePublicClient, useSignTypedData } from "wagmi";
 import { CreditCardIcon, CalculatorIcon, DocumentDuplicateIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
-import { splitSignature } from "../../utils/usdc";
+import { MICRO_DOMAIN, TYPES, USDC_PERMIT_DOMAIN, splitSignature } from "~~/utils/eip712";
+import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
 
 const BorrowPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -127,12 +125,7 @@ const BorrowPage: NextPage = () => {
     return roundDownToNearestPenny(amountInWei);
   };
 
-  // Contract configs
-  const contracts = deployedContracts[31337];
-  const USDC_ADDRESS = contracts?.MockUSDC?.address as `0x${string}` | undefined;
-  const USDC_ABI = contracts?.MockUSDC?.abi;
-  const MICRO_ADDRESS = contracts?.DecentralizedMicrocredit?.address as `0x${string}` | undefined;
-  const MICRO_ABI = contracts?.DecentralizedMicrocredit?.abi;
+  const publicClient = usePublicClient({ chainId: CHAIN_ID });
 
   // Cache USDC token name for EIP-2612 domain (avoid hardcoding to prevent invalid signatures)
   const [usdcTokenName, setUsdcTokenName] = useState<string | undefined>(undefined);
@@ -140,7 +133,7 @@ const BorrowPage: NextPage = () => {
     let cancelled = false;
     const loadName = async () => {
       try {
-        if (!USDC_ADDRESS || !USDC_ABI) return;
+        if (!publicClient || !USDC_ADDRESS || !USDC_ABI) return;
         const name = (await publicClient.readContract({
           address: USDC_ADDRESS,
           abi: USDC_ABI,
@@ -157,7 +150,7 @@ const BorrowPage: NextPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [USDC_ADDRESS, USDC_ABI]);
+  }, [publicClient]);
 
   // Dev-only domain sanity: warn if token name differs
   useEffect(() => {
@@ -172,7 +165,7 @@ const BorrowPage: NextPage = () => {
 
   // Helper function to check USDC balance
   const checkUSDCBalance = async (amount: bigint) => {
-    if (!connectedAddress || !USDC_ADDRESS) {
+    if (!connectedAddress || !USDC_ADDRESS || !USDC_ABI || !publicClient) {
       throw new Error("Missing required addresses");
     }
 
@@ -249,75 +242,15 @@ const BorrowPage: NextPage = () => {
     return "UNKNOWN_ERROR";
   };
 
-  // --- viem public client (local Anvil) -----------------------------------
-  const CHAIN_ID = 31337;
-  const RPC_URL = "http://localhost:8545";
-
-  const publicClient = useMemo(
-    () =>
-      createPublicClient({
-        chain: { ...localhost, id: CHAIN_ID },
-        transport: http(RPC_URL),
-      }),
-    []
-  );
-
-  // Deployed Microcredit contract address / ABI
-  const microcreditData = deployedContracts[CHAIN_ID]?.DecentralizedMicrocredit as any;
-  const CONTRACT_ADDRESS = microcreditData?.address as `0x${string}` | undefined;
-  const CONTRACT_ABI = microcreditData?.abi;
-
   // EIP-712 signing
   const { signTypedDataAsync } = useSignTypedData();
 
-  // Helpers for meta-transaction domain and types (Microcredit)
-  const domain = useMemo(
-    () => ({
-      name: "DecentralizedMicrocredit",
-      version: "1",
-      chainId: CHAIN_ID,
-      verifyingContract: CONTRACT_ADDRESS as `0x${string}` | undefined,
-    }),
-    [CHAIN_ID, CONTRACT_ADDRESS]
-  );
+  const domain = MICRO_DOMAIN(CHAIN_ID, MICROCREDIT_ADDRESS);
+  const borrowAndDisburseTypes = { BorrowAndDisburse: TYPES.BorrowAndDisburse };
 
-  const borrowAndDisburseTypes = {
-    BorrowAndDisburse: [
-      { name: "borrower", type: "address" },
-      { name: "amount", type: "uint256" },
-      { name: "to", type: "address" },
-      { name: "repaymentPeriod", type: "uint256" },
-      { name: "maxAprBps", type: "uint256" },
-      { name: "nonce", type: "uint256" },
-      { name: "deadline", type: "uint256" },
-    ],
-  } as const;
-
-  // Removed RepayRequest typed-data. Repay now uses only USDC Permit.
-
-  // ERC-2612 Permit typed data domain for USDC
-  // Use on-chain token name when available; default to "USD Coin" (MockUSDC constructor) to maintain compatibility
-  const usdcPermitDomain = useMemo(
-    () => ({
-      name: usdcTokenName || "USD Coin",
-      version: "1",
-      chainId: CHAIN_ID,
-      verifyingContract: USDC_ADDRESS as `0x${string}` | undefined,
-    }),
-    [CHAIN_ID, USDC_ADDRESS, usdcTokenName]
-  );
-
-  const permitTypes = {
-    Permit: [
-      { name: "owner", type: "address" },
-      { name: "spender", type: "address" },
-      { name: "value", type: "uint256" },
-      { name: "nonce", type: "uint256" },
-      { name: "deadline", type: "uint256" },
-    ],
-  } as const;
-
-  // Using splitSignature from utils/usdc.
+  // ERC-2612 permit domain; uses the on-chain token name when available ("USD Coin" for MockUSDC).
+  const usdcPermitDomain = USDC_ADDRESS ? USDC_PERMIT_DOMAIN(CHAIN_ID, USDC_ADDRESS, usdcTokenName) : undefined;
+  const permitTypes = { Permit: TYPES.Permit };
 
   // Preview loan terms when amount or repayment period changes
   const { data: previewTermsData } = useScaffoldReadContract({
@@ -405,33 +338,36 @@ const BorrowPage: NextPage = () => {
     await Promise.allSettled(ops);
   };
 
-  // Event-driven sync to avoid races after repayments/disbursements
+  // Event-driven sync to avoid races after repayments/disbursements. Watchers call the latest
+  // refreshAfterMutation through a ref so they are not re-subscribed on every render.
+  const refreshAfterMutationRef = useRef(refreshAfterMutation);
+  refreshAfterMutationRef.current = refreshAfterMutation;
   useEffect(() => {
-    if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !connectedAddress) return;
+    if (!publicClient || !connectedAddress) return;
     const isMine = (a?: any) => a?.toLowerCase?.() === connectedAddress.toLowerCase();
 
     const off1 = publicClient.watchContractEvent({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
+      address: MICROCREDIT_ADDRESS,
+      abi: MICROCREDIT_ABI,
       eventName: "LoanRepaid",
       onLogs: (logs: any[]) => {
-        if (logs?.some?.(l => isMine((l as any)?.args?.borrower))) void refreshAfterMutation();
+        if (logs?.some?.(l => isMine((l as any)?.args?.borrower))) void refreshAfterMutationRef.current();
       },
     });
     const off2 = publicClient.watchContractEvent({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
+      address: MICROCREDIT_ADDRESS,
+      abi: MICROCREDIT_ABI,
       eventName: "MetaLoanRepaid",
       onLogs: (logs: any[]) => {
-        if (logs?.some?.(l => isMine((l as any)?.args?.borrower))) void refreshAfterMutation();
+        if (logs?.some?.(l => isMine((l as any)?.args?.borrower))) void refreshAfterMutationRef.current();
       },
     });
     const off3 = publicClient.watchContractEvent({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
+      address: MICROCREDIT_ADDRESS,
+      abi: MICROCREDIT_ABI,
       eventName: "MetaLoanDisbursed",
       onLogs: (logs: any[]) => {
-        if (logs?.some?.(l => isMine((l as any)?.args?.borrower))) void refreshAfterMutation();
+        if (logs?.some?.(l => isMine((l as any)?.args?.borrower))) void refreshAfterMutationRef.current();
       },
     });
 
@@ -444,7 +380,7 @@ const BorrowPage: NextPage = () => {
         /* noop */
       }
     };
-  }, [CONTRACT_ADDRESS, CONTRACT_ABI, publicClient, connectedAddress]);
+  }, [publicClient, connectedAddress]);
 
   const handleOneClickBorrow = async () => {
     if (!loanAmount || !connectedAddress) return;
@@ -453,11 +389,11 @@ const BorrowPage: NextPage = () => {
     try {
       const principal = parseLoanAmount(loanAmount);
       if (!principal) return;
-      if (!CONTRACT_ADDRESS || !CONTRACT_ABI) throw new Error("Contract not available");
+      if (!publicClient) throw new Error("Contract not available");
       // === One-Click Borrow (BorrowAndDisburse) ===
       const nonce = (await publicClient.readContract({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
+        address: MICROCREDIT_ADDRESS,
+        abi: MICROCREDIT_ABI,
         functionName: "nonces",
         args: [connectedAddress],
       })) as bigint;
@@ -489,7 +425,7 @@ const BorrowPage: NextPage = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chainId: CHAIN_ID,
-          contractAddress: CONTRACT_ADDRESS,
+          contractAddress: MICROCREDIT_ADDRESS,
           req: {
             borrower: borrowReq.borrower,
             amount: borrowReq.amount.toString(),
@@ -771,11 +707,11 @@ const BorrowPage: NextPage = () => {
                     try {
                       setPermitError(null);
                       console.log("Starting full repayment process (gasless meta)...");
-                      if (!CONTRACT_ADDRESS || !CONTRACT_ABI) throw new Error("Missing contracts");
+                      if (!publicClient) throw new Error("Missing contracts");
                       // Read canonical outstanding rounded to cent (contract view)
                       const out = (await publicClient.readContract({
-                        address: CONTRACT_ADDRESS,
-                        abi: CONTRACT_ABI,
+                        address: MICROCREDIT_ADDRESS,
+                        abi: MICROCREDIT_ABI,
                         functionName: "getOutstandingRoundedToCent",
                         args: [activeLoanId as bigint],
                       })) as bigint;
@@ -784,7 +720,7 @@ const BorrowPage: NextPage = () => {
                       // Check USDC balance first
                       await checkUSDCBalance(amountToRepay);
 
-                      if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !USDC_ADDRESS || !USDC_ABI) throw new Error("Missing contracts");
+                      if (!publicClient || !USDC_ADDRESS || !USDC_ABI || !usdcPermitDomain) throw new Error("Missing contracts");
 
                       // 1) Build EIP-2612 permit for USDC (spender = micro contract). Permit is REQUIRED.
                       let permitPayload: { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` };
@@ -798,7 +734,7 @@ const BorrowPage: NextPage = () => {
                         const permitDeadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
                         const permitMsg = {
                           owner: connectedAddress,
-                          spender: CONTRACT_ADDRESS,
+                          spender: MICROCREDIT_ADDRESS,
                           value: amountToRepay,
                           nonce: usdcNonce,
                           deadline: permitDeadline,
@@ -831,7 +767,7 @@ const BorrowPage: NextPage = () => {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                           chainId: CHAIN_ID,
-                          contractAddress: CONTRACT_ADDRESS,
+                          contractAddress: MICROCREDIT_ADDRESS,
                           borrower: connectedAddress,
                           loanId: (activeLoanId as bigint).toString(),
                           amount: "0",
@@ -909,7 +845,7 @@ const BorrowPage: NextPage = () => {
                         // Check USDC balance first
                         await checkUSDCBalance(repayAmountBigInt);
 
-                        if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !USDC_ADDRESS || !USDC_ABI) throw new Error("Missing contracts");
+                        if (!publicClient || !USDC_ADDRESS || !USDC_ABI || !usdcPermitDomain) throw new Error("Missing contracts");
 
                         // 1) Build USDC EIP-2612 permit (REQUIRED)
                         let permitPayload: { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` };
@@ -923,7 +859,7 @@ const BorrowPage: NextPage = () => {
                           const permitDeadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
                           const permitMsg = {
                             owner: connectedAddress,
-                            spender: CONTRACT_ADDRESS,
+                            spender: MICROCREDIT_ADDRESS,
                             value: repayAmountBigInt,
                             nonce: usdcNonce,
                             deadline: permitDeadline,
@@ -955,7 +891,7 @@ const BorrowPage: NextPage = () => {
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
                             chainId: CHAIN_ID,
-                            contractAddress: CONTRACT_ADDRESS,
+                            contractAddress: MICROCREDIT_ADDRESS,
                             borrower: connectedAddress,
                             loanId: (activeLoanId as bigint).toString(),
                             amount: repayAmountBigInt.toString(),
