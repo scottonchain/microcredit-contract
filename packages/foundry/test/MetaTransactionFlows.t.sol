@@ -321,7 +321,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
 
     function testRepayLoanMetaRepayAllPullsCurrentOutstanding() public {
         uint256 loanId = _borrow(40e6);
-        vm.warp(block.timestamp + 10 days);
+        vm.warp(vm.getBlockTimestamp() + 10 days);
         uint256 owed = credit.getCurrentOutstandingAmount(loanId);
         assertGt(owed, 40e6, "interest accrued after grace period");
         usdc.mint(borrower, owed - 40e6);
@@ -343,7 +343,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
 
     function testRepayLoanMetaAfterPartialRepaymentPullsRemainder() public {
         uint256 loanId = _borrow(40e6);
-        vm.warp(block.timestamp + 10 days);
+        vm.warp(vm.getBlockTimestamp() + 10 days);
         vm.startPrank(borrower);
         usdc.approve(address(credit), type(uint256).max);
         credit.repayLoan(loanId, 15e6);
@@ -363,7 +363,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
 
     function testRepayLoanMetaToleratesOneCentDrift() public {
         uint256 loanId = _borrow(40e6);
-        vm.warp(block.timestamp + 10 days);
+        vm.warp(vm.getBlockTimestamp() + 10 days);
         uint256 owed = credit.getCurrentOutstandingAmount(loanId);
         usdc.mint(borrower, owed - 40e6);
         vm.prank(borrower);

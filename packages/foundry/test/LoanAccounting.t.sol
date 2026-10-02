@@ -32,13 +32,13 @@ contract LoanAccountingTest is MicrocreditTestBase {
 
     function testNoInterestDuringGracePeriod() public {
         uint256 loanId = _openLoan(PRINCIPAL);
-        vm.warp(block.timestamp + 1 days - 1);
+        vm.warp(vm.getBlockTimestamp() + 1 days - 1);
         assertEq(credit.getCurrentOutstandingAmount(loanId), PRINCIPAL);
     }
 
     function testSimpleInterestAccruesFromOrigination() public {
         uint256 loanId = _openLoan(PRINCIPAL);
-        vm.warp(block.timestamp + 365 days);
+        vm.warp(vm.getBlockTimestamp() + 365 days);
         assertEq(credit.getCurrentOutstandingAmount(loanId), PRINCIPAL + (PRINCIPAL * RATE) / 10_000);
 
         (, uint256 outstanding,,,) = credit.getLoan(loanId);
@@ -47,7 +47,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
 
     function testOutstandingRoundedToNearestCent() public {
         uint256 loanId = _openLoan(PRINCIPAL);
-        vm.warp(block.timestamp + 10 days);
+        vm.warp(vm.getBlockTimestamp() + 10 days);
         uint256 exact = credit.getCurrentOutstandingAmount(loanId);
         uint256 rounded = credit.getOutstandingRoundedToCent(loanId);
         assertEq(rounded % 10_000, 0);
@@ -56,7 +56,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
 
     function testRepayLoanInFullClosesLoan() public {
         uint256 loanId = _openLoan(PRINCIPAL);
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
         uint256 owed = credit.getCurrentOutstandingAmount(loanId);
         usdc.mint(borrower, owed - PRINCIPAL);
         vm.startPrank(borrower);
@@ -83,7 +83,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
 
     function testPartialRepaymentReducesOutstanding() public {
         uint256 loanId = _openLoan(PRINCIPAL);
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
         uint256 owed = credit.getCurrentOutstandingAmount(loanId);
 
         vm.startPrank(borrower);
@@ -99,7 +99,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
 
     function testPartialRepaymentsThenPayoffCloseLoan() public {
         uint256 loanId = _openLoan(PRINCIPAL);
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
         uint256 owed = credit.getCurrentOutstandingAmount(loanId);
         usdc.mint(borrower, owed - PRINCIPAL);
 
@@ -131,7 +131,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
 
     function testRepayWithPermitPartialReducesOutstanding() public {
         uint256 loanId = _openLoan(PRINCIPAL);
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
         uint256 owed = credit.getCurrentOutstandingAmount(loanId);
 
         DecentralizedMicrocredit.PermitData memory p = _signPermit(borrowerPk, 300e6, _deadline());
@@ -148,7 +148,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
         uint256 loanId = _openLoan(PRINCIPAL);
         uint256 owed;
         for (uint256 day = 2; day < 60; day++) {
-            vm.warp(block.timestamp + 1 days);
+            vm.warp(vm.getBlockTimestamp() + 1 days);
             owed = credit.getCurrentOutstandingAmount(loanId);
             if (owed % 10_000 != 0 && owed % 10_000 < 5_000) break;
         }
