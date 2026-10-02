@@ -259,6 +259,20 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         credit.requestWithdrawalMeta(req, sig);
     }
 
+    /// @dev Lends the entire pool (POOL + 1,000 from `lender`) to `borrower`, leaving nothing liquid.
+    function _lendOutWholePool() internal returns (uint256 loanId) {
+        vm.startPrank(owner);
+        credit.setMaxLoanAmount(POOL + 1_000e6);
+        credit.setScoreOverride(borrower, SCALE);
+        credit.setLendingUtilizationCap(10_000);
+        credit.setLiquidityLimits(0, 0);
+        vm.stopPrank();
+        vm.prank(borrower);
+        loanId = credit.requestLoan(POOL + 1_000e6);
+        credit.disburseLoan(loanId);
+        assertEq(usdc.balanceOf(address(credit)), 0);
+    }
+
     function testWithdrawalFillsImmediatelyWhenLiquid() public {
         _depositPermitOnly(lender, lenderPk, 1_000e6);
         address payout = makeAddr("payout");
@@ -276,18 +290,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
 
     function testWithdrawalQueuesUntilDepositsRestoreLiquidity() public {
         _depositPermitOnly(lender, lenderPk, 1_000e6);
-
-        // Lend out the whole pool so nothing is liquid.
-        vm.startPrank(owner);
-        credit.setMaxLoanAmount(POOL + 1_000e6);
-        credit.setScoreOverride(borrower, SCALE);
-        credit.setLendingUtilizationCap(10_000);
-        credit.setLiquidityLimits(0, 0);
-        vm.stopPrank();
-        vm.prank(borrower);
-        uint256 loanId = credit.requestLoan(POOL + 1_000e6);
-        credit.disburseLoan(loanId);
-        assertEq(usdc.balanceOf(address(credit)), 0);
+        _lendOutWholePool();
 
         address payout = makeAddr("payout");
         _requestWithdrawal(1_000e6, payout);
@@ -304,6 +307,70 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         _depositPermitOnly(other, 0x07E4, 1_000e6);
         assertEq(usdc.balanceOf(payout), 1_000e6);
         assertEq(credit.lenderDeposits(lender), 0);
+    }
+
+    function testQueuedFundsCannotBeQueuedOrWithdrawnTwice() public {
+        _depositPermitOnly(lender, lenderPk, 1_000e6);
+        _lendOutWholePool();
+        _requestWithdrawal(1_000e6, lender);
+        assertEq(credit.queuedWithdrawals(lender), 1_000e6);
+
+        DecentralizedMicrocredit.RequestWithdrawal memory again = DecentralizedMicrocredit.RequestWithdrawal({
+            lender: lender, amount: 1_000e6, to: lender, nonce: credit.nonces(lender), deadline: _deadline()
+        });
+        bytes memory sig = _signRequestWithdrawal(lenderPk, again);
+        vm.prank(relayer);
+        vm.expectRevert("Insufficient balance");
+        credit.requestWithdrawalMeta(again, sig);
+
+        vm.prank(lender);
+        vm.expectRevert("Insufficient balance");
+        credit.withdrawFunds(1);
+    }
+
+    function testRepaymentFillsWithdrawalQueue() public {
+        _depositPermitOnly(lender, lenderPk, 1_000e6);
+        uint256 loanId = _lendOutWholePool();
+        address payout = makeAddr("payout");
+        _requestWithdrawal(1_000e6, payout);
+
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), 1_000e6);
+        credit.repayLoan(loanId, 1_000e6);
+        vm.stopPrank();
+
+        assertEq(usdc.balanceOf(payout), 1_000e6);
+        assertEq(credit.lenderDeposits(lender), 0);
+        assertEq(credit.queuedWithdrawals(lender), 0);
+    }
+
+    function testDirectDepositFillsWithdrawalQueue() public {
+        _depositPermitOnly(lender, lenderPk, 1_000e6);
+        _lendOutWholePool();
+        address payout = makeAddr("payout");
+        _requestWithdrawal(1_000e6, payout);
+
+        _deposit(makeAddr("newLender"), 1_000e6);
+        assertEq(usdc.balanceOf(payout), 1_000e6);
+    }
+
+    function testDirectWithdrawalCannotJumpTheQueue() public {
+        _depositPermitOnly(lender, lenderPk, 1_000e6);
+        _lendOutWholePool();
+        address payout = makeAddr("payout");
+        _requestWithdrawal(1_000e6, payout);
+
+        // Liquidity that arrives outside a deposit or repayment still goes to the queue first:
+        // a direct withdrawal only gets what is left after the queued request is paid.
+        usdc.mint(address(credit), 1_500e6);
+        vm.prank(poolLender);
+        credit.withdrawFunds(500e6);
+        assertEq(usdc.balanceOf(payout), 1_000e6);
+        assertEq(usdc.balanceOf(poolLender), 500e6);
+
+        vm.prank(poolLender);
+        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        credit.withdrawFunds(1);
     }
 
     function testWithdrawalRequestRejectsMoreThanDeposited() public {

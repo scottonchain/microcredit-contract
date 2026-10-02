@@ -1608,6 +1608,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "queuedWithdrawals",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "recordAttestation",
           inputs: [
             {
