@@ -192,6 +192,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     // FIFO withdrawal queue (filled as liquidity returns)
     WithdrawalQueueItem[] private withdrawalQueue;
     uint256 private withdrawalHead;
+    mapping(address => uint256) public queuedWithdrawals; // per lender, still waiting in the queue
 
     // ───────────────────────────── events ─────────────────────────────
 
@@ -329,16 +330,19 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         require(amount > 0, "Amount > 0");
         _pullUsdc(msg.sender, amount);
         _recordDeposit(msg.sender, amount);
+        _tryFillWithdrawalQueue();
     }
 
+    /// @notice Withdraw immediately. Queued withdrawals are paid first, and funds already queued
+    ///         cannot be withdrawn again here.
     function withdrawFunds(uint256 amount) external {
         require(amount > 0, "Amount > 0");
-        require(lenderDeposits[msg.sender] >= amount, "Insufficient balance");
+        require(lenderDeposits[msg.sender] - queuedWithdrawals[msg.sender] >= amount, "Insufficient balance");
+        _tryFillWithdrawalQueue();
 
-        uint256 liquidBalance = usdc.balanceOf(address(this));
         uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
         require(
-            liquidBalance - reservedLiquidity - amount >= bufferRequired + liquidityThreshold,
+            usdc.balanceOf(address(this)) >= reservedLiquidity + amount + bufferRequired + liquidityThreshold,
             "LIQUIDITY_BELOW_THRESHOLD"
         );
 
@@ -605,7 +609,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             keccak256(abi.encode(REQUEST_WITHDRAWAL_TYPEHASH, req.lender, req.amount, req.to, req.nonce, req.deadline)),
             sig
         );
-        require(lenderDeposits[req.lender] >= req.amount, "Insufficient balance");
+        require(lenderDeposits[req.lender] - queuedWithdrawals[req.lender] >= req.amount, "Insufficient balance");
+        queuedWithdrawals[req.lender] += req.amount;
 
         uint256 queueId = withdrawalQueue.length;
         withdrawalQueue.push(
@@ -874,6 +879,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         if (owed - paid < CENT) {
             _closeLoan(loan);
         }
+        _tryFillWithdrawalQueue();
     }
 
     function _closeLoan(Loan storage loan) internal {
@@ -922,7 +928,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         }
     }
 
-    /// @dev Pays queued withdrawals in FIFO order while liquidity stays above the guards.
+    /// @dev Pays queued withdrawals in FIFO order while liquidity stays above the guards. Called
+    ///      from every path that adds liquidity, and before direct withdrawals.
     function _tryFillWithdrawalQueue() internal {
         uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
 
@@ -942,6 +949,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             uint256 pay = item.remaining <= available ? item.remaining : available;
 
             lenderDeposits[item.lender] -= pay;
+            queuedWithdrawals[item.lender] -= pay;
             totalDeposits -= pay;
             _pushUsdc(item.to, pay);
             item.remaining -= pay;
