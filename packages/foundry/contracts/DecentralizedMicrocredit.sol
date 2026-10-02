@@ -46,7 +46,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     struct Loan {
         uint256 principal;
-        uint256 outstanding;
+        uint256 repaid; // cumulative repayments
         address borrower;
         uint256 interestRate; // APR in BASIS_POINTS, fixed at origination
         bool isActive;
@@ -355,20 +355,14 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         _disburseLoan(loanId, loans[loanId].borrower);
     }
 
+    /// @notice Repay up to `amount`; any excess over the outstanding balance is not pulled.
     function repayLoan(uint256 loanId, uint256 amount) external {
         Loan storage loan = _repayableLoan(loanId);
         require(msg.sender == loan.borrower, "Borrower only");
         require(amount > 0, "Amount > 0");
 
-        uint256 currentOutstanding = getCurrentOutstandingAmount(loanId);
-        _pullUsdc(msg.sender, amount);
-
-        if (amount >= currentOutstanding) {
-            _closeLoan(loan);
-        } else {
-            loan.outstanding = currentOutstanding - amount;
-        }
-        emit LoanRepaid(msg.sender, loanId, amount);
+        uint256 paid = _repay(loanId, loan, msg.sender, amount);
+        emit LoanRepaid(msg.sender, loanId, paid);
     }
 
     /**
@@ -397,15 +391,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         }
         require(spend > 0, "Nothing to repay");
 
-        _pullUsdc(borrower, spend);
-
-        uint256 currentOutstanding = getCurrentOutstandingAmount(loanId);
-        if (spend >= currentOutstanding || currentOutstanding < CENT) {
-            _closeLoan(loan);
-        } else {
-            loan.outstanding = currentOutstanding - spend;
-        }
-        emit LoanRepaid(borrower, loanId, spend);
+        uint256 paid = _repay(loanId, loan, borrower, spend);
+        emit LoanRepaid(borrower, loanId, paid);
     }
 
     // ───────────────────────────── attestations & credit ─────────────────────────────
@@ -563,8 +550,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             require(out - req.amount <= CENT, "OUTSTANDING_CHANGED");
         }
 
-        _pullUsdc(req.borrower, out);
-        _closeLoan(loan);
+        _repay(req.loanId, loan, req.borrower, out);
         emit MetaLoanRepaid(req.borrower, req.loanId, out);
     }
 
@@ -690,21 +676,26 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         returns (uint256 principal, uint256 outstanding, address borrower, uint256 interestRate, bool isActive)
     {
         Loan storage loan = loans[loanId];
-        outstanding = loan.isActive ? getCurrentOutstandingAmount(loanId) : loan.outstanding;
+        outstanding = loan.isActive ? getCurrentOutstandingAmount(loanId) : 0;
         return (loan.principal, outstanding, loan.borrower, loan.interestRate, loan.isActive);
     }
 
-    /// @notice Principal plus simple interest accrued since origination (none in the first day).
+    /**
+     * @notice Principal plus simple interest accrued since origination, less repayments.
+     * @dev No interest accrues during the first day. Interest keeps accruing on the original
+     *      principal until the loan closes; partial repayments reduce the balance, not the base.
+     */
     function getCurrentOutstandingAmount(uint256 loanId) public view returns (uint256) {
         Loan storage loan = loans[loanId];
         require(loan.isActive, "Loan inactive");
 
+        uint256 owed = loan.principal;
         uint256 timeElapsed = block.timestamp - loan.createdAt;
-        if (timeElapsed < GRACE_PERIOD) {
-            return loan.principal;
+        if (timeElapsed >= GRACE_PERIOD) {
+            uint256 annualInterest = (loan.principal * loan.interestRate) / BASIS_POINTS;
+            owed += (annualInterest * timeElapsed) / SECONDS_PER_YEAR;
         }
-        uint256 annualInterest = (loan.principal * loan.interestRate) / BASIS_POINTS;
-        return loan.principal + (annualInterest * timeElapsed) / SECONDS_PER_YEAR;
+        return owed > loan.repaid ? owed - loan.repaid : 0;
     }
 
     /// @notice Outstanding balance rounded half-up to the cent, as shown in the UI.
@@ -826,7 +817,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         loanId = nextLoanId++;
         loans[loanId] = Loan({
             principal: amount,
-            outstanding: amount,
+            repaid: 0,
             borrower: borrower,
             interestRate: effrRate + riskPremium,
             isActive: true,
@@ -861,9 +852,24 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         require(loan.disbursed, "Not disbursed");
     }
 
+    /**
+     * @dev Pulls `min(amount, outstanding)` from `payer` and closes the loan once less than a
+     *      cent remains (sub-cent balances are forgiven). Returns the amount pulled.
+     */
+    function _repay(uint256 loanId, Loan storage loan, address payer, uint256 amount) internal returns (uint256 paid) {
+        uint256 owed = getCurrentOutstandingAmount(loanId);
+        paid = amount < owed ? amount : owed;
+        if (paid > 0) {
+            _pullUsdc(payer, paid);
+            loan.repaid += paid;
+        }
+        if (owed - paid < CENT) {
+            _closeLoan(loan);
+        }
+    }
+
     function _closeLoan(Loan storage loan) internal {
         totalLentOut -= loan.principal;
-        loan.outstanding = 0;
         loan.isActive = false;
     }
 
