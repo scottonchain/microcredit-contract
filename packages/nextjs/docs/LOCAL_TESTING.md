@@ -4,27 +4,21 @@ This document provides all the necessary connection details for testing the micr
 
 ## 🚀 Quick Start
 
+All commands run from the repository root.
+
 ### 1. Start Local Blockchain
 ```bash
-# From project root
-cd packages/foundry
-yarn chain
-# or
-anvil
+yarn chain    # scripts/start-anvil.sh: zero gas, state persisted to chain-state.json
 ```
 
 ### 2. Deploy Contracts
 ```bash
-# From packages/foundry
 yarn deploy
-# or
-forge script script/Deploy.s.sol:DeployScript --rpc-url localhost --broadcast
 ```
 
 ### 3. Start Frontend
 ```bash
-# From packages/nextjs
-yarn dev
+yarn start
 ```
 
 ## 🔗 Network Configuration
@@ -131,16 +125,11 @@ PRIVATE_KEY=your_private_key_here
 ### 1. Setup
 ```bash
 # Terminal 1: Start blockchain
-cd packages/foundry
 yarn chain
 
-# Terminal 2: Deploy contracts
-cd packages/foundry
+# Terminal 2: Deploy contracts, then start the frontend
 yarn deploy
-
-# Terminal 3: Start frontend
-cd packages/nextjs
-yarn dev
+yarn start
 ```
 
 ### 2. Test User Flow
@@ -211,15 +200,8 @@ cast logs --rpc-url http://127.0.0.1:8545
 
 ### Complete Reset
 ```bash
-# Stop all processes
-# Delete deployment files
-rm packages/foundry/deployment.json
-rm packages/foundry/broadcast/Deploy.s.sol/31337/*.json
-
-# Restart from scratch
-yarn chain
-yarn deploy
-yarn dev
+# Stops the chain and frontend, deletes chain-state.json, restarts both and redeploys
+yarn restart
 ```
 
 ### Quick Reset

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/demo.sh — Start the demo environment (chain + contracts + app).
+# scripts/demo.sh: start the demo environment (chain + contracts + app).
 # Usage (from the repo root):
 #   yarn demo                       # fresh deploy, then run Playwright automation
 #   yarn demo --manual              # fresh deploy, leave servers running for manual use
