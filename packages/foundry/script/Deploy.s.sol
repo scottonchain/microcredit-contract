@@ -1,149 +1,104 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "forge-std/Script.sol";
-import "../contracts/DecentralizedMicrocredit.sol";
-import "../contracts/MockUSDC.sol";
+import { Script, console } from "forge-std/Script.sol";
+import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
+import { MockUSDC } from "../contracts/MockUSDC.sol";
 
 /**
- * @notice Main deployment script for all contracts
- * @dev Run this when you want to deploy multiple contracts at once
- *
- * Example: yarn deploy # runs this script(without`--file` flag)
- * To deploy with MockUSDC: DEPLOY_MOCK_USDC=true yarn deploy
+ * @notice Deploys MockUSDC (unless deployment-config.json points at a live one) and
+ *         DecentralizedMicrocredit, then seeds the local demo state.
+ * @dev Run with `yarn deploy`. Uses Anvil's deterministic accounts:
+ *        9 Alexis   — deployer, owner and oracle
+ *        2 Avery    — attester
+ *        3 Brighton — borrower
+ *        4 Diana, 5 Eve — background borrowers that bring pool utilisation to 89%
  */
 contract DeployScript is Script {
+    uint256 internal constant ALEXIS_PK = 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6;
+    uint256 internal constant AVERY_PK = 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a;
+    uint256 internal constant BRIGHTON_PK = 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6;
+    uint256 internal constant DIANA_PK = 0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a;
+    uint256 internal constant EVE_PK = 0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba;
+
+    uint256 internal constant EFFR_BPS = 433; // 4.33%
+    uint256 internal constant RISK_PREMIUM_BPS = 500; // 5.00%
+    uint256 internal constant MAX_LOAN = 100e6; // 100 USDC at a 100% credit score
+    uint256 internal constant POOL_SEED = 10_000e6;
+
+    DecentralizedMicrocredit internal credit;
+
     function run() external {
-        // Debug: Print the current working directory
-        console.logString(string.concat("Current working directory: ", vm.projectRoot()));
+        address alexis = vm.addr(ALEXIS_PK);
+        vm.startBroadcast(ALEXIS_PK);
 
-        // Debug: Print the sender address
-        console.logString(string.concat("Sender address: ", vm.toString(msg.sender)));
+        address usdc = _resolveUsdc();
+        credit = new DecentralizedMicrocredit(EFFR_BPS, RISK_PREMIUM_BPS, MAX_LOAN, usdc, alexis);
+        console.log("DecentralizedMicrocredit deployed at:", address(credit));
 
-        // Use the default Anvil account for local deployment
-        uint256 deployerPrivateKey = 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6;
-        console.logString("Using default Anvil account");
+        // Seed the lending pool.
+        MockUSDC(usdc).mint(alexis, POOL_SEED);
+        MockUSDC(usdc).approve(address(credit), POOL_SEED);
+        credit.depositFunds(POOL_SEED);
+        console.log("Seeded lending pool with 10,000 USDC");
 
-        // Start broadcasting transactions
-        vm.startBroadcast(deployerPrivateKey);
+        // Diana + Eve bring utilisation to 89%: the most we can lend while leaving a slot for
+        // Brighton's 100 USDC demo loan under the 90% cap ($8,899 + $100 <= $9,000).
+        // Lender APY ~ 8.3% (= 9.33% loan rate x 89% utilisation).
+        credit.setMaxLoanAmount(POOL_SEED);
+        _seedBorrower(DIANA_PK, 6_500e6);
+        _seedBorrower(EVE_PK, 2_399e6);
+        credit.setMaxLoanAmount(MAX_LOAN);
+        console.log("Background borrowers: Diana $6,500 + Eve $2,399 = $8,899 lent (89%)");
 
-        address usdcAddress = _resolveUsdc();
+        // Established scores for the operator and the attester, so Avery's attestation
+        // carries weight in PageRank.
+        credit.setScoreOverride(alexis, 950_000); // 95%
+        credit.setScoreOverride(vm.addr(AVERY_PK), 920_000); // 92%
 
-        // Deploy the Microcredit contract (oracle temporarily set to deployer)
-        DecentralizedMicrocredit microcreditContract = new DecentralizedMicrocredit(
-            433, // effrRate 4.33% (scaled 1e4) – current market rate
-            500, // riskPremium 5.0% (scaled 1e4) – platform premium
-            100 * 1e6, // maxLoanAmount 100 USDC (6 decimals) – matches personalization cap
-            usdcAddress,
-            vm.addr(deployerPrivateKey) // set deployer as oracle placeholder
-        );
+        _setDisplayName(AVERY_PK, "Avery");
+        _setDisplayName(BRIGHTON_PK, "Brighton");
 
-        // Log deployment information
-        console.logString(
-            string.concat("DecentralizedMicrocredit deployed at: ", vm.toString(address(microcreditContract)))
-        );
-        if (address(microcreditContract).code.length == 0) {
-            console.logString("ERROR: DecentralizedMicrocredit bytecode missing on-chain after deployment. Aborting.");
-            revert("DecentralizedMicrocredit deployment failed (no code)");
+        // Gas money for extra wallets used when demoing with a real browser wallet.
+        address[3] memory demoWallets = [
+            0x455EB67473a5f8Da69dbFde7eDe1d1c008C31274,
+            0xE51a60126dF85801D4C76bDAf58D6F9E81Cc26cA,
+            0xC9E2518013169a09dfE47Da38b8DA092AB68d66A
+        ];
+        for (uint256 i = 0; i < demoWallets.length; i++) {
+            _sendEth(demoWallets[i], 10 ether);
         }
 
-        // Set basePersonalization to 0 as requested
-        microcreditContract.setBasePersonalization(0);
-        console.logString("Set basePersonalization to 0");
-
-        // ── Seed the lending pool ──────────────────────────────────────────────
-        uint256 poolSeed = 10_000_000_000; // 10,000 USDC (6 decimals)
-        MockUSDC(usdcAddress).mint(vm.addr(deployerPrivateKey), poolSeed);
-        MockUSDC(usdcAddress).approve(address(microcreditContract), poolSeed);
-        microcreditContract.depositFunds(poolSeed);
-        console.logString("Seeded lending pool with 10,000 USDC");
-
-        // ── Background borrowers ───────────────────────────────────────────────
-        // Diana + Eve together bring utilisation to ~89% — the highest we can
-        // go while still leaving a $100 slot open for the Casey demo borrower
-        // (90% cap = $9,000; $8,899 lent + $100 Casey = $8,999 ≤ $9,000).
-        // Resulting lender APY ≈ 8.3% (= 9.33% loan rate × 89% utilisation).
-        microcreditContract.setMaxLoanAmount(10_000 * 1e6); // raise cap for seeding
-
-        // Diana — Anvil account 4
-        uint256 dianaPrivateKey = 0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926b;
-        address diana = vm.addr(dianaPrivateKey); // 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65
-        microcreditContract.setScoreOverride(diana, 1_000_000); // 100%
-        (bool sentDiana,) = payable(diana).call{ value: 1 ether }("");
-        require(sentDiana, "ETH transfer to Diana failed");
         vm.stopBroadcast();
-        vm.startBroadcast(dianaPrivateKey);
-        uint256 dianaLoanId = microcreditContract.requestLoan(6_500_000_000); // 6,500 USDC
+
+        vm.serializeAddress("deploy", "DecentralizedMicrocredit", address(credit));
+        vm.writeJson(vm.serializeAddress("deploy", "USDC", usdc), "deployment.json");
+    }
+
+    /// @dev Gives `pk` a 100% score and an open, disbursed loan of `amount`.
+    function _seedBorrower(uint256 pk, uint256 amount) internal {
+        address borrower = vm.addr(pk);
+        credit.setScoreOverride(borrower, 1_000_000);
+        _sendEth(borrower, 1 ether);
+
         vm.stopBroadcast();
-        vm.startBroadcast(deployerPrivateKey);
-        microcreditContract.disburseLoan(dianaLoanId);
+        vm.broadcast(pk);
+        uint256 loanId = credit.requestLoan(amount);
+        vm.startBroadcast(ALEXIS_PK);
 
-        // Eve — Anvil account 5
-        uint256 evePrivateKey = 0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba;
-        address eve = vm.addr(evePrivateKey); // 0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc
-        microcreditContract.setScoreOverride(eve, 1_000_000); // 100%
-        (bool sentEve,) = payable(eve).call{ value: 1 ether }("");
-        require(sentEve, "ETH transfer to Eve failed");
+        credit.disburseLoan(loanId);
+    }
+
+    function _setDisplayName(uint256 pk, string memory name) internal {
         vm.stopBroadcast();
-        vm.startBroadcast(evePrivateKey);
-        uint256 eveLoanId = microcreditContract.requestLoan(2_399_000_000); // 2,399 USDC
-        vm.stopBroadcast();
-        vm.startBroadcast(deployerPrivateKey);
-        microcreditContract.disburseLoan(eveLoanId);
+        vm.broadcast(pk);
+        credit.setDisplayName(name);
+        vm.startBroadcast(ALEXIS_PK);
+    }
 
-        microcreditContract.setMaxLoanAmount(100 * 1e6); // reset to normal 100 USDC cap
-        console.logString("Background borrowers: Diana $6,500 + Eve $2,399 = $8,899 lent (89%, APY ~8.3%)");
-
-        // ── Pre-establish demo persona credit scores ───────────────────────────
-        // Alexis (admin/deployer, account 9) — 95% as platform operator
-        microcreditContract.setScoreOverride(vm.addr(deployerPrivateKey), 950000); // 95% (scaled 1e6)
-        console.logString("Set Alexis's credit score override to 95%");
-
-        // Avery (attester, account 2) — 92% so she can attest credibly
-        uint256 alexisPrivateKey = 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a;
-        address alexis = vm.addr(alexisPrivateKey); // 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
-        microcreditContract.setScoreOverride(alexis, 920000); // 92% (scaled 1e6)
-        console.logString("Set Avery's credit score override to 92%");
-
-        // ── Set display names for demo personas ────────────────────────────────
-        uint256 brightonPrivateKey = 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6;
-        address brighton = vm.addr(brightonPrivateKey); // 0x90F79bf6EB2c4f870365E785982E1f101E93b906
-        vm.stopBroadcast();
-        vm.startBroadcast(alexisPrivateKey);
-        microcreditContract.setDisplayName("Avery");
-        vm.stopBroadcast();
-        vm.startBroadcast(brightonPrivateKey);
-        microcreditContract.setDisplayName("Brighton");
-        vm.stopBroadcast();
-        vm.startBroadcast(deployerPrivateKey);
-        console.logString("Set display names: Avery (attester), Brighton (borrower)");
-
-        // Provision ETH to demo addresses (excluding admin addresses that can fund themselves)
-        console.logString("--- Provisioning ETH to demo addresses ---");
-
-        address[] memory demoAddresses = new address[](3);
-        demoAddresses[0] = 0x455EB67473a5f8Da69dbFde7eDe1d1c008C31274;
-        demoAddresses[1] = 0xE51a60126dF85801D4C76bDAf58D6F9E81Cc26cA;
-        demoAddresses[2] = 0xC9E2518013169a09dfE47Da38b8DA092AB68d66A;
-
-        uint256 ethAmount = 10 * 1e18; // 10 ETH in wei
-
-        for (uint256 i = 0; i < demoAddresses.length; i++) {
-            // Use vm.deal() to set the balance directly
-            vm.deal(demoAddresses[i], ethAmount);
-            console.logString(string.concat("Provisioned 10 ETH to: ", vm.toString(demoAddresses[i])));
-        }
-
-        console.logString("Note: Admin addresses can fund themselves using the /fund page");
-
-        console.logString("--- Contracts deployed and demo addresses funded successfully ---");
-        console.logString("Use the web interface to populate test data (lenders, borrowers, attestations)");
-
-        // Save deployment information (use a stable object key and writeJson)
-        string memory obj = "deploy";
-        vm.serializeAddress(obj, "DecentralizedMicrocredit", address(microcreditContract));
-        string memory jsonOut = vm.serializeAddress(obj, "USDC", usdcAddress);
-        vm.writeJson(jsonOut, "deployment.json");
+    function _sendEth(address to, uint256 amount) internal {
+        (bool sent,) = payable(to).call{ value: amount }("");
+        require(sent, "ETH transfer failed");
     }
 
     /// @dev Reuses the USDC recorded in deployment-config.json when it still has code on this
@@ -157,12 +112,12 @@ contract DeployScript is Script {
             }
         }
         if (usdc != address(0) && usdc.code.length > 0) {
-            console.logString(string.concat("Reusing USDC from deployment config: ", vm.toString(usdc)));
+            console.log("Reusing USDC from deployment config:", usdc);
             return usdc;
         }
 
         usdc = address(new MockUSDC());
-        console.logString(string.concat("MockUSDC deployed at: ", vm.toString(usdc)));
+        console.log("MockUSDC deployed at:", usdc);
         vm.writeJson(vm.serializeAddress("config", "usdcAddress", usdc), configPath);
     }
 
