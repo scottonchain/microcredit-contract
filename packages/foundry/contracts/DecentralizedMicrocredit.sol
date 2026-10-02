@@ -5,6 +5,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import { SignatureChecker } from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { PageRank } from "./PageRank.sol";
 
 /**
@@ -49,7 +50,9 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         address borrower;
         uint256 interestRate; // APR in BASIS_POINTS, fixed at origination
         bool isActive;
-        uint256 createdAt;
+        bool disbursed;
+        uint256 createdAt; // interest accrues from here
+
     }
 
     struct Attestation {
@@ -344,17 +347,16 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     /// @notice Request a loan as the caller. Liquidity is reserved until {disburseLoan}.
     function requestLoan(uint256 amount) external returns (uint256 loanId) {
-        return _requestLoan(msg.sender, amount);
+        return _originateLoan(msg.sender, amount);
     }
 
-    /// @notice Send a requested loan's principal to its borrower and start interest accrual.
+    /// @notice Send a requested loan's principal to its borrower. Callable by anyone.
     function disburseLoan(uint256 loanId) external {
         _disburseLoan(loanId, loans[loanId].borrower);
     }
 
     function repayLoan(uint256 loanId, uint256 amount) external {
-        Loan storage loan = loans[loanId];
-        require(loan.isActive, "Loan inactive");
+        Loan storage loan = _repayableLoan(loanId);
         require(msg.sender == loan.borrower, "Borrower only");
         require(amount > 0, "Amount > 0");
 
@@ -384,8 +386,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         bytes32 r,
         bytes32 s
     ) external {
-        Loan storage loan = loans[loanId];
-        require(loan.isActive, "Loan inactive");
+        Loan storage loan = _repayableLoan(loanId);
         require(loan.borrower == borrower, "Wrong borrower");
 
         IERC20Permit(address(usdc)).permit(borrower, address(this), value, deadline, v, r, s);
@@ -473,7 +474,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             keccak256(abi.encode(LOAN_REQUEST_TYPEHASH, req.borrower, req.amount, req.nonce, req.deadline)),
             sig
         );
-        loanId = _requestLoan(req.borrower, req.amount);
+        loanId = _originateLoan(req.borrower, req.amount);
         emit MetaLoanRequested(req.borrower, req.amount, loanId);
     }
 
@@ -489,8 +490,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         );
         require(req.to == loans[req.loanId].borrower && req.to == req.borrower, "Must send to borrower");
 
-        _disburseLoan(req.loanId, req.to);
-        emit MetaLoanDisbursed(req.borrower, req.loanId, loans[req.loanId].principal);
+        uint256 principal = _disburseLoan(req.loanId, req.to);
+        emit MetaLoanDisbursed(req.borrower, req.loanId, principal);
     }
 
     /// @notice One-click borrow: create and disburse a loan in one relayed transaction.
@@ -517,32 +518,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         uint256 currentApr = effrRate + riskPremium;
         require(currentApr <= req.maxAprBps, "APR changed");
 
-        uint256 score = getCreditScore(req.borrower);
-        require(score > 0, "Score > 0");
-        uint256 maxBorrow = (maxLoanAmount * score) / SCALE;
-        require(req.amount <= maxBorrow, "Over limit");
-        require(_activePrincipal(req.borrower) + req.amount <= maxBorrow, "Outstanding loans exceed max");
-        _requireWithinUtilizationCap(req.amount);
-
-        uint256 availableLiquidity = totalDeposits - reservedLiquidity - totalLentOut;
-        uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
-        require(
-            availableLiquidity >= req.amount + bufferRequired + liquidityThreshold, "LIQUIDITY_BELOW_THRESHOLD"
-        );
-
-        uint256 loanId = nextLoanId++;
-        loans[loanId] = Loan({
-            principal: req.amount,
-            outstanding: req.amount,
-            borrower: req.borrower,
-            interestRate: currentApr,
-            isActive: true,
-            createdAt: block.timestamp
-        });
-        _borrowerLoans[req.borrower].push(loanId);
-
-        totalLentOut += req.amount;
-        _pushUsdc(req.to, req.amount);
+        uint256 loanId = _originateLoan(req.borrower, req.amount);
+        _disburseLoan(loanId, req.to);
 
         emit MetaLoanCreated(req.borrower, loanId, req.amount, currentApr, req.repaymentPeriod);
         emit MetaLoanDisbursed(req.borrower, loanId, req.amount);
@@ -568,8 +545,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             sig
         );
 
-        Loan storage loan = loans[req.loanId];
-        require(loan.isActive, "Loan inactive");
+        Loan storage loan = _repayableLoan(req.loanId);
         require(loan.borrower == req.borrower, "Wrong borrower");
 
         uint256 out = getCurrentOutstandingAmount(req.loanId);
@@ -823,22 +799,26 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         }
     }
 
-    function _requireWithinUtilizationCap(uint256 amount) internal view {
-        uint256 maxCommitment = (totalDeposits * lendingUtilizationCap) / BASIS_POINTS;
-        require(reservedLiquidity + totalLentOut + amount <= maxCommitment, "Pool utilisation cap exceeded");
-    }
-
-    function _requestLoan(address borrower, uint256 amount) internal returns (uint256 loanId) {
+    /**
+     * @dev Single origination path for requestLoan, requestLoanMeta and borrowAndDisburseMeta.
+     *      Enforces the score-based limit across the borrower's active loans, the pool
+     *      utilisation cap and the liquidity buffer, then reserves the principal.
+     */
+    function _originateLoan(address borrower, uint256 amount) internal returns (uint256 loanId) {
         require(amount > 0, "Amount > 0");
         uint256 score = getCreditScore(borrower);
         require(score > 0, "Score > 0");
 
-        uint256 allowed = (maxLoanAmount / SCALE) * score;
-        require(_activePrincipal(borrower) + amount <= allowed, "Outstanding loans exceed max");
-        require(amount <= allowed, "Amount exceeds maximum for score");
-        _requireWithinUtilizationCap(amount);
+        uint256 limit = Math.mulDiv(maxLoanAmount, score, SCALE);
+        require(_activePrincipal(borrower) + amount <= limit, "Outstanding loans exceed max");
+
+        uint256 maxCommitment = (totalDeposits * lendingUtilizationCap) / BASIS_POINTS;
+        require(reservedLiquidity + totalLentOut + amount <= maxCommitment, "Pool utilisation cap exceeded");
+
+        uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
         require(
-            amount <= usdc.balanceOf(address(this)) - reservedLiquidity, "Insufficient available liquidity"
+            usdc.balanceOf(address(this)) - reservedLiquidity >= amount + bufferRequired + liquidityThreshold,
+            "LIQUIDITY_BELOW_THRESHOLD"
         );
 
         reservedLiquidity += amount;
@@ -850,6 +830,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             borrower: borrower,
             interestRate: effrRate + riskPremium,
             isActive: true,
+            disbursed: false,
             createdAt: block.timestamp
         });
 
@@ -861,14 +842,23 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         _borrowerLoans[borrower].push(loanId);
     }
 
-    function _disburseLoan(uint256 loanId, address to) internal {
+    /// @dev Moves a reserved loan's principal to `to`. Callers decide who may receive it.
+    function _disburseLoan(uint256 loanId, address to) internal returns (uint256 principal) {
         Loan storage loan = loans[loanId];
         require(loan.isActive, "Loan inactive");
-        require(to == loan.borrower, "Must disburse to borrower");
+        require(!loan.disbursed, "Already disbursed");
+        loan.disbursed = true;
 
-        reservedLiquidity -= loan.principal;
-        totalLentOut += loan.principal;
-        _pushUsdc(to, loan.principal);
+        principal = loan.principal;
+        reservedLiquidity -= principal;
+        totalLentOut += principal;
+        _pushUsdc(to, principal);
+    }
+
+    function _repayableLoan(uint256 loanId) internal view returns (Loan storage loan) {
+        loan = loans[loanId];
+        require(loan.isActive, "Loan inactive");
+        require(loan.disbursed, "Not disbursed");
     }
 
     function _closeLoan(Loan storage loan) internal {

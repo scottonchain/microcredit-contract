@@ -81,6 +81,45 @@ contract LoanAccountingTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(borrower), 0);
     }
 
+    function testRequestLoanEnforcesLiquidityBuffer() public {
+        vm.startPrank(owner);
+        credit.setMaxLoanAmount(100_000e6);
+        credit.setLendingUtilizationCap(10_000); // only the 5% buffer should bind
+        vm.stopPrank();
+
+        vm.prank(borrower);
+        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        credit.requestLoan(96_000e6);
+
+        vm.prank(borrower);
+        credit.requestLoan(95_000e6);
+    }
+
+    function testLoanCannotBeDisbursedTwice() public {
+        address other = makeAddr("other");
+        vm.prank(owner);
+        credit.setScoreOverride(other, SCALE);
+        vm.prank(other);
+        credit.requestLoan(PRINCIPAL); // keeps reservedLiquidity above one loan's principal
+
+        uint256 loanId = _openLoan(PRINCIPAL);
+        vm.expectRevert("Already disbursed");
+        credit.disburseLoan(loanId);
+        assertEq(usdc.balanceOf(borrower), PRINCIPAL);
+        assertEq(credit.reservedLiquidity(), PRINCIPAL);
+    }
+
+    function testUndisbursedLoanCannotBeRepaid() public {
+        vm.prank(borrower);
+        uint256 loanId = credit.requestLoan(PRINCIPAL);
+        usdc.mint(borrower, PRINCIPAL);
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), PRINCIPAL);
+        vm.expectRevert("Not disbursed");
+        credit.repayLoan(loanId, PRINCIPAL);
+        vm.stopPrank();
+    }
+
     function testOnlyBorrowerCanRepayDirectly() public {
         uint256 loanId = _openLoan(PRINCIPAL);
         vm.prank(stranger);
