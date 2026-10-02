@@ -9,10 +9,10 @@ import { MockUSDC } from "../contracts/MockUSDC.sol";
  * @notice Deploys MockUSDC (unless deployment-config.json points at a live one) and
  *         DecentralizedMicrocredit, then seeds the local demo state.
  * @dev Run with `yarn deploy`. Uses Anvil's deterministic accounts:
- *        9 Alexis   — deployer, owner and oracle
- *        2 Avery    — attester
- *        3 Brighton — borrower
- *        4 Diana, 5 Eve — background borrowers that bring pool utilisation to 89%
+ *        9 Alexis: deployer, owner and oracle
+ *        2 Avery: attester
+ *        3 Brighton: borrower
+ *        4 Diana, 5 Eve: background borrowers that bring pool utilisation to 89%
  */
 contract DeployScript is Script {
     uint256 internal constant ALEXIS_PK = 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6;
