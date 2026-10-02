@@ -1,21 +1,17 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 // Attestation flow moved to /attest; no need for search params here
 import type { NextPage } from "next";
-import { useAccount, useSignTypedData } from "wagmi";
+import { useAccount, usePublicClient, useSignTypedData } from "wagmi";
 import { toast } from "react-hot-toast";
 import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
 import { BanknotesIcon, PlusIcon, EyeIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import HowItWorks from "~~/components/HowItWorks";
-// removed parseEther import because USDC uses 6 decimals
-// import { AddressInput } from "~~/components/scaffold-eth";
-import deployedContracts from "~~/contracts/deployedContracts";
-import { createPublicClient, http } from "viem";
-import { localhost } from "viem/chains";
-import { MICRO_DOMAIN, TYPES, USDC_PERMIT_DOMAIN, splitSignature, roundDownToCent } from "../../types/eip712";
+import { MICRO_DOMAIN, TYPES, USDC_PERMIT_DOMAIN, roundDownToCent, splitSignature } from "~~/utils/eip712";
+import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
 
 const LendPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -62,23 +58,11 @@ const LendPage: NextPage = () => {
     functionName: "usdc",
   });
 
-  // Resolve DecentralizedMicrocredit & USDC contract data from deployments
-  const CONTRACT_ADDRESS = deployedContracts[31337]?.DecentralizedMicrocredit?.address as `0x${string}`;
-  const CONTRACT_ABI = deployedContracts[31337]?.DecentralizedMicrocredit?.abi as any;
-  const USDC_ADDRESS_FROM_DEPLOY = deployedContracts[31337]?.MockUSDC?.address as `0x${string}` | undefined;
-  const USDC_ABI = deployedContracts[31337]?.MockUSDC?.abi as any;
-
   const { writeContractAsync: writeUSDCAsync } = useScaffoldWriteContract({
     contractName: "MockUSDC",
   });
 
-  // viem public client
-  const CHAIN_ID = 31337;
-  const RPC_URL = "http://localhost:8545";
-  const publicClient = useMemo(
-    () => createPublicClient({ chain: { ...localhost, id: CHAIN_ID }, transport: http(RPC_URL) }),
-    []
-  );
+  const publicClient = usePublicClient({ chainId: CHAIN_ID });
 
   // EIP-712 signer
   const { signTypedDataAsync } = useSignTypedData();
@@ -153,7 +137,7 @@ const LendPage: NextPage = () => {
     
     setIsLoading(true);
     try {
-      if (!CONTRACT_ADDRESS || !CONTRACT_ABI) throw new Error("Contract not available");
+      if (!publicClient) throw new Error("Contract not available");
       const lender = connectedAddress as `0x${string}`;
       const receiver = connectedAddress as `0x${string}`;
 
@@ -161,7 +145,7 @@ const LendPage: NextPage = () => {
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
       let permitPayload: { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` } | undefined;
       try {
-        const usdcAddr = (usdcAddress || USDC_ADDRESS_FROM_DEPLOY) as `0x${string}` | undefined;
+        const usdcAddr = (usdcAddress || USDC_ADDRESS) as `0x${string}` | undefined;
         if (!usdcAddr || !USDC_ABI) throw new Error("Missing USDC config");
 
         const permitNonce = (await publicClient.readContract({
@@ -184,14 +168,14 @@ const LendPage: NextPage = () => {
 
         const permitMsg = {
           owner: lender,
-          spender: CONTRACT_ADDRESS,
+          spender: MICROCREDIT_ADDRESS,
           value: amountInt,
           nonce: permitNonce,
           deadline,
         } as const;
 
         const sigPermit = await signTypedDataAsync({
-          domain: USDC_PERMIT_DOMAIN(31337, usdcAddr, tokenName) as any,
+          domain: USDC_PERMIT_DOMAIN(CHAIN_ID, usdcAddr, tokenName) as any,
           types: { Permit: TYPES.Permit } as any,
           primaryType: "Permit",
           message: permitMsg as any,
@@ -208,8 +192,8 @@ const LendPage: NextPage = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          chainId: 31337,
-          contractAddress: CONTRACT_ADDRESS,
+          chainId: CHAIN_ID,
+          contractAddress: MICROCREDIT_ADDRESS,
           lender,
           permit: permitPayload,
         }),
@@ -249,13 +233,13 @@ const LendPage: NextPage = () => {
     }
     setWithdrawLoading(true);
     try {
-      if (!CONTRACT_ADDRESS || !CONTRACT_ABI) throw new Error("Contract not available");
+      if (!publicClient) throw new Error("Contract not available");
       const lender = connectedAddress as `0x${string}`;
       const to = connectedAddress as `0x${string}`;
 
       const metaNonce = (await publicClient.readContract({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
+        address: MICROCREDIT_ADDRESS,
+        abi: MICROCREDIT_ABI,
         functionName: "nonces",
         args: [lender],
       })) as bigint;
@@ -263,7 +247,7 @@ const LendPage: NextPage = () => {
 
       const rq = { lender, amount: amountInt, to, nonce: metaNonce, deadline } as const;
       const sig = await signTypedDataAsync({
-        domain: MICRO_DOMAIN(31337, CONTRACT_ADDRESS) as any,
+        domain: MICRO_DOMAIN(CHAIN_ID, MICROCREDIT_ADDRESS) as any,
         types: { RequestWithdrawal: TYPES.RequestWithdrawal } as any,
         primaryType: "RequestWithdrawal",
         message: rq as any,
@@ -273,8 +257,8 @@ const LendPage: NextPage = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          chainId: 31337,
-          contractAddress: CONTRACT_ADDRESS,
+          chainId: CHAIN_ID,
+          contractAddress: MICROCREDIT_ADDRESS,
           req: {
             lender,
             amount: amountInt.toString(),
@@ -358,13 +342,13 @@ const LendPage: NextPage = () => {
       setErrorMessage(null);
       
       // Auto-approve after minting for convenience
-      if (CONTRACT_ADDRESS) {
+      if (MICROCREDIT_ADDRESS) {
         console.log("🔍 Auto-approving USDC spending for DecentralizedMicrocredit...");
         try {
           const maxAmount = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
           await writeUSDCAsync({
             functionName: "approve",
-            args: [CONTRACT_ADDRESS, maxAmount],
+            args: [MICROCREDIT_ADDRESS, maxAmount],
           });
           // no allowance in permit-only flow
           console.log("🔍 Auto-approval successful");

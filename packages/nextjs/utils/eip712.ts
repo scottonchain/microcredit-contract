@@ -1,5 +1,5 @@
-// Shared EIP-712 typed data builders for the Next.js frontend
-// Keeps UI flows consistent with contract structs & API expectations
+// EIP-712 / EIP-2612 typed-data definitions shared by the signing UI flows.
+// Field order must match the typehashes in DecentralizedMicrocredit.sol and ERC20Permit.
 
 export const MICRO_DOMAIN = (chainId: number, verifyingContract: `0x${string}`) => ({
   name: "DecentralizedMicrocredit",
@@ -8,11 +8,7 @@ export const MICRO_DOMAIN = (chainId: number, verifyingContract: `0x${string}`) 
   verifyingContract,
 });
 
-export const USDC_PERMIT_DOMAIN = (
-  chainId: number,
-  verifyingContract: `0x${string}`,
-  tokenName = "USD Coin",
-) => ({
+export const USDC_PERMIT_DOMAIN = (chainId: number, verifyingContract: `0x${string}`, tokenName = "USD Coin") => ({
   name: tokenName,
   version: "1",
   chainId,
@@ -20,10 +16,12 @@ export const USDC_PERMIT_DOMAIN = (
 });
 
 export const TYPES = {
-  DepositRequest: [
-    { name: "lender", type: "address" },
+  BorrowAndDisburse: [
+    { name: "borrower", type: "address" },
     { name: "amount", type: "uint256" },
-    { name: "receiver", type: "address" },
+    { name: "to", type: "address" },
+    { name: "repaymentPeriod", type: "uint256" },
+    { name: "maxAprBps", type: "uint256" },
     { name: "nonce", type: "uint256" },
     { name: "deadline", type: "uint256" },
   ],
@@ -50,22 +48,6 @@ export const TYPES = {
   ],
 } as const;
 
-export type DepositRequest = {
-  lender: `0x${string}`;
-  amount: bigint;
-  receiver: `0x${string}`;
-  nonce: bigint;
-  deadline: bigint;
-};
-
-export type RequestWithdrawal = {
-  lender: `0x${string}`;
-  amount: bigint;
-  to: `0x${string}`;
-  nonce: bigint;
-  deadline: bigint;
-};
-
 export type AttestRequest = {
   attester: `0x${string}`;
   borrower: `0x${string}`;
@@ -74,14 +56,7 @@ export type AttestRequest = {
   deadline: bigint;
 };
 
-export type PermitMessage = {
-  owner: `0x${string}`;
-  spender: `0x${string}`;
-  value: bigint;
-  nonce: bigint;
-  deadline: bigint;
-};
-
+/** Splits a 65-byte signature into the (v, r, s) form ERC-2612 `permit` expects. */
 export const splitSignature = (sig: `0x${string}`) => {
   const hex = sig.slice(2);
   const r = ("0x" + hex.slice(0, 64)) as `0x${string}`;

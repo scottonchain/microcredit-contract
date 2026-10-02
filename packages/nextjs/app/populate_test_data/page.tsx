@@ -12,12 +12,9 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { localhost } from "viem/chains";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import deployedContracts from "~~/contracts/deployedContracts";
 import Link from "next/link";
 import { useIsAdmin } from "~~/hooks/useIsAdmin";
-
-const RPC_URL = "http://127.0.0.1:8545";
-const CHAIN_ID = 31337; // Anvil's default chain ID
+import { ANVIL_RPC_URL, CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
 
 export default function PopulatePage() {
   const { address: connectedAddress } = useAccount();
@@ -39,10 +36,6 @@ export default function PopulatePage() {
     return x - Math.floor(x);
   };
 
-  // Read deployed addresses
-  const contracts = deployedContracts[31337];
-  const CONTRACT_ADDRESS = contracts?.DecentralizedMicrocredit?.address;
-  const USDC_ADDRESS = contracts?.MockUSDC?.address;
 
   // Use scaffold-eth hooks to read contract data
   const { data: owner } = useScaffoldReadContract({
@@ -58,7 +51,7 @@ export default function PopulatePage() {
 
   async function populate() {
     console.log("Starting populate function");
-    console.log("CONTRACT_ADDRESS:", CONTRACT_ADDRESS);
+    console.log("MICROCREDIT_ADDRESS:", MICROCREDIT_ADDRESS);
     console.log("USDC_ADDRESS:", USDC_ADDRESS);
 
     // TODO: REMOVE THIS
@@ -66,13 +59,13 @@ export default function PopulatePage() {
     ];
     const publicClient = createPublicClient({ 
       chain: { ...localhost, id: CHAIN_ID }, 
-      transport: http(RPC_URL) 
+      transport: http(ANVIL_RPC_URL) 
     });
 
     // Ensure the minter account (private key 0x01...) has enough ETH to pay gas for subsequent mint calls
     const MINTER_PK = toHex(1, { size: 32 }) as `0x${string}`;
     const minterAccount = privateKeyToAccount(MINTER_PK);
-    await fetch(RPC_URL, {
+    await fetch(ANVIL_RPC_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -86,7 +79,7 @@ export default function PopulatePage() {
     // ─── Create & fund dummy admin account to submit admin txs (computePageRank, etc.) ───
     const ADMIN_PK = toHex(0x5000, { size: 32 }) as `0x${string}`; // deterministic but unused key
     const adminAccount = privateKeyToAccount(ADMIN_PK);
-    await fetch(RPC_URL, {
+    await fetch(ANVIL_RPC_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -97,7 +90,7 @@ export default function PopulatePage() {
       }),
     });
     
-    if (!CONTRACT_ADDRESS || !USDC_ADDRESS) {
+    if (!MICROCREDIT_ADDRESS || !USDC_ADDRESS) {
       setStatus("❌ Contracts not deployed");
       return;
     }
@@ -111,8 +104,8 @@ export default function PopulatePage() {
     try {
       console.log("Verifying contract deployment...");
       const owner = await publicClient.readContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: contracts.DecentralizedMicrocredit.abi,
+        address: MICROCREDIT_ADDRESS as `0x${string}`,
+        abi: MICROCREDIT_ABI,
         functionName: "owner",
       });
       console.log("Contract owner:", owner);
@@ -189,7 +182,7 @@ export default function PopulatePage() {
       setProgress((i / lenders.length) * 0.25); // 25% for deposits
       
       try {
-        await fetch(RPC_URL, { 
+        await fetch(ANVIL_RPC_URL, { 
           method: "POST", 
           headers: { "Content-Type": "application/json" }, 
           body: JSON.stringify({ 
@@ -200,11 +193,11 @@ export default function PopulatePage() {
           }) 
         });
 
-        const usdcConfig = { address: USDC_ADDRESS as `0x${string}`, abi: contracts.MockUSDC.abi };
-        const microConfig = { address: CONTRACT_ADDRESS as `0x${string}`, abi: contracts.DecentralizedMicrocredit.abi };
+        const usdcConfig = { address: USDC_ADDRESS as `0x${string}`, abi: USDC_ABI! };
+        const microConfig = { address: MICROCREDIT_ADDRESS as `0x${string}`, abi: MICROCREDIT_ABI };
         const walletClient = createWalletClient({ 
           chain: { ...localhost, id: CHAIN_ID }, 
-          transport: http(RPC_URL), 
+          transport: http(ANVIL_RPC_URL), 
           account: L 
         });
 
@@ -222,7 +215,7 @@ export default function PopulatePage() {
         txHash = await walletClient.writeContract({ 
           ...usdcConfig, 
           functionName: "approve", 
-          args: [CONTRACT_ADDRESS, depositAmt],
+          args: [MICROCREDIT_ADDRESS, depositAmt],
           gas: 5000000n // 5 million gas
         });
         await publicClient.waitForTransactionReceipt({ hash: txHash });
@@ -264,7 +257,7 @@ export default function PopulatePage() {
       const L = lenders[lenderIndex];
       const walletClient = createWalletClient({ 
         chain: { ...localhost, id: CHAIN_ID }, 
-        transport: http(RPC_URL), 
+        transport: http(ANVIL_RPC_URL), 
         account: L 
       });
       for (let borrowerIndex = 0; borrowerIndex < borrowers.length; borrowerIndex++) {
@@ -282,8 +275,8 @@ export default function PopulatePage() {
           
           try {
             const txHash = await walletClient.writeContract({ 
-              address: CONTRACT_ADDRESS as `0x${string}`, 
-              abi: contracts.DecentralizedMicrocredit.abi, 
+              address: MICROCREDIT_ADDRESS as `0x${string}`, 
+              abi: MICROCREDIT_ABI, 
               functionName: "recordAttestation", 
               args: [B.address, getRandomAttestWeight(lenderIndex, borrowerIndex)],
               gas: 5000000n // 5 million gas
@@ -296,13 +289,13 @@ export default function PopulatePage() {
               try {
                 const pageRankWalletClient = createWalletClient({ 
                   chain: { ...localhost, id: CHAIN_ID }, 
-                  transport: http(RPC_URL), 
+                  transport: http(ANVIL_RPC_URL), 
                   account: adminAccount // use dummy admin
                 });
                 
                 const pageRankTxHash = await pageRankWalletClient.writeContract({ 
-                  address: CONTRACT_ADDRESS as `0x${string}`, 
-                  abi: contracts.DecentralizedMicrocredit.abi, 
+                  address: MICROCREDIT_ADDRESS as `0x${string}`, 
+                  abi: MICROCREDIT_ABI, 
                   functionName: "computePageRank",
                   gas: 30000000n // 30 million gas for PageRank
                 });
@@ -347,7 +340,7 @@ export default function PopulatePage() {
         
         const walletClient = createWalletClient({ 
           chain: { ...localhost, id: CHAIN_ID }, 
-          transport: http(RPC_URL), 
+          transport: http(ANVIL_RPC_URL), 
           account: L1 
         });
         
@@ -357,8 +350,8 @@ export default function PopulatePage() {
         
         try {
                                 const txHash = await walletClient.writeContract({ 
-            address: CONTRACT_ADDRESS as `0x${string}`, 
-            abi: contracts.DecentralizedMicrocredit.abi, 
+            address: MICROCREDIT_ADDRESS as `0x${string}`, 
+            abi: MICROCREDIT_ABI, 
             functionName: "recordAttestation", 
             args: [L2.address, getRandomAttestWeight(lender1Index, lender2Index)],
             gas: 5000000n // 5 million gas
@@ -370,13 +363,13 @@ export default function PopulatePage() {
           try {
             const pageRankWalletClient = createWalletClient({ 
               chain: { ...localhost, id: CHAIN_ID }, 
-              transport: http(RPC_URL), 
+              transport: http(ANVIL_RPC_URL), 
               account: adminAccount
             });
             
             const pageRankTxHash = await pageRankWalletClient.writeContract({ 
-              address: CONTRACT_ADDRESS as `0x${string}`, 
-              abi: contracts.DecentralizedMicrocredit.abi, 
+              address: MICROCREDIT_ADDRESS as `0x${string}`, 
+              abi: MICROCREDIT_ABI, 
               functionName: "computePageRank",
               gas: 30000000n // 30 million gas for PageRank
             });
@@ -408,11 +401,11 @@ export default function PopulatePage() {
       // Final PageRank computation to ensure all scores are current
       const prHash = await createWalletClient({ 
         chain: { ...localhost, id: CHAIN_ID }, 
-        transport: http(RPC_URL), 
+        transport: http(ANVIL_RPC_URL), 
         account: adminAccount 
       }).writeContract({ 
-        address: CONTRACT_ADDRESS as `0x${string}`, 
-        abi: contracts.DecentralizedMicrocredit.abi, 
+        address: MICROCREDIT_ADDRESS as `0x${string}`, 
+        abi: MICROCREDIT_ABI, 
         functionName: "computePageRank",
         gas: 30000000n // Use 30 million gas (block limit)
       });
@@ -439,7 +432,7 @@ export default function PopulatePage() {
     
     try {
       // Give borrower some ETH for gas
-      await fetch(RPC_URL, { 
+      await fetch(ANVIL_RPC_URL, { 
         method: "POST", 
         headers: { "Content-Type": "application/json" }, 
         body: JSON.stringify({ 
@@ -471,10 +464,10 @@ export default function PopulatePage() {
   let loanRequestsCreated = 0;
   
   // Get the contract's maxLoanAmount
-  console.log(`Attempting to read maxLoanAmount from contract at ${CONTRACT_ADDRESS}`);
+  console.log(`Attempting to read maxLoanAmount from contract at ${MICROCREDIT_ADDRESS}`);
   const contractMaxLoanAmount = await publicClient.readContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
-    abi: contracts.DecentralizedMicrocredit.abi,
+    address: MICROCREDIT_ADDRESS as `0x${string}`,
+    abi: MICROCREDIT_ABI,
     functionName: "maxLoanAmount",
   });
   console.log(`Successfully read maxLoanAmount: ${contractMaxLoanAmount}`);
@@ -485,8 +478,8 @@ export default function PopulatePage() {
     try {
       // Get borrower's credit score using getCreditScore function
       const creditScore = await publicClient.readContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: contracts.DecentralizedMicrocredit.abi,
+        address: MICROCREDIT_ADDRESS as `0x${string}`,
+        abi: MICROCREDIT_ABI,
         functionName: "getCreditScore",
         args: [B.address],
       });
@@ -506,13 +499,13 @@ export default function PopulatePage() {
           
           const walletClient = createWalletClient({ 
             chain: { ...localhost, id: CHAIN_ID }, 
-            transport: http(RPC_URL), 
+            transport: http(ANVIL_RPC_URL), 
             account: B 
           });
           
           const loanTxHash = await walletClient.writeContract({ 
-            address: CONTRACT_ADDRESS as `0x${string}`, 
-            abi: contracts.DecentralizedMicrocredit.abi, 
+            address: MICROCREDIT_ADDRESS as `0x${string}`, 
+            abi: MICROCREDIT_ABI, 
             functionName: "requestLoan", 
             args: [loanAmount],
             gas: 5000000n // 5 million gas
@@ -529,8 +522,8 @@ export default function PopulatePage() {
           setStatus(`⏳ Disbursing loan ${loanId} for ${B.address.slice(0, 6)}...`);
           try {
             const disburseTxHash = await walletClient.writeContract({ 
-              address: CONTRACT_ADDRESS as `0x${string}`, 
-              abi: contracts.DecentralizedMicrocredit.abi, 
+              address: MICROCREDIT_ADDRESS as `0x${string}`, 
+              abi: MICROCREDIT_ABI, 
               functionName: "disburseLoan", 
               args: [loanId],
               gas: 5000000n // 5 million gas
@@ -585,7 +578,7 @@ export default function PopulatePage() {
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <h3 className="text-lg font-semibold text-yellow-800 mb-2">🔍 Debug Information</h3>
           <div className="text-sm text-yellow-700 space-y-1">
-            <p><strong>Contract Address:</strong> {CONTRACT_ADDRESS || "Not deployed"}</p>
+            <p><strong>Contract Address:</strong> {MICROCREDIT_ADDRESS || "Not deployed"}</p>
             <p><strong>USDC Address:</strong> {USDC_ADDRESS || "Not deployed"}</p>
             <p><strong>Owner:</strong> {owner || "Loading..."}</p>
             <p><strong>Oracle:</strong> {oracle || "Loading..."}</p>
