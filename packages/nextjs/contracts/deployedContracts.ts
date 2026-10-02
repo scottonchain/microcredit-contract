@@ -552,11 +552,11 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1776722667196.json",
+      deploymentFile: "run-1790959043653.json",
       deploymentScript: "Deploy.s.sol",
     },
     DecentralizedMicrocredit: {
-      address: "0x5621d0b4d8043524ac5837918d6a95b1050ef228",
+      address: "0xa15bb66138824a1c7167f5e85b957d04dd34e468",
       abi: [
         {
           type: "constructor",
@@ -1003,6 +1003,25 @@ const deployedContracts = {
           ],
           outputs: [],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "displayNames",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -1680,38 +1699,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "displayNames",
-          inputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "string",
-              internalType: "string",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "setDisplayName",
-          inputs: [
-            {
-              name: "name",
-              type: "string",
-              internalType: "string",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
           name: "repayLoan",
           inputs: [
             {
@@ -2023,6 +2010,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "setDisplayName",
+          inputs: [
+            {
+              name: "name",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "setEffrRate",
           inputs: [
             {
@@ -2230,6 +2230,25 @@ const deployedContracts = {
           ],
           outputs: [],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "DisplayNameSet",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "name",
+              type: "string",
+              indexed: false,
+              internalType: "string",
+            },
+          ],
+          anonymous: false,
         },
         {
           type: "event",
@@ -2517,7 +2536,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deploymentFile: "run-1776723714553.json",
+      deploymentFile: "run-1790959043653.json",
       deploymentScript: "Deploy.s.sol",
     },
   },

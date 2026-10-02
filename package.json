@@ -21,7 +21,6 @@
     "format": "yarn next:format && yarn foundry:format",
     "foundry:account": "yarn workspace @se-2/foundry account",
     "foundry:account-import": "yarn workspace @se-2/foundry account:import",
-    "foundry:chain": "yarn workspace @se-2/foundry chain",
     "foundry:clean": "yarn workspace @se-2/foundry clean",
     "foundry:compile": "yarn workspace @se-2/foundry compile",
     "foundry:deploy": "yarn workspace @se-2/foundry deploy",
