@@ -120,6 +120,14 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         assertTrue(active);
     }
 
+    function testBorrowAndDisburseLoansAreEnumerated() public {
+        uint256 loanId = _borrow(40e6);
+        assertEq(credit.getAllLoanIds().length, 1);
+        assertEq(credit.getAllLoanIds()[0], loanId);
+        assertEq(credit.getBorrowers().length, 1);
+        assertEq(credit.getBorrowers()[0], borrower);
+    }
+
     function testBorrowAndDisburseRevertsWhenAprAboveTolerance() public {
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _borrowRequest(40e6, LOAN_APR - 1);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
