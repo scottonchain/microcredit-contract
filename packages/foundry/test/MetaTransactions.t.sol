@@ -31,7 +31,8 @@ contract MetaTransactionsTest is MicrocreditTestBase {
     }
 
     function _requestLoan() internal returns (uint256 loanId) {
-        DecentralizedMicrocredit.LoanRequest memory req = _loanRequest(LOAN_AMOUNT, credit.nonces(borrower), _deadline());
+        DecentralizedMicrocredit.LoanRequest memory req =
+            _loanRequest(LOAN_AMOUNT, credit.nonces(borrower), _deadline());
         bytes memory sig = _signLoanRequest(borrowerPk, req);
         vm.prank(relayer);
         loanId = credit.requestLoanMeta(req, sig);
@@ -71,7 +72,11 @@ contract MetaTransactionsTest is MicrocreditTestBase {
         credit.disburseLoanMeta(disburse, disburseSig);
 
         DecentralizedMicrocredit.RepayRequest memory repay = DecentralizedMicrocredit.RepayRequest({
-            borrower: borrower, loanId: loanId, amount: LOAN_AMOUNT, nonce: credit.nonces(borrower), deadline: _deadline()
+            borrower: borrower,
+            loanId: loanId,
+            amount: LOAN_AMOUNT,
+            nonce: credit.nonces(borrower),
+            deadline: _deadline()
         });
         bytes memory repaySig = _signRepayRequest(borrowerPk, repay);
         DecentralizedMicrocredit.PermitData memory permit = _signPermit(borrowerPk, LOAN_AMOUNT, _deadline());

@@ -84,7 +84,8 @@ abstract contract MicrocreditTestBase is Test {
         view
         returns (bytes memory)
     {
-        return _sign(pk, keccak256(abi.encode(LOAN_REQUEST_TYPEHASH, req.borrower, req.amount, req.nonce, req.deadline)));
+        return
+            _sign(pk, keccak256(abi.encode(LOAN_REQUEST_TYPEHASH, req.borrower, req.amount, req.nonce, req.deadline)));
     }
 
     function _signDisburseRequest(uint256 pk, DecentralizedMicrocredit.DisburseRequest memory req)
@@ -182,5 +183,5 @@ abstract contract MicrocreditTestBase is Test {
         permit = DecentralizedMicrocredit.PermitData({ value: value, deadline: deadline, v: v, r: r, s: s });
     }
 
-    function _noPermit() internal pure returns (DecentralizedMicrocredit.PermitData memory permit) {}
+    function _noPermit() internal pure returns (DecentralizedMicrocredit.PermitData memory permit) { }
 }
