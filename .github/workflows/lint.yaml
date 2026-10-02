@@ -50,6 +50,9 @@ jobs:
           done
           yarn deploy
 
+      - name: Check committed contract ABIs match the fresh deploy
+        run: git diff --exit-code packages/nextjs/contracts/deployedContracts.ts
+
       - name: Run nextjs lint
         run: yarn next:lint --max-warnings=0
 
