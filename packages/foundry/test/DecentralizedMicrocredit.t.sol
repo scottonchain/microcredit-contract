@@ -209,7 +209,7 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         credit.disburseLoan(loanId);
         assertEq(credit.totalLentOut(), 100_000e6);
 
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
         uint256 payoff = credit.getCurrentOutstandingAmount(loanId);
         usdc.mint(borrower, payoff);
         vm.startPrank(borrower);
