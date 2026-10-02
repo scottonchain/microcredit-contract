@@ -68,9 +68,10 @@ abstract contract PageRank {
         }
     }
 
-    function _addPagerankEdge(address from, address to, uint256 weight) internal {
+    /// @dev Sets (or replaces) the weight of the edge `from -> to`.
+    function _setPagerankEdge(address from, address to, uint256 weight) internal {
+        pagerankOutDegree[from] = pagerankOutDegree[from] - pagerankEdges[from][to] + weight;
         pagerankEdges[from][to] = weight;
-        pagerankOutDegree[from] += weight;
     }
 
     /// @dev Removes every node, edge and score.
