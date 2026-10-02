@@ -199,7 +199,9 @@ if [[ -d "$REPO/packages/nextjs/.next" ]]; then
 fi
 _next_bin="$REPO/node_modules/next/dist/bin/next"
 [[ ! -f "$_next_bin" ]] && _next_bin="$REPO/packages/nextjs/node_modules/next/dist/bin/next"
-(cd "$REPO/packages/nextjs" && node "$_next_bin" dev) >"$REPO/logs/nextjs-demo.log" 2>&1 &
+# Demo wallet mode presents the MetaMask connector the personas are injected through;
+# without it local dev auto-connects a random burner wallet instead.
+(cd "$REPO/packages/nextjs" && NEXT_PUBLIC_DEMO_WALLET=true node "$_next_bin" dev) >"$REPO/logs/nextjs-demo.log" 2>&1 &
 unset _next_bin
 NEXT_PID=$!
 
