@@ -13,6 +13,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import deployedContracts from "~~/contracts/deployedContracts";
+import scaffoldConfig from "~~/scaffold.config";
 
 /**
  * Shared server-side relayer for the /api/meta/* routes. Each route receives a payload signed by
@@ -42,7 +43,35 @@ export type RelayResult = {
   events: DecodedEvent[];
 };
 
-const deployments = deployedContracts as unknown as Record<number, { DecentralizedMicrocredit?: { abi: Abi } }>;
+const deployments = deployedContracts as unknown as Record<
+  number,
+  { DecentralizedMicrocredit?: { address: Address; abi: Abi } }
+>;
+const TARGET_CHAIN_IDS = new Set<number>(scaffoldConfig.targetNetworks.map(network => network.id));
+
+/**
+ * Resolves the contract to call from server-side config only. The request's chainId and
+ * contractAddress must match a known deployment, so the relayer can't be pointed at other
+ * contracts or chains.
+ */
+function resolveDeployment(chainId: number, contractAddress: Address) {
+  if (!TARGET_CHAIN_IDS.has(chainId)) throw new RelayerError(`Unsupported chain ${chainId}`, 400);
+  const deployment = deployments[chainId]?.DecentralizedMicrocredit;
+  if (!deployment) throw new RelayerError(`DecentralizedMicrocredit is not deployed on chain ${chainId}`);
+  if (contractAddress?.toLowerCase() !== deployment.address.toLowerCase()) {
+    throw new RelayerError("Unknown contract address", 400);
+  }
+  return deployment;
+}
+
+// One relayer key sends every transaction. Sends are serialized so concurrent requests can't
+// pick the same account nonce; receipts are awaited outside the queue.
+let sendQueue: Promise<unknown> = Promise.resolve();
+function serialized<T>(send: () => Promise<T>): Promise<T> {
+  const result = sendQueue.then(send, send);
+  sendQueue = result.catch(() => undefined);
+  return result;
+}
 
 function getRpcUrl(chainId: number): string {
   if (chainId === LOCAL_CHAIN_ID) return process.env.LOCAL_RPC_URL || "http://localhost:8545";
@@ -71,12 +100,9 @@ async function getRelayer(chainId: number) {
     throw new RelayerError("Missing RELAYER_PRIVATE_KEY");
   }
 
-  const abi = deployments[chainId]?.DecentralizedMicrocredit?.abi;
-  if (!abi) throw new RelayerError("ABI not found for chain");
-
   const walletClient = createWalletClient({ account, chain, transport: http(rpcUrl) });
   const address = typeof account === "string" ? account : account.address;
-  return { publicClient, walletClient, abi, address };
+  return { publicClient, walletClient, address };
 }
 
 /** Decodes the receipt's DecentralizedMicrocredit events (other contracts' logs are skipped). */
@@ -99,19 +125,22 @@ export async function relay(params: {
   functionName: string;
   args: readonly unknown[];
 }): Promise<RelayResult> {
-  const { chainId, contractAddress, functionName, args } = params;
-  const { publicClient, walletClient, abi, address } = await getRelayer(chainId);
+  const { chainId, functionName, args } = params;
+  const { address: contractAddress, abi } = resolveDeployment(chainId, params.contractAddress);
+  const { publicClient, walletClient, address } = await getRelayer(chainId);
   console.log(`[relayer] ${functionName}`, { chainId, contractAddress, relayer: address });
 
-  // Simulate first so reverts surface with their reason and never cost the relayer gas.
-  const { request } = await publicClient.simulateContract({
-    address: contractAddress,
-    abi,
-    functionName,
-    args,
-    account: walletClient.account!,
+  const hash = await serialized(async () => {
+    // Simulate first so reverts surface with their reason and never cost the relayer gas.
+    const { request } = await publicClient.simulateContract({
+      address: contractAddress,
+      abi,
+      functionName,
+      args,
+      account: walletClient.account!,
+    });
+    return walletClient.writeContract(request);
   });
-  const hash = await walletClient.writeContract(request);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new RelayerError(`Transaction ${hash} reverted`);
 
