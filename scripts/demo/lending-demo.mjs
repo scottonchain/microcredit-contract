@@ -349,17 +349,18 @@ async function main() {
     const borrowBtn = page.getByRole('button', { name: /one.click borrow/i });
     await borrowBtn.waitFor({ state: 'visible', timeout: 30000 });
 
-    // Fill the loan amount (number input)
-    console.log('  → entering loan amount: 50');
-    await page.locator('input[type="number"]').first().fill('50');
-    await sleep(400);
-
-    // Select 28-day repayment period (option value is the number of days)
+    // Select the 28-day repayment period first: changing the period resets the
+    // amount field to the maximum eligible amount for that term.
     console.log('  → selecting 28-day repayment period');
     const periodSelect = page.locator('select').first();
     if (await periodSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
       await periodSelect.selectOption('28');
     }
+    await sleep(400);
+
+    // Fill the loan amount (number input)
+    console.log('  → entering loan amount: 50');
+    await page.locator('input[type="number"]').first().fill('50');
     await sleep(400);
 
     console.log('  → clicking One-Click Borrow');
