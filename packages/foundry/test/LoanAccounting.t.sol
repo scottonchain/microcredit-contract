@@ -232,6 +232,12 @@ contract LoanAccountingTest is MicrocreditTestBase {
         assertEq(lenders, 1);
     }
 
+    function testPreviewLoanTermsUnderOneWeekIsOnePayment() public view {
+        (, uint256 payment) = credit.previewLoanTerms(borrower, 1_000e6, 3 days);
+        uint256 interest = (1_000e6 * RATE * 3 days) / (10_000 * 365 days);
+        assertEq(payment, 1_000e6 + interest);
+    }
+
     function testPreviewLoanTermsUsesPlatformRate() public view {
         (uint256 rate, uint256 weekly) = credit.previewLoanTerms(borrower, 1_000e6, 28 days);
         assertEq(rate, RATE);
@@ -286,6 +292,27 @@ contract LoanAccountingTest is MicrocreditTestBase {
     }
 
     // ───────────────────────────── admin access ─────────────────────────────
+
+    event ParameterUpdated(bytes32 indexed parameter, uint256 value);
+    event ScoreOverrideSet(address indexed user, uint256 score);
+    event OracleUpdated(address oracle);
+
+    function testAdminChangesEmitEvents() public {
+        vm.startPrank(owner);
+        vm.expectEmit(address(credit));
+        emit ParameterUpdated("effrRate", 450);
+        credit.setEffrRate(450);
+        vm.expectEmit(address(credit));
+        emit ParameterUpdated("maxLoanAmount", 5e6);
+        credit.setMaxLoanAmount(5e6);
+        vm.expectEmit(address(credit));
+        emit ScoreOverrideSet(stranger, 1);
+        credit.setScoreOverride(stranger, 1);
+        vm.expectEmit(address(credit));
+        emit OracleUpdated(stranger);
+        credit.setOracle(stranger);
+        vm.stopPrank();
+    }
 
     function testAdminSettersAreOwnerOnly() public {
         bytes[] memory calls = new bytes[](12);

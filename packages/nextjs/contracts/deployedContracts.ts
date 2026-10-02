@@ -2211,6 +2211,50 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "Attested",
+          inputs: [
+            {
+              name: "attester",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "borrower",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "weight",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "Deposited",
+          inputs: [
+            {
+              name: "lender",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "DisplayNameSet",
           inputs: [
             {
@@ -2236,6 +2280,19 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "KycVerified",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "LiquidityLimitsUpdated",
           inputs: [
             {
@@ -2246,6 +2303,37 @@ const deployedContracts = {
             },
             {
               name: "threshold",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "LoanDisbursed",
+          inputs: [
+            {
+              name: "borrower",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "loanId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "to",
+              type: "address",
+              indexed: false,
+              internalType: "address",
+            },
+            {
+              name: "amount",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -2271,6 +2359,37 @@ const deployedContracts = {
             },
             {
               name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "LoanRequested",
+          inputs: [
+            {
+              name: "borrower",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "loanId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "interestRate",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -2497,9 +2616,115 @@ const deployedContracts = {
           anonymous: false,
         },
         {
+          type: "event",
+          name: "OracleUpdated",
+          inputs: [
+            {
+              name: "oracle",
+              type: "address",
+              indexed: false,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "ParameterUpdated",
+          inputs: [
+            {
+              name: "parameter",
+              type: "bytes32",
+              indexed: true,
+              internalType: "bytes32",
+            },
+            {
+              name: "value",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "RelayerWhitelisted",
+          inputs: [
+            {
+              name: "relayer",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "allowed",
+              type: "bool",
+              indexed: false,
+              internalType: "bool",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "ScoreOverrideSet",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "score",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "Withdrawn",
+          inputs: [
+            {
+              name: "lender",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "to",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
           type: "error",
           name: "InvalidShortString",
           inputs: [],
+        },
+        {
+          type: "error",
+          name: "SafeERC20FailedOperation",
+          inputs: [
+            {
+              name: "token",
+              type: "address",
+              internalType: "address",
+            },
+          ],
         },
         {
           type: "error",

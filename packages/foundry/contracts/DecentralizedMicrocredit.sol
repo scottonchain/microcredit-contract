@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity 0.8.33;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import { SignatureChecker } from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -17,6 +18,8 @@ import { PageRank } from "./PageRank.sol";
  *      that work (and credit score updates) is meant to move to an off-chain oracle.
  */
 contract DecentralizedMicrocredit is EIP712, PageRank {
+    using SafeERC20 for IERC20;
+
     // ───────────────────────────── constants ─────────────────────────────
 
     uint256 public constant SCALE = 1e6; // credit scores and attestation weights (1e6 = 100%)
@@ -196,7 +199,17 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     // ───────────────────────────── events ─────────────────────────────
 
+    event ParameterUpdated(bytes32 indexed parameter, uint256 value);
     event LiquidityLimitsUpdated(uint256 bufferBp, uint256 threshold);
+    event OracleUpdated(address oracle);
+    event RelayerWhitelisted(address indexed relayer, bool allowed);
+    event ScoreOverrideSet(address indexed user, uint256 score);
+    event KycVerified(address indexed user);
+    event Deposited(address indexed lender, uint256 amount);
+    event Withdrawn(address indexed lender, address indexed to, uint256 amount);
+    event LoanRequested(address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 interestRate);
+    event LoanDisbursed(address indexed borrower, uint256 indexed loanId, address to, uint256 amount);
+    event Attested(address indexed attester, address indexed borrower, uint256 weight);
     event DisplayNameSet(address indexed user, string name);
     event LoanRepaid(address indexed borrower, uint256 indexed loanId, uint256 amount);
     event MetaLoanRequested(address indexed borrower, uint256 amount, uint256 loanId);
@@ -256,36 +269,44 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     function setOracle(address _oracle) external onlyOwner {
         require(_oracle != address(0), "Invalid oracle");
         oracle = _oracle;
+        emit OracleUpdated(_oracle);
     }
 
     function setKycBonus(uint256 _kycBonus) external onlyOwner {
         kycBonus = _kycBonus;
+        emit ParameterUpdated("kycBonus", _kycBonus);
     }
 
     function setBasePersonalization(uint256 _base) external onlyOwner {
         basePersonalization = _base;
+        emit ParameterUpdated("basePersonalization", _base);
     }
 
     function setPersonalizationCap(uint256 _cap) external onlyOwner {
         personalizationCap = _cap;
+        emit ParameterUpdated("personalizationCap", _cap);
     }
 
     function setEffrRate(uint256 _effrRate) external onlyOwner {
         effrRate = _effrRate;
+        emit ParameterUpdated("effrRate", _effrRate);
     }
 
     function setRiskPremium(uint256 _riskPremium) external onlyOwner {
         riskPremium = _riskPremium;
+        emit ParameterUpdated("riskPremium", _riskPremium);
     }
 
     function setMaxLoanAmount(uint256 _maxLoanAmount) external onlyOwner {
         maxLoanAmount = _maxLoanAmount;
+        emit ParameterUpdated("maxLoanAmount", _maxLoanAmount);
     }
 
     /// @param cap Max share of deposits that may be lent or reserved, in BASIS_POINTS.
     function setLendingUtilizationCap(uint256 cap) external onlyOwner {
         require(cap <= BASIS_POINTS, "Cap cannot exceed 100%");
         lendingUtilizationCap = cap;
+        emit ParameterUpdated("lendingUtilizationCap", cap);
     }
 
     /// @param bufferBp Share of deposits to keep liquid, in BASIS_POINTS.
@@ -299,11 +320,13 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     function setRelayerWhitelistEnabled(bool enabled) external onlyOwner {
         relayerWhitelistEnabled = enabled;
+        emit ParameterUpdated("relayerWhitelistEnabled", enabled ? 1 : 0);
     }
 
     function setRelayerWhitelisted(address relayer, bool allowed) external onlyOwner {
         require(relayer != address(0), "Invalid relayer address");
         relayerWhitelist[relayer] = allowed;
+        emit RelayerWhitelisted(relayer, allowed);
     }
 
     /// @notice Assign a credit score directly, bypassing PageRank. Set 0 to clear.
@@ -311,11 +334,13 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     function setScoreOverride(address user, uint256 score) external onlyOwner {
         require(score <= SCALE, "Score exceeds SCALE");
         scoreOverrides[user] = score;
+        emit ScoreOverrideSet(user, score);
     }
 
     function markKYCVerified(address user) external onlyOracle {
         require(!isKYCVerified[user], "Already verified");
         isKYCVerified[user] = true;
+        emit KycVerified(user);
     }
 
     function setDisplayName(string calldata name) external {
@@ -346,9 +371,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             "LIQUIDITY_BELOW_THRESHOLD"
         );
 
-        lenderDeposits[msg.sender] -= amount;
-        totalDeposits -= amount;
-        _pushUsdc(msg.sender, amount);
+        _payOut(msg.sender, msg.sender, amount);
     }
 
     // ───────────────────────────── loans ─────────────────────────────
@@ -391,7 +414,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         Loan storage loan = _repayableLoan(loanId);
         require(loan.borrower == borrower, "Wrong borrower");
 
-        IERC20Permit(address(usdc)).permit(borrower, address(this), value, deadline, v, r, s);
+        _permit(borrower, value, deadline, v, r, s);
 
         uint256 spend = amount == 0 ? _roundToCent(getCurrentOutstandingAmount(loanId)) : amount;
         if (spend > value) {
@@ -560,7 +583,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         emit MetaLoanRepaid(req.borrower, req.loanId, out);
     }
 
-    /// @notice Gasless deposit authorized by a DepositRequest signature, with optional permit.
+    /// @notice Gasless deposit of the signer's USDC, credited to `req.receiver`, with optional permit.
     function depositWithPermitMeta(DepositRequest calldata req, bytes calldata sig, PermitData calldata permit)
         external
         onlyAllowedRelayer
@@ -580,8 +603,10 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             require(permit.value >= req.amount, "Permit value too low");
         }
 
+        require(req.receiver != address(0), "Bad receiver");
+
         _pullUsdc(req.lender, req.amount);
-        _recordDeposit(req.lender, req.amount);
+        _recordDeposit(req.receiver, req.amount);
         emit MetaDeposit(req.lender, req.amount, req.receiver, req.amount);
 
         _tryFillWithdrawalQueue();
@@ -668,7 +693,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     }
 
     /// @return interestRate APR in BASIS_POINTS
-    /// @return payment      Weekly payment over `repaymentPeriod` (seconds, at least 7 days)
+    /// @return payment      Weekly payment over `repaymentPeriod` (one payment if under a week)
     function previewLoanTerms(
         address,
         /* borrower */
@@ -681,7 +706,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     {
         interestRate = effrRate + riskPremium;
         uint256 interest = (principal * interestRate * repaymentPeriod) / (BASIS_POINTS * SECONDS_PER_YEAR);
-        payment = (principal + interest) / (repaymentPeriod / 7 days);
+        uint256 payments = repaymentPeriod / 7 days;
+        payment = (principal + interest) / (payments == 0 ? 1 : payments);
     }
 
     function getLoan(uint256 loanId)
@@ -770,16 +796,24 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     }
 
     function _permit(address holder, PermitData calldata permit) internal {
-        IERC20Permit(address(usdc))
-            .permit(holder, address(this), permit.value, permit.deadline, permit.v, permit.r, permit.s);
+        _permit(holder, permit.value, permit.deadline, permit.v, permit.r, permit.s);
+    }
+
+    /// @dev Anyone can submit a permit signature first (e.g. by watching the mempool), which makes
+    ///      the relayed permit() revert on a used nonce. Proceed when the allowance is already set.
+    function _permit(address holder, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) internal {
+        try IERC20Permit(address(usdc)).permit(holder, address(this), value, deadline, v, r, s) { }
+        catch {
+            require(usdc.allowance(holder, address(this)) >= value, "Permit failed");
+        }
     }
 
     function _pullUsdc(address from, uint256 amount) internal {
-        require(usdc.transferFrom(from, address(this), amount), "Transfer failed");
+        usdc.safeTransferFrom(from, address(this), amount);
     }
 
     function _pushUsdc(address to, uint256 amount) internal {
-        require(usdc.transfer(to, amount), "Transfer failed");
+        usdc.safeTransfer(to, amount);
     }
 
     function _recordDeposit(address lender, uint256 amount) internal {
@@ -790,6 +824,15 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             lenderCount += 1;
             _lenders.push(lender);
         }
+        emit Deposited(lender, amount);
+    }
+
+    /// @dev Pays `amount` of `lender`'s deposit out to `to`.
+    function _payOut(address lender, address to, uint256 amount) internal {
+        lenderDeposits[lender] -= amount;
+        totalDeposits -= amount;
+        _pushUsdc(to, amount);
+        emit Withdrawn(lender, to, amount);
     }
 
     /// @dev Sum of principal across the borrower's active loans.
@@ -844,6 +887,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             _borrowers.push(borrower);
         }
         _borrowerLoans[borrower].push(loanId);
+        emit LoanRequested(borrower, loanId, amount, effrRate + riskPremium);
     }
 
     /// @dev Moves a reserved loan's principal to `to`. Callers decide who may receive it.
@@ -857,6 +901,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         reservedLiquidity -= principal;
         totalLentOut += principal;
         _pushUsdc(to, principal);
+        emit LoanDisbursed(loan.borrower, loanId, to, principal);
     }
 
     function _repayableLoan(uint256 loanId) internal view returns (Loan storage loan) {
@@ -913,6 +958,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             attests.push(Attestation({ attester: attester, weight: weight }));
         }
 
+        emit Attested(attester, borrower, weight);
         _computePageRank(); // DEMO ONLY: production moves this off-chain
     }
 
@@ -948,11 +994,9 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             uint256 available = liquid - locked;
             uint256 pay = item.remaining <= available ? item.remaining : available;
 
-            lenderDeposits[item.lender] -= pay;
             queuedWithdrawals[item.lender] -= pay;
-            totalDeposits -= pay;
-            _pushUsdc(item.to, pay);
             item.remaining -= pay;
+            _payOut(item.lender, item.to, pay);
             emit MetaWithdrawalFilled(withdrawalHead, pay);
 
             if (item.remaining != 0) break; // partial fill; resume on the next liquidity event
