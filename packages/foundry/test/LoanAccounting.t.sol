@@ -81,6 +81,91 @@ contract LoanAccountingTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(borrower), 0);
     }
 
+    function testPartialRepaymentReducesOutstanding() public {
+        uint256 loanId = _openLoan(PRINCIPAL);
+        vm.warp(block.timestamp + 30 days);
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), 400e6);
+        credit.repayLoan(loanId, 400e6);
+        vm.stopPrank();
+
+        (, uint256 outstanding,,, bool active) = credit.getLoan(loanId);
+        assertTrue(active);
+        assertEq(outstanding, owed - 400e6);
+        assertEq(credit.getCurrentOutstandingAmount(loanId), owed - 400e6);
+    }
+
+    function testPartialRepaymentsThenPayoffCloseLoan() public {
+        uint256 loanId = _openLoan(PRINCIPAL);
+        vm.warp(block.timestamp + 30 days);
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        usdc.mint(borrower, owed - PRINCIPAL);
+
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), owed);
+        credit.repayLoan(loanId, 250e6);
+        credit.repayLoan(loanId, 250e6);
+        credit.repayLoan(loanId, credit.getCurrentOutstandingAmount(loanId));
+        vm.stopPrank();
+
+        (,,,, bool active) = credit.getLoan(loanId);
+        assertFalse(active);
+        assertEq(usdc.balanceOf(borrower), 0, "paid exactly what was owed");
+        assertEq(credit.totalLentOut(), 0);
+    }
+
+    function testRepayLoanNeverPullsMoreThanOwed() public {
+        uint256 loanId = _openLoan(PRINCIPAL);
+        usdc.mint(borrower, 100e6);
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), PRINCIPAL + 100e6);
+        credit.repayLoan(loanId, PRINCIPAL + 100e6);
+        vm.stopPrank();
+
+        (,,,, bool active) = credit.getLoan(loanId);
+        assertFalse(active);
+        assertEq(usdc.balanceOf(borrower), 100e6, "overpayment stays with the borrower");
+    }
+
+    function testRepayWithPermitPartialReducesOutstanding() public {
+        uint256 loanId = _openLoan(PRINCIPAL);
+        vm.warp(block.timestamp + 30 days);
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+
+        DecentralizedMicrocredit.PermitData memory p = _signPermit(borrowerPk, 300e6, _deadline());
+        vm.prank(relayer);
+        credit.repayWithPermit(borrower, loanId, 300e6, p.value, p.deadline, p.v, p.r, p.s);
+
+        assertEq(credit.getCurrentOutstandingAmount(loanId), owed - 300e6);
+        assertEq(usdc.balanceOf(borrower), PRINCIPAL - 300e6);
+    }
+
+    /// The borrower UI pays `getOutstandingRoundedToCent` with amount = 0. When that rounds
+    /// down, the sub-cent remainder must be forgiven rather than leaving the loan open.
+    function testRepayWithPermitCentRoundedPayoffClosesLoan() public {
+        uint256 loanId = _openLoan(PRINCIPAL);
+        uint256 owed;
+        for (uint256 day = 2; day < 60; day++) {
+            vm.warp(block.timestamp + 1 days);
+            owed = credit.getCurrentOutstandingAmount(loanId);
+            if (owed % 10_000 != 0 && owed % 10_000 < 5_000) break;
+        }
+        uint256 rounded = credit.getOutstandingRoundedToCent(loanId);
+        assertLt(rounded, owed, "fixture should round down");
+        usdc.mint(borrower, rounded - PRINCIPAL);
+
+        DecentralizedMicrocredit.PermitData memory p = _signPermit(borrowerPk, rounded, _deadline());
+        vm.prank(relayer);
+        credit.repayWithPermit(borrower, loanId, 0, p.value, p.deadline, p.v, p.r, p.s);
+
+        (,,,, bool active) = credit.getLoan(loanId);
+        assertFalse(active);
+        assertEq(usdc.balanceOf(borrower), 0);
+        assertEq(credit.totalLentOut(), 0);
+    }
+
     function testRequestLoanEnforcesLiquidityBuffer() public {
         vm.startPrank(owner);
         credit.setMaxLoanAmount(100_000e6);

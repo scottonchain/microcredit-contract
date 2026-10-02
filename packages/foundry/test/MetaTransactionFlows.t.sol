@@ -349,6 +349,26 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         assertEq(credit.totalLentOut(), 0);
     }
 
+    function testRepayLoanMetaAfterPartialRepaymentPullsRemainder() public {
+        uint256 loanId = _borrow(40e6);
+        vm.warp(block.timestamp + 10 days);
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), type(uint256).max);
+        credit.repayLoan(loanId, 15e6);
+        vm.stopPrank();
+
+        uint256 remainder = credit.getCurrentOutstandingAmount(loanId);
+        usdc.mint(borrower, remainder - usdc.balanceOf(borrower));
+        DecentralizedMicrocredit.RepayRequest memory req = _repayRequest(loanId, 0);
+        bytes memory sig = _signRepayRequest(borrowerPk, req);
+
+        vm.expectEmit(address(credit));
+        emit MetaLoanRepaid(borrower, loanId, remainder);
+        vm.prank(relayer);
+        credit.repayLoanMeta(req, sig, _noPermit());
+        assertEq(usdc.balanceOf(borrower), 0);
+    }
+
     function testRepayLoanMetaToleratesOneCentDrift() public {
         uint256 loanId = _borrow(40e6);
         vm.warp(block.timestamp + 10 days);
