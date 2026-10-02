@@ -48,13 +48,13 @@ Contributions are made via Issues and Pull Requests (PRs). A few general guideli
 ## Development Setup
 
 ### Prerequisites
-- `git`, `node >=18`, `yarn`
+- `git`, `node >=20.18.3`, `yarn`
 - Foundry (`curl -L https://foundry.paradigm.xyz | bash`)
 
 ### Local Development
-1. **Clone & install**
+1. **Clone & install** (the OpenZeppelin submodule is required to compile)
 ```bash
-git clone <repository-url>
+git clone --recurse-submodules <repository-url>
 cd microcredit-contract
 yarn install
 ```
@@ -64,12 +64,8 @@ yarn install
 yarn chain
 ```
 
-3. **Deploy contracts with test data**
+3. **Deploy contracts with test data** (MockUSDC, a seeded pool and the demo personas)
 ```bash
-# For development/testing (includes MockUSDC)
-DEPLOY_MOCK_USDC=true yarn deploy
-
-# For production-like testing (no MockUSDC)
 yarn deploy
 ```
 
@@ -79,12 +75,7 @@ yarn start
 ```
 
 ### Environment Configuration
-Create `packages/nextjs/.env.local` for frontend overrides:
-```env
-NEXT_PUBLIC_TARGET_NETWORK=localhost
-NEXT_PUBLIC_CONTRACT_ADDRESS=<DecentralizedMicrocredit address>
-NEXT_PUBLIC_USDC_ADDRESS=<MockUSDC address>
-```
+`yarn deploy` regenerates `packages/nextjs/contracts/deployedContracts.ts`, which the frontend reads for addresses and ABIs; commit it when the contract ABI changes. See the README for optional `packages/nextjs/.env.local` settings.
 
 ## Project Structure
 
@@ -93,15 +84,17 @@ microcredit-contract/
 ├── packages/
 │   ├── foundry/           # Smart contracts and deployment
 │   │   ├── contracts/     # Solidity contracts
-│   │   ├── script/        # Deployment scripts
-│   │   ├── test/          # Contract tests
-│   │   └── scripts-js/    # Node.js utilities
-│   └── nextjs/           # Frontend application
-│       ├── app/          # Next.js 14 app router pages
-│       ├── components/   # React components
-│       └── hooks/        # Custom React hooks
-├── lib/                  # External dependencies
-└── scripts/             # Project-wide scripts
+│   │   ├── script/        # Forge deployment scripts
+│   │   ├── scripts-js/    # Node.js deploy/keystore utilities
+│   │   ├── scripts-py/    # NetworkX PageRank baseline
+│   │   └── test/          # Forge tests
+│   └── nextjs/            # Frontend application
+│       ├── app/           # Next.js 15 app router pages and relayer API routes
+│       ├── components/    # React components
+│       ├── hooks/         # Custom React hooks
+│       └── utils/         # Shared helpers (deployment constants, EIP-712 types)
+├── lib/                   # OpenZeppelin submodule (vendors forge-std)
+└── scripts/               # start-anvil.sh, demo.sh, restart.sh, Playwright demo
 ```
 
 ## Testing
@@ -113,7 +106,7 @@ yarn foundry:test
 
 # Run specific tests
 cd packages/foundry
-forge test --match-test testLoanApproval -vv
+forge test --match-test testRequestLoan -vv
 
 # Run tests with gas reporting
 forge test --gas-report
@@ -126,6 +119,9 @@ yarn next:check-types
 
 # Linting
 yarn next:lint
+
+# Production build
+yarn next:build
 ```
 
 ## Deployment Considerations
@@ -137,14 +133,13 @@ This repository includes demo helpers for local development. **These are NOT mea
 **Important Security Notes:**
 - `packages/foundry/script/Deploy.s.sol` contains hard-coded private keys for Anvil development chains only
 - Never run deployment scripts with hard-coded keys on public networks
-- The `DEPLOY_MOCK_USDC=true` flag is for testing only
-- Production deployments require proper USDC contract addresses
+- `Deploy.s.sol` deploys MockUSDC (free mint, no access control) unless `deployment-config.json` points at a live token
+- Production deployments require a real USDC contract address
 
 **Best Practices:**
-- Always use `DEPLOY_MOCK_USDC=true` for local testing
 - Run `forge clean` before compilation after major changes
 - Use keystore accounts for testnet/mainnet deployments
-- Verify contract addresses in `deployment.json` after deployment
+- Verify contract addresses in `packages/foundry/deployment.json` after deployment
 
 ## Code Style and Conventions
 
@@ -158,7 +153,7 @@ This repository includes demo helpers for local development. **These are NOT mea
 ### Frontend
 - Use shared formatting helpers from `packages/nextjs/utils/format.ts`
 - Reuse components from `packages/nextjs/components/` instead of duplicating
-- Follow Next.js 14 App Router conventions
+- Follow Next.js 15 App Router conventions
 - Use TypeScript strictly (no `any` types)
 - Prefer server components when possible
 

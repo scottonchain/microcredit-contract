@@ -21,20 +21,17 @@ if (args.includes("--help") || args.includes("-h")) {
   console.log(`
 Usage: yarn deploy [options]
 Options:
-  --file <filename>     Specify the deployment script file (default: Deploy.s.sol)
-  --network <network>   Specify the network (default: localhost)
-  --keystore <n>     Specify the keystore account to use (bypasses selection prompt)
-  --help, -h           Show this help message
+  --file <filename>     Deployment script in script/ (default: Deploy.s.sol)
+  --network <network>   Network from foundry.toml [rpc_endpoints] (default: localhost)
+  --keystore <name>     Keystore account to use (bypasses selection prompt)
+  --help, -h            Show this help message
 
 Environment Variables:
-  DEPLOY_MOCK_USDC=true Deploy MockUSDC contract (default: false)
+  GAS_LIMIT             Per-transaction gas limit (default: 100000000)
 
 Examples:
-  yarn deploy --file DeployDecentralizedMicrocredit.s.sol --network sepolia
-  yarn deploy --network sepolia --keystore my-account
-  yarn deploy --file DeployDecentralizedMicrocredit.s.sol
   yarn deploy
-  DEPLOY_MOCK_USDC=true yarn deploy  # Deploy with MockUSDC contract
+  yarn deploy --network sepolia --keystore my-account
   `);
   process.exit(0);
 }
@@ -77,7 +74,7 @@ try {
   if (!parsedToml.rpc_endpoints[network]) {
     console.log(
       `\n❌ Error: Network '${network}' not found in foundry.toml!`,
-      "\nPlease check \`foundry.toml\` for available networks in the [rpc_endpoints] section or add a new network."
+      "\nPlease check `foundry.toml` for available networks in the [rpc_endpoints] section or add a new network."
     );
     process.exit(1);
   }
@@ -87,7 +84,8 @@ try {
 }
 
 if (
-  (process.env.LOCALHOST_KEYSTORE_ACCOUNT || "scaffold-eth-default") !== "scaffold-eth-default" &&
+  (process.env.LOCALHOST_KEYSTORE_ACCOUNT || "scaffold-eth-default") !==
+    "scaffold-eth-default" &&
   network === "localhost"
 ) {
   console.log(`
@@ -101,7 +99,8 @@ You can either:
 `);
 }
 
-let selectedKeystore = process.env.LOCALHOST_KEYSTORE_ACCOUNT || "scaffold-eth-default";
+let selectedKeystore =
+  process.env.LOCALHOST_KEYSTORE_ACCOUNT || "scaffold-eth-default";
 if (network !== "localhost") {
   if (keystoreArg) {
     // Use the keystore provided via command line argument
@@ -161,8 +160,14 @@ if (network === "localhost") {
     const socket = new net.Socket();
     socket.setTimeout(1000);
     socket
-      .once("connect", () => { socket.destroy(); resolve(true); })
-      .once("timeout", () => { socket.destroy(); resolve(false); })
+      .once("connect", () => {
+        socket.destroy();
+        resolve(true);
+      })
+      .once("timeout", () => {
+        socket.destroy();
+        resolve(false);
+      })
       .once("error", () => resolve(false))
       .connect(port, "127.0.0.1");
   });
@@ -179,14 +184,66 @@ Then re-run your deploy command.
   }
 }
 
-// Set environment variables for the make command
-process.env.DEPLOY_SCRIPT = `script/${fileName}`;
-process.env.RPC_URL = network;
-process.env.ETH_KEYSTORE_ACCOUNT = selectedKeystore;
+// The default localhost keystore wraps Anvil's well-known account 9 (the same key
+// Deploy.s.sol broadcasts with). forge refuses to run when ETH_KEYSTORE_ACCOUNT
+// names a keystore that does not exist, so create it on first use.
+const LOCAL_KEYSTORE = "scaffold-eth-default";
+const LOCAL_KEYSTORE_PK =
+  "0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6";
+const LOCAL_KEYSTORE_PASSWORD = "localhost";
 
-const result = spawnSync("make", ["deploy-and-generate-abis"], {
+if (
+  selectedKeystore === LOCAL_KEYSTORE &&
+  !existsSync(join(process.env.HOME, ".foundry", "keystores", LOCAL_KEYSTORE))
+) {
+  const imported = spawnSync(
+    "cast",
+    [
+      "wallet",
+      "import",
+      LOCAL_KEYSTORE,
+      "--private-key",
+      LOCAL_KEYSTORE_PK,
+      "--unsafe-password",
+      LOCAL_KEYSTORE_PASSWORD,
+    ],
+    { stdio: "inherit" }
+  );
+  if (imported.status !== 0) process.exit(imported.status ?? 1);
+}
+
+const deployScript = join("script", fileName);
+if (!existsSync(join(__dirname, "..", deployScript))) {
+  console.error(`\n❌ Error: Deploy script '${deployScript}' not found`);
+  process.exit(1);
+}
+
+const forgeArgs = [
+  "script",
+  `${deployScript}:DeployScript`,
+  "--rpc-url",
+  network,
+  "--broadcast",
+  "--legacy",
+  "--gas-limit",
+  process.env.GAS_LIMIT || "100000000",
+];
+if (selectedKeystore === LOCAL_KEYSTORE) {
+  forgeArgs.push("--password", LOCAL_KEYSTORE_PASSWORD);
+}
+
+const deployed = spawnSync("forge", forgeArgs, {
+  cwd: join(__dirname, ".."),
   stdio: "inherit",
-  shell: true,
+  env: {
+    ...process.env,
+    ETH_KEYSTORE_ACCOUNT: selectedKeystore,
+    FOUNDRY_AUTO_CONFIRM: "1",
+  },
 });
+if (deployed.status !== 0) process.exit(deployed.status ?? 1);
 
-process.exit(result.status);
+const generated = spawnSync("node", [join(__dirname, "generateTsAbis.js")], {
+  stdio: "inherit",
+});
+process.exit(generated.status ?? 1);

@@ -1,0 +1,15 @@
+import deployedContracts from "~~/contracts/deployedContracts";
+import scaffoldConfig from "~~/scaffold.config";
+
+/** Chain the app targets (local Anvil by default; see scaffold.config.ts). */
+export const CHAIN_ID = scaffoldConfig.targetNetworks[0].id;
+
+const deployment = deployedContracts[CHAIN_ID];
+
+export const MICROCREDIT_ADDRESS = deployment.DecentralizedMicrocredit.address as `0x${string}`;
+export const MICROCREDIT_ABI = deployment.DecentralizedMicrocredit.abi;
+export const USDC_ADDRESS = deployment.MockUSDC?.address as `0x${string}` | undefined;
+export const USDC_ABI = deployment.MockUSDC?.abi;
+
+/** Raw JSON-RPC endpoint for local-only tooling that calls anvil_* methods directly. */
+export const ANVIL_RPC_URL = "http://127.0.0.1:8545";

@@ -184,8 +184,6 @@ function processAllDeployments(broadcastPath) {
         address: deployment.address,
         abi: artifact.abi,
         inheritedFunctions: getInheritedFunctions(artifact),
-        deploymentFile: deployment.deploymentFile,
-        deploymentScript: deployment.deploymentScript,
       };
     }
   });
@@ -195,39 +193,13 @@ function processAllDeployments(broadcastPath) {
 
 function main() {
   const current_path_to_broadcast = join(__dirname, "..", "broadcast");
-  const current_path_to_deployments = join(__dirname, "..", "deployments");
-
-  const Deploymentchains = getFiles(current_path_to_deployments);
-  const deployments = {};
-
-  // Load existing deployments from deployments directory
-  Deploymentchains.forEach((chain) => {
-    if (!chain.endsWith(".json")) return;
-    chain = chain.slice(0, -5);
-    var deploymentObject = JSON.parse(
-      readFileSync(`${current_path_to_deployments}/${chain}.json`)
-    );
-    deployments[chain] = deploymentObject;
-  });
 
   // Process all deployments from all script folders
   const allGeneratedContracts = processAllDeployments(
     current_path_to_broadcast
   );
 
-  // Update contract keys based on deployments if they exist
-  Object.entries(allGeneratedContracts).forEach(([chainId, contracts]) => {
-    Object.entries(contracts).forEach(([contractName, contractData]) => {
-      const deployedName = deployments[chainId]?.[contractData.address];
-      if (deployedName) {
-        // If we have a deployment name, use it instead of the contract name
-        allGeneratedContracts[chainId][deployedName] = contractData;
-        delete allGeneratedContracts[chainId][contractName];
-      }
-    });
-  });
-
-  const NEXTJS_TARGET_DIR = "../nextjs/contracts/";
+  const NEXTJS_TARGET_DIR = join(__dirname, "..", "..", "nextjs", "contracts");
 
   // Ensure target directories exist
   if (!existsSync(NEXTJS_TARGET_DIR)) {
@@ -257,14 +229,17 @@ function main() {
   `;
 
   writeFileSync(
-    `${NEXTJS_TARGET_DIR}deployedContracts.ts`,
+    join(NEXTJS_TARGET_DIR, "deployedContracts.ts"),
     format(fileTemplate("~~/utils/scaffold-eth/contract"), {
       parser: "typescript",
     })
   );
 
   console.log(
-    `📝 Updated TypeScript contract definition file on ${NEXTJS_TARGET_DIR}deployedContracts.ts`
+    `📝 Updated TypeScript contract definition file on ${join(
+      NEXTJS_TARGET_DIR,
+      "deployedContracts.ts"
+    )}`
   );
 }
 
