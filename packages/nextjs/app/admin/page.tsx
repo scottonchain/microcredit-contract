@@ -7,7 +7,7 @@ import { CogIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract, useTransactor } from "~~/hooks/scaffold-eth";
 import { formatPercent, formatUSDC } from "~~/utils/format";
-import { createPublicClient, formatUnits, http, parseUnits, zeroAddress } from "viem";
+import { createPublicClient, formatUnits, http, isAddress, parseUnits, zeroAddress } from "viem";
 import { localhost } from "viem/chains";
 import Link from "next/link";
 import { useIsAdmin } from "~~/hooks/useIsAdmin";
@@ -40,6 +40,124 @@ const bpsToPercent = (bps?: bigint) => (bps !== undefined ? formatPercent(Number
  * (plain-language text from utils/contractErrors.ts for DecentralizedMicrocredit errors), so the
  * handlers only reset their own state.
  */
+
+/**
+ * Emergency pause: stops new loans and disbursements, while repayments, defaults and withdrawals go
+ * on. The guardian or the owner can pause; only the owner can unpause or change the guardian.
+ */
+const EmergencyPausePanel = ({ isOwner }: { isOwner: boolean }) => {
+  const { address: connectedAddress } = useAccount();
+  const [guardianInput, setGuardianInput] = useState("");
+  const [busy, setBusy] = useState<"pause" | "unpause" | "guardian" | null>(null);
+
+  const { data: paused } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "paused",
+  });
+  const { data: guardian } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "guardian",
+  });
+  const { writeContractAsync } = useScaffoldWriteContract({ contractName: "DecentralizedMicrocredit" });
+
+  const hasGuardian = !!guardian && guardian !== zeroAddress;
+  const isGuardian = hasGuardian && !!connectedAddress && connectedAddress.toLowerCase() === guardian.toLowerCase();
+  const newGuardian = isAddress(guardianInput) ? guardianInput : null;
+
+  const pause = async () => {
+    setBusy("pause");
+    try {
+      await writeContractAsync({ functionName: "pause" });
+    } catch (error) {
+      console.error("pause failed:", error);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const unpause = async () => {
+    setBusy("unpause");
+    try {
+      await writeContractAsync({ functionName: "unpause" });
+    } catch (error) {
+      console.error("unpause failed:", error);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveGuardian = async () => {
+    if (!newGuardian) return;
+    setBusy("guardian");
+    try {
+      await writeContractAsync({ functionName: "setGuardian", args: [newGuardian] });
+      setGuardianInput("");
+    } catch (error) {
+      console.error("setGuardian failed:", error);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+      <h2 className="text-xl font-semibold mb-1">Emergency Pause</h2>
+      <p className="text-sm text-gray-600 mb-4">
+        Pausing stops new loans and disbursements. Repayments, defaults and withdrawals still work.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className={`p-4 rounded-lg ${paused ? "bg-red-50" : "bg-green-50"}`}>
+          <h3 className={`font-medium mb-2 ${paused ? "text-red-800" : "text-green-800"}`}>New Lending</h3>
+          <div className={`text-2xl font-bold ${paused ? "text-red-600" : "text-green-600"}`}>
+            {paused === undefined ? "-" : paused ? "Paused" : "Open"}
+          </div>
+          <p className={`text-sm mt-1 ${paused ? "text-red-600" : "text-green-600"}`}>
+            {paused ? "Only the owner can unpause." : "The guardian or the owner can pause at once."}
+          </p>
+        </div>
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <h3 className="font-medium text-blue-800 mb-2">Guardian</h3>
+          {hasGuardian ? (
+            <Address address={guardian} />
+          ) : (
+            <div className="text-2xl font-bold text-blue-600">{guardian === undefined ? "-" : "None"}</div>
+          )}
+          <p className="text-sm text-blue-600 mt-1">Can pause, but cannot unpause.</p>
+        </div>
+      </div>
+      {(isOwner || isGuardian) && (
+        <div className="flex flex-wrap gap-2 mt-6">
+          <button className="btn btn-error" disabled={paused !== false || busy !== null} onClick={pause}>
+            {busy === "pause" ? "Pausing..." : "Pause new lending"}
+          </button>
+          {isOwner && (
+            <button className="btn btn-primary" disabled={paused !== true || busy !== null} onClick={unpause}>
+              {busy === "unpause" ? "Unpausing..." : "Unpause"}
+            </button>
+          )}
+        </div>
+      )}
+      {isOwner ? (
+        <div className="mt-6 max-w-md">
+          <label className="block text-sm font-medium mb-2">New guardian</label>
+          <div className="flex gap-2">
+            <div className="flex-1 min-w-0">
+              <AddressInput value={guardianInput} onChange={setGuardianInput} placeholder="0x..." />
+            </div>
+            <button className="btn btn-primary" disabled={!newGuardian || busy !== null} onClick={saveGuardian}>
+              {busy === "guardian" ? "Saving..." : "Set guardian"}
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Set the zero address to remove the guardian.</p>
+        </div>
+      ) : (
+        !isGuardian && (
+          <p className="text-sm text-gray-500 mt-4">Only the guardian or the owner can pause. Only the owner can unpause.</p>
+        )
+      )}
+    </div>
+  );
+};
 
 /**
  * First-loss reserve: a share of repaid interest, plus capital anyone adds, that pays uncovered
@@ -227,8 +345,9 @@ const FirstLossReservePanel = ({ isOwner }: { isOwner: boolean }) => {
 
 /**
  * The credit oracle's issuance budget. OracleScoreProvider counts scores in units of 1e6 = one full
- * line of maxLoanAmount; this panel shows them in USDC at the current max loan. The provider is
- * whatever DecentralizedMicrocredit.scoreProvider() points at.
+ * line of maxLoanAmount; this panel shows them in USDC at the current max loan. The budget caps
+ * totalHeld (budget held per account, the highest line since it was last unused), not totalScore.
+ * The provider is whatever DecentralizedMicrocredit.scoreProvider() points at.
  */
 const IssuanceBudgetPanel = () => {
   const { address: connectedAddress } = useAccount();
@@ -252,10 +371,11 @@ const IssuanceBudgetPanel = () => {
       { ...providerContract, functionName: "maxTotalScore" },
       { ...providerContract, functionName: "maxIncreasePerReport" },
       { ...providerContract, functionName: "owner" },
+      { ...providerContract, functionName: "totalHeld" },
     ],
     query: { enabled: hasProvider },
   });
-  // Oracle reports move totalScore, so refresh on every block as the scaffold read hooks do.
+  // Oracle reports and releaseBudget move these totals, so refresh on every block as the scaffold read hooks do.
   const { data: blockNumber } = useBlockNumber({ watch: true });
   useEffect(() => {
     if (hasProvider) refetch();
@@ -265,14 +385,19 @@ const IssuanceBudgetPanel = () => {
   const maxTotalScore = limits?.[1]?.result;
   const maxIncreasePerReport = limits?.[2]?.result;
   const providerOwner = limits?.[3]?.result;
-  const reportsBudget = totalScore !== undefined && maxTotalScore !== undefined && maxIncreasePerReport !== undefined;
+  const totalHeld = limits?.[4]?.result;
+  const reportsBudget =
+    totalScore !== undefined &&
+    totalHeld !== undefined &&
+    maxTotalScore !== undefined &&
+    maxIncreasePerReport !== undefined;
   const isProviderOwner =
     !!connectedAddress && !!providerOwner && connectedAddress.toLowerCase() === providerOwner.toLowerCase();
 
   const toUsdc = (score: bigint) => (maxLoanAmount !== undefined ? (score * maxLoanAmount) / 1_000_000n : undefined);
   const lines = (score: bigint) => (Number(score) / 1e6).toFixed(2);
   const usedPct =
-    reportsBudget && maxTotalScore > 0n ? Math.min(100, (Number(totalScore) / Number(maxTotalScore)) * 100) : 0;
+    reportsBudget && maxTotalScore > 0n ? Math.min(100, (Number(totalHeld) / Number(maxTotalScore)) * 100) : 0;
 
   const budgetUsdc = parseFixed(budgetInput, 6);
   const perReportUsdc = parseFixed(perReportInput, 6);
@@ -318,13 +443,20 @@ const IssuanceBudgetPanel = () => {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-purple-50 p-4 rounded-lg">
-              <h3 className="font-medium text-purple-800 mb-2">Issued</h3>
+              <h3 className="font-medium text-purple-800 mb-2">Budget Held</h3>
               <div className="text-2xl font-bold text-purple-600">
-                {formatUSDC(toUsdc(totalScore))} <span className="text-base font-normal">of {formatUSDC(toUsdc(maxTotalScore))}</span>
+                {formatUSDC(toUsdc(totalHeld))} <span className="text-base font-normal">of {formatUSDC(toUsdc(maxTotalScore))}</span>
               </div>
               <progress className="progress progress-primary w-full mt-2" value={usedPct} max={100} />
               <p className="text-sm text-purple-600 mt-1">
-                {lines(totalScore)} of {lines(maxTotalScore)} full lines of {formatUSDC(maxLoanAmount)}
+                {lines(totalHeld)} of {lines(maxTotalScore)} full lines of {formatUSDC(maxLoanAmount)}
+              </p>
+              <p className="text-sm text-purple-600 mt-1">
+                Current lines: {formatUSDC(toUsdc(totalScore))} ({lines(totalScore)} full lines)
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                A lowered line keeps its budget until the account&apos;s line is unused. Then anyone can call
+                releaseBudget to free it.
               </p>
             </div>
             <div className="bg-orange-50 p-4 rounded-lg">
@@ -374,8 +506,8 @@ const IssuanceBudgetPanel = () => {
                   {saving ? "Saving..." : "Set issuance limits"}
                 </button>
                 <p className="text-xs text-gray-500">
-                  Stored in score units, so the USDC amounts follow the max loan. A budget below what is already issued
-                  blocks any report that raises a score until the total is back under it.
+                  Stored in score units, so the USDC amounts follow the max loan. A budget below what is held blocks any
+                  report that raises a score until held budget is back under it.
                 </p>
               </div>
             </div>
@@ -1044,7 +1176,7 @@ const AdminPage: NextPage = () => {
           <ShieldCheckIcon className="h-16 w-16 mx-auto text-red-500 mb-4" />
           <h1 className="text-2xl font-bold text-red-500 mb-2">Access Denied</h1>
           <p className="text-gray-600 mb-4">
-            You need to be the contract owner, oracle, or whitelisted to access this page.
+            You need to be the contract owner, guardian, oracle, or whitelisted to access this page.
           </p>
           <div className="space-y-2 text-sm text-gray-500">
             <div>
@@ -1113,6 +1245,8 @@ const AdminPage: NextPage = () => {
               🛠️ Populate Test Data
             </Link>
           </div>
+
+          <EmergencyPausePanel isOwner={isOwner} />
 
           {/* Gas Fee Information */}
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
