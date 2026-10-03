@@ -1919,6 +1919,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "maxWithdrawable",
+          inputs: [
+            {
+              name: "lender",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "nonces",
           inputs: [
             {
@@ -3636,11 +3655,6 @@ const deployedContracts = {
         {
           type: "error",
           name: "InvalidTerm",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "LoanClosed",
           inputs: [],
         },
         {

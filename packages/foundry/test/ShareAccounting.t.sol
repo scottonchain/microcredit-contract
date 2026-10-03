@@ -295,6 +295,35 @@ contract ShareAccountingTest is MicrocreditTestBase {
         assertEq(credit.totalAssets(), assets, "the default only confirms what was provisioned");
     }
 
+    // ───────────────────────────── lender views ─────────────────────────────
+
+    /// @dev Hermes, PR #3 round 1: a lender could not see what was withdrawable.
+    function testMaxWithdrawableIsWhatWithdrawFundsPays() public {
+        _deposit(alice, 500e6);
+        _deposit(bob, 500e6);
+        assertApproxEqAbs(credit.maxWithdrawable(alice), 500e6, DUST);
+
+        _openLoan(900e6); // 100 USDC left in cash
+        assertEq(credit.maxWithdrawable(alice), 100e6, "capped by the cash on hand");
+
+        uint256 max = credit.maxWithdrawable(alice);
+        vm.prank(alice);
+        credit.withdrawFunds(max);
+        assertEq(credit.maxWithdrawable(bob), 0);
+        vm.prank(bob);
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
+        credit.withdrawFunds(1);
+    }
+
+    function testClosedLoansReadZeroOutstanding() public {
+        _deposit(alice, 1_000e6);
+        uint256 loanId = _openLoan(LOAN);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
+        _repay(loanId, credit.getCurrentOutstandingAmount(loanId));
+        assertEq(credit.getCurrentOutstandingAmount(loanId), 0);
+        assertEq(credit.getOutstandingRoundedToCent(loanId), 0);
+    }
+
     // ───────────────────────────── share price integrity ─────────────────────────────
 
     function testStrayTransferDoesNotMoveSharePrice() public {

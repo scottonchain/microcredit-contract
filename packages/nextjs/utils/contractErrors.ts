@@ -42,7 +42,6 @@ export const CONTRACT_ERROR_MESSAGES: Record<MicrocreditErrorName, string> = {
   AprChanged: "The interest rate changed after you signed. Please review and try again.",
   LoanNotRequested: "This loan is not waiting to be paid out.",
   LoanNotActive: "This loan is not active.",
-  LoanClosed: "This loan is closed.",
   NotCancellableYet: "Only the borrower can cancel this loan for now.",
   NotYetDefaultable: "This loan is not overdue long enough to be marked defaulted.",
   NotOverdue: "This loan is not past its due date yet.",
