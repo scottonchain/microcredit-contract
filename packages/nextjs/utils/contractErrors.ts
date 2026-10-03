@@ -53,6 +53,7 @@ export const CONTRACT_ERROR_MESSAGES: Record<MicrocreditErrorName, string> = {
   // backing & stake
   SelfBacking: "You cannot back yourself.",
   TooManyBackers: "This borrower already has the maximum number of backers.",
+  BackingTooSmall: "Backing must be at least 1 USDC.",
   InsufficientCredit: "You do not have that much free credit or stake to back with.",
   BackingInUse: "That backing is covering money the borrower still owes. You can lower it once they repay.",
   StakeCommitted: "That stake is committed to backing someone. Withdraw the backing first.",

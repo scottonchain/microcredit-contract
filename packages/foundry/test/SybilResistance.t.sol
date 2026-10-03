@@ -319,12 +319,12 @@ contract SybilResistanceTest is MicrocreditTestBase {
         credit.setReserveBps(5_000);
         vm.prank(avery);
         credit.back(carlos, AVERY_CREDIT);
-        uint256 loanId = _borrow(carlos, 50e6);
-        vm.warp(block.timestamp + 90 days);
+        uint256 loanId = _borrow(carlos, 90e6);
+        vm.warp(block.timestamp + 365 days);
         _repayInFull(carlos, loanId);
 
         uint256 dues = credit.duesPaid(carlos);
-        assertGt(dues, 0);
+        assertGe(dues, credit.MIN_BACKING());
         vm.prank(carlos);
         credit.back(sam, dues);
         assertEq(_limit(sam), dues);
