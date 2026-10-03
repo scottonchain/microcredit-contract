@@ -287,6 +287,29 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         assertEq(credit.totalAssets(), assets - (30e6 - reserve));
     }
 
+    /// @dev An institution standing behind the credit it grants posts first-loss capital.
+    function testAnyoneCanFundTheReserveAndItAbsorbsLossesFirst() public {
+        address institution = makeAddr("institution");
+        usdc.mint(institution, 30e6);
+        vm.startPrank(institution);
+        usdc.approve(address(credit), 30e6);
+        credit.fundReserve(30e6);
+        vm.stopPrank();
+        assertEq(credit.firstLossReserve(), 30e6);
+        assertEq(credit.totalAssets(), POOL, "first-loss capital is not lenders' asset");
+
+        address dana = makeAddr("dana");
+        _backWithCredit(carol, dana, 30e6);
+        vm.prank(dana);
+        uint256 loanId = credit.requestLoan(30e6);
+        credit.disburseLoan(loanId);
+        vm.warp(_defaultableAt(loanId));
+        credit.markDefaulted(loanId);
+
+        assertEq(credit.firstLossReserve(), 0);
+        assertEq(credit.totalAssets(), POOL, "lenders lose nothing");
+    }
+
     function testReserveSettersAreBoundedAndOwnerOnly() public {
         uint256 max = credit.MAX_RESERVE_BPS();
         vm.expectRevert(DecentralizedMicrocredit.NotOwner.selector);

@@ -1327,6 +1327,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "fundReserve",
+          inputs: [
+            {
+              name: "amount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "getAllLoanIds",
           inputs: [],
           outputs: [
@@ -3400,6 +3413,25 @@ const deployedContracts = {
             },
             {
               name: "fee",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "ReserveFunded",
+          inputs: [
+            {
+              name: "from",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
