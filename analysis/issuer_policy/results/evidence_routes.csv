@@ -1,0 +1,10 @@
+route,why,good_weight,bad_weight,interest_paid_usdc,interest_per_trial_usdc
+"reference: 100 unsecured, 30 days",a full trial,1,0,1.01342,1.01342
+100 repaid inside the 24-hour window,free and recyclable (Theorem 3),0,0,0,inf
+"100 fully stake-secured, 30 days",lenders bore no risk; stake is recyclable,0,0,1.01342,inf
+"100 with 95 stake-secured, 30 days",only 5 at risk,0.5,0,1.01342,2.02685
+"1 unsecured, 30 days",dust loans,0.1,0,0.010134,0.10134
+"100 unsecured, 3 days",short loans,0.1,0,0.101342,1.01342
+"100 unsecured, 30 days, two years ago",aged or bought history,0.25,0,1.01342,4.0537
+"100 late (repaid at day 45), stake-secured",bad evidence: never discounted for stake,0,1,1.52014,inf
+loans of an account it backed,guarantor records: back your own fresh account,0,0,nan,inf

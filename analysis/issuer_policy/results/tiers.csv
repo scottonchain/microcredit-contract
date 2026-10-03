@@ -1,0 +1,4 @@
+tier,identity_cost_usdc,cap_usdc,incentive_compatible,prior_alpha,prior_beta,prior_strength_trials,prior_annual_pd,start_line_usdc,line_after_24_trials_usdc
+basic,15,15,True,0.993568,55.9108,56.9043,0.068555,6.10039,15
+standard,40,40,True,0.769122,59.6327,60.4018,0.0504347,21.8854,38.6139
+enhanced,120,100,True,0.776752,92.8861,93.6629,0.0331187,43.326,54.7321
