@@ -11,18 +11,21 @@ import { CreditHandler } from "./CreditHandler.sol";
  *      credit cannot be manufactured, so Sybil accounts add nothing. A fixed cast of credited
  *      accounts, stakers and sybils back, stake, borrow, repay, default and exit in arbitrary
  *      order (see CreditHandler); scores stay fixed, so each account's issued line I0(a) never
- *      changes and the only other source of granted credit is the dues it pays.
+ *      changes and the only other source of granted credit is its dues: the share of the
+ *      interest it pays that goes into the first-loss reserve.
  *
  *      Notation: G(a) = grantedCredit(a), C(a) = creditCommitted(a), SC(a) = stakeCommitted(a),
  *      line(a) = I0(a) + dues(a), P(a) = unpaid principal on a's open loans, E(a) = backing a
  *      receives (secured + unsecured, nominal), Limit(a) = getBorrowLimit(a).limit.
  *
- *      Defaults are kept small enough for `forge test` (the whole directory runs in well under
- *      90 s); for a deeper campaign run e.g.
- *      FOUNDRY_INVARIANT_RUNS=256 FOUNDRY_INVARIANT_DEPTH=100 forge test --match-path 'test/invariant/*'
+ *      The inline settings below keep `forge test --match-path 'test/invariant/*'` at about half a
+ *      minute. Inline config overrides FOUNDRY_INVARIANT_* variables, so for a deeper campaign
+ *      raise runs and depth here (runs = 256, depth = 100 passes in a few minutes). Per-run
+ *      coverage (loans, defaults, charges, slashes, sybil loans, how close Q and I2 come to
+ *      binding) is logged by afterInvariant with -vv, and appended to INVARIANT_STATS_FILE when set.
  */
-/// forge-config: default.invariant.runs = 32
-/// forge-config: default.invariant.depth = 60
+/// forge-config: default.invariant.runs = 64
+/// forge-config: default.invariant.depth = 80
 /// forge-config: default.invariant.fail-on-revert = true
 contract CreditConservationInvariantTest is MicrocreditTestBase {
     uint256 internal constant MAX_LOAN = 100e6;
@@ -64,7 +67,7 @@ contract CreditConservationInvariantTest is MicrocreditTestBase {
         (address lender2, uint256 lender2Key) = makeAddrAndKey("lender2");
         handler = new CreditHandler(credit, usdc, owner, poolLender, POOL, lender2, lender2Key, actors_);
 
-        bytes4[] memory selectors = new bytes4[](20);
+        bytes4[] memory selectors = new bytes4[](21);
         selectors[0] = CreditHandler.back.selector;
         selectors[1] = CreditHandler.stake.selector;
         selectors[2] = CreditHandler.unstake.selector;
@@ -85,6 +88,7 @@ contract CreditConservationInvariantTest is MicrocreditTestBase {
         selectors[17] = CreditHandler.claimFees.selector;
         selectors[18] = CreditHandler.releaseReserve.selector;
         selectors[19] = CreditHandler.impairLoan.selector;
+        selectors[20] = CreditHandler.fundReserve.selector;
         targetContract(address(handler));
         targetSelector(FuzzSelector({ addr: address(handler), selectors: selectors }));
     }
@@ -139,7 +143,7 @@ contract CreditConservationInvariantTest is MicrocreditTestBase {
      *      the loss realised before the first-loss reserve (sum of writtenOff - stake slashed)
      *      and U = sum over borrowers of max(0, disbursed unpaid principal - secured backing
      *      received), the further loss if every open loan defaulted now. Lenders can never lose
-     *      more than the credit that was issued plus the dues borrowers paid them, however many
+     *      more than the credit that was issued plus the dues borrowers paid in, however many
      *      accounts exist and whatever they do. It follows from Q summed over accounts.
      */
     function invariant_I2_lossBound() public view {
@@ -158,6 +162,32 @@ contract CreditConservationInvariantTest is MicrocreditTestBase {
             "I2: realised plus potential loss exceeds the credit issued plus dues paid"
         );
         assertLe(handler.realisedLoss(), handler.lossBeforeReserve(), "I2: the reserve added to lenders' loss");
+    }
+
+    /**
+     * @dev Honest lenders never pay for dues-funded credit. Dues are exactly the reserve share of
+     *      interest, so I2 gives lenders' loss (writtenOff - slashed - reserve used) plus U at
+     *      most sum I0 + reserve on hand - reserve funded + reserve released: lenders' realised
+     *      loss plus the potential loss the reserve on hand cannot absorb never exceeds the issued
+     *      lines (plus reserve already handed to them). Credit earned from history is prepaid.
+     */
+    function invariant_I8_honestLendersPayOnlyForIssuedLines() public view {
+        uint256 issued = 0;
+        uint256 exposure = 0;
+        for (uint256 i = 0; i < cast.length; i++) {
+            address a = cast[i];
+            issued += handler.issuedLine(a);
+            (uint256 secured,) = _received(a);
+            uint256 lent = handler.lentPrincipal(a);
+            if (lent > secured) exposure += lent - secured;
+        }
+        uint256 reserve = credit.firstLossReserve();
+        uint256 uncovered = exposure > reserve ? exposure - reserve : 0;
+        assertLe(
+            handler.realisedLoss() + uncovered,
+            issued + handler.reserveReleased() + handler.totalRoundingDust(),
+            "I8: lenders bear loss beyond the issued lines"
+        );
     }
 
     /**
@@ -228,12 +258,20 @@ contract CreditConservationInvariantTest is MicrocreditTestBase {
 
     // ───────────────────────────── I5 / I6: money ─────────────────────────────
 
-    /// @dev Every USDC the contract owes is held: lenders' cash, fees, stake and the reserve.
+    /**
+     * @dev Every USDC the contract owes is held: pool cash (the reserve's included), fees and
+     *      stake. The reserve is a junior claim inside the pool, so it never exceeds the pool.
+     */
     function invariant_I5_solvency() public view {
-        uint256 owed = credit.lenderCash() + credit.protocolFees() + credit.totalStaked() + credit.firstLossReserve();
+        uint256 owed = credit.lenderCash() + credit.protocolFees() + credit.totalStaked();
         uint256 balance = usdc.balanceOf(address(credit));
         assertGe(balance, owed, "I5: the contract owes more USDC than it holds");
         assertEq(balance, owed + handler.donated(), "I5: USDC unaccounted for beyond stray transfers");
+        assertLe(
+            credit.firstLossReserve(),
+            credit.lenderCash() + credit.totalLentOut(),
+            "I5: reserve claims more than the pool"
+        );
     }
 
     /// @dev Lenders' shares never claim more than the pool's assets.
@@ -283,7 +321,7 @@ contract CreditConservationInvariantTest is MicrocreditTestBase {
             assertLe(credit.stakeCommitted(a), credit.stakeOf(a), "ledger: committed stake exceeds stake");
             stakes += credit.stakeOf(a);
             assertEq(credit.creditLoss(a), handler.charged(a), "ledger: creditLoss != pro-rata charges");
-            assertEq(credit.duesPaid(a), handler.dues(a), "ledger: duesPaid != interest paid net of fee");
+            assertEq(credit.duesPaid(a), handler.dues(a), "ledger: duesPaid != reserve share of interest paid");
             uint256 line = handler.issuedLine(a) + handler.dues(a);
             uint256 expected =
                 credit.defaultedLoans(a) != 0 || line <= handler.charged(a) ? 0 : line - handler.charged(a);
@@ -298,9 +336,9 @@ contract CreditConservationInvariantTest is MicrocreditTestBase {
 
     /**
      * @dev Pool bookkeeping matches the loan model: lent and reserved principal, loan states and
-     *      balances, shares, fees, the reserve, and the lenders' P&L identity
-     *      totalAssets + impaired + paid out + lenders' loss + forgiven
-     *          = deposits + lenders' interest + reserve released.
+     *      balances, shares, fees, the reserve, and the pool's P&L identity
+     *      lenderCash + totalLentOut + paid out + loss before reserve + forgiven
+     *          = deposits + interest net of fee + reserve funded.
      */
     function invariant_poolLedgers() public view {
         uint256 lent = 0;
@@ -340,15 +378,18 @@ contract CreditConservationInvariantTest is MicrocreditTestBase {
         assertEq(credit.protocolFees() + handler.feesClaimed(), handler.feesAccrued(), "ledger: protocol fees");
         assertEq(
             credit.firstLossReserve() + handler.reserveUsed() + handler.reserveReleased(),
-            handler.reserveIn(),
+            handler.reserveIn() + handler.reserveFunded(),
             "ledger: first-loss reserve"
         );
+        uint256 pool = credit.lenderCash() + credit.totalLentOut();
         assertEq(
-            credit.totalAssets() + credit.totalImpaired() + handler.paidOut() + handler.realisedLoss()
-                + handler.forgiven(),
-            handler.deposited() + handler.lenderInterest() + handler.reserveReleased(),
-            "ledger: lenders' P&L identity"
+            pool + handler.paidOut() + handler.lossBeforeReserve() + handler.forgiven(),
+            handler.deposited() + handler.poolInterest() + handler.reserveFunded(),
+            "ledger: pool P&L identity"
         );
+        uint256 junior =
+            credit.totalImpaired() > credit.firstLossReserve() ? credit.totalImpaired() : credit.firstLossReserve();
+        assertEq(credit.totalAssets(), pool - junior, "ledger: totalAssets != pool - max(provisions, reserve)");
     }
 
     /// @dev No panic or foreign revert, the contract always matched the model, exits never diluted stayers.

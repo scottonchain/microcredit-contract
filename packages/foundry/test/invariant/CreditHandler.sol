@@ -18,7 +18,7 @@ import { MockUSDC } from "../../contracts/MockUSDC.sol";
  *
  *      Next to the contract the handler keeps an independent model built from the documented
  *      rules, not from the contract's storage: each loan's principal, interest and interest-first
- *      repayments, the dues (interest net of the protocol fee) each borrower has paid, the reserve's
+ *      repayments, the dues (the reserve share of its interest) each borrower has paid, the reserve's
  *      inflows, and for every default the stake slashed, the credit charged pro rata to each
  *      unsecured backer, and the residual that fell on the reserve and the lenders.
  */
@@ -88,6 +88,7 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
     address public immutable lender;
     uint256 internal immutable lenderKey;
     address public immutable feeRecipient;
+    address public immutable funder;
     uint256 public immutable feeBps;
     uint256 public immutable reserveBps;
 
@@ -103,7 +104,7 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
 
     /// @notice I0(a): the credit line issued by the score override, maxLoanAmount x score / SCALE.
     mapping(address => uint256) public issuedLine;
-    /// @notice Interest a borrower has paid on its own loans, net of the protocol fee.
+    /// @notice Dues: the share of a borrower's interest paid into the first-loss reserve.
     mapping(address => uint256) public dues;
     /// @notice Granted credit charged to `a` as an unsecured backer of defaulted loans (pro rata).
     mapping(address => uint256) public charged;
@@ -123,12 +124,13 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
     uint256 public lenderMinted;
     uint256 public lenderDeposited;
     uint256 public interestPaid;
-    uint256 public lenderInterest; // interest - fee - reserve share
+    uint256 public poolInterest; // interest - fee: into lenderCash, reserve share included
     uint256 public feesAccrued;
     uint256 public feesClaimed;
     uint256 public reserveIn;
     uint256 public reserveUsed;
     uint256 public reserveReleased;
+    uint256 public reserveFunded;
     uint256 public forgiven; // unpaid principal written off when a loan closes under a cent
     uint256 public donated;
 
@@ -176,6 +178,7 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
         lender = lender_;
         lenderKey = lenderKey_;
         feeRecipient = makeAddr("feeRecipient");
+        funder = makeAddr("reserveFunder");
         feeBps = credit_.protocolFeeBps();
         reserveBps = credit_.reserveBps();
         deposited = poolDeposit;
@@ -603,21 +606,48 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
         }
     }
 
-    /// @dev Rare: one call in four releases part of the first-loss reserve to lenders.
+    /// @dev Rare: one call in four hands part of the reserve's claim to lenders (no cash moves).
+    ///      Only the part not absorbing provisions can go; one release in five probes beyond it.
     function releaseReserve(uint256 amountSeed) external sharePriceKept("releaseReserve") {
         uint256 reserve = credit.firstLossReserve();
+        uint256 impaired = credit.totalImpaired();
+        uint256 releasable = reserve > impaired ? reserve - impaired : 0;
         if (reserve == 0 || amountSeed % 4 != 0) {
             _skip("releaseReserve");
             return;
         }
-        uint256 amount = _bound(amountSeed / 4, 1, reserve);
+        uint256 seed = amountSeed / 4;
+        uint256 amount = releasable == 0 || seed % 5 == 0
+            ? _bound(seed, releasable + 1, reserve + 1e6)
+            : _bound(seed, 1, releasable);
         _call("releaseReserve");
         vm.prank(owner);
         try credit.releaseReserve(amount) {
             _ok("releaseReserve");
             reserveReleased += amount;
+            if (amount > releasable) _mismatch("releaseReserve: released reserve that backs provisions");
         } catch (bytes memory reason) {
             _rejected("releaseReserve", reason);
+        }
+    }
+
+    /// @dev Rare: one call in four adds first-loss capital from an outside funder.
+    function fundReserve(uint256 amountSeed) external sharePriceKept("fundReserve") {
+        if (amountSeed % 4 != 0) {
+            _skip("fundReserve");
+            return;
+        }
+        uint256 amount = _bound(amountSeed / 4, 1, MAX_DONATION);
+        usdc.mint(funder, amount);
+        _call("fundReserve");
+        vm.prank(funder);
+        usdc.approve(address(credit), amount);
+        vm.prank(funder);
+        try credit.fundReserve(amount) {
+            _ok("fundReserve");
+            reserveFunded += amount;
+        } catch (bytes memory reason) {
+            _rejected("fundReserve", reason);
         }
     }
 
@@ -698,30 +728,28 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
         return _actors[seed % _actors.length];
     }
 
-    /// @dev Three picks in four go to an account that can borrow, if any; the rest are raw.
+    /// @dev Three picks in four go to an account that can borrow, chosen uniformly among them.
     function _borrowerFor(uint256 seed) internal view returns (address) {
-        uint256 n = _actors.length;
-        if (seed % 4 != 0) {
-            for (uint256 k = 0; k < n; k++) {
-                address a = _actors[(seed % n + k) % n];
-                (, uint256 available) = credit.getBorrowLimit(a);
-                if (available > 0) return a;
-            }
+        if (seed % 4 == 0) return _actor(seed);
+        address[] memory able = new address[](_actors.length);
+        uint256 count = 0;
+        for (uint256 i = 0; i < _actors.length; i++) {
+            (, uint256 available) = credit.getBorrowLimit(_actors[i]);
+            if (available > 0) able[count++] = _actors[i];
         }
-        return _actor(seed);
+        return count == 0 ? _actor(seed) : able[(seed / 4) % count];
     }
 
-    /// @dev Three picks in four go to an account with free credit or stake, if any.
+    /// @dev Three picks in four go to an account with free credit or stake, chosen uniformly.
     function _backerFor(uint256 seed) internal view returns (address) {
-        uint256 n = _actors.length;
-        if (seed % 4 != 0) {
-            for (uint256 k = 0; k < n; k++) {
-                address a = _actors[(seed % n + k) % n];
-                (uint256 freeCredit, uint256 freeStake) = credit.getFreeCredit(a);
-                if (freeCredit + freeStake > 0) return a;
-            }
+        if (seed % 4 == 0) return _actor(seed);
+        address[] memory able = new address[](_actors.length);
+        uint256 count = 0;
+        for (uint256 i = 0; i < _actors.length; i++) {
+            (uint256 freeCredit, uint256 freeStake) = credit.getFreeCredit(_actors[i]);
+            if (freeCredit + freeStake > 0) able[count++] = _actors[i];
         }
-        return _actor(seed);
+        return count == 0 ? _actor(seed) : able[(seed / 4) % count];
     }
 
     /// @dev Mostly within the borrower's available limit; one in five probes beyond it.
@@ -810,8 +838,8 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
         interestPaid += interest;
         feesAccrued += fee;
         reserveIn += toReserve;
-        lenderInterest += interest - fee - toReserve;
-        dues[m.borrower] += interest - fee;
+        poolInterest += interest - fee;
+        dues[m.borrower] += toReserve;
         if (owed - paid < CENT) {
             forgiven += m.principal - m.principalRepaid;
             m.impaired = 0;

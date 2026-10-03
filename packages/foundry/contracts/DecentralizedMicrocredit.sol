@@ -42,7 +42,7 @@ contract DecentralizedMicrocredit is EIP712 {
     ///         drains the rest.
     uint256 public constant QUEUE_FILLS_PER_CALL = 10;
     uint256 public constant MAX_PROTOCOL_FEE_BPS = 2_000; // 20% of repaid interest
-    uint256 public constant MAX_RESERVE_BPS = 5_000; // 50% of repaid interest
+    uint256 public constant MAX_RESERVE_BPS = 8_000; // 80% of repaid interest (fee + reserve <= 100%)
     uint256 public constant DEFAULT_LOAN_TERM = 30 days; // for requestLoan / requestLoanMeta
     uint256 public constant MIN_LOAN_TERM = 1 days;
     uint256 public constant MAX_LOAN_TERM = 365 days;
@@ -198,9 +198,10 @@ contract DecentralizedMicrocredit is EIP712 {
     // Credit scores, computed off-chain and published by an oracle (see IScoreProvider)
     IScoreProvider public scoreProvider;
 
-    // Pool accounting: totalAssets() = lenderCash + totalLentOut - totalImpaired. Tracked internally rather than
-    // read from the token balance, so stray transfers cannot move the share price.
-    uint256 public lenderCash; // lenders' USDC held here, reserved included; excludes protocol fees
+    // Pool accounting: totalAssets() = lenderCash + totalLentOut - max(totalImpaired, firstLossReserve).
+    // Tracked internally rather than read from the token balance, so stray transfers cannot move
+    // the share price.
+    uint256 public lenderCash; // pool USDC (lenders' and the reserve's), reserved included; excludes fees and stake
     uint256 public totalLentOut; // principal still owed on disbursed, active loans
     uint256 public totalImpaired; // part of totalLentOut provisioned against on overdue loans
     uint256 public reservedLiquidity; // principal approved but not yet disbursed
@@ -210,7 +211,9 @@ contract DecentralizedMicrocredit is EIP712 {
     uint256 public protocolFeeBps; // share of repaid interest kept by the protocol, in BASIS_POINTS
     uint256 public protocolFees; // accrued, unclaimed protocol fees (USDC)
     uint256 public reserveBps; // share of repaid interest that funds the first-loss reserve, in BASIS_POINTS
-    uint256 public firstLossReserve; // USDC that pays uncovered default losses before lenders; not lenders' asset
+    // Junior claim on the pool: its cash sits in lenderCash and is lent like any other, but it
+    // absorbs provisions and default losses before lenders' shares do (see totalAssets).
+    uint256 public firstLossReserve;
 
     // Lenders
     mapping(address => uint256) public sharesOf;
@@ -246,7 +249,7 @@ contract DecentralizedMicrocredit is EIP712 {
     mapping(address => uint256) public stakeCommitted; // stake committed to backing, per backer
     mapping(address => uint256) public creditCommitted; // granted credit committed to backing, per backer
     mapping(address => uint256) public creditLoss; // backed defaults charged against granted credit
-    mapping(address => uint256) public duesPaid; // interest paid on own loans, net of the protocol fee
+    mapping(address => uint256) public duesPaid; // interest paid on own loans into the first-loss reserve
     mapping(address => uint256) public activeLoanCount; // per borrower, requested and not yet closed
     mapping(address => uint256) public completedLoans; // per borrower, repaid in full
     mapping(address => uint256) public defaultedLoans; // per borrower; any default blocks borrowing
@@ -452,21 +455,22 @@ contract DecentralizedMicrocredit is EIP712 {
     }
 
     /// @notice Add first-loss capital: an issuer, institution or the operator standing behind the
-    ///         pool's credit. It pays default losses before lenders and is never returned to the payer.
+    ///         pool's credit. It absorbs losses before lenders and is never returned to the payer.
     function fundReserve(uint256 amount) external {
         require(amount > 0, ZeroAmount());
         _pullUsdc(msg.sender, amount);
+        lenderCash += amount;
         firstLossReserve += amount;
         emit ReserveFunded(msg.sender, amount);
+        _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
-    /// @notice Return part of the first-loss reserve to lenders once it exceeds what the pool needs.
+    /// @notice Hand part of the first-loss reserve to lenders once it exceeds what the pool needs.
+    ///         Only the part not already absorbing provisions on overdue loans can be released.
     function releaseReserve(uint256 amount) external onlyOwner {
-        require(amount <= firstLossReserve, ExceedsReserve());
+        require(amount + totalImpaired <= firstLossReserve, ExceedsReserve());
         firstLossReserve -= amount;
-        lenderCash += amount;
         emit ReserveReleased(amount);
-        _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
     function claimProtocolFees(address to, uint256 amount) external onlyOwner {
@@ -606,12 +610,11 @@ contract DecentralizedMicrocredit is EIP712 {
         loan.status = LoanStatus.Defaulted;
         activeLoanCount[loan.borrower] -= 1;
         defaultedLoans[loan.borrower] += 1;
-        uint256 recovered = _chargeBackers(loan.borrower, loanId, writtenOff);
-        uint256 fromReserve = Math.min(writtenOff - recovered, firstLossReserve);
+        uint256 slashed = _chargeBackers(loan.borrower, loanId, writtenOff);
+        lenderCash += slashed;
+        uint256 fromReserve = Math.min(writtenOff - slashed, firstLossReserve);
         firstLossReserve -= fromReserve;
-        recovered += fromReserve;
-        lenderCash += recovered;
-        emit LoanDefaulted(loan.borrower, loanId, writtenOff, recovered);
+        emit LoanDefaulted(loan.borrower, loanId, writtenOff, slashed + fromReserve);
 
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
@@ -700,11 +703,14 @@ contract DecentralizedMicrocredit is EIP712 {
 
     /**
      * @notice Unsecured credit `account` holds itself: its issued line (credit score x
-     *         maxLoanAmount) plus the dues it has paid (interest net of the protocol fee), less the
-     *         defaults charged to it as a backer. 0 once it has defaulted on a loan.
-     * @dev Dues are the largest credit on-chain history can earn without an accountable issuer:
-     *      any rule granting more than the value a history paid to lenders can be farmed by
-     *      recycling one seed through fresh accounts (docs/CREDIT_MODEL.md, Theorem 3).
+     *         maxLoanAmount) plus its dues (the share of its interest paid into the first-loss
+     *         reserve), less the defaults charged to it as a backer. 0 once it has defaulted.
+     * @dev On-chain history can earn credit only up to value the account has put beyond its own
+     *      reach on the lenders' side (docs/CREDIT_MODEL.md, Theorem 3): any larger rule is farmed
+     *      by recycling one seed through fresh accounts, and interest paid to lenders does not
+     *      qualify because an attacker who is also a lender recaptures its share of it. The
+     *      reserve share qualifies: no lender can withdraw it, and it absorbs the very default
+     *      the credit it grants could cause.
      */
     function grantedCredit(address account) public view returns (uint256) {
         if (defaultedLoans[account] != 0) return 0;
@@ -953,10 +959,14 @@ contract DecentralizedMicrocredit is EIP712 {
         return (grossBp * (BASIS_POINTS - protocolFeeBps - reserveBps)) / BASIS_POINTS;
     }
 
-    /// @notice USDC the lenders own: cash held for them plus principal still owed by borrowers,
-    ///         less what is provisioned against overdue loans (see {impairLoan}).
+    /**
+     * @notice USDC the lenders' shares own: pool cash plus principal still owed by borrowers, less
+     *         the first-loss reserve's junior claim, or less the provisions on overdue loans
+     *         (see {impairLoan}) once they exceed it. Provisions and losses up to the reserve
+     *         therefore leave the share price where it is.
+     */
     function totalAssets() public view returns (uint256) {
-        return lenderCash + totalLentOut - totalImpaired;
+        return lenderCash + totalLentOut - Math.max(totalImpaired, firstLossReserve);
     }
 
     function convertToShares(uint256 assets) public view returns (uint256) {
@@ -1284,8 +1294,8 @@ contract DecentralizedMicrocredit is EIP712 {
             loan.impaired -= recovered;
             totalImpaired -= recovered;
             _outstandingPrincipal[loan.borrower] -= principal;
-            duesPaid[loan.borrower] += interest - fee;
-            lenderCash += paid - fee - toReserve;
+            duesPaid[loan.borrower] += toReserve;
+            lenderCash += paid - fee;
             protocolFees += fee;
             firstLossReserve += toReserve;
             emit RepaymentApplied(loanId, interest, principal, fee);

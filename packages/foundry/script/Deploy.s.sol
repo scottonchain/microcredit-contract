@@ -30,6 +30,10 @@ contract DeployScript is Script {
     uint256 internal constant MAX_SCORE_AGE = 7 days;
     // Oracle issuance budget: at most 50 full lines (5,000 USDC at maxLoan 100), half the seeded pool.
     uint256 internal constant ISSUANCE_BUDGET = 50e6;
+    // Share of interest into the first-loss reserve: covers expected loss at 3% annual default
+    // probability, the most the 500 bps premium prices (analysis/credit_risk). The calibration's
+    // full recommendation, which also builds a 99% buffer over three years, is 5,500.
+    uint256 internal constant RESERVE_BPS = 3_000;
 
     DecentralizedMicrocredit internal credit;
 
@@ -44,6 +48,7 @@ contract DeployScript is Script {
         OracleScoreProvider scores = new OracleScoreProvider(alexis, alexis, MAX_SCORE_AGE, ISSUANCE_BUDGET);
         credit.setScoreProvider(scores);
         console.log("OracleScoreProvider deployed at:", address(scores));
+        credit.setReserveBps(RESERVE_BPS);
 
         // Seed the lending pool.
         MockUSDC(usdc).mint(alexis, POOL_SEED);

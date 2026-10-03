@@ -244,12 +244,14 @@ contract SybilResistanceTest is MicrocreditTestBase {
         assertEq(credit.stakeOf(carlos), 100e6, "the seed was never at risk");
     }
 
-    /// @dev The same farm with 30-day loans: an account earns exactly the interest it paid, net
-    ///      of the protocol fee. Borrowing that credit and defaulting hands lenders back only what
-    ///      they were paid, so they end exactly where they started.
+    /// @dev The same farm with paid interest: an account earns exactly the reserve share of the
+    ///      interest it paid. Borrowing that credit and defaulting is absorbed by the reserve it
+    ///      funded, so lenders keep everything else they were paid.
     function testHistoryEarnsOnlyTheDuesItPaid() public {
-        vm.prank(owner);
+        vm.startPrank(owner);
         credit.setProtocolFeeBps(1_000);
+        credit.setReserveBps(5_000);
+        vm.stopPrank();
         uint256 assetsBefore = credit.totalAssets();
         _stake(carlos, 100e6);
         address member = _ring()[0];
@@ -263,7 +265,8 @@ contract SybilResistanceTest is MicrocreditTestBase {
         vm.prank(carlos);
         credit.back(member, 0);
 
-        uint256 dues = interest - (interest * 1_000) / 10_000;
+        uint256 fee = (interest * 1_000) / 10_000;
+        uint256 dues = (interest * 5_000) / 10_000;
         assertGt(dues, 0);
         assertEq(credit.duesPaid(member), dues);
         assertEq(credit.grantedCredit(member), dues);
@@ -271,11 +274,48 @@ contract SybilResistanceTest is MicrocreditTestBase {
 
         _default(_borrow(member, dues));
         assertEq(credit.grantedCredit(member), 0, "dues are forfeited on default");
-        assertEq(credit.totalAssets(), assetsBefore, "lenders lost exactly the dues they had been paid");
+        assertEq(credit.firstLossReserve(), 0, "the reserve the account funded absorbed its default");
+        assertEq(credit.totalAssets(), assetsBefore + interest - fee - dues, "lenders keep their share of the interest");
+    }
+
+    /// @dev Found by analysis/sybil_sim (attack A7). If dues were all interest net of fee, an
+    ///      attacker that is also a lender would get its pool share of that interest back, withdraw
+    ///      while its loans are current, and leave the dues-funded default to the other lenders.
+    ///      Counting only the reserve share closes it: the reserve cannot be withdrawn by lenders.
+    function testAttackerWhoIsAlsoALenderCannotFarmDues() public {
+        vm.prank(owner);
+        credit.setReserveBps(5_000); // protocol fee 0: the attacker's best case
+        address attacker = makeAddr("attacker");
+        _deposit(attacker, 10_000e6); // half the pool
+        uint256 honestBefore = credit.lenderBalance(poolLender);
+
+        _stake(carlos, 100e6); // the attacker's recyclable seed
+        address member = _ring()[0];
+        vm.prank(carlos);
+        credit.back(member, 100e6);
+        uint256 loanId = _borrow(member, 100e6);
+        vm.warp(block.timestamp + 365 days);
+        uint256 interest = credit.getCurrentOutstandingAmount(loanId) - 100e6;
+        _repayInFull(member, loanId);
+        vm.prank(carlos);
+        credit.back(member, 0);
+
+        vm.startPrank(attacker);
+        credit.withdrawFunds(type(uint256).max);
+        vm.stopPrank();
+        uint256 dues = credit.duesPaid(member);
+        _default(_borrow(member, dues));
+
+        uint256 attackerOut = usdc.balanceOf(attacker) + dues; // withdrawal plus the loan kept
+        uint256 attackerIn = 10_000e6 + interest;
+        assertLe(attackerOut, attackerIn, "the attacker cannot profit");
+        assertGe(credit.lenderBalance(poolLender), honestBefore, "the honest lender loses nothing");
     }
 
     /// @dev Dues are credit like any other: they can back someone, which moves them.
     function testDuesCanBackOthers() public {
+        vm.prank(owner);
+        credit.setReserveBps(5_000);
         vm.prank(avery);
         credit.back(carlos, AVERY_CREDIT);
         uint256 loanId = _borrow(carlos, 50e6);
