@@ -450,12 +450,15 @@ contract DecentralizedMicrocredit is EIP712 {
         emit ScoreProviderUpdated(address(provider));
     }
 
+    /// @dev EFFR plus the premium is every new loan's APR; together they are capped at 100%.
     function setEffrRate(uint256 _effrRate) external onlyOwner {
+        require(_effrRate + riskPremium <= BASIS_POINTS, AboveOneHundredPercent());
         effrRate = _effrRate;
         emit ParameterUpdated("effrRate", _effrRate);
     }
 
     function setRiskPremium(uint256 _riskPremium) external onlyOwner {
+        require(effrRate + _riskPremium <= BASIS_POINTS, AboveOneHundredPercent());
         riskPremium = _riskPremium;
         emit ParameterUpdated("riskPremium", _riskPremium);
     }
