@@ -60,6 +60,7 @@ Inherits OpenZeppelin `EIP712`. A single `owner` with two-step handover (`transf
 - `lendingUtilizationCap`: max fraction of `totalAssets` that can be lent or reserved (default 90%)
 - `liquidityBuffer` / `liquidityThreshold`: share of `totalAssets` / absolute USDC that new loans must leave liquid (default 5% / 0). Withdrawals and the queue may use it
 - `protocolFees`: accrued, unclaimed fees; outside `lenderCash`, never lent or withdrawn by lenders
+- `unclaimedPayouts(to)` / `totalUnclaimedPayouts`: lender payouts the token refused (Circle's USDC refuses blacklisted addresses), held outside `lenderCash` so a refused recipient cannot block the repayments and deposits that pay the queue; `claimPayout(to)` delivers them once the token allows
 - `lenderBalance(lender)` / `lenderPrincipal(lender)`: current value of a lender's shares / what they deposited net of the cost basis of shares withdrawn (earnings = the difference)
 - `totalQueuedShares` / `totalQueuedWithdrawals()`: shares locked in the FIFO withdrawal queue (`requestWithdrawalMeta`) and their USDC value, held back from loans and direct withdrawals. Queued shares keep earning until paid. Each deposit, repayment or withdrawal pays at most `QUEUE_FILLS_PER_CALL` (10) queued requests; anyone can call `processWithdrawalQueue(maxItems)` to drain the rest
 - `withdrawFunds` and `requestWithdrawalMeta` take a USDC amount; `type(uint256).max` means the whole unqueued balance
@@ -149,6 +150,7 @@ All suites extend `test/utils/MicrocreditTestBase.sol` (real MockUSDC, EIP-712/E
 - `OracleScoreProvider.t.sol`: reporter and CRE forwarder paths, workflow pinning, epochs, batch bounds, staleness, ownership
 - `LoanAccounting.t.sol`: interest, partial/full repayment, admin permissions, views
 - `MetaTransactions.t.sol`: signature, nonce, deadline and relayer-whitelist rules
-- `MetaTransactionFlows.t.sol`: effects of each meta-transaction entry point
+- `MetaTransactionFlows.t.sol`: effects of each meta-transaction entry point, withdrawal queue, refused payouts
+- `fork/BaseSepoliaUsdc.t.sol`: against Circle's USDC on a Base Sepolia fork (permit domain "USDC"/"2", permit deposit/borrow/repay, blacklisted queue recipient); skipped unless `BASE_SEPOLIA_RPC_URL` is set: `BASE_SEPOLIA_RPC_URL=https://sepolia.base.org forge test --match-path 'test/fork/*'`
 
 The fixture deploys an `OracleScoreProvider` with `oracle` as reporter; `_publishScore(user, score)` publishes as the oracle would, and `_stake(who, amount)` mints and stakes.
