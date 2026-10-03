@@ -1,6 +1,6 @@
 import { relay, relayerRoute, requireFields, txResponse } from "../relayer";
 
-/** Gasless attestation: relays an AttestRequest signed by the attester. */
+/** Gasless backing: relays a BackRequest signed by the backer. */
 export const POST = relayerRoute(async body => {
   requireFields(body, "chainId", "contractAddress", "req", "signature");
   const { chainId, contractAddress, req, signature } = body;
@@ -8,12 +8,12 @@ export const POST = relayerRoute(async body => {
   const result = await relay({
     chainId,
     contractAddress,
-    functionName: "attestMeta",
+    functionName: "backMeta",
     args: [
       {
-        attester: req.attester,
+        backer: req.backer,
         borrower: req.borrower,
-        weight: BigInt(req.weight),
+        amount: BigInt(req.amount),
         nonce: BigInt(req.nonce),
         deadline: BigInt(req.deadline),
       },

@@ -11,7 +11,6 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
 
     function setUp() public {
         _deploy(750, 250, 10_000e6); // 7.5% EFFR + 2.5% premium, $10k max loan at a 100% score
-        _relaxSybilGuards();
         usdc.mint(owner, 1_000_000e6);
         usdc.mint(borrower, 1_000e6);
         usdc.mint(lender, 1_000_000e6);
@@ -21,11 +20,8 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         credit.depositFunds(500_000e6);
         vm.stopPrank();
 
-        // Give the borrower a PageRank-derived score, anchored by a KYC-verified attester.
-        vm.prank(oracle);
-        credit.markKYCVerified(lender);
-        vm.prank(lender);
-        credit.recordAttestation(borrower, 800_000);
+        // The oracle grants the borrower a 90% score: 9,000 USDC of credit at a 10,000 maxLoanAmount.
+        _publishScore(borrower, 900_000);
     }
 
     function _ownerDeposit(uint256 amount) internal {
@@ -57,16 +53,6 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
 
         (,,,, bool isActive) = credit.getLoan(loanId);
         assertFalse(isActive);
-    }
-
-    function testAttesterRewardSharesPrincipal() public {
-        vm.prank(borrower);
-        uint256 loanId = credit.requestLoan(1_000e6);
-        credit.disburseLoan(loanId);
-
-        // Sole attester receives the whole 5%-of-principal pot.
-        assertEq(credit.computeAttesterReward(loanId, lender), 50e6);
-        assertEq(credit.computeAttesterReward(loanId, makeAddr("nobody")), 0);
     }
 
     function testInterestRateIsPlatformRate() public {
@@ -143,13 +129,11 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         vm.prank(owner);
         DecentralizedMicrocredit pool = new DecentralizedMicrocredit(750, 250, type(uint256).max, address(usdc), oracle);
         vm.startPrank(owner);
-        pool.setMinVouchStake(0);
-        pool.setFirstLoanCap(type(uint256).max);
+        pool.setScoreOverride(borrower, SCALE);
         vm.stopPrank();
-        vm.startPrank(lender); // the lender's own balance anchors the attestation
+        vm.startPrank(lender);
         usdc.approve(address(pool), 100_000e6);
         pool.depositFunds(100_000e6);
-        pool.recordAttestation(borrower, 800_000);
         vm.stopPrank();
 
         uint256 utilisationCap = (100_000e6 * pool.lendingUtilizationCap()) / pool.BASIS_POINTS();

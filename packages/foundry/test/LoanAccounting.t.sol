@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
+import { IScoreProvider } from "../contracts/interfaces/IScoreProvider.sol";
 import { MicrocreditTestBase } from "./utils/MicrocreditTestBase.sol";
 
 /// @dev Interest accrual, repayment accounting, admin permissions and view helpers.
@@ -17,7 +18,6 @@ contract LoanAccountingTest is MicrocreditTestBase {
 
     function setUp() public {
         _deploy(750, 250, 10_000e6);
-        _relaxSybilGuards();
         _deposit(makeAddr("poolLender"), 100_000e6);
         vm.prank(owner);
         credit.setScoreOverride(borrower, SCALE);
@@ -248,21 +248,29 @@ contract LoanAccountingTest is MicrocreditTestBase {
 
     // ───────────────────────────── scores & identity ─────────────────────────────
 
-    function testScoreOverrideTakesPrecedenceOverPageRank() public {
+    function testScoreOverrideTakesPrecedenceOverProvider() public {
+        _publishScore(borrower, 300_000);
         assertEq(credit.getCreditScore(borrower), SCALE);
 
         vm.prank(owner);
         credit.setScoreOverride(borrower, 0);
-        assertEq(credit.getCreditScore(borrower), 0, "falls back to PageRank (no attestations)");
+        assertEq(credit.getCreditScore(borrower), 300_000, "falls back to the published score");
+
+        vm.warp(vm.getBlockTimestamp() + MAX_SCORE_AGE + 1);
+        assertEq(credit.getCreditScore(borrower), 0, "stale published scores back nothing");
+
+        vm.prank(owner);
+        credit.setScoreProvider(IScoreProvider(address(0)));
+        assertEq(credit.getCreditScore(borrower), 0, "no provider: overrides only");
 
         vm.prank(owner);
         vm.expectRevert(DecentralizedMicrocredit.ScoreTooHigh.selector);
         credit.setScoreOverride(borrower, SCALE + 1);
     }
 
-    function testRequestLoanRequiresScore() public {
+    function testRequestLoanRequiresCredit() public {
         vm.prank(stranger);
-        vm.expectRevert(DecentralizedMicrocredit.NoCreditScore.selector);
+        vm.expectRevert(DecentralizedMicrocredit.NoCredit.selector);
         credit.requestLoan(1e6);
     }
 
@@ -316,23 +324,19 @@ contract LoanAccountingTest is MicrocreditTestBase {
     }
 
     function testAdminSettersAreOwnerOnly() public {
-        bytes[] memory calls = new bytes[](16);
+        bytes[] memory calls = new bytes[](12);
         calls[0] = abi.encodeCall(credit.setOracle, (stranger));
-        calls[1] = abi.encodeCall(credit.setKycBonus, (1));
-        calls[2] = abi.encodeCall(credit.setBasePersonalization, (1));
-        calls[3] = abi.encodeCall(credit.setPersonalizationCap, (1));
-        calls[4] = abi.encodeCall(credit.setEffrRate, (1));
-        calls[5] = abi.encodeCall(credit.setRiskPremium, (1));
-        calls[6] = abi.encodeCall(credit.setMaxLoanAmount, (1));
-        calls[7] = abi.encodeCall(credit.setLendingUtilizationCap, (1));
-        calls[8] = abi.encodeCall(credit.setLiquidityLimits, (1, 1));
-        calls[9] = abi.encodeCall(credit.setRelayerWhitelistEnabled, (true));
-        calls[10] = abi.encodeCall(credit.setRelayerWhitelisted, (stranger, true));
-        calls[11] = abi.encodeCall(credit.setScoreOverride, (stranger, 1));
-        calls[12] = abi.encodeCall(credit.setProtocolFeeBps, (1));
-        calls[13] = abi.encodeCall(credit.claimProtocolFees, (stranger, 0));
-        calls[14] = abi.encodeCall(credit.setMinVouchStake, (1));
-        calls[15] = abi.encodeCall(credit.setFirstLoanCap, (1));
+        calls[1] = abi.encodeCall(credit.setScoreProvider, (IScoreProvider(stranger)));
+        calls[2] = abi.encodeCall(credit.setEffrRate, (1));
+        calls[3] = abi.encodeCall(credit.setRiskPremium, (1));
+        calls[4] = abi.encodeCall(credit.setMaxLoanAmount, (1));
+        calls[5] = abi.encodeCall(credit.setLendingUtilizationCap, (1));
+        calls[6] = abi.encodeCall(credit.setLiquidityLimits, (1, 1));
+        calls[7] = abi.encodeCall(credit.setRelayerWhitelistEnabled, (true));
+        calls[8] = abi.encodeCall(credit.setRelayerWhitelisted, (stranger, true));
+        calls[9] = abi.encodeCall(credit.setScoreOverride, (stranger, 1));
+        calls[10] = abi.encodeCall(credit.setProtocolFeeBps, (1));
+        calls[11] = abi.encodeCall(credit.claimProtocolFees, (stranger, 0));
 
         for (uint256 i = 0; i < calls.length; i++) {
             vm.prank(stranger);

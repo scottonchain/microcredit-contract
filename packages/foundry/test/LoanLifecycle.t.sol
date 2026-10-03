@@ -7,36 +7,40 @@ import { MicrocreditTestBase } from "./utils/MicrocreditTestBase.sol";
 /**
  * @dev Loan terms, due dates, cancellation and default. Hermes persona 4: a $100 loan left
  *      unpaid for three years stayed active forever, nothing was written down and lenders
- *      could only withdraw the unlent part. Runs on the default guard settings.
+ *      could only withdraw the unlent part. Brighton has no credit of his own: Avery backs him
+ *      with 50 staked USDC, so every default here is charged to a known backer.
  */
 contract LoanLifecycleTest is MicrocreditTestBase {
     uint256 internal constant POOL = 1_000e6;
     uint256 internal constant STAKE = 50e6;
-    uint256 internal constant LOAN = 40e6; // under the 50 USDC first-loan cap
+    uint256 internal constant LOAN = 40e6; // within Avery's 50 USDC of backing
 
     uint256 internal brightonPk = 0xB417;
     address internal brighton = vm.addr(brightonPk);
     address internal avery = makeAddr("avery");
     address internal blake = makeAddr("blake");
+    address internal carol = makeAddr("carol");
     address internal lender = makeAddr("lender");
 
     function setUp() public {
         _deploy(433, 500, 100e6);
         _deposit(lender, POOL);
-        vm.startPrank(oracle);
-        credit.markKYCVerified(avery);
-        credit.markKYCVerified(blake);
-        vm.stopPrank();
-        _vouchWithStake(avery, STAKE, SCALE);
+        _backWithStake(avery, brighton, STAKE);
     }
 
-    function _vouchWithStake(address attester, uint256 stakeAmount, uint256 weight) internal {
-        usdc.mint(attester, stakeAmount);
-        vm.startPrank(attester);
-        usdc.approve(address(credit), stakeAmount);
-        credit.stake(stakeAmount);
-        credit.recordAttestation(brighton, weight);
-        vm.stopPrank();
+    function _backWithStake(address backer, address borrower, uint256 amount) internal {
+        _stake(backer, amount);
+        vm.prank(backer);
+        credit.back(borrower, amount);
+    }
+
+    /// @dev Gives `backer` `amount` of granted credit (a score override) and backs `borrower` with it.
+    function _backWithCredit(address backer, address borrower, uint256 amount) internal {
+        uint256 score = (amount * SCALE) / credit.maxLoanAmount();
+        vm.prank(owner);
+        credit.setScoreOverride(backer, score);
+        vm.prank(backer);
+        credit.back(borrower, amount);
     }
 
     function _borrow(uint256 amount) internal returns (uint256 loanId) {
@@ -161,15 +165,15 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         assertEq(uint256(_status(loanId)), uint256(DecentralizedMicrocredit.LoanStatus.Defaulted));
     }
 
-    /// @dev Hermes persona 4, fully covered by the voucher's stake: lenders lose nothing.
-    function testDefaultWritesDownPrincipalAndSlashesVoucher() public {
+    /// @dev Hermes persona 4. Avery's staked backing covers the whole loss: lenders lose nothing.
+    function testDefaultSlashesSecuredBackingIntoThePool() public {
         uint256 loanId = _borrow(LOAN);
         vm.warp(vm.getBlockTimestamp() + 3 * 365 days);
         credit.markDefaulted(loanId);
 
         assertEq(credit.totalLentOut(), 0);
-        assertEq(credit.attesterStake(avery), STAKE - LOAN);
-        assertEq(credit.totalAttesterStake(), STAKE - LOAN);
+        assertEq(credit.stakeOf(avery), STAKE - LOAN);
+        assertEq(credit.totalStaked(), STAKE - LOAN);
         assertEq(credit.totalAssets(), POOL, "the slashed stake replaces the lost principal");
         assertApproxEqAbs(credit.lenderBalance(lender), POOL, 2);
 
@@ -182,46 +186,54 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         vm.expectRevert(DecentralizedMicrocredit.BorrowerInDefault.selector);
         credit.requestLoan(1e6);
 
-        // The vouch is no longer locked by a loan.
+        // Brighton has no open loans left, so the rest of Avery's backing is released.
+        assertEq(credit.stakeCommitted(avery), 0);
         vm.prank(avery);
-        credit.recordAttestation(brighton, 0);
+        credit.unstake(STAKE - LOAN);
+        assertEq(usdc.balanceOf(avery), STAKE - LOAN);
     }
 
-    function testUncoveredLossLowersSharePrice() public {
-        vm.prank(owner);
-        credit.setMinVouchStake(10e6);
-        address thin = makeAddr("thin");
-        vm.prank(oracle);
-        credit.markKYCVerified(thin);
-        _vouchWithStake(thin, 10e6, SCALE);
+    function testUnsecuredBackingBurnsTheBackersCredit() public {
+        address dana = makeAddr("dana");
+        _backWithCredit(carol, dana, 30e6);
+        vm.prank(dana);
+        uint256 loanId = credit.requestLoan(30e6);
+        credit.disburseLoan(loanId);
+
+        vm.warp(_defaultableAt(loanId));
+        credit.markDefaulted(loanId);
+
+        assertEq(credit.creditLoss(carol), 30e6);
+        assertEq(credit.grantedCredit(carol), 0, "Carol cannot back the same loss twice");
+        assertEq(credit.creditCommitted(carol), 0);
+        assertEq(credit.totalAssets(), POOL - 30e6, "unsecured backing recovers nothing: lenders absorb it");
+    }
+
+    function testStakeIsChargedBeforeCredit() public {
+        _backWithCredit(carol, brighton, 30e6); // Brighton: 50 secured (Avery) + 30 unsecured (Carol)
+        uint256 loanId = _borrow(60e6);
+        vm.warp(_defaultableAt(loanId));
+        credit.markDefaulted(loanId);
+
+        assertEq(credit.stakeOf(avery), 0, "all 50 of Avery's stake first");
+        assertEq(credit.creditLoss(carol), 10e6, "then 10 of Carol's credit");
+        assertEq(credit.totalAssets(), POOL - 10e6);
+    }
+
+    function testChargesArePaidProRata() public {
         vm.prank(avery);
-        credit.recordAttestation(brighton, 1); // Avery's share of the loss is negligible
+        credit.back(brighton, 30e6);
+        _backWithStake(blake, brighton, 10e6);
 
         uint256 loanId = _borrow(LOAN);
         vm.warp(_defaultableAt(loanId));
         credit.markDefaulted(loanId);
 
-        // `thin` covers at most its 10 USDC stake; lenders absorb the rest.
-        assertEq(credit.attesterStake(thin), 0);
-        uint256 averySlash = STAKE - credit.attesterStake(avery);
-        assertEq(credit.totalAssets(), POOL - LOAN + 10e6 + averySlash);
-        assertLt(credit.lenderBalance(lender), POOL);
+        assertEq(credit.stakeOf(avery), STAKE - 30e6);
+        assertEq(credit.stakeOf(blake), 0);
     }
 
-    function testSlashingIsProportionalToVouchWeight() public {
-        vm.prank(avery);
-        credit.recordAttestation(brighton, 750_000);
-        _vouchWithStake(blake, STAKE, 250_000);
-
-        uint256 loanId = _borrow(LOAN);
-        vm.warp(_defaultableAt(loanId));
-        credit.markDefaulted(loanId);
-
-        assertEq(credit.attesterStake(avery), STAKE - 30e6);
-        assertEq(credit.attesterStake(blake), STAKE - 10e6);
-    }
-
-    function testPartialRepaymentReducesTheWriteDown() public {
+    function testPartialRepaymentReducesTheCharge() public {
         uint256 loanId = _borrow(LOAN);
         vm.warp(vm.getBlockTimestamp() + 2 days);
         uint256 interest = credit.getCurrentOutstandingAmount(loanId) - LOAN;
@@ -233,7 +245,26 @@ contract LoanLifecycleTest is MicrocreditTestBase {
 
         vm.warp(_defaultableAt(loanId));
         credit.markDefaulted(loanId);
-        assertEq(credit.attesterStake(avery), STAKE - 25e6, "only unpaid principal is slashed");
+        assertEq(credit.stakeOf(avery), STAKE - 25e6, "only unpaid principal is charged");
+    }
+
+    function testDefaultKeepsBackingForTheBorrowersOtherOpenLoans() public {
+        uint256 first = _borrow(20e6);
+        vm.warp(vm.getBlockTimestamp() + 40 days);
+        uint256 second = _borrow(20e6);
+
+        vm.warp(_defaultableAt(first));
+        credit.markDefaulted(first);
+        assertEq(credit.stakeOf(avery), 30e6);
+        assertEq(credit.stakeCommitted(avery), 30e6, "still backing the second loan");
+        vm.prank(avery);
+        vm.expectRevert(DecentralizedMicrocredit.StakeCommitted.selector);
+        credit.unstake(1);
+
+        vm.warp(_defaultableAt(second));
+        credit.markDefaulted(second);
+        assertEq(credit.stakeOf(avery), 10e6);
+        assertEq(credit.stakeCommitted(avery), 0, "released with no open loans left");
     }
 
     function testClosedLoansCannotDefaultOrBeRepaid() public {
@@ -257,16 +288,15 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         credit.repayLoan(second, 1);
     }
 
-    function testVouchersPerBorrowerAreBounded() public {
-        vm.prank(owner);
-        credit.setMinVouchStake(0);
-        uint256 max = credit.MAX_VOUCHERS_PER_BORROWER();
+    function testBackersPerBorrowerAreBounded() public {
+        uint256 max = credit.MAX_BACKERS_PER_BORROWER();
         for (uint256 i = 1; i < max; i++) {
-            vm.prank(makeAddr(string.concat("voucher", vm.toString(i))));
-            credit.recordAttestation(brighton, SCALE);
+            _backWithStake(makeAddr(string.concat("backer", vm.toString(i))), brighton, 1e6);
         }
-        vm.prank(makeAddr("one too many"));
-        vm.expectRevert(DecentralizedMicrocredit.TooManyVouchers.selector);
-        credit.recordAttestation(brighton, SCALE);
+        address oneTooMany = makeAddr("one too many");
+        _stake(oneTooMany, 1e6);
+        vm.prank(oneTooMany);
+        vm.expectRevert(DecentralizedMicrocredit.TooManyBackers.selector);
+        credit.back(brighton, 1e6);
     }
 }

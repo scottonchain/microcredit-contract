@@ -6,6 +6,59 @@ import { useAccount } from "wagmi";
 import { ChartBarIcon } from "@heroicons/react/24/outline";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { formatUSDC } from "~~/utils/format";
+
+/** An account's own (granted) credit and total limit including backing received. */
+const CreditFigures = ({ account }: { account?: string }) => {
+  const { data: granted } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "grantedCredit",
+    args: [account as `0x${string}` | undefined],
+  });
+  const { data: borrowLimit } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getBorrowLimit",
+    args: [account as `0x${string}` | undefined],
+  });
+  return (
+    <>
+      <div className="text-center">
+        <div className="text-2xl font-bold text-blue-500">{granted !== undefined ? formatUSDC(granted) : "-"}</div>
+        <div className="text-sm text-gray-600">Own Credit</div>
+      </div>
+      <div className="text-center">
+        <div className="text-2xl font-bold text-green-500">
+          {borrowLimit !== undefined ? formatUSDC(borrowLimit[0]) : "-"}
+        </div>
+        <div className="text-sm text-gray-600">Credit Limit (own + backing)</div>
+      </div>
+    </>
+  );
+};
+
+/** Who backs `account`, and with how much stake and credit. */
+const BackersList = ({ account }: { account: string }) => {
+  const { data: backings } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getBackings",
+    args: [account as `0x${string}`],
+  });
+  const active = (backings ?? []).filter(b => b.secured + b.unsecured > 0n);
+  if (active.length === 0) return <div className="text-center text-gray-500 py-4">No one backs this address yet</div>;
+  return (
+    <>
+      {active.map(b => (
+        <div key={b.backer} className="flex items-center justify-between bg-base-200 rounded p-2">
+          <Address address={b.backer} />
+          <span className="text-sm">
+            {formatUSDC(b.secured + b.unsecured)}
+            {b.secured > 0n ? ` (${formatUSDC(b.secured)} staked)` : ""}
+          </span>
+        </div>
+      ))}
+    </>
+  );
+};
 
 const ScoresPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -102,20 +155,7 @@ const ScoresPage: NextPage = () => {
                     {getCreditScoreLabel(toPercent(userCreditScore))}
                   </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-500">
-                    {/* Placeholder for total attestations */}
-                    0
-                  </div>
-                  <div className="text-sm text-gray-600">Total Attestations</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-500">
-                    {/* Placeholder for average confidence */}
-                    0.0%
-                  </div>
-                  <div className="text-sm text-gray-600">Average Confidence</div>
-                </div>
+                <CreditFigures account={connectedAddress} />
               </div>
               
               <div className="mt-6">
@@ -145,28 +185,13 @@ const ScoresPage: NextPage = () => {
                     {getCreditScoreLabel(toPercent(searchedCreditScore))}
                   </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-500">
-                    {/* Placeholder for total attestations */}
-                    0
-                  </div>
-                  <div className="text-sm text-gray-600">Total Attestations</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-500">
-                    {/* Placeholder for average confidence */}
-                    0.0%
-                  </div>
-                  <div className="text-sm text-gray-600">Average Confidence</div>
-                </div>
+                <CreditFigures account={selectedAddress ?? undefined} />
               </div>
 
-              {/* Attestations List */}
               <div>
-                <h3 className="font-medium mb-3">Attestations</h3>
+                <h3 className="font-medium mb-3">Backers</h3>
                 <div className="space-y-2">
-                  {/* Placeholder for attestations */}
-                  <div className="text-center text-gray-500 py-4">No attestations found</div>
+                  <BackersList account={selectedAddress} />
                 </div>
               </div>
             </div>
@@ -218,15 +243,15 @@ const ScoresPage: NextPage = () => {
               </div>
               
               <div>
-                <h3 className="font-medium mb-3">How Scores Are Calculated</h3>
+                <h3 className="font-medium mb-3">How Credit Works</h3>
                 <div className="space-y-4">
                   <div className="flex items-start space-x-3">
                     <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
                       1
                     </div>
                     <div>
-                      <h4 className="font-medium">Social Attestations</h4>
-                      <p className="text-gray-600">Community members attest to your creditworthiness</p>
+                      <h4 className="font-medium">Your Own Credit</h4>
+                      <p className="text-gray-600">Your score, set by an institution or by the credit oracle (for example from your repayment history), times the maximum loan</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -234,8 +259,8 @@ const ScoresPage: NextPage = () => {
                       2
                     </div>
                     <div>
-                      <h4 className="font-medium">Reputation Engine</h4>
-                      <p className="text-gray-600">Scores are calculated on-chain from social attestations</p>
+                      <h4 className="font-medium">Backing</h4>
+                      <p className="text-gray-600">People with credit can back you from their own: their limit falls by exactly what yours gains</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -243,8 +268,8 @@ const ScoresPage: NextPage = () => {
                       3
                     </div>
                     <div>
-                      <h4 className="font-medium">Repayment History</h4>
-                      <p className="text-gray-600">Successful loan repayments improve your score</p>
+                      <h4 className="font-medium">Stake</h4>
+                      <p className="text-gray-600">Anyone can stake USDC to back someone with money instead of credit</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -252,8 +277,8 @@ const ScoresPage: NextPage = () => {
                       4
                     </div>
                     <div>
-                      <h4 className="font-medium">Network Effects</h4>
-                      <p className="text-gray-600">Being attested by high-scoring users boosts your score</p>
+                      <h4 className="font-medium">Defaults</h4>
+                      <p className="text-gray-600">Backers pay first: staked USDC is slashed and committed credit is lost, and the borrower cannot borrow again</p>
                     </div>
                   </div>
                 </div>
@@ -263,7 +288,7 @@ const ScoresPage: NextPage = () => {
 
           {/* Tips for Improving Credit Score */}
           <div className="bg-base-300 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Tips for Improving Your Credit Score</h2>
+            <h2 className="text-xl font-semibold mb-4">Growing Your Credit</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
@@ -271,8 +296,8 @@ const ScoresPage: NextPage = () => {
                     1
                   </div>
                   <div>
-                    <h3 className="font-medium">Get Attested</h3>
-                    <p className="text-gray-600">Ask trusted community members to attest to your creditworthiness</p>
+                    <h3 className="font-medium">Ask to Be Backed</h3>
+                    <p className="text-gray-600">Share your backing link with people who know you and have credit</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
@@ -281,7 +306,7 @@ const ScoresPage: NextPage = () => {
                   </div>
                   <div>
                     <h3 className="font-medium">Repay Loans on Time</h3>
-                    <p className="text-gray-600">Timely repayments have the biggest positive impact on your score</p>
+                    <p className="text-gray-600">Lenders and institutions look at your repayment history when setting your credit</p>
                   </div>
                 </div>
               </div>
@@ -291,8 +316,8 @@ const ScoresPage: NextPage = () => {
                     3
                   </div>
                   <div>
-                    <h3 className="font-medium">Build Relationships</h3>
-                    <p className="text-gray-600">Develop trust relationships with other community members</p>
+                    <h3 className="font-medium">Keep Your Backers Whole</h3>
+                    <p className="text-gray-600">Your backers stand behind you; repaying protects their credit and stake</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
@@ -300,8 +325,8 @@ const ScoresPage: NextPage = () => {
                     4
                   </div>
                   <div>
-                    <h3 className="font-medium">Attest to Others</h3>
-                    <p className="text-gray-600">Providing accurate attestations builds your reputation in the network</p>
+                    <h3 className="font-medium">Back Carefully</h3>
+                    <p className="text-gray-600">Back only people you trust: a default costs you the credit or stake you committed</p>
                   </div>
                 </div>
               </div>

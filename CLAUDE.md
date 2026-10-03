@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Decentralized microcredit lending protocol built with Solidity (Foundry) and Next.js. Borrowers obtain collateral-free USDC loans backed by social reputation, computed via an on-chain PageRank algorithm over weighted attestation graphs. Lenders deposit to a shared pool. Meta-transactions (EIP-712) and EIP-2612 permits enable gasless operations via relayers.
+Decentralized microcredit lending protocol built with Solidity (Foundry) and Next.js. Borrowers obtain collateral-free USDC loans backed by credit: their own (granted from history or by an institution) or credit that others back them with from theirs. Credit is conserved, so Sybil accounts cannot manufacture it (see `docs/CREDIT_INTEGRITY_ISSUES.md`, which must be kept current). Lenders deposit to a shared pool. Meta-transactions (EIP-712) and EIP-2612 permits enable gasless operations via relayers.
 
 ## Monorepo Structure
 
@@ -47,7 +47,7 @@ Node >= 20.18.3 and Foundry are required.
 
 ### Core Contract: `DecentralizedMicrocredit.sol`
 
-Inherits `PageRank` (graph + computation) and OpenZeppelin `EIP712`. The file is grouped into constants, types, state, events, admin, lending pool, loans, credit, meta-transactions, views and internals.
+Inherits OpenZeppelin `EIP712`. The file is grouped into constants, types, state, events, errors, admin, lending pool, loans, credit & backing, meta-transactions, views and internals.
 
 **Single pool lending model**: All lenders deposit USDC to one shared pool; all borrowers draw from the same pool. Lenders hold non-transferable shares (`sharesOf`, `totalShares`); `convertToShares` / `convertToAssets` follow OpenZeppelin ERC4626 with a 6-decimal virtual offset. Interest is recognised on repayment (cash basis): `_repay` settles accrued interest before principal, and the interest, less `protocolFeeBps` (max `MAX_PROTOCOL_FEE_BPS`, 20%), raises the share price. The owner withdraws fees with `claimProtocolFees`.
 
@@ -68,7 +68,7 @@ Inherits `PageRank` (graph + computation) and OpenZeppelin `EIP712`. The file is
 3. `borrowAndDisburseMeta()`: steps 1 and 2 in one relayed transaction with the signed `repaymentPeriod` as term (1 to 365 days); what the borrower UI uses
 4. `repayLoan()` / `repayWithPermit()` (UI) / `repayLoanMeta()`: repay; partial repayments reduce the balance
 5. `cancelLoan()`: release an undisbursed loan's reservation (the borrower any time, anyone after `RESERVATION_TTL`, 7 days)
-6. `markDefaulted()`: anyone, once `LATE_PERIOD` (30 days) past due. Writes off the unpaid principal, slashes the borrower's vouchers by vouch weight (each up to their stake) into `lenderCash`, and blocks the borrower from borrowing again (`defaultedLoans`). Lenders absorb any uncovered loss through the share price
+6. `markDefaulted()`: anyone, once `LATE_PERIOD` (30 days) past due. Writes off the unpaid principal and charges it to the borrower's backers (`_chargeBackers`), and blocks the borrower from borrowing or backing again (`defaultedLoans`). Lenders absorb any uncovered loss through the share price
 
 Every origination path goes through `_originateLoan` (term bounds, default check, score limit and first-loan cap across outstanding principal, utilisation cap, liquidity buffer); every repayment goes through `_repay` (pulls `min(amount, outstanding)`, closes when less than a cent remains).
 
@@ -76,29 +76,23 @@ Every origination path goes through `_originateLoan` (term bounds, default check
 
 **Errors:** the contract reverts with custom errors (declared in its errors section). `packages/nextjs/utils/contractErrors.ts` maps every ABI error name to plain-language text, typed so a new error without a message fails `next:check-types`; the relayer routes return `{ error, code }` with that text, and scaffold's `getParsedError` uses it for wallet transactions.
 
-**Credit score gating:** Max borrow = `creditScore × maxLoanAmount / SCALE` (`Math.mulDiv`), summed across the borrower's active loans. Credit score is an admin override (`setScoreOverride`) if set, otherwise derived from PageRank.
+### Credit model (`docs/CREDIT_INTEGRITY_ISSUES.md`)
 
-### PageRank-Based Credit Scores (`PageRank.sol`)
+**Invariant: credit cannot be manufactured.** An account borrows only against credit it holds or credit someone who holds credit backs it with from their own. Two sources:
+- **Granted credit** `grantedCredit(a)` = `getCreditScore(a) × maxLoanAmount / SCALE − creditLoss(a)` (0 after a default of its own). `getCreditScore` is the admin override (`setScoreOverride`) if set, otherwise the `IScoreProvider` (`OracleScoreProvider`: CRE `onReport` from a pinned forwarder/workflow, or `publishScores` from a reporter; epochs must increase; stale after `maxScoreAge`). The only unsecured credit, and only the owner or oracle creates it.
+- **Stake** `stakeOf(a)`: USDC locked via `stake` / `unstake`, held outside the pool (`totalStaked`).
 
-Attesters create weighted directed edges (0–100% confidence) to borrowers; re-attesting replaces the edge weight. The on-chain PageRank (alpha=0.85, max 100 iterations, per-node convergence threshold 1e-3) runs after every attestation (demo only). The personalization vector comes from the `_personalizationWeight` hook:
-- Admin score override, if set; otherwise
-- `basePersonalization` + `lenderBalance` (capped at `personalizationCap`) + `kycBonus` for KYC-verified users
+**Backing** (`back` / `backMeta`, stored per borrower as `Backing { backer, secured, unsecured }`, at most `MAX_BACKERS_PER_BORROWER` = 32): raising a backing commits the backer's free granted credit first (`creditCommitted`), then free stake (`stakeCommitted`). `getFreeCredit(a)` = (granted not committed and not used by a's own loans, which draw on backing received first; stake not committed). Received backing cannot be passed on. Lowering a backing releases unsecured before secured and may not leave the borrower owing more than their limit (`BackingInUse`); committed stake cannot be unstaked (`StakeCommitted`).
 
-Scores are scaled to `PR_SCALE = 100000`; credit score = `SCALE * x / (x + 100)` with `x = 1000 * PR / max(PR)`. `computePageRank()` is callable by anyone and is gas-intensive; `clearPageRankState()` is owner/oracle only.
+**Limit:** `getBorrowLimit(b)` = (granted − creditCommitted) + `_backingReceived(b)`, and `available` = limit − outstanding principal. `_backingReceived` counts an unsecured edge only as far as its backer's granted credit, net of the backer's own outstanding loans, still covers everything that backer committed, so lost credit stops backing others.
 
-Iteration starts from the personalization vector (same fixed point as NetworkX's uniform start), so nodes no trust reaches stay at exactly 0. If no graph node has personalization weight, PageRank falls back to uniform as NetworkX does (`pagerankPersonalized` false) and every credit score is 0: a uniform ranking is no evidence of trust. Keep `basePersonalization` at 0, since any base weight makes every node its own anchor.
-
-### Sybil guards
-
-- **Vouch stake:** `stake` / `unstake` hold attester USDC outside the pool (`attesterStake`, `totalAttesterStake`). Each active vouch (weight > 0) needs `minVouchStake` (default 50 USDC) staked. A vouch cannot be lowered or revoked while the borrower has an active loan (`activeLoanCount`), and stake cannot fall below `minVouchStake × activeVouches`. On default, `markDefaulted` slashes vouchers (see the loan lifecycle). At most `MAX_VOUCHERS_PER_BORROWER` (32) attestations per borrower keep slashing bounded.
-- **First-loan cap:** a borrower's active principal is capped at `firstLoanCap` (default 50 USDC) until `completedLoans > 0`. `getBorrowLimit(borrower)` returns `(limit, available)`.
-- Attestation updates are O(1) through `_attestationSlot`; `getVouchWeight(attester, borrower)`.
+**Default** (`_chargeBackers`): loss = unpaid principal. Secured backing is charged first, pro rata (stake slashed into `lenderCash`), then unsecured, pro rata (`creditLoss` burns the backer's granted credit); any rest falls on lenders. Charged backing is consumed; the remainder is released only once the borrower has no open loans.
 
 ### Meta-Transactions (EIP-712)
 
-Borrowers/lenders/attesters sign typed messages; relayers submit on-chain. Entry points: `requestLoanMeta`, `disburseLoanMeta`, `borrowAndDisburseMeta`, `repayLoanMeta`, `depositWithPermitMeta`, `depositPermitOnlyMeta`, `requestWithdrawalMeta`, `attestMeta`, plus permit-only `repayWithPermit`. All share `_verifyMeta` (deadline, per-signer nonce, EIP-712/ERC-1271 signature) and the optional relayer whitelist (`onlyAllowedRelayer`, `setRelayerWhitelistEnabled()`).
+Borrowers/lenders/attesters sign typed messages; relayers submit on-chain. Entry points: `requestLoanMeta`, `disburseLoanMeta`, `borrowAndDisburseMeta`, `repayLoanMeta`, `depositWithPermitMeta`, `depositPermitOnlyMeta`, `requestWithdrawalMeta`, `backMeta`, plus permit-only `repayWithPermit`. All share `_verifyMeta` (deadline, per-signer nonce, EIP-712/ERC-1271 signature) and the optional relayer whitelist (`onlyAllowedRelayer`, `setRelayerWhitelistEnabled()`).
 
-The Next.js API routes at `packages/nextjs/app/api/meta/*` (`attest`, `borrow`, `deposit`, `repay-one`, `request-withdrawal`) act as relayers on top of `app/api/meta/relayer.ts`, which resolves the relayer account (`RELAYER_PRIVATE_KEY`, or Anvil's first unlocked account locally), simulates, submits, waits for the receipt and decodes events.
+The Next.js API routes at `packages/nextjs/app/api/meta/*` (`back`, `borrow`, `deposit`, `repay-one`, `request-withdrawal`) act as relayers on top of `app/api/meta/relayer.ts`, which resolves the relayer account (`RELAYER_PRIVATE_KEY`, or Anvil's first unlocked account locally), simulates, submits, waits for the receipt and decodes events.
 
 ### MockUSDC
 
@@ -111,9 +105,9 @@ Next.js 15 App Router with wagmi v2 + viem + RainbowKit for Web3. Zustand for cl
 **Pages by user role:**
 - `/lend` + `/lender` (alias): deposit USDC, view position
 - `/borrower`: request loans, repay
-- `/attest`: create attestations for other addresses
-- `/scores`: view PageRank credit scores
-- `/admin`: set rates, trigger PageRank computation, manage relayers
+- `/attest`: back a borrower with your credit or stake (backing links point here)
+- `/scores`: credit score, own credit, limit and backers for any address
+- `/admin`: set rates, manage relayers, view borrowers and backings
 - `/oracle-setup`: configure oracle parameters
 - `/populate-test-data`: seed random lenders/borrowers (admin, local only)
 - `/fund`: fund test addresses with ETH/USDC (dev only)
@@ -124,7 +118,7 @@ Demo wallet mode (`NEXT_PUBLIC_DEMO_WALLET=true`, set automatically by `yarn dem
 
 ## Deployment
 
-`packages/foundry/script/Deploy.s.sol` (local only; broadcasts with Anvil's published keys) deploys MockUSDC (unless `deployment-config.json` points at a live token) and `DecentralizedMicrocredit` with EFFR=433 bps, risk premium=500 bps, maxLoan=100 USDC. It seeds a 10,000 USDC pool, opens background loans for Diana and Eve (89% utilisation, lifting the first-loan cap while it does), sets score overrides for Alexis (admin, account 9, 95%) and Avery (attester, account 2, 92%), stakes `minVouchStake` for Avery, sets display names for Avery and Brighton (borrower, account 3), and sends ETH to three demo wallets. `yarn deploy` (`scripts-js/parseArgs.js`) then runs `generateTsAbis.js` to regenerate `packages/nextjs/contracts/deployedContracts.ts`; commit that file when the ABI changes.
+`packages/foundry/script/Deploy.s.sol` (local only; broadcasts with Anvil's published keys) deploys MockUSDC (unless `deployment-config.json` points at a live token) and `DecentralizedMicrocredit` with EFFR=433 bps, risk premium=500 bps, maxLoan=100 USDC. It seeds a 10,000 USDC pool, deploys `OracleScoreProvider` (reporter Alexis, 7-day `maxScoreAge`) and sets it as the score provider, opens background loans for Diana and Eve (89% utilisation), grants credit with score overrides to Alexis (admin, account 9, 95 USDC), Avery (backer, account 2, 92 USDC) and Brighton (borrower, account 3, 25 USDC), sets display names for Avery and Brighton (borrower, account 3), and sends ETH to three demo wallets. `yarn deploy` (`scripts-js/parseArgs.js`) then runs `generateTsAbis.js` to regenerate `packages/nextjs/contracts/deployedContracts.ts`; commit that file when the ABI changes.
 
 Network configuration is in `packages/nextjs/scaffold.config.ts` (default: Foundry localhost).
 
@@ -132,9 +126,8 @@ Network configuration is in `packages/nextjs/scaffold.config.ts` (default: Found
 
 | Constant | Value | Meaning |
 |---|---|---|
-| `SCALE` | 1e6 | Credit score / attestation weight precision |
+| `SCALE` | 1e6 | Credit score precision |
 | `BASIS_POINTS` | 10000 | 100% APR |
-| `PR_SCALE` | 100000 | PageRank score precision |
 | `CENT` | 10_000 | 0.01 USDC (6 decimals) |
 
 ## Testing Notes
@@ -142,11 +135,11 @@ Network configuration is in `packages/nextjs/scaffold.config.ts` (default: Found
 All suites extend `test/utils/MicrocreditTestBase.sol` (real MockUSDC, EIP-712/EIP-2612 signing helpers that rebuild typehashes from their type strings):
 - `DecentralizedMicrocredit.t.sol`: core lending, limits, liquidity, withdrawals
 - `ShareAccounting.t.sol`: share price, interest-first repayment, protocol fee, buffer vs exits, stray transfers
-- `LoanLifecycle.t.sol`: terms, due dates, cancellation, default write-down and voucher slashing
-- `SybilResistance.t.sol`: HermesCRBot persona regressions (ring, unanchored attester), vouch stake and locks, first-loan cap. The only suite on default guard settings; the others call `_relaxSybilGuards()`
+- `LoanLifecycle.t.sol`: terms, due dates, cancellation, default write-down and charging backers
+- `SybilResistance.t.sol`: credit conservation; HermesCRBot's ring attack (fresh, staked, and with one credited member), backing moves credit, locks, lost credit stops backing
+- `OracleScoreProvider.t.sol`: reporter and CRE forwarder paths, workflow pinning, epochs, batch bounds, staleness, ownership
 - `LoanAccounting.t.sol`: interest, partial/full repayment, admin permissions, views
 - `MetaTransactions.t.sol`: signature, nonce, deadline and relayer-whitelist rules
 - `MetaTransactionFlows.t.sol`: effects of each meta-transaction entry point
-- `PageRankVerification.t.sol`: verifies Solidity PageRank matches the NetworkX baseline from `scripts-py/` (tolerance: 100 = 0.1% of PR_SCALE)
 
-PageRank tests use hardcoded expected values from NetworkX. If the algorithm changes, update both (see `test/README_PageRank.md`).
+The fixture deploys an `OracleScoreProvider` with `oracle` as reporter; `_publishScore(user, score)` publishes as the oracle would, and `_stake(who, amount)` mints and stakes.

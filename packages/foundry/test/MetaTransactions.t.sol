@@ -15,7 +15,6 @@ contract MetaTransactionsTest is MicrocreditTestBase {
 
     function setUp() public {
         _deploy(500, 500, MAX_LOAN_AMOUNT);
-        _relaxSybilGuards();
         _deposit(makeAddr("lender"), 10_000e6);
         vm.prank(owner);
         credit.setScoreOverride(borrower, 800_000); // 80% -> 8,000 USDC limit
