@@ -98,7 +98,7 @@ The Next.js API routes at `packages/nextjs/app/api/meta/*` (`back`, `borrow`, `d
 
 ### MicrocreditLens
 
-Stateless read-only views derived from the pool's public state, kept out of `DecentralizedMicrocredit` because the pool is near the EIP-170 size limit (23,913 of 24,576 bytes; CI-26): `getFundingPoolAPY`, `getPoolInfo`, `previewLoanTerms`, `getOutstandingRoundedToCent`, `maxWithdrawable`. Every deploy script deploys one next to the pool. Put new derived views here, not in the pool.
+Stateless read-only views derived from the pool's public state, kept out of `DecentralizedMicrocredit` because the pool is near the EIP-170 size limit (23,913 of 24,576 bytes; CI-26): `getFundingPoolAPY`, `getUtilisation`, `sharePrice` (realised return since launch), `getPoolInfo`, `previewLoanTerms`, `getOutstandingRoundedToCent`, `maxWithdrawable`. Every deploy script deploys one next to the pool. Put new derived views here, not in the pool.
 
 ### MockUSDC
 
