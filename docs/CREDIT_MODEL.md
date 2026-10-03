@@ -9,9 +9,9 @@ this model are tracked in [`CREDIT_INTEGRITY_ISSUES.md`](CREDIT_INTEGRITY_ISSUES
 
 1. **Sybil-proofness is a loss bound, not a detection problem.** Identities are free (Douceur 2002),
    and no symmetric reputation function of a graph of accounts is sybilproof (Cheng and Friedman
-   2005), so no rule that reads the graph's structure can tell a ring of fakes from a community. The protocol instead bounds what any set of accounts can
-   take: lenders' realised plus potential loss never exceeds the credit that was issued plus the
-   dues that were paid (Theorem 2). Accounts with nothing issued and nothing paid add exactly
+   2005), so no rule that reads the graph's structure can tell a ring of fakes from a community.
+   The protocol instead bounds what any set of accounts can take: lenders' realised plus potential
+   loss never exceeds the credit that was issued plus the dues that were paid (Theorem 2). Accounts with nothing issued and nothing paid add exactly
    nothing, however many there are.
 2. **Credit is a liability of someone.** Every unit of borrowing capacity is underwritten by a
    named account's issued credit, its dues, or its stake. Backing moves underwriting from one
@@ -29,8 +29,9 @@ this model are tracked in [`CREDIT_INTEGRITY_ISSUES.md`](CREDIT_INTEGRITY_ISSUES
 4. **Larger credit from history needs an accountable issuer.** History is information about the
    probability of default; turning it into a larger line requires someone who bears the loss if
    the information is wrong: an institution (delegated monitoring, Diamond 1984) or a costly
-   identity. Issuance is therefore budgeted on-chain, so a compromised or gamed oracle can
-   misallocate its budget but cannot exceed it.
+   identity. Issuance is therefore budgeted on-chain, charged on the highest line an account holds
+   while its line is in use (Theorem 2'), so a compromised or gamed oracle can misallocate its
+   budget but never has more than the budget lent against its lines.
 5. **Unsecured backing lowers the probability of default, not the loss given default.** Burning a
    backer's credit recovers no cash. It works through selection and monitoring (Stiglitz 1990;
    Ghatak and Guinnane 1999). Lenders' cash recovery comes only from stake and from the first-loss
@@ -70,14 +71,15 @@ The operations and the checks the contract makes:
 - **borrow** $x$: $o(v)+x \le \mathrm{Lim}(v)$.
 - **back** (raise an edge by $x$): $x \le \varphi(u) + (s(u)-s^c(u))$, where the free credit
   $\varphi(u)=\min\big(G(u)-c(u),\ \mathrm{Lim}(u)-o(u)\big)$ is committed first and stake covers the rest.
-  Received backing is not in $\varphi$, so it cannot be passed on.
+  Received backing is not in $\varphi$, so it cannot be passed on. An edge is 0 or at least
+  `MIN_BACKING` (1 USDC), and a defaulted borrower cannot be backed.
 - **cut** an edge: unsecured first, then secured, and afterwards $o(v)\le \mathrm{Lim}(v)$
   (`BackingInUse`). Committed stake cannot be unstaked (`StakeCommitted`).
 - **default** of a loan with unpaid principal $w$ (anyone, after `LATE_PERIOD`): with
   $\Sigma\sigma$ and $\Sigma\upsilon$ the borrower's incoming totals, stake
   $f_s=\min(w,\Sigma\sigma)$ is slashed pro rata and returned to lenders, then
   $f_c=\min(w-f_s,\Sigma\upsilon)$ is charged pro rata to the unsecured backers' $\lambda$, and the
-  residual $w-f_s-f_c$ falls on lenders. Charged backing is consumed; the rest is released once
+  residual $w-f_s-f_c$ falls on the first-loss reserve, then on lenders. Charged backing is consumed; the rest is released once
   the borrower has no open loans. The borrower's own $G$ becomes 0.
 
 ## 3. Conservation
@@ -92,8 +94,8 @@ $\kappa(u)\le G(u)/c(u)$. $\square$
 Theorem 1 is about capacity at an instant. Losses happen over time, while credit is charged,
 burned and released, so the statement that matters needs its own proof.
 
-Let $\Lambda$ be lenders' cumulative realised loss (written-off principal not recovered from
-stake) and $U=\sum_v \max\big(0,\ o^{\mathrm{act}}(v) - \Sigma\sigma_{\mathrm{in}}(v)\big)$ their
+Let $\Lambda$ be the cumulative realised loss (written-off principal not recovered from stake;
+the first-loss reserve then pays part of it, which only reduces what lenders bear) and $U=\sum_v \max\big(0,\ o^{\mathrm{act}}(v) - \Sigma\sigma_{\mathrm{in}}(v)\big)$ their
 potential loss: disbursed principal not covered by secured backing.
 
 **Theorem 2 (loss bound).** With issued lines fixed, in every reachable state
@@ -140,10 +142,11 @@ backer defaults: it stops new borrowing against credit that is no longer there (
 it last had no open loans and no backing commitments. Then at every time
 $U \le \sum_a \big(\ell^*(a)+d(a)\big)$.
 
-*Proof.* Lowering a line does not change the left side of $Q(a)$, so $Q(a)$ keeps holding with the
-highest line in place of the current one; raising it only helps. When the account has no open
-loans and no commitments, $r(a)=c(a)=0$ and its potential exposure is zero, so the maximum can
-restart there. Summing as before gives the bound on $U$. $\square$
+*Proof.* Count $\Lambda_a$ per cycle, from the last time the account had no open loans and no
+commitments; at that point $r(a)=c(a)=0$, so $Q(a)$ holds with $\Lambda_a=0$ and any line.
+Within a cycle, lowering a line does not change the left side of $Q(a)$, so $Q(a)$ keeps holding
+with the cycle's highest line $\ell^*(a)$ in place of the current one, and raising it only helps.
+So $r(a)+c(a)\le\ell^*(a)+d(a)$ always, and summing as before bounds $U$. $\square$
 
 The bound is in terms of $\ell^*$, not the current line, and that difference is an attack: an
 issuer that raises one account's line, lets it borrow, lowers it and raises another's keeps the
@@ -185,7 +188,7 @@ Theorem 2 does not say nothing can go wrong. It says where an attacker has to go
 | Fresh accounts, rings, wash trades | nothing | $\ell=d=s=0$ |
 | An honest backer (persuade, bribe, impersonate a friend) | what that backer commits to the attacker's accounts | the backer's own choice; charged to the backer |
 | The issuer (fool its policy, buy identities it trusts, compromise the oracle) | the lines it issues to the attacker | the issuance budget (and, with CI-17, the issuer's capital first) |
-| Governance (the owner key) | anything: overrides, `maxLoanAmount`, the provider | none on-chain today (CI-6) |
+| Governance (the owner key) | anything: overrides, `maxLoanAmount`, the provider | a self-administered timelock run by a multisig (`DeployProduction.s.sol`); overrides and `maxLoanAmount` remain unbudgeted (CI-6) |
 
 So the protocol's security reduces to issuance and governance, which is where it should be: those
 are the only places credit is created. The rest of this document is about making issuance safe.
@@ -365,7 +368,8 @@ to go first (the run logic of Diamond and Dybvig 1983). `impairLoan`, callable b
 loan is past due, removes the unpaid principal not covered by secured backing from `totalAssets`
 (expected-loss provisioning in the IFRS 9 / CECL sense, with unsecured exposure treated as fully
 lost). Exits after that pay the loss pro rata; repayment reverses the provision and the default
-only confirms it. With several open loans per borrower each loan counts the borrower's whole
+only confirms it. With a first-loss reserve, provisions up to its size are absorbed by the reserve
+and the share price does not move at all. With several open loans per borrower each loan counts the borrower's whole
 secured backing, so the provision can be low; the default settles the exact loss.
 
 ## 8. Requirements mapped to results
@@ -373,6 +377,9 @@ secured backing, so the provision can be low; the default settles the exact loss
 | Requirement (Scott, Hermes) | Status |
 | --- | --- |
 | Borrow only with credit of your own or credit someone who has it backs you with | Theorem 1, enforced on every borrow |
+| Whoever vouches must already hold credit, from previous activity or an institution, not necessarily money; vouching must not create credit (the demo video) | `back` commits the backer's own issued line, dues or stake and lowers its capacity accordingly; a backer with none is rejected (`InsufficientCredit`) |
+| Credit from previous activity | Dues on-chain (Theorem 3 bound); larger lines from an issuer that reads history and answers for it (4.2) |
+| Credit from an institution | An issued line within the oracle's budget, or the owner's override; institutions can also post first-loss capital (`fundReserve`) |
 | A ring's credit is bounded by what enters it from outside | Corollary to Theorem 2 (min-cut) |
 | Vouching locks the voucher's capacity; default costs the voucher | `back` commits; Theorem 2's charge step |
 | No credit from nothing; no uniform fallback | $\ell=d=s=0 \Rightarrow$ zero capacity; no fallback exists |
