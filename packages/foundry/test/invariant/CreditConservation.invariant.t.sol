@@ -259,11 +259,13 @@ contract CreditConservationInvariantTest is MicrocreditTestBase {
     // ───────────────────────────── I5 / I6: money ─────────────────────────────
 
     /**
-     * @dev Every USDC the contract owes is held: pool cash (the reserve's included), fees and
-     *      stake. The reserve is a junior claim inside the pool, so it never exceeds the pool.
+     * @dev Every USDC the contract owes is held: pool cash (the reserve's included), fees, stake
+     *      and payouts held for refused recipients. The reserve is a junior claim inside the pool,
+     *      so it never exceeds the pool.
      */
     function invariant_I5_solvency() public view {
-        uint256 owed = credit.lenderCash() + credit.protocolFees() + credit.totalStaked();
+        uint256 owed =
+            credit.lenderCash() + credit.protocolFees() + credit.totalStaked() + credit.totalUnclaimedPayouts();
         uint256 balance = usdc.balanceOf(address(credit));
         assertGe(balance, owed, "I5: the contract owes more USDC than it holds");
         assertEq(balance, owed + handler.donated(), "I5: USDC unaccounted for beyond stray transfers");
