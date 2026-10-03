@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import inspect
-import math
 import re
 import unittest
 from dataclasses import fields, replace
