@@ -397,14 +397,24 @@ and community graphs (1,000 accounts, 20% holding a line, trust 25 per edge, loa
   own, and a similar share is supplied by credit holders not adjacent to the borrower, who are
   charged on default for a borrower they never chose. If every intermediary must stand behind its
   hop with credit of its own, multi-hop liquidity collapses to exactly one-hop liquidity.
-- **The Sybil bound holds in every regime.** Attacker extraction equals the cut and is identical for
-  1 and for 1,000 Sybil accounts, at most the attack edges times the trust per edge.
+- **The Sybil bound holds in every regime, with a larger constant under multi-hop.** Attacker
+  extraction equals the cut and is identical for 1 and for 1,000 Sybil accounts, at most the
+  attack edges times the trust per edge. Under one hop only attack edges from credit holders
+  count; under multi-hop an edge from an account without credit is worth its full trust too, so
+  the same attack edges take 3.3 to 7 times as much (random endpoints, 20 or more edges), most of
+  it charged to holders who never trusted a Sybil.
+- **When credit is committed matters as much as hop count.** The contract commits at `back`. If
+  holders split their credit evenly ahead of demand, the chance to borrow 50 falls from 0.50 to
+  0.12. Lines that commit on draw (a `back` and a borrow in one transaction) recover that with
+  one-hop liability unchanged.
 
 So multi-hop routing is a liquidity gain bought with a different liability rule: holders must
 accept charges for borrowers reached through intermediaries they trust. That is a product and
 legal decision as much as a technical one (path selection on-chain or a routing proof, roughly
 1.5 to 8 storage slots more per routed loan). The one-hop rule keeps every charge on an account
-that chose the borrower (CI-20).
+that chose the borrower (CI-20). If multi-hop is adopted, the study recommends at most two hops,
+with relaying a permission each source grants per line, so a holder that does not opt in keeps
+one-hop semantics.
 
 ## 7. Lender fairness
 

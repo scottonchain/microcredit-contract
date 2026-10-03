@@ -176,4 +176,4 @@ m Sybils (no credit, unlimited trust among themselves) behind g attack edges of 
 | SBM, credit in half the blocks | no credit | 20 | 500 | 0 | 0 | 250 | 425.0 | 500 | 0 | 20,000 | 0% |
 | SBM, credit in half the blocks | no credit | 50 | 1,250 | 0 | 0 | 600 | 1,050.0 | 1,250 | 0 | 20,000 | 0% |
 
-Runtime: 231 s.
+Runtime: 202 s.
