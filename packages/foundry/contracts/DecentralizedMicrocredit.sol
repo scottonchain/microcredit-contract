@@ -96,6 +96,7 @@ contract DecentralizedMicrocredit is EIP712 {
         uint256 requestedAt;
         uint256 disbursedAt; // interest accrues from here
         LoanStatus status;
+        uint256 impaired; // principal provisioned against (see impairLoan), out of totalAssets
     }
 
     /// @dev Credit a backer has committed to a borrower: `secured` from the backer's stake,
@@ -197,10 +198,11 @@ contract DecentralizedMicrocredit is EIP712 {
     // Credit scores, computed off-chain and published by an oracle (see IScoreProvider)
     IScoreProvider public scoreProvider;
 
-    // Pool accounting: totalAssets() = lenderCash + totalLentOut. Tracked internally rather than
+    // Pool accounting: totalAssets() = lenderCash + totalLentOut - totalImpaired. Tracked internally rather than
     // read from the token balance, so stray transfers cannot move the share price.
     uint256 public lenderCash; // lenders' USDC held here, reserved included; excludes protocol fees
     uint256 public totalLentOut; // principal still owed on disbursed, active loans
+    uint256 public totalImpaired; // part of totalLentOut provisioned against on overdue loans
     uint256 public reservedLiquidity; // principal approved but not yet disbursed
     uint256 public lendingUtilizationCap; // max (lent + reserved) / totalAssets, in BASIS_POINTS
     uint256 public liquidityBuffer; // share of totalAssets new loans must leave liquid, in BASIS_POINTS
@@ -276,6 +278,7 @@ contract DecentralizedMicrocredit is EIP712 {
     event LoanRequested(address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 interestRate);
     event LoanDisbursed(address indexed borrower, uint256 indexed loanId, address to, uint256 amount);
     event LoanCancelled(address indexed borrower, uint256 indexed loanId);
+    event LoanImpaired(uint256 indexed loanId, uint256 impaired);
     /// @dev `writtenOff` is the unpaid principal; `recovered` the part paid back to lenders from
     ///      backers' slashed stake and the first-loss reserve.
     event LoanDefaulted(address indexed borrower, uint256 indexed loanId, uint256 writtenOff, uint256 recovered);
@@ -341,6 +344,7 @@ contract DecentralizedMicrocredit is EIP712 {
     error LoanClosed();
     error NotCancellableYet();
     error NotYetDefaultable();
+    error NotOverdue();
     error NotBorrower();
     error WrongBorrower();
     error MustSendToBorrower();
@@ -547,6 +551,33 @@ contract DecentralizedMicrocredit is EIP712 {
     }
 
     /**
+     * @notice Provision against a loan once it is past due. Callable by anyone, and again to
+     *         update. The unpaid principal that secured backing does not cover leaves
+     *         totalAssets until the borrower repays it or the loan defaults, so a lender who
+     *         exits before {markDefaulted} cannot leave a loss that is already visible to those
+     *         who stay. Expected-loss provisioning in the IFRS 9 / CECL sense, with the
+     *         unsecured part counted as fully lost.
+     * @dev With several open loans, each loan counts the borrower's whole secured backing, so
+     *      the provision can be low; {markDefaulted} always settles the true loss.
+     */
+    function impairLoan(uint256 loanId) external {
+        Loan storage loan = loans[loanId];
+        require(loan.status == LoanStatus.Active, LoanNotActive());
+        require(block.timestamp > loan.disbursedAt + loan.term, NotOverdue());
+
+        uint256 unpaid = loan.principal - loan.principalRepaid;
+        uint256 secured = 0;
+        Backing[] storage edges = _backings[loan.borrower];
+        for (uint256 i = 0; i < edges.length; i++) {
+            secured += edges[i].secured;
+        }
+        uint256 provision = unpaid > secured ? unpaid - secured : 0;
+        totalImpaired = totalImpaired + provision - loan.impaired;
+        loan.impaired = provision;
+        emit LoanImpaired(loanId, provision);
+    }
+
+    /**
      * @notice Mark a loan defaulted once it is LATE_PERIOD past due. Callable by anyone.
      *         The unpaid principal is written off and charged to the borrower's backers (see
      *         {_chargeBackers}); the borrower can never borrow or back again. What slashed stake
@@ -560,6 +591,8 @@ contract DecentralizedMicrocredit is EIP712 {
 
         uint256 writtenOff = loan.principal - loan.principalRepaid;
         totalLentOut -= writtenOff;
+        totalImpaired -= loan.impaired;
+        loan.impaired = 0;
         _outstandingPrincipal[loan.borrower] -= writtenOff;
         loan.status = LoanStatus.Defaulted;
         activeLoanCount[loan.borrower] -= 1;
@@ -911,9 +944,10 @@ contract DecentralizedMicrocredit is EIP712 {
         return (grossBp * (BASIS_POINTS - protocolFeeBps - reserveBps)) / BASIS_POINTS;
     }
 
-    /// @notice USDC the lenders own: cash held for them plus principal still owed by borrowers.
+    /// @notice USDC the lenders own: cash held for them plus principal still owed by borrowers,
+    ///         less what is provisioned against overdue loans (see {impairLoan}).
     function totalAssets() public view returns (uint256) {
-        return lenderCash + totalLentOut;
+        return lenderCash + totalLentOut - totalImpaired;
     }
 
     function convertToShares(uint256 assets) public view returns (uint256) {
@@ -1173,7 +1207,8 @@ contract DecentralizedMicrocredit is EIP712 {
             term: term,
             requestedAt: block.timestamp,
             disbursedAt: 0,
-            status: LoanStatus.Requested
+            status: LoanStatus.Requested,
+            impaired: 0
         });
 
         _allLoanIds.push(loanId);
@@ -1226,6 +1261,9 @@ contract DecentralizedMicrocredit is EIP712 {
             loan.repaid += paid;
             loan.principalRepaid += principal;
             totalLentOut -= principal;
+            uint256 recovered = Math.min(principal, loan.impaired);
+            loan.impaired -= recovered;
+            totalImpaired -= recovered;
             _outstandingPrincipal[loan.borrower] -= principal;
             duesPaid[loan.borrower] += interest - fee;
             lenderCash += paid - fee - toReserve;
@@ -1247,6 +1285,8 @@ contract DecentralizedMicrocredit is EIP712 {
         uint256 unpaid = loan.principal - loan.principalRepaid;
         if (status == LoanStatus.Repaid) {
             totalLentOut -= unpaid;
+            totalImpaired -= loan.impaired;
+            loan.impaired = 0;
             completedLoans[loan.borrower] += 1;
         }
         _outstandingPrincipal[loan.borrower] -= unpaid;

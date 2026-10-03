@@ -225,6 +225,76 @@ contract ShareAccountingTest is MicrocreditTestBase {
         assertEq(credit.getFundingPoolAPY(), 450);
     }
 
+    // ───────────────────────────── impairment (run fairness) ─────────────────────────────
+
+    /// @dev Hermes, PR #3 round 2: a default plus a run must not let the first exiter take more
+    ///      than a pro-rata share. Without a provision the loan counts at full value for 30 days
+    ///      after it is due, so Alice could exit at the old price and leave the loss to Bob.
+    function testImpairmentStopsAnExitAheadOfAKnownLoss() public {
+        _deposit(alice, 500e6);
+        _deposit(bob, 500e6);
+        uint256 loanId = _openLoan(LOAN);
+        (,,,, uint256 dueAt) = credit.getLoanTerms(loanId);
+
+        vm.expectRevert(DecentralizedMicrocredit.NotOverdue.selector);
+        credit.impairLoan(loanId);
+        vm.warp(dueAt + 1);
+        credit.impairLoan(loanId); // anyone, e.g. Bob or a keeper
+        assertEq(credit.totalImpaired(), LOAN);
+        assertEq(credit.totalAssets(), 900e6);
+
+        vm.prank(alice);
+        credit.withdrawFunds(type(uint256).max);
+        assertApproxEqAbs(usdc.balanceOf(alice), 450e6, DUST, "Alice exits with her share of the loss");
+
+        vm.warp(dueAt + credit.LATE_PERIOD() + 1);
+        credit.markDefaulted(loanId);
+        assertEq(credit.totalImpaired(), 0);
+        assertApproxEqAbs(credit.lenderBalance(bob), 450e6, DUST, "Bob bears the same loss, no more");
+    }
+
+    function testImpairmentIsReleasedAsTheBorrowerRepays() public {
+        _deposit(alice, 1_000e6);
+        uint256 loanId = _openLoan(LOAN);
+        (,,,, uint256 dueAt) = credit.getLoanTerms(loanId);
+        vm.warp(dueAt + 1);
+        credit.impairLoan(loanId);
+
+        uint256 interest = credit.getCurrentOutstandingAmount(loanId) - LOAN;
+        _repay(loanId, interest + 40e6);
+        assertEq(credit.totalImpaired(), 60e6, "repaid principal leaves the provision");
+        credit.impairLoan(loanId); // re-marking is idempotent
+        assertEq(credit.totalImpaired(), 60e6);
+
+        _repay(loanId, credit.getCurrentOutstandingAmount(loanId));
+        assertEq(credit.totalImpaired(), 0);
+        assertEq(credit.totalAssets(), 1_000e6 + interest, "the provision is fully reversed");
+    }
+
+    /// @dev Only what secured backing does not cover is provisioned: slashed stake will cover the rest.
+    function testSecuredBackingIsNotProvisioned() public {
+        _deposit(alice, 1_000e6);
+        address dana = makeAddr("dana");
+        _stake(bob, 30e6);
+        vm.prank(bob);
+        credit.back(dana, 30e6);
+        vm.prank(owner);
+        credit.setScoreOverride(dana, 20_000); // 200 USDC of her own at maxLoan 10,000
+        vm.prank(dana);
+        uint256 loanId = credit.requestLoan(50e6);
+        credit.disburseLoan(loanId);
+
+        (,,,, uint256 dueAt) = credit.getLoanTerms(loanId);
+        vm.warp(dueAt + 1);
+        credit.impairLoan(loanId);
+        assertEq(credit.totalImpaired(), 20e6);
+
+        vm.warp(dueAt + credit.LATE_PERIOD() + 1);
+        uint256 assets = credit.totalAssets();
+        credit.markDefaulted(loanId);
+        assertEq(credit.totalAssets(), assets, "the default only confirms what was provisioned");
+    }
+
     // ───────────────────────────── share price integrity ─────────────────────────────
 
     function testStrayTransferDoesNotMoveSharePrice() public {
