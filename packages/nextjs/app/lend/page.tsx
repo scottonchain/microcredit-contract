@@ -102,7 +102,7 @@ const LendPage: NextPage = () => {
     functionName: "getPoolInfo",
   });
 
-  // poolInfo returns [_totalDeposits, _availableFunds, _lenderCount]
+  // poolInfo returns [_totalDeposits, _availableFunds, _reservedFunds, _lenderCount]
   const totalDeposits = poolInfo ? poolInfo[0] : undefined;
   const availableFunds = poolInfo ? poolInfo[1] : undefined;
   const lenderCount = poolInfo ? poolInfo[3] : undefined;
