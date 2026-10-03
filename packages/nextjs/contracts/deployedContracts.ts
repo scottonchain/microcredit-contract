@@ -1732,6 +1732,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "impairLoan",
+          inputs: [
+            {
+              name: "loanId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "isKYCVerified",
           inputs: [
             {
@@ -2685,6 +2698,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "totalImpaired",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "totalLentOut",
           inputs: [],
           outputs: [
@@ -3005,6 +3031,25 @@ const deployedContracts = {
             },
             {
               name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "LoanImpaired",
+          inputs: [
+            {
+              name: "loanId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "impaired",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -3604,6 +3649,11 @@ const deployedContracts = {
         {
           type: "error",
           name: "NotOracle",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotOverdue",
           inputs: [],
         },
         {

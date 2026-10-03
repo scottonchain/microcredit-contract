@@ -45,6 +45,7 @@ export const CONTRACT_ERROR_MESSAGES: Record<MicrocreditErrorName, string> = {
   LoanClosed: "This loan is closed.",
   NotCancellableYet: "Only the borrower can cancel this loan for now.",
   NotYetDefaultable: "This loan is not overdue long enough to be marked defaulted.",
+  NotOverdue: "This loan is not past its due date yet.",
   NotBorrower: "Only the borrower can do this.",
   WrongBorrower: "This loan belongs to a different borrower.",
   MustSendToBorrower: "Loan funds can only go to the borrower.",
