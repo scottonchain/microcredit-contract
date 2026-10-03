@@ -14,6 +14,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import deployedContracts from "~~/contracts/deployedContracts";
 import scaffoldConfig from "~~/scaffold.config";
+import { rateLimited } from "~~/app/api/meta/rateLimit";
 import { contractErrorName, describeContractError } from "~~/utils/contractErrors";
 
 /**
@@ -171,11 +172,28 @@ export function requireFields(body: Record<string, unknown>, ...fields: string[]
   if (fields.some(field => !body[field])) throw new RelayerError("Missing parameters", 400);
 }
 
-/** Wraps a POST handler: parses the JSON body and turns thrown errors into `{ error }` responses. */
+/** The account that signed a relayer request, whichever route it is for. */
+function signerOf(body: Record<string, any>): string | undefined {
+  const signer = body.req?.borrower ?? body.req?.backer ?? body.req?.lender ?? body.borrower ?? body.lender;
+  return typeof signer === "string" ? signer : undefined;
+}
+
+function clientIp(req: NextRequest): string {
+  return req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
+}
+
+/**
+ * Wraps a POST handler: parses the JSON body, applies the relayer's rate limits (see rateLimit.ts)
+ * and turns thrown errors into `{ error }` responses.
+ */
 export function relayerRoute(handler: (body: Record<string, any>) => Promise<Record<string, unknown>>) {
   return async (req: NextRequest) => {
     try {
-      return NextResponse.json(await handler(await req.json()));
+      const body = await req.json();
+      if (rateLimited(clientIp(req), signerOf(body))) {
+        throw new RelayerError("Too many requests. Please wait a minute and try again.", 429);
+      }
+      return NextResponse.json(await handler(body));
     } catch (e: any) {
       // A contract revert is the caller's problem (400) and gets plain-language text.
       const code = contractErrorName(e);
