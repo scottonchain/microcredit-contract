@@ -6,6 +6,7 @@ import { VmSafe } from "forge-std/Vm.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { TimelockController } from "@openzeppelin/contracts/governance/TimelockController.sol";
 import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
+import { MicrocreditLens } from "../contracts/MicrocreditLens.sol";
 import { ICreditUsage, OracleScoreProvider } from "../contracts/OracleScoreProvider.sol";
 
 /**
@@ -62,6 +63,7 @@ contract DeployProductionScript is Script {
         address deployer;
         TimelockController timelock;
         DecentralizedMicrocredit credit;
+        MicrocreditLens lens;
         OracleScoreProvider scores;
         bytes scheduleAcceptCredit;
         bytes executeAcceptCredit;
@@ -132,6 +134,7 @@ contract DeployProductionScript is Script {
 
         // The constructor makes the deployer owner; ADMIN gets the oracle role (markKYCVerified).
         d.credit = new DecentralizedMicrocredit(cfg.effrBps, cfg.riskPremiumBps, cfg.maxLoan, cfg.usdc, cfg.admin);
+        d.lens = new MicrocreditLens(d.credit);
         // No reporter: scores arrive only through a pinned CRE workflow, once one is configured.
         d.scores =
             new OracleScoreProvider(d.deployer, address(0), cfg.maxScoreAge, cfg.issuanceBudgetLines * SCORE_SCALE);
@@ -225,6 +228,7 @@ contract DeployProductionScript is Script {
         OracleScoreProvider scores = d.scores;
         TimelockController timelock = d.timelock;
         require(scores.SCALE() == SCORE_SCALE, "check: score scale");
+        require(address(d.lens.credit()) == address(credit), "check: lens");
 
         require(address(credit.usdc()) == cfg.usdc, "check: usdc");
         require(credit.effrRate() == cfg.effrBps, "check: effrRate");
@@ -315,6 +319,7 @@ contract DeployProductionScript is Script {
         console.log("TimelockController:        ", address(d.timelock));
         console.log("  minDelay (s):            ", cfg.timelockDelay);
         console.log("DecentralizedMicrocredit:  ", address(d.credit));
+        console.log("MicrocreditLens:           ", address(d.lens));
         console.log("OracleScoreProvider:       ", address(d.scores));
         console.log("");
         console.log("effrRate / riskPremium (bps):", cfg.effrBps, cfg.riskPremiumBps);
@@ -381,6 +386,7 @@ contract DeployProductionScript is Script {
         vm.serializeAddress(key, "USDC", cfg.usdc);
         vm.serializeAddress(key, "TimelockController", address(d.timelock));
         vm.serializeAddress(key, "DecentralizedMicrocredit", address(d.credit));
+        vm.serializeAddress(key, "MicrocreditLens", address(d.lens));
         vm.serializeAddress(key, "OracleScoreProvider", address(d.scores));
         vm.serializeUint(key, "timelockDelay", cfg.timelockDelay);
         vm.serializeUint(key, "effrBps", cfg.effrBps);

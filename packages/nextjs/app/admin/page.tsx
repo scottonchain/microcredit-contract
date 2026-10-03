@@ -628,7 +628,7 @@ const AdminPage: NextPage = () => {
 
   // Pool info for overview stats
   const { data: poolInfo, refetch: refetchPoolInfo } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
+    contractName: "MicrocreditLens",
     functionName: "getPoolInfo",
   });
   const availableFunds = poolInfo ? poolInfo[1] : undefined;
@@ -664,7 +664,7 @@ const AdminPage: NextPage = () => {
     functionName: "getLoanRate",
   });
   const { data: fundingPoolAPY } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
+    contractName: "MicrocreditLens",
     functionName: "getFundingPoolAPY",
   });
 

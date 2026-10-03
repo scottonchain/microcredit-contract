@@ -24,7 +24,8 @@ No `--broadcast` happens before all three are recorded.
   itself, so role changes also wait out the delay. ADMIN also gets the canceller role.
 - Deploys `DecentralizedMicrocredit` and `OracleScoreProvider` with the deployer as temporary
   owner. The lending contract's oracle role (`markKYCVerified`) goes to ADMIN. The provider gets
-  no reporter.
+  no reporter. Also deploys `MicrocreditLens`, the stateless read-only views the front end uses;
+  it has no owner and can be redeployed at any time.
 - Configures the issuance limits, `setLending`, the CRE forwarder if one is given, the score
   provider, the reserve share, the protocol fee and the relayer whitelist if a relayer is given.
 - Calls `transferOwnership(timelock)` on both contracts. Ownership moves only when the timelock

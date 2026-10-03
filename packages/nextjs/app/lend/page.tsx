@@ -86,7 +86,7 @@ const LendPage: NextPage = () => {
   });
   // What a withdrawal pays out now; any larger amount is queued and paid as loans are repaid.
   const { data: maxWithdrawable, refetch: refetchMaxWithdrawable } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
+    contractName: "MicrocreditLens",
     functionName: "maxWithdrawable",
     args: [connectedAddress as `0x${string}` | undefined],
   });
@@ -94,7 +94,7 @@ const LendPage: NextPage = () => {
     Promise.all([refetchLenderBalance(), refetchLenderPrincipal(), refetchMaxWithdrawable()]);
 
   const { data: poolApyBp } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
+    contractName: "MicrocreditLens",
     functionName: "getFundingPoolAPY" as any,
   });
   
@@ -122,7 +122,7 @@ const LendPage: NextPage = () => {
 
   // Remove placeholder arrays and fetch on-chain data
   const { data: poolInfo, refetch: refetchPoolInfo } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
+    contractName: "MicrocreditLens",
     functionName: "getPoolInfo",
   });
 

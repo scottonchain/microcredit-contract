@@ -3,6 +3,7 @@ pragma solidity 0.8.33;
 
 import { Script, console } from "forge-std/Script.sol";
 import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
+import { MicrocreditLens } from "../contracts/MicrocreditLens.sol";
 import { MockUSDC } from "../contracts/MockUSDC.sol";
 import { ICreditUsage, OracleScoreProvider } from "../contracts/OracleScoreProvider.sol";
 
@@ -33,6 +34,7 @@ contract DeployTestnetScript is Script {
         address deployer;
         address usdc;
         DecentralizedMicrocredit credit;
+        MicrocreditLens lens;
         OracleScoreProvider scores;
     }
 
@@ -50,6 +52,7 @@ contract DeployTestnetScript is Script {
         d.credit = new DecentralizedMicrocredit(
             _envUint("EFFR_BPS", 433), _envUint("RISK_PREMIUM_BPS", 500), _envUint("MAX_LOAN", 25e6), d.usdc, d.deployer
         );
+        d.lens = new MicrocreditLens(d.credit);
         d.scores =
             new OracleScoreProvider(d.deployer, d.deployer, _envUint("MAX_SCORE_AGE", 7 days), lines * SCORE_SCALE);
         d.scores.setLending(ICreditUsage(address(d.credit)));
@@ -61,6 +64,7 @@ contract DeployTestnetScript is Script {
         console.log("Chain id:", block.chainid);
         console.log("USDC:", d.usdc);
         console.log("DecentralizedMicrocredit:", address(d.credit));
+        console.log("MicrocreditLens:", address(d.lens));
         console.log("OracleScoreProvider:", address(d.scores));
         console.log("Owner, oracle, reporter and guardian:", d.deployer);
     }

@@ -44,7 +44,7 @@ A reserve funded from lenders' own interest does not raise their expected return
 Over a long horizon the reserve absorbs about $uL$ a year, so expected APY is close to
 $u\,(a(1-f) - L)$. External first-loss capital (`fundReserve`) does raise it.
 
-`getFundingPoolAPY()` shows $u\,a\,(1-f-r)$: the projected return before default losses, net of
+`MicrocreditLens.getFundingPoolAPY()` shows $u\,a\,(1-f-r)$: the projected return before default losses, net of
 the fee and the reserve share.
 
 ## Setting the premium
@@ -76,5 +76,5 @@ production script defaults to 800 bps and 6,500 bps, the calibration for 5%
 
 New loans may use at most `lendingUtilizationCap` (90%) of `totalAssets` and must leave
 `liquidityBuffer` (5%) plus queued withdrawals in cash; withdrawals and the queue may use the
-buffer. `maxWithdrawable(lender)` is what a lender can take now; larger requests join a FIFO
+buffer. `MicrocreditLens.maxWithdrawable(lender)` is what a lender can take now; larger requests join a FIFO
 queue paid as loans are repaid, and queued shares keep earning until paid.

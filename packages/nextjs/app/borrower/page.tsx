@@ -12,7 +12,15 @@ import { relayerErrorMessage } from "~~/utils/contractErrors";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 import { MICRO_DOMAIN, TYPES, USDC_PERMIT_DOMAIN, splitSignature } from "~~/utils/eip712";
-import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
+import {
+  CHAIN_ID,
+  LENS_ABI,
+  LENS_ADDRESS,
+  MICROCREDIT_ABI,
+  MICROCREDIT_ADDRESS,
+  USDC_ABI,
+  USDC_ADDRESS,
+} from "~~/utils/microcredit";
 
 const BorrowPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -24,7 +32,7 @@ const BorrowPage: NextPage = () => {
 
   // Fetch pool info for total participants
   const { data: poolInfo } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
+    contractName: "MicrocreditLens",
     functionName: "getPoolInfo",
   });
 
@@ -261,7 +269,7 @@ const BorrowPage: NextPage = () => {
 
   // Preview loan terms when amount or repayment period changes
   const { data: previewTermsData } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
+    contractName: "MicrocreditLens",
     functionName: "previewLoanTerms",
     args: [
       connectedAddress as `0x${string}` | undefined,
@@ -327,7 +335,7 @@ const BorrowPage: NextPage = () => {
 
   // Outstanding rounded to the cent; the contract returns 0 once the loan is closed.
   const outRoundedRes = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
+    contractName: "MicrocreditLens",
     functionName: "getOutstandingRoundedToCent" as any,
     args: activeLoanId !== undefined ? ([activeLoanId as bigint] as any) : undefined,
     query: {
@@ -748,8 +756,8 @@ const BorrowPage: NextPage = () => {
                       if (!publicClient) throw new Error("Missing contracts");
                       // Read canonical outstanding rounded to cent (contract view)
                       const out = (await publicClient.readContract({
-                        address: MICROCREDIT_ADDRESS,
-                        abi: MICROCREDIT_ABI,
+                        address: LENS_ADDRESS,
+                        abi: LENS_ABI,
                         functionName: "getOutstandingRoundedToCent",
                         args: [activeLoanId as bigint],
                       })) as bigint;

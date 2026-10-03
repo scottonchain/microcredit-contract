@@ -19,6 +19,7 @@ contract DeployTestnetTest is Test {
         assertEq(d.scores.reporter(), d.deployer);
         assertEq(address(d.scores.lending()), address(d.credit));
         assertEq(address(d.credit.usdc()), d.usdc);
+        assertEq(address(d.lens.credit()), address(d.credit));
         assertEq(d.credit.totalAssets(), 0, "nothing is seeded");
     }
 

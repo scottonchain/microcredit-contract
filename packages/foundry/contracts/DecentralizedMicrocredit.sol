@@ -999,17 +999,6 @@ contract DecentralizedMicrocredit is EIP712 {
         return effrRate + riskPremium;
     }
 
-    /// @notice Projected lender APY in BASIS_POINTS: loan rate x pool utilisation, net of the
-    ///         protocol fee and the reserve share, before default losses. Realised only as
-    ///         borrowers repay.
-    function getFundingPoolAPY() external view returns (uint256) {
-        uint256 assets = totalAssets();
-        if (assets == 0) return 0;
-        uint256 utilisationBp = ((totalLentOut + reservedLiquidity) * BASIS_POINTS) / assets;
-        uint256 grossBp = ((effrRate + riskPremium) * utilisationBp) / BASIS_POINTS;
-        return (grossBp * (BASIS_POINTS - protocolFeeBps - reserveBps)) / BASIS_POINTS;
-    }
-
     /**
      * @notice USDC the lenders' shares own: pool cash plus principal still owed by borrowers, less
      *         the first-loss reserve's junior claim, or less the provisions on overdue loans
@@ -1035,15 +1024,6 @@ contract DecentralizedMicrocredit is EIP712 {
         return convertToAssets(sharesOf[lender]);
     }
 
-    /// @notice The most `lender` can take now with {withdrawFunds}: the value of its shares not in
-    ///         the withdrawal queue, up to the cash not reserved for loans or owed to the queue.
-    function maxWithdrawable(address lender) external view returns (uint256) {
-        uint256 value = convertToAssets(sharesOf[lender] - queuedShares[lender]);
-        uint256 committed = reservedLiquidity + totalQueuedWithdrawals();
-        uint256 liquid = lenderCash > committed ? lenderCash - committed : 0;
-        return Math.min(value, liquid);
-    }
-
     /// @notice Current USDC value of `lender`'s shares waiting in the withdrawal queue.
     function queuedWithdrawals(address lender) external view returns (uint256) {
         return convertToAssets(queuedShares[lender]);
@@ -1052,42 +1032,6 @@ contract DecentralizedMicrocredit is EIP712 {
     /// @notice USDC owed to the withdrawal queue, held back from new loans and direct withdrawals.
     function totalQueuedWithdrawals() public view returns (uint256) {
         return convertToAssets(totalQueuedShares);
-    }
-
-    /**
-     * @return _totalAssets    USDC owned by lenders (see {totalAssets})
-     * @return _availableFunds Liquid USDC not reserved for loans or owed to the withdrawal queue
-     * @return _reservedFunds  USDC reserved for approved, undisbursed loans
-     * @return _lenderCount    Unique depositors
-     */
-    function getPoolInfo()
-        external
-        view
-        returns (uint256 _totalAssets, uint256 _availableFunds, uint256 _reservedFunds, uint256 _lenderCount)
-    {
-        _totalAssets = totalAssets();
-        _reservedFunds = reservedLiquidity;
-        uint256 committed = _reservedFunds + totalQueuedWithdrawals();
-        _availableFunds = lenderCash > committed ? lenderCash - committed : 0;
-        _lenderCount = lenderCount;
-    }
-
-    /// @return interestRate APR in BASIS_POINTS
-    /// @return payment      Weekly payment over `repaymentPeriod` (one payment if under a week)
-    function previewLoanTerms(
-        address,
-        /* borrower */
-        uint256 principal,
-        uint256 repaymentPeriod
-    )
-        external
-        view
-        returns (uint256 interestRate, uint256 payment)
-    {
-        interestRate = effrRate + riskPremium;
-        uint256 interest = (principal * interestRate * repaymentPeriod) / (BASIS_POINTS * SECONDS_PER_YEAR);
-        uint256 payments = repaymentPeriod / 7 days;
-        payment = (principal + interest) / (payments == 0 ? 1 : payments);
     }
 
     function getLoan(uint256 loanId)
@@ -1124,11 +1068,6 @@ contract DecentralizedMicrocredit is EIP712 {
 
         uint256 owed = loan.principal + _interestAccrued(loan);
         return owed > loan.repaid ? owed - loan.repaid : 0;
-    }
-
-    /// @notice Outstanding balance rounded half-up to the cent, as shown in the UI.
-    function getOutstandingRoundedToCent(uint256 loanId) external view returns (uint256) {
-        return _roundToCent(getCurrentOutstandingAmount(loanId));
     }
 
     function getAllLoanIds() external view returns (uint256[] memory) {
