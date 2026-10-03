@@ -9,6 +9,8 @@ import { DocumentDuplicateIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { useAddressDisplayName } from "~~/hooks/useAddressDisplayName";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { formatUSDC } from "~~/utils/format";
+import { relayerErrorMessage } from "~~/utils/contractErrors";
+import { getParsedError } from "~~/utils/scaffold-eth";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 import { AttestRequest, MICRO_DOMAIN, TYPES } from "~~/utils/eip712";
 import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS } from "~~/utils/microcredit";
@@ -111,7 +113,7 @@ function AttestForm() {
       toast.success(`Staked ${formatUSDC(stakeShortfall)}`, { position: "top-center" });
     } catch (err: any) {
       console.error("Stake error", err);
-      toast.error(`Failed to stake: ${err?.shortMessage || err?.message || "Unknown error"}`);
+      toast.error(`Failed to stake: ${getParsedError(err)}`);
     } finally {
       setStakeLoading(false);
     }
@@ -190,7 +192,7 @@ function AttestForm() {
           signature: sig,
         }),
       });
-      if (!resp.ok) throw new Error(await resp.text());
+      if (!resp.ok) throw new Error(await relayerErrorMessage(resp));
       const j = await resp.json();
       console.log("Meta attestation result:", j);
 

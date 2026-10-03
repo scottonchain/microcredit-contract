@@ -1,4 +1,5 @@
 import { BaseError as BaseViemError, ContractFunctionRevertedError } from "viem";
+import { describeContractError } from "~~/utils/contractErrors";
 
 /**
  * Parses an viem/wagmi error to get a displayable string
@@ -6,6 +7,9 @@ import { BaseError as BaseViemError, ContractFunctionRevertedError } from "viem"
  * @returns parsed error string
  */
 export const getParsedError = (error: any): string => {
+  const friendly = describeContractError(error);
+  if (friendly) return friendly;
+
   const parsedError = error?.walk ? error.walk() : error;
 
   if (parsedError instanceof BaseViemError) {

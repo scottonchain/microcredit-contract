@@ -41,6 +41,15 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     ///         drains the rest.
     uint256 public constant QUEUE_FILLS_PER_CALL = 10;
     uint256 public constant MAX_PROTOCOL_FEE_BPS = 2_000; // 20% of repaid interest
+    uint256 public constant DEFAULT_LOAN_TERM = 30 days; // for requestLoan / requestLoanMeta
+    uint256 public constant MIN_LOAN_TERM = 1 days;
+    uint256 public constant MAX_LOAN_TERM = 365 days;
+    /// @notice How long after its due date an unpaid loan can be marked defaulted.
+    uint256 public constant LATE_PERIOD = 30 days;
+    /// @notice After this long, anyone may cancel an undisbursed loan to free its reservation.
+    uint256 public constant RESERVATION_TTL = 7 days;
+    /// @notice Bounds the attestations per borrower, and so the work of slashing on default.
+    uint256 public constant MAX_VOUCHERS_PER_BORROWER = 32;
     /// @dev Virtual shares and assets, as in OpenZeppelin's ERC4626 with a 6-decimal offset: the
     ///      first deposit cannot be front-run into a rounding loss. They hold a negligible slice
     ///      of the pool, so balances can read a few millionths of a cent low.
@@ -65,15 +74,26 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     // ───────────────────────────── types ─────────────────────────────
 
+    /// @dev Requested -> Active -> Repaid | Defaulted, or Requested -> Cancelled.
+    enum LoanStatus {
+        None,
+        Requested, // liquidity reserved, not yet disbursed
+        Active, // disbursed and outstanding
+        Repaid,
+        Defaulted,
+        Cancelled
+    }
+
     struct Loan {
         uint256 principal;
         uint256 repaid; // cumulative repayments, interest and principal
         uint256 principalRepaid; // part of `repaid` applied to principal (interest is settled first)
         address borrower;
         uint256 interestRate; // APR in BASIS_POINTS, fixed at origination
-        bool isActive;
-        bool disbursed;
-        uint256 createdAt; // interest accrues from here
+        uint256 term; // seconds from disbursement to the due date
+        uint256 requestedAt;
+        uint256 disbursedAt; // interest accrues from here
+        LoanStatus status;
     }
 
     struct Attestation {
@@ -221,6 +241,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     mapping(address => uint256) public activeVouches; // attestations with weight > 0, per attester
     mapping(address => uint256) public activeLoanCount; // per borrower, requested and not yet closed
     mapping(address => uint256) public completedLoans; // per borrower, repaid in full
+    mapping(address => uint256) public defaultedLoans; // per borrower; any default blocks borrowing
+    mapping(address => uint256) private _outstandingPrincipal; // per borrower, across open loans
 
     // Meta-transactions
     mapping(address => uint256) public nonces;
@@ -246,6 +268,10 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     event Withdrawn(address indexed lender, address indexed to, uint256 assets, uint256 shares);
     event LoanRequested(address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 interestRate);
     event LoanDisbursed(address indexed borrower, uint256 indexed loanId, address to, uint256 amount);
+    event LoanCancelled(address indexed borrower, uint256 indexed loanId);
+    /// @dev `writtenOff` is the unpaid principal; `recovered` the part covered by slashed stake.
+    event LoanDefaulted(address indexed borrower, uint256 indexed loanId, uint256 writtenOff, uint256 recovered);
+    event VoucherSlashed(address indexed attester, uint256 indexed loanId, uint256 amount);
     event Attested(address indexed attester, address indexed borrower, uint256 weight);
     event DisplayNameSet(address indexed user, string name);
     event LoanRepaid(address indexed borrower, uint256 indexed loanId, uint256 amount);
@@ -267,12 +293,65 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     event MetaWithdrawalFilled(uint256 indexed queueId, uint256 amountFilled);
     event MetaAttested(address indexed attester, address indexed borrower, uint256 weight);
 
+    // ───────────────────────────── errors ─────────────────────────────
+    // packages/nextjs/utils/contractErrors.ts maps each to plain-language text for the UI.
+
+    // access & config
+    error NotOwner();
+    error NotOracle();
+    error NotOwnerOrOracle();
+    error UnauthorizedRelayer();
+    error ZeroAddress();
+    error ZeroAmount();
+    error AboveOneHundredPercent();
+    error FeeTooHigh();
+    error ScoreTooHigh();
+    error AlreadyVerified();
+    error NameTooLong();
+    error ExceedsAccruedFees();
+    // meta-transactions & permits
+    error SignatureExpired();
+    error InvalidNonce();
+    error InvalidSignature();
+    error PermitFailed();
+    error PermitValueTooLow();
+    // pool
+    error ZeroShares();
+    error InsufficientBalance();
+    error InsufficientLiquidity();
+    // loans
+    error NoCreditScore();
+    error BorrowLimitExceeded();
+    error FirstLoanCapExceeded();
+    error BorrowerInDefault();
+    error UtilisationCapExceeded();
+    error InvalidTerm();
+    error AprChanged();
+    error LoanNotRequested();
+    error LoanNotActive();
+    error LoanClosed();
+    error NotCancellableYet();
+    error NotYetDefaultable();
+    error NotBorrower();
+    error WrongBorrower();
+    error MustSendToBorrower();
+    error NothingToRepay();
+    error OutstandingChanged();
+    // attestations & stake
+    error WeightTooHigh();
+    error SelfAttestation();
+    error TooManyVouchers();
+    error StakeRequired();
+    error StakeLockedByVouches();
+    error InsufficientStake();
+    error VouchLockedByActiveLoan();
+
     // ───────────────────────────── setup & access ─────────────────────────────
 
     constructor(uint256 _effrRate, uint256 _riskPremium, uint256 _maxLoanAmount, address _usdc, address _oracle)
         EIP712("DecentralizedMicrocredit", "1")
     {
-        require(_usdc != address(0) && _oracle != address(0), "Invalid addresses");
+        require(_usdc != address(0) && _oracle != address(0), ZeroAddress());
         usdc = IERC20(_usdc);
         owner = msg.sender;
         oracle = _oracle;
@@ -288,24 +367,24 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     }
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Owner only");
+        require(msg.sender == owner, NotOwner());
         _;
     }
 
     modifier onlyOracle() {
-        require(msg.sender == oracle, "Oracle only");
+        require(msg.sender == oracle, NotOracle());
         _;
     }
 
     modifier onlyOwnerOrOracle() {
-        require(msg.sender == owner || msg.sender == oracle, "Owner or oracle only");
+        require(msg.sender == owner || msg.sender == oracle, NotOwnerOrOracle());
         _;
     }
 
     /// @dev Applies the optional relayer whitelist to meta-transaction entry points.
     modifier onlyAllowedRelayer() {
         if (relayerWhitelistEnabled) {
-            require(relayerWhitelist[msg.sender], "Unauthorized relayer");
+            require(relayerWhitelist[msg.sender], UnauthorizedRelayer());
         }
         _;
     }
@@ -313,7 +392,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     // ───────────────────────────── admin ─────────────────────────────
 
     function setOracle(address _oracle) external onlyOwner {
-        require(_oracle != address(0), "Invalid oracle");
+        require(_oracle != address(0), ZeroAddress());
         oracle = _oracle;
         emit OracleUpdated(_oracle);
     }
@@ -352,7 +431,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     /// @param cap Max share of deposits that may be lent or reserved, in BASIS_POINTS.
     function setLendingUtilizationCap(uint256 cap) external onlyOwner {
-        require(cap <= BASIS_POINTS, "Cap cannot exceed 100%");
+        require(cap <= BASIS_POINTS, AboveOneHundredPercent());
         lendingUtilizationCap = cap;
         emit ParameterUpdated("lendingUtilizationCap", cap);
     }
@@ -360,7 +439,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     /// @param bufferBp Share of deposits to keep liquid, in BASIS_POINTS.
     /// @param threshold Absolute USDC amount (6 decimals) to keep liquid.
     function setLiquidityLimits(uint256 bufferBp, uint256 threshold) external onlyOwner {
-        require(bufferBp <= BASIS_POINTS, "Buffer > 100%");
+        require(bufferBp <= BASIS_POINTS, AboveOneHundredPercent());
         liquidityBuffer = bufferBp;
         liquidityThreshold = threshold;
         emit LiquidityLimitsUpdated(bufferBp, threshold);
@@ -368,14 +447,14 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     /// @param feeBps Share of repaid interest kept by the protocol, in BASIS_POINTS.
     function setProtocolFeeBps(uint256 feeBps) external onlyOwner {
-        require(feeBps <= MAX_PROTOCOL_FEE_BPS, "Fee too high");
+        require(feeBps <= MAX_PROTOCOL_FEE_BPS, FeeTooHigh());
         protocolFeeBps = feeBps;
         emit ParameterUpdated("protocolFeeBps", feeBps);
     }
 
     function claimProtocolFees(address to, uint256 amount) external onlyOwner {
-        require(to != address(0), "Bad recipient");
-        require(amount <= protocolFees, "Exceeds accrued fees");
+        require(to != address(0), ZeroAddress());
+        require(amount <= protocolFees, ExceedsAccruedFees());
         protocolFees -= amount;
         _pushUsdc(to, amount);
         emit ProtocolFeesClaimed(to, amount);
@@ -399,7 +478,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     }
 
     function setRelayerWhitelisted(address relayer, bool allowed) external onlyOwner {
-        require(relayer != address(0), "Invalid relayer address");
+        require(relayer != address(0), ZeroAddress());
         relayerWhitelist[relayer] = allowed;
         emit RelayerWhitelisted(relayer, allowed);
     }
@@ -407,19 +486,19 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     /// @notice Assign a credit score directly, bypassing PageRank. Set 0 to clear.
     /// @param score Score in SCALE units (1e6 = 100%).
     function setScoreOverride(address user, uint256 score) external onlyOwner {
-        require(score <= SCALE, "Score exceeds SCALE");
+        require(score <= SCALE, ScoreTooHigh());
         scoreOverrides[user] = score;
         emit ScoreOverrideSet(user, score);
     }
 
     function markKYCVerified(address user) external onlyOracle {
-        require(!isKYCVerified[user], "Already verified");
+        require(!isKYCVerified[user], AlreadyVerified());
         isKYCVerified[user] = true;
         emit KycVerified(user);
     }
 
     function setDisplayName(string calldata name) external {
-        require(bytes(name).length <= 32, "Name too long");
+        require(bytes(name).length <= 32, NameTooLong());
         displayNames[msg.sender] = name;
         emit DisplayNameSet(msg.sender, name);
     }
@@ -427,7 +506,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     // ───────────────────────────── lending pool ─────────────────────────────
 
     function depositFunds(uint256 amount) external {
-        require(amount > 0, "Amount > 0");
+        require(amount > 0, ZeroAmount());
         _pullUsdc(msg.sender, amount);
         _recordDeposit(msg.sender, amount);
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
@@ -439,20 +518,21 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
      *         liquidity buffer, which only limits new loans.
      */
     function withdrawFunds(uint256 amount) external {
-        require(amount > 0, "Amount > 0");
+        require(amount > 0, ZeroAmount());
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
 
         (uint256 shares, uint256 assets) = _sharesForWithdrawal(msg.sender, amount);
-        require(lenderCash >= reservedLiquidity + totalQueuedWithdrawals() + assets, "LIQUIDITY_BELOW_THRESHOLD");
+        require(lenderCash >= reservedLiquidity + totalQueuedWithdrawals() + assets, InsufficientLiquidity());
 
         _payOut(msg.sender, msg.sender, assets, shares);
     }
 
     // ───────────────────────────── loans ─────────────────────────────
 
-    /// @notice Request a loan as the caller. Liquidity is reserved until {disburseLoan}.
+    /// @notice Request a loan as the caller, due DEFAULT_LOAN_TERM after disbursement.
+    ///         Liquidity is reserved until {disburseLoan} or {cancelLoan}.
     function requestLoan(uint256 amount) external returns (uint256 loanId) {
-        return _originateLoan(msg.sender, amount);
+        return _originateLoan(msg.sender, amount, DEFAULT_LOAN_TERM);
     }
 
     /// @notice Send a requested loan's principal to its borrower. Callable by anyone.
@@ -460,11 +540,51 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         _disburseLoan(loanId, loans[loanId].borrower);
     }
 
+    /// @notice Cancel an undisbursed loan: the borrower at any time, anyone once the
+    ///         reservation is older than RESERVATION_TTL.
+    function cancelLoan(uint256 loanId) external {
+        Loan storage loan = loans[loanId];
+        require(loan.status == LoanStatus.Requested, LoanNotRequested());
+        require(
+            msg.sender == loan.borrower || block.timestamp > loan.requestedAt + RESERVATION_TTL, NotCancellableYet()
+        );
+
+        reservedLiquidity -= loan.principal;
+        _closeLoan(loan, LoanStatus.Cancelled);
+        emit LoanCancelled(loan.borrower, loanId);
+    }
+
+    /**
+     * @notice Mark a loan defaulted once it is LATE_PERIOD past due. Callable by anyone.
+     *         The unpaid principal is written off, the borrower's vouchers are slashed by vouch
+     *         weight (each up to their stake) to cover it, and the borrower cannot borrow again.
+     *         Lenders absorb whatever stake does not cover through a lower share price.
+     * @dev Slashing uses the vouch weights at default time; vouches cannot be lowered while
+     *      the loan is open, but a vouch added meanwhile also backs it.
+     */
+    function markDefaulted(uint256 loanId) external {
+        Loan storage loan = loans[loanId];
+        require(loan.status == LoanStatus.Active, LoanNotActive());
+        require(block.timestamp > loan.disbursedAt + loan.term + LATE_PERIOD, NotYetDefaultable());
+
+        uint256 writtenOff = loan.principal - loan.principalRepaid;
+        uint256 recovered = _slashVouchers(loan.borrower, loanId, writtenOff);
+        totalLentOut -= writtenOff;
+        _outstandingPrincipal[loan.borrower] -= writtenOff;
+        lenderCash += recovered;
+        loan.status = LoanStatus.Defaulted;
+        activeLoanCount[loan.borrower] -= 1;
+        defaultedLoans[loan.borrower] += 1;
+        emit LoanDefaulted(loan.borrower, loanId, writtenOff, recovered);
+
+        _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
+    }
+
     /// @notice Repay up to `amount`; any excess over the outstanding balance is not pulled.
     function repayLoan(uint256 loanId, uint256 amount) external {
         Loan storage loan = _repayableLoan(loanId);
-        require(msg.sender == loan.borrower, "Borrower only");
-        require(amount > 0, "Amount > 0");
+        require(msg.sender == loan.borrower, NotBorrower());
+        require(amount > 0, ZeroAmount());
 
         uint256 paid = _repay(loanId, loan, msg.sender, amount);
         emit LoanRepaid(msg.sender, loanId, paid);
@@ -486,7 +606,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         bytes32 s
     ) external {
         Loan storage loan = _repayableLoan(loanId);
-        require(loan.borrower == borrower, "Wrong borrower");
+        require(loan.borrower == borrower, WrongBorrower());
 
         _permit(borrower, value, deadline, v, r, s);
 
@@ -494,7 +614,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         if (spend > value) {
             spend = value;
         }
-        require(spend > 0, "Nothing to repay");
+        require(spend > 0, NothingToRepay());
 
         uint256 paid = _repay(loanId, loan, borrower, spend);
         emit LoanRepaid(borrower, loanId, paid);
@@ -504,7 +624,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     /// @notice Stake USDC that backs your vouches. It is held outside the lending pool.
     function stake(uint256 amount) external {
-        require(amount > 0, "Amount > 0");
+        require(amount > 0, ZeroAmount());
         _pullUsdc(msg.sender, amount);
         attesterStake[msg.sender] += amount;
         totalAttesterStake += amount;
@@ -514,8 +634,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     /// @notice Withdraw stake not needed by your active vouches (minVouchStake each).
     function unstake(uint256 amount) external {
         uint256 staked = attesterStake[msg.sender];
-        require(amount > 0 && amount <= staked, "Insufficient stake");
-        require(staked - amount >= minVouchStake * activeVouches[msg.sender], "Stake locked by vouches");
+        require(amount > 0 && amount <= staked, InsufficientStake());
+        require(staked - amount >= minVouchStake * activeVouches[msg.sender], StakeLockedByVouches());
         attesterStake[msg.sender] = staked - amount;
         totalAttesterStake -= amount;
         _pushUsdc(msg.sender, amount);
@@ -563,6 +683,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
      *         most firstLoanCap until a loan is repaid in full) and how much of it is unused.
      */
     function getBorrowLimit(address borrower) public view returns (uint256 limit, uint256 available) {
+        if (defaultedLoans[borrower] != 0) return (0, 0);
         limit = Math.mulDiv(maxLoanAmount, getCreditScore(borrower), SCALE);
         if (completedLoans[borrower] == 0 && limit > firstLoanCap) {
             limit = firstLoanCap;
@@ -607,7 +728,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             keccak256(abi.encode(LOAN_REQUEST_TYPEHASH, req.borrower, req.amount, req.nonce, req.deadline)),
             sig
         );
-        loanId = _originateLoan(req.borrower, req.amount);
+        loanId = _originateLoan(req.borrower, req.amount, DEFAULT_LOAN_TERM);
         emit MetaLoanRequested(req.borrower, req.amount, loanId);
     }
 
@@ -619,7 +740,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             keccak256(abi.encode(DISBURSE_REQUEST_TYPEHASH, req.borrower, req.loanId, req.to, req.nonce, req.deadline)),
             sig
         );
-        require(req.to == loans[req.loanId].borrower && req.to == req.borrower, "Must send to borrower");
+        require(req.to == loans[req.loanId].borrower && req.to == req.borrower, MustSendToBorrower());
 
         uint256 principal = _disburseLoan(req.loanId, req.to);
         emit MetaLoanDisbursed(req.borrower, req.loanId, principal);
@@ -647,9 +768,9 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         );
 
         uint256 currentApr = effrRate + riskPremium;
-        require(currentApr <= req.maxAprBps, "APR changed");
+        require(currentApr <= req.maxAprBps, AprChanged());
 
-        uint256 loanId = _originateLoan(req.borrower, req.amount);
+        uint256 loanId = _originateLoan(req.borrower, req.amount, req.repaymentPeriod);
         _disburseLoan(loanId, req.to);
 
         emit MetaLoanCreated(req.borrower, loanId, req.amount, currentApr, req.repaymentPeriod);
@@ -677,21 +798,21 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         );
 
         Loan storage loan = _repayableLoan(req.loanId);
-        require(loan.borrower == req.borrower, "Wrong borrower");
+        require(loan.borrower == req.borrower, WrongBorrower());
 
         uint256 out = getCurrentOutstandingAmount(req.loanId);
         if (out < CENT) {
-            _closeLoan(loan);
+            _closeLoan(loan, LoanStatus.Repaid);
             emit MetaLoanRepaid(req.borrower, req.loanId, 0);
             return;
         }
 
         if (permit.deadline != 0) {
             _permit(req.borrower, permit);
-            require(permit.value >= out, "Permit value too low");
+            require(permit.value >= out, PermitValueTooLow());
         }
         if (req.amount != 0 && req.amount < out) {
-            require(out - req.amount <= CENT, "OUTSTANDING_CHANGED");
+            require(out - req.amount <= CENT, OutstandingChanged());
         }
 
         _repay(req.loanId, loan, req.borrower, out);
@@ -715,10 +836,10 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
         if (permit.deadline != 0) {
             _permit(req.lender, permit);
-            require(permit.value >= req.amount, "Permit value too low");
+            require(permit.value >= req.amount, PermitValueTooLow());
         }
 
-        require(req.receiver != address(0), "Bad receiver");
+        require(req.receiver != address(0), ZeroAddress());
 
         _pullUsdc(req.lender, req.amount);
         uint256 shares = _recordDeposit(req.receiver, req.amount);
@@ -729,8 +850,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     /// @notice Gasless deposit of exactly `permit.value`, authorized by the permit alone.
     function depositPermitOnlyMeta(address lender, PermitData calldata permit) external onlyAllowedRelayer {
-        require(lender != address(0), "Bad lender");
-        require(permit.value > 0, "Zero amount");
+        require(lender != address(0), ZeroAddress());
+        require(permit.value > 0, ZeroAmount());
 
         _permit(lender, permit);
         _pullUsdc(lender, permit.value);
@@ -753,7 +874,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             keccak256(abi.encode(REQUEST_WITHDRAWAL_TYPEHASH, req.lender, req.amount, req.to, req.nonce, req.deadline)),
             sig
         );
-        require(req.amount > 0, "Amount > 0");
+        require(req.amount > 0, ZeroAmount());
         (uint256 shares, uint256 assets) = _sharesForWithdrawal(req.lender, req.amount);
         queuedShares[req.lender] += shares;
         totalQueuedShares += shares;
@@ -873,8 +994,20 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         returns (uint256 principal, uint256 outstanding, address borrower, uint256 interestRate, bool isActive)
     {
         Loan storage loan = loans[loanId];
-        outstanding = loan.isActive ? getCurrentOutstandingAmount(loanId) : 0;
-        return (loan.principal, outstanding, loan.borrower, loan.interestRate, loan.isActive);
+        isActive = _isOpen(loan);
+        outstanding = isActive ? getCurrentOutstandingAmount(loanId) : 0;
+        return (loan.principal, outstanding, loan.borrower, loan.interestRate, isActive);
+    }
+
+    /// @notice Lifecycle and schedule of a loan; `disbursedAt` and `dueAt` are 0 until disbursement.
+    function getLoanTerms(uint256 loanId)
+        external
+        view
+        returns (LoanStatus status, uint256 term, uint256 requestedAt, uint256 disbursedAt, uint256 dueAt)
+    {
+        Loan storage loan = loans[loanId];
+        dueAt = loan.disbursedAt == 0 ? 0 : loan.disbursedAt + loan.term;
+        return (loan.status, loan.term, loan.requestedAt, loan.disbursedAt, dueAt);
     }
 
     /**
@@ -884,7 +1017,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
      */
     function getCurrentOutstandingAmount(uint256 loanId) public view returns (uint256) {
         Loan storage loan = loans[loanId];
-        require(loan.isActive, "Loan inactive");
+        require(_isOpen(loan), LoanClosed());
 
         uint256 owed = loan.principal + _interestAccrued(loan);
         return owed > loan.repaid ? owed - loan.repaid : 0;
@@ -942,9 +1075,9 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     function _verifyMeta(address signer, uint256 nonce, uint256 deadline, bytes32 structHash, bytes calldata sig)
         internal
     {
-        require(block.timestamp <= deadline, "Expired");
-        require(nonce == nonces[signer]++, "Bad nonce");
-        require(SignatureChecker.isValidSignatureNow(signer, _hashTypedDataV4(structHash), sig), "Bad signature");
+        require(block.timestamp <= deadline, SignatureExpired());
+        require(nonce == nonces[signer]++, InvalidNonce());
+        require(SignatureChecker.isValidSignatureNow(signer, _hashTypedDataV4(structHash), sig), InvalidSignature());
     }
 
     function _permit(address holder, PermitData calldata permit) internal {
@@ -956,7 +1089,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     function _permit(address holder, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) internal {
         try IERC20Permit(address(usdc)).permit(holder, address(this), value, deadline, v, r, s) { }
         catch {
-            require(usdc.allowance(holder, address(this)) >= value, "Permit failed");
+            require(usdc.allowance(holder, address(this)) >= value, PermitFailed());
         }
     }
 
@@ -971,7 +1104,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     /// @dev Mints shares for `assets` already pulled in, at the current share price.
     function _recordDeposit(address lender, uint256 assets) internal returns (uint256 shares) {
         shares = convertToShares(assets);
-        require(shares > 0, "Zero shares");
+        require(shares > 0, ZeroShares());
         sharesOf[lender] += shares;
         totalShares += shares;
         lenderCash += assets;
@@ -1016,18 +1149,16 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             shares = _convertToSharesRoundingUp(amount);
             assets = amount;
         }
-        require(shares > 0 && shares <= free, "Insufficient balance");
+        require(shares > 0 && shares <= free, InsufficientBalance());
     }
 
-    /// @dev Sum of principal across the borrower's active loans.
-    function _activePrincipal(address borrower) internal view returns (uint256 total) {
-        uint256[] storage ids = _borrowerLoans[borrower];
-        for (uint256 i = 0; i < ids.length; i++) {
-            Loan storage loan = loans[ids[i]];
-            if (loan.isActive) {
-                total += loan.principal;
-            }
-        }
+    /// @dev Principal still owed across the borrower's open (requested or active) loans.
+    function _activePrincipal(address borrower) internal view returns (uint256) {
+        return _outstandingPrincipal[borrower];
+    }
+
+    function _isOpen(Loan storage loan) internal view returns (bool) {
+        return loan.status == LoanStatus.Requested || loan.status == LoanStatus.Active;
     }
 
     /**
@@ -1035,25 +1166,27 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
      *      Enforces the score-based limit across the borrower's active loans, the pool
      *      utilisation cap and the liquidity buffer, then reserves the principal.
      */
-    function _originateLoan(address borrower, uint256 amount) internal returns (uint256 loanId) {
-        require(amount > 0, "Amount > 0");
+    function _originateLoan(address borrower, uint256 amount, uint256 term) internal returns (uint256 loanId) {
+        require(amount > 0, ZeroAmount());
+        require(term >= MIN_LOAN_TERM && term <= MAX_LOAN_TERM, InvalidTerm());
+        require(defaultedLoans[borrower] == 0, BorrowerInDefault());
         uint256 score = getCreditScore(borrower);
-        require(score > 0, "Score > 0");
+        require(score > 0, NoCreditScore());
 
         uint256 committed = _activePrincipal(borrower) + amount;
-        require(committed <= Math.mulDiv(maxLoanAmount, score, SCALE), "Outstanding loans exceed max");
+        require(committed <= Math.mulDiv(maxLoanAmount, score, SCALE), BorrowLimitExceeded());
         if (completedLoans[borrower] == 0) {
-            require(committed <= firstLoanCap, "First loan cap exceeded");
+            require(committed <= firstLoanCap, FirstLoanCapExceeded());
         }
 
         uint256 assets = totalAssets();
         uint256 maxCommitment = (assets * lendingUtilizationCap) / BASIS_POINTS;
-        require(reservedLiquidity + totalLentOut + amount <= maxCommitment, "Pool utilisation cap exceeded");
+        require(reservedLiquidity + totalLentOut + amount <= maxCommitment, UtilisationCapExceeded());
 
         uint256 bufferRequired = (assets * liquidityBuffer) / BASIS_POINTS;
         require(
             lenderCash - reservedLiquidity >= amount + totalQueuedWithdrawals() + bufferRequired + liquidityThreshold,
-            "LIQUIDITY_BELOW_THRESHOLD"
+            InsufficientLiquidity()
         );
 
         reservedLiquidity += amount;
@@ -1065,9 +1198,10 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             principalRepaid: 0,
             borrower: borrower,
             interestRate: effrRate + riskPremium,
-            isActive: true,
-            disbursed: false,
-            createdAt: block.timestamp
+            term: term,
+            requestedAt: block.timestamp,
+            disbursedAt: 0,
+            status: LoanStatus.Requested
         });
 
         _allLoanIds.push(loanId);
@@ -1077,15 +1211,16 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         }
         _borrowerLoans[borrower].push(loanId);
         activeLoanCount[borrower] += 1;
+        _outstandingPrincipal[borrower] += amount;
         emit LoanRequested(borrower, loanId, amount, effrRate + riskPremium);
     }
 
     /// @dev Moves a reserved loan's principal to `to`. Callers decide who may receive it.
     function _disburseLoan(uint256 loanId, address to) internal returns (uint256 principal) {
         Loan storage loan = loans[loanId];
-        require(loan.isActive, "Loan inactive");
-        require(!loan.disbursed, "Already disbursed");
-        loan.disbursed = true;
+        require(loan.status == LoanStatus.Requested, LoanNotRequested());
+        loan.status = LoanStatus.Active;
+        loan.disbursedAt = block.timestamp;
 
         principal = loan.principal;
         reservedLiquidity -= principal;
@@ -1097,8 +1232,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     function _repayableLoan(uint256 loanId) internal view returns (Loan storage loan) {
         loan = loans[loanId];
-        require(loan.isActive, "Loan inactive");
-        require(loan.disbursed, "Not disbursed");
+        require(loan.status == LoanStatus.Active, LoanNotActive());
     }
 
     /**
@@ -1119,35 +1253,70 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             loan.repaid += paid;
             loan.principalRepaid += principal;
             totalLentOut -= principal;
+            _outstandingPrincipal[loan.borrower] -= principal;
             lenderCash += paid - fee;
             protocolFees += fee;
             emit RepaymentApplied(loanId, interest, principal, fee);
         }
         if (owed - paid < CENT) {
-            _closeLoan(loan);
+            _closeLoan(loan, LoanStatus.Repaid);
         }
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
-    /// @dev Closes a repaid loan. Any principal still unpaid (under a cent, see {_repay}) is
-    ///      written off.
-    function _closeLoan(Loan storage loan) internal {
-        totalLentOut -= loan.principal - loan.principalRepaid;
-        loan.isActive = false;
+    /**
+     * @dev Closes a repaid or cancelled loan. For a repaid loan, any principal still unpaid
+     *      (under a cent, see {_repay}) is written off; a cancelled loan was never lent out.
+     */
+    function _closeLoan(Loan storage loan, LoanStatus status) internal {
+        uint256 unpaid = loan.principal - loan.principalRepaid;
+        if (status == LoanStatus.Repaid) {
+            totalLentOut -= unpaid;
+            completedLoans[loan.borrower] += 1;
+        }
+        _outstandingPrincipal[loan.borrower] -= unpaid;
         activeLoanCount[loan.borrower] -= 1;
-        completedLoans[loan.borrower] += 1;
+        loan.status = status;
     }
 
-    /// @dev Simple interest on the original principal since origination; none in the first day.
+    /**
+     * @dev Takes up to `loss` from the stake of `borrower`'s vouchers, split by vouch weight and
+     *      capped at each voucher's stake. Returns the amount taken, which callers add back to
+     *      the pool.
+     */
+    function _slashVouchers(address borrower, uint256 loanId, uint256 loss) internal returns (uint256 recovered) {
+        Attestation[] storage attests = borrowerAttestations[borrower];
+        uint256 totalWeight = 0;
+        for (uint256 i = 0; i < attests.length; i++) {
+            totalWeight += attests[i].weight;
+        }
+        if (totalWeight == 0 || loss == 0) return 0;
+
+        for (uint256 i = 0; i < attests.length; i++) {
+            if (attests[i].weight == 0) continue;
+            address attester = attests[i].attester;
+            uint256 share = Math.mulDiv(loss, attests[i].weight, totalWeight);
+            uint256 staked = attesterStake[attester];
+            uint256 slash = share < staked ? share : staked;
+            if (slash == 0) continue;
+            attesterStake[attester] = staked - slash;
+            totalAttesterStake -= slash;
+            recovered += slash;
+            emit VoucherSlashed(attester, loanId, slash);
+        }
+    }
+
+    /// @dev Simple interest on the original principal since disbursement; none in the first day.
     function _interestAccrued(Loan storage loan) internal view returns (uint256) {
-        uint256 elapsed = block.timestamp - loan.createdAt;
+        if (loan.disbursedAt == 0) return 0;
+        uint256 elapsed = block.timestamp - loan.disbursedAt;
         if (elapsed < GRACE_PERIOD) return 0;
         return (((loan.principal * loan.interestRate) / BASIS_POINTS) * elapsed) / SECONDS_PER_YEAR;
     }
 
     function _recordAttestation(address attester, address borrower, uint256 weight) internal {
-        require(weight <= SCALE, "Weight too high");
-        require(borrower != attester, "Self-attestation");
+        require(weight <= SCALE, WeightTooHigh());
+        require(borrower != attester, SelfAttestation());
 
         if (!_attesterSeen[attester]) {
             _attesterSeen[attester] = true;
@@ -1156,11 +1325,11 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
         uint256 previous = getVouchWeight(attester, borrower);
         if (weight < previous) {
-            require(activeLoanCount[borrower] == 0, "Vouch locked by active loan");
+            require(activeLoanCount[borrower] == 0, VouchLockedByActiveLoan());
         }
         if (previous == 0 && weight > 0) {
             activeVouches[attester] += 1;
-            require(attesterStake[attester] >= minVouchStake * activeVouches[attester], "Stake required");
+            require(attesterStake[attester] >= minVouchStake * activeVouches[attester], StakeRequired());
         } else if (previous > 0 && weight == 0) {
             activeVouches[attester] -= 1;
         }
@@ -1172,6 +1341,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         Attestation[] storage attests = borrowerAttestations[borrower];
         uint256 slot = _attestationSlot[attester][borrower];
         if (slot == 0) {
+            require(attests.length < MAX_VOUCHERS_PER_BORROWER, TooManyVouchers());
             attests.push(Attestation({ attester: attester, weight: weight }));
             _attestationSlot[attester][borrower] = attests.length;
         } else {

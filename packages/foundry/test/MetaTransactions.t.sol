@@ -95,7 +95,7 @@ contract MetaTransactionsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.LoanRequest memory req = _loanRequest(LOAN_AMOUNT, 0, block.timestamp - 1);
         bytes memory sig = _signLoanRequest(borrowerPk, req);
         vm.prank(relayer);
-        vm.expectRevert("Expired");
+        vm.expectRevert(DecentralizedMicrocredit.SignatureExpired.selector);
         credit.requestLoanMeta(req, sig);
     }
 
@@ -103,7 +103,7 @@ contract MetaTransactionsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.LoanRequest memory req = _loanRequest(LOAN_AMOUNT, 1, _deadline());
         bytes memory sig = _signLoanRequest(borrowerPk, req);
         vm.prank(relayer);
-        vm.expectRevert("Bad nonce");
+        vm.expectRevert(DecentralizedMicrocredit.InvalidNonce.selector);
         credit.requestLoanMeta(req, sig);
     }
 
@@ -111,7 +111,7 @@ contract MetaTransactionsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.LoanRequest memory req = _loanRequest(LOAN_AMOUNT, 0, _deadline());
         bytes memory sig = _signLoanRequest(impostorPk, req);
         vm.prank(relayer);
-        vm.expectRevert("Bad signature");
+        vm.expectRevert(DecentralizedMicrocredit.InvalidSignature.selector);
         credit.requestLoanMeta(req, sig);
     }
 
@@ -123,7 +123,7 @@ contract MetaTransactionsTest is MicrocreditTestBase {
         credit.requestLoanMeta(req, sig);
         assertEq(credit.nonces(borrower), 1);
 
-        vm.expectRevert("Bad nonce");
+        vm.expectRevert(DecentralizedMicrocredit.InvalidNonce.selector);
         credit.requestLoanMeta(req, sig);
         vm.stopPrank();
     }
@@ -134,7 +134,7 @@ contract MetaTransactionsTest is MicrocreditTestBase {
         bytes memory sig = _signDisburseRequest(borrowerPk, req);
 
         vm.prank(relayer);
-        vm.expectRevert("Must send to borrower");
+        vm.expectRevert(DecentralizedMicrocredit.MustSendToBorrower.selector);
         credit.disburseLoanMeta(req, sig);
     }
 
@@ -142,7 +142,7 @@ contract MetaTransactionsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.LoanRequest memory req = _loanRequest(MAX_LOAN_AMOUNT, 0, _deadline());
         bytes memory sig = _signLoanRequest(borrowerPk, req);
         vm.prank(relayer);
-        vm.expectRevert("Outstanding loans exceed max");
+        vm.expectRevert(DecentralizedMicrocredit.BorrowLimitExceeded.selector);
         credit.requestLoanMeta(req, sig);
     }
 
@@ -154,7 +154,7 @@ contract MetaTransactionsTest is MicrocreditTestBase {
         bytes memory sig = _signLoanRequest(borrowerPk, req);
 
         vm.prank(relayer);
-        vm.expectRevert("Unauthorized relayer");
+        vm.expectRevert(DecentralizedMicrocredit.UnauthorizedRelayer.selector);
         credit.requestLoanMeta(req, sig);
 
         vm.prank(owner);

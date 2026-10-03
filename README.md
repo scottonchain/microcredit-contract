@@ -139,7 +139,8 @@ The borrower's APR is `effrRate + riskPremium`, fixed when the loan is created. 
 1. Ask contacts for attestations to raise your credit score.  
 2. Check the *Scores* page for your current score and max loan amount.  
 3. Submit a loan request on the *Borrower* page; the UI previews repayments. Your first loans are capped at 50 USDC in total until you repay one in full.  
-4. Repay in full or in part from the *Borrower* page. Repayments are gasless: you sign one USDC permit.
+4. Repay in full or in part from the *Borrower* page before the due date shown there. Repayments are gasless: you sign one USDC permit.
+5. A loan unpaid 30 days after its due date can be marked defaulted by anyone: your vouchers lose stake and you cannot borrow again.
 
 ### Lenders
 1. Deposit USDC through the *Lend* page.  
@@ -149,7 +150,8 @@ The borrower's APR is `effrRate + riskPremium`, fixed when the loan is created. 
 ### Attesters
 1. Stake USDC on the *Attest* page: each active vouch locks 50 USDC of it (the `minVouchStake` default).  
 2. Create an attestation for a borrower, choosing a confidence weight. Re-attesting updates the weight. A vouch cannot be lowered or withdrawn while the borrower has a loan out, and it only carries weight if trust reaches you (an admin-assigned score, a lender balance, KYC, or vouches from trusted people).  
-3. The contract computes each attester's weight-proportional share of a reward pot (`computeAttesterReward`); automatic payouts are not implemented yet.
+3. If a borrower you vouch for defaults, your stake covers your share of the unpaid principal (split by vouch weight).  
+4. The contract computes each attester's weight-proportional share of a reward pot (`computeAttesterReward`); automatic payouts are not implemented yet.
 
 ### Oracle / Admin
 1. PageRank is recomputed on-chain after every attestation (demo only); the admin page can also trigger it.  

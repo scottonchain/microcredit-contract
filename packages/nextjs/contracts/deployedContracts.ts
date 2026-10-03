@@ -602,6 +602,45 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "DEFAULT_LOAN_TERM",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "LATE_PERIOD",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "MAX_LOAN_TERM",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "MAX_PROTOCOL_FEE_BPS",
           inputs: [],
           outputs: [
@@ -615,7 +654,46 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "MAX_VOUCHERS_PER_BORROWER",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "MIN_LOAN_TERM",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "QUEUE_FILLS_PER_CALL",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "RESERVATION_TTL",
           inputs: [],
           outputs: [
             {
@@ -824,6 +902,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "cancelLoan",
+          inputs: [
+            {
+              name: "loanId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "claimProtocolFees",
           inputs: [
             {
@@ -930,6 +1021,25 @@ const deployedContracts = {
               name: "assets",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "defaultedLoans",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
             },
           ],
           outputs: [
@@ -1484,6 +1594,45 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getLoanTerms",
+          inputs: [
+            {
+              name: "loanId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "status",
+              type: "uint8",
+              internalType: "enum DecentralizedMicrocredit.LoanStatus",
+            },
+            {
+              name: "term",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "requestedAt",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "disbursedAt",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "dueAt",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "getMaxPageRankScore",
           inputs: [],
           outputs: [
@@ -1719,6 +1868,19 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "markDefaulted",
+          inputs: [
+            {
+              name: "loanId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -2776,6 +2938,56 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "LoanCancelled",
+          inputs: [
+            {
+              name: "borrower",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "loanId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "LoanDefaulted",
+          inputs: [
+            {
+              name: "borrower",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "loanId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "writtenOff",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "recovered",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "LoanDisbursed",
           inputs: [
             {
@@ -3239,6 +3451,31 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "VoucherSlashed",
+          inputs: [
+            {
+              name: "attester",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "loanId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "Withdrawn",
           inputs: [
             {
@@ -3270,7 +3507,157 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "AboveOneHundredPercent",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "AlreadyVerified",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "AprChanged",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BorrowLimitExceeded",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BorrowerInDefault",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "ExceedsAccruedFees",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "FeeTooHigh",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "FirstLoanCapExceeded",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InsufficientBalance",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InsufficientLiquidity",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InsufficientStake",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidNonce",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "InvalidShortString",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidSignature",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidTerm",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "LoanClosed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "LoanNotActive",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "LoanNotRequested",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "MustSendToBorrower",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NameTooLong",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NoCreditScore",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotBorrower",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotCancellableYet",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotOracle",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotOwner",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotOwnerOrOracle",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotYetDefaultable",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NothingToRepay",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "OutstandingChanged",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "PermitFailed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "PermitValueTooLow",
           inputs: [],
         },
         {
@@ -3286,6 +3673,31 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "ScoreTooHigh",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "SelfAttestation",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "SignatureExpired",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "StakeLockedByVouches",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "StakeRequired",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "StringTooLong",
           inputs: [
             {
@@ -3294,6 +3706,51 @@ const deployedContracts = {
               internalType: "string",
             },
           ],
+        },
+        {
+          type: "error",
+          name: "TooManyVouchers",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "UnauthorizedRelayer",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "UtilisationCapExceeded",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "VouchLockedByActiveLoan",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "WeightTooHigh",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "WrongBorrower",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "ZeroAddress",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "ZeroAmount",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "ZeroShares",
+          inputs: [],
         },
       ],
       inheritedFunctions: {},

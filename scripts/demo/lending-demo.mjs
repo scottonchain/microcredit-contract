@@ -339,7 +339,7 @@ async function main() {
     // ── STEP 3: Brighton requests a 40 USDC first loan ─────────────────────────
     // All transactions are gasless meta-transactions paid by the relayer —
     // Brighton does not need ETH.
-    banner(3, `${ACCOUNTS.borrower.name} takes a 40 USDC first loan, 28-day term`);
+    banner(3, `${ACCOUNTS.borrower.name} borrows 40 USDC, a 28-day first loan`);
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
 

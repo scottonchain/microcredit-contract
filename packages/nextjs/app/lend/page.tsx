@@ -7,6 +7,7 @@ import { maxUint256 } from "viem";
 import { useAccount, usePublicClient, useSignTypedData } from "wagmi";
 import { toast } from "react-hot-toast";
 import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
+import { relayerErrorMessage } from "~~/utils/contractErrors";
 import { BanknotesIcon, PlusIcon, EyeIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
@@ -208,10 +209,7 @@ const LendPage: NextPage = () => {
         }),
       });
 
-      if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(text);
-      }
+      if (!resp.ok) throw new Error(await relayerErrorMessage(resp));
       const j = await resp.json();
       console.log("Deposit meta result:", j);
 
@@ -278,7 +276,7 @@ const LendPage: NextPage = () => {
           signature: sig,
         }),
       });
-      if (!resp.ok) throw new Error(await resp.text());
+      if (!resp.ok) throw new Error(await relayerErrorMessage(resp));
       const j = await resp.json();
       console.log("Withdrawal request meta result:", j);
 

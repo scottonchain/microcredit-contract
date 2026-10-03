@@ -8,6 +8,7 @@ import { CreditCardIcon, CalculatorIcon, DocumentDuplicateIcon, CurrencyDollarIc
 import Link from "next/link";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
+import { relayerErrorMessage } from "~~/utils/contractErrors";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 import { MICRO_DOMAIN, TYPES, USDC_PERMIT_DOMAIN, splitSignature } from "~~/utils/eip712";
@@ -323,6 +324,23 @@ const BorrowPage: NextPage = () => {
   const activePrincipal: bigint | undefined = loanIsActive ? activeLoan?.[0] : undefined;
   const activeOutstanding: bigint | undefined = loanIsActive ? activeLoan?.[1] : undefined;
 
+  // Schedule of the newest loan: [status, term, requestedAt, disbursedAt, dueAt] (seconds)
+  const { data: loanTerms } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getLoanTerms",
+    args: [activeLoanId],
+    query: { enabled: activeLoanId !== undefined },
+  });
+  const { data: latePeriod } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "LATE_PERIOD",
+  });
+  const dueAt = loanTerms && loanTerms[4] > 0n ? Number(loanTerms[4]) : undefined;
+  const nowSecs = Math.floor(Date.now() / 1000);
+  const daysOverdue = dueAt !== undefined && nowSecs > dueAt ? Math.floor((nowSecs - dueAt) / 86400) : 0;
+  const defaultableAt = dueAt !== undefined && latePeriod !== undefined ? dueAt + Number(latePeriod) : undefined;
+  const formatDate = (secs: number) => new Date(secs * 1000).toLocaleDateString();
+
   // Outstanding rounded — disable when inactive; keep result object
   const outRoundedRes = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
@@ -460,7 +478,7 @@ const BorrowPage: NextPage = () => {
           signature: sig,
         }),
       });
-      if (!resp.ok) throw new Error(`Relayer borrow failed: ${await resp.text()}`);
+      if (!resp.ok) throw new Error(await relayerErrorMessage(resp));
       const resJson = await resp.json();
       console.log("One-click borrow completed:", { txHash: resJson.txHash, status: resJson.status, loanId: resJson.loanId });
 
@@ -684,24 +702,32 @@ const BorrowPage: NextPage = () => {
               </div>
             </div>
 
-            {/* Next Payment Due */}
+            {/* Repayment Schedule */}
             <div className="bg-base-200 rounded-lg p-4">
-              <h3 className="font-medium mb-3">Next Payment Due</h3>
+              <h3 className="font-medium mb-3">Repayment Schedule</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Weekly Payment:</span>
-                  <span className="font-medium text-green-500">
-                    {previewTermsData && loanAmount ? `${(Number(previewTermsData[1]) / 1e6).toFixed(2)} USDC` : "-"}
-                  </span>
+                  <span className="text-gray-600">Term:</span>
+                  <span className="font-medium">{loanTerms ? `${Number(loanTerms[1]) / 86400} days` : "-"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Due Date:</span>
-                  <span className="font-medium">Next Week</span>
+                  <span className="font-medium">{dueAt !== undefined ? formatDate(dueAt) : "Not yet disbursed"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Status:</span>
-                  <span className="font-medium text-green-500">Current</span>
+                  {daysOverdue > 0 ? (
+                    <span className="font-medium text-error">Overdue by {daysOverdue} days</span>
+                  ) : (
+                    <span className="font-medium text-green-500">Current</span>
+                  )}
                 </div>
+                {daysOverdue > 0 && defaultableAt !== undefined && (
+                  <p className="text-xs text-error">
+                    Repay before {formatDate(defaultableAt)}. After that the loan can be marked defaulted, your
+                    vouchers lose stake, and you cannot borrow again.
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -798,7 +824,7 @@ const BorrowPage: NextPage = () => {
                           permit: permitPayload,
                         }),
                       });
-                      if (!resp.ok) throw new Error(await resp.text());
+                      if (!resp.ok) throw new Error(await relayerErrorMessage(resp));
                       const result = await resp.json();
                       console.log("Repayment submitted (gasless, single approval)", { txHash: result.txHash, amountUsed: result.amountUsed });
 
@@ -922,7 +948,7 @@ const BorrowPage: NextPage = () => {
                             permit: permitPayload,
                           }),
                         });
-                        if (!resp.ok) throw new Error(await resp.text());
+                        if (!resp.ok) throw new Error(await relayerErrorMessage(resp));
                         const result = await resp.json();
                         console.log("Partial repayment submitted (gasless, single approval)", { txHash: result.txHash, amountUsed: result.amountUsed });
                         setRepayAmount("");

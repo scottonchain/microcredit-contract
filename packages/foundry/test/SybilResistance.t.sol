@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
+import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
 import { MicrocreditTestBase } from "./utils/MicrocreditTestBase.sol";
 
 /**
@@ -70,7 +71,7 @@ contract SybilResistanceTest is MicrocreditTestBase {
 
     function testUnstakedAccountsCannotVouch() public {
         vm.prank(makeAddr("sybil0"));
-        vm.expectRevert("Stake required");
+        vm.expectRevert(DecentralizedMicrocredit.StakeRequired.selector);
         credit.recordAttestation(sam, SCALE);
         assertEq(credit.getCreditScore(sam), 0);
     }
@@ -80,7 +81,7 @@ contract SybilResistanceTest is MicrocreditTestBase {
         assertEq(credit.getCreditScore(sam), 0);
 
         vm.prank(sam);
-        vm.expectRevert("Score > 0");
+        vm.expectRevert(DecentralizedMicrocredit.NoCreditScore.selector);
         credit.requestLoan(1e6);
     }
 
@@ -122,12 +123,12 @@ contract SybilResistanceTest is MicrocreditTestBase {
         assertEq(available, FIRST_LOAN_CAP);
 
         vm.prank(brighton);
-        vm.expectRevert("First loan cap exceeded");
+        vm.expectRevert(DecentralizedMicrocredit.FirstLoanCapExceeded.selector);
         credit.requestLoan(FIRST_LOAN_CAP + 1);
 
         vm.startPrank(brighton);
         uint256 first = credit.requestLoan(30e6);
-        vm.expectRevert("First loan cap exceeded"); // the cap covers active loans together
+        vm.expectRevert(DecentralizedMicrocredit.FirstLoanCapExceeded.selector); // the cap covers active loans together
         credit.requestLoan(21e6);
         vm.stopPrank();
         credit.disburseLoan(first);
@@ -155,7 +156,7 @@ contract SybilResistanceTest is MicrocreditTestBase {
         _vouch(avery, brighton, 900_000); // raising an existing vouch needs no more stake
 
         vm.prank(avery);
-        vm.expectRevert("Stake required");
+        vm.expectRevert(DecentralizedMicrocredit.StakeRequired.selector);
         credit.recordAttestation(sam, SCALE);
 
         _stake(avery, STAKE);
@@ -171,11 +172,11 @@ contract SybilResistanceTest is MicrocreditTestBase {
         credit.disburseLoan(loanId);
 
         vm.startPrank(avery);
-        vm.expectRevert("Vouch locked by active loan");
+        vm.expectRevert(DecentralizedMicrocredit.VouchLockedByActiveLoan.selector);
         credit.recordAttestation(brighton, 500_000);
-        vm.expectRevert("Vouch locked by active loan");
+        vm.expectRevert(DecentralizedMicrocredit.VouchLockedByActiveLoan.selector);
         credit.recordAttestation(brighton, 0);
-        vm.expectRevert("Stake locked by vouches");
+        vm.expectRevert(DecentralizedMicrocredit.StakeLockedByVouches.selector);
         credit.unstake(1);
         vm.stopPrank();
 
@@ -201,7 +202,7 @@ contract SybilResistanceTest is MicrocreditTestBase {
     function testUnstakeRejectsMoreThanStaked() public {
         _stake(avery, STAKE);
         vm.prank(avery);
-        vm.expectRevert("Insufficient stake");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientStake.selector);
         credit.unstake(STAKE + 1);
     }
 }

@@ -83,7 +83,7 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         credit.requestLoan(allowed);
 
         vm.prank(borrower);
-        vm.expectRevert("Outstanding loans exceed max");
+        vm.expectRevert(DecentralizedMicrocredit.BorrowLimitExceeded.selector);
         credit.requestLoan(1e6);
     }
 
@@ -172,7 +172,7 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         credit.withdrawFunds(40_000e6);
         credit.withdrawFunds(30_000e6);
 
-        vm.expectRevert("Insufficient balance");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientBalance.selector);
         credit.withdrawFunds(40_000e6); // only 30k left
         vm.stopPrank();
     }
@@ -186,7 +186,7 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         credit.requestLoan(850_000e6);
         credit.requestLoan(50_000e6); // exactly at the cap
 
-        vm.expectRevert("Pool utilisation cap exceeded");
+        vm.expectRevert(DecentralizedMicrocredit.UtilisationCapExceeded.selector);
         credit.requestLoan(1e6);
         vm.stopPrank();
 
@@ -203,7 +203,7 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
 
         // 100k stays unreserved, and all of it can leave: the 5% buffer only limits new loans.
         vm.startPrank(owner);
-        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
         credit.withdrawFunds(100_000e6 + 1);
         credit.withdrawFunds(100_000e6);
         vm.stopPrank();
