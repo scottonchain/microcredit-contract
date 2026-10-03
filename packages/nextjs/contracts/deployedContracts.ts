@@ -602,6 +602,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "QUEUE_FILLS_PER_CALL",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "SCALE",
           inputs: [],
           outputs: [
@@ -1608,6 +1621,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "processWithdrawalQueue",
+          inputs: [
+            {
+              name: "maxItems",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "queuedWithdrawals",
           inputs: [
             {
@@ -2173,6 +2199,19 @@ const deployedContracts = {
         {
           type: "function",
           name: "totalLentOut",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "totalQueuedWithdrawals",
           inputs: [],
           outputs: [
             {

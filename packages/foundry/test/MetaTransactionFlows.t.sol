@@ -283,16 +283,17 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         credit.requestWithdrawalMeta(req, sig);
     }
 
-    /// @dev Lends the entire pool (POOL + 1,000 from `lender`) to `borrower`, leaving nothing liquid.
+    /// @dev Lends every deposited USDC to `borrower`, leaving nothing liquid.
     function _lendOutWholePool() internal returns (uint256 loanId) {
+        uint256 pool = credit.totalDeposits();
         vm.startPrank(owner);
-        credit.setMaxLoanAmount(POOL + 1_000e6);
+        credit.setMaxLoanAmount(pool);
         credit.setScoreOverride(borrower, SCALE);
         credit.setLendingUtilizationCap(10_000);
         credit.setLiquidityLimits(0, 0);
         vm.stopPrank();
         vm.prank(borrower);
-        loanId = credit.requestLoan(POOL + 1_000e6);
+        loanId = credit.requestLoan(pool);
         credit.disburseLoan(loanId);
         assertEq(usdc.balanceOf(address(credit)), 0);
     }
@@ -395,6 +396,75 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         vm.prank(poolLender);
         vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
         credit.withdrawFunds(1);
+    }
+
+    /// @dev Queues `count` requests of 10 USDC against a drained pool, then deposits 500 USDC,
+    ///      enough for all of them.
+    function _queuedRequestsThenRefill(uint256 count) internal returns (address payout) {
+        _depositPermitOnly(lender, lenderPk, count * 10e6);
+        _lendOutWholePool();
+        payout = makeAddr("payout");
+        for (uint256 i = 0; i < count; i++) {
+            _requestWithdrawal(10e6, payout);
+        }
+        _deposit(makeAddr("newLender"), 500e6);
+    }
+
+    function testQueueFillIsBoundedPerCall() public {
+        address payout = _queuedRequestsThenRefill(11);
+        assertEq(usdc.balanceOf(payout), 100e6, "one call fills at most 10 requests");
+        assertEq(credit.totalQueuedWithdrawals(), 10e6);
+
+        credit.processWithdrawalQueue(10);
+        assertEq(usdc.balanceOf(payout), 110e6);
+        assertEq(credit.totalQueuedWithdrawals(), 0);
+        assertEq(credit.queuedWithdrawals(lender), 0);
+    }
+
+    function testLiquidityOwedToQueueIsNotLent() public {
+        _queuedRequestsThenRefill(11); // 400 USDC liquid, 10 USDC of it still owed to the queue
+
+        vm.prank(owner);
+        credit.setMaxLoanAmount(type(uint256).max);
+        vm.prank(borrower);
+        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        credit.requestLoan(391e6);
+        vm.prank(borrower);
+        credit.requestLoan(390e6);
+
+        (, uint256 available,,) = credit.getPoolInfo();
+        assertEq(available, 0);
+    }
+
+    function testLiquidityOwedToQueueIsNotWithdrawn() public {
+        // The deposit pays 10 requests and the withdrawal's own fill pays 10 more, so 10 USDC
+        // is still queued out of the 300 USDC left.
+        address payout = _queuedRequestsThenRefill(21);
+
+        vm.prank(poolLender);
+        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        credit.withdrawFunds(291e6);
+        vm.prank(poolLender);
+        credit.withdrawFunds(290e6);
+
+        assertEq(usdc.balanceOf(payout), 200e6);
+        assertEq(credit.totalQueuedWithdrawals(), 10e6);
+        assertEq(usdc.balanceOf(address(credit)), 10e6);
+    }
+
+    function testPartialFillThenDirectWithdrawalKeepsQueueOrder() public {
+        _depositPermitOnly(lender, lenderPk, 1_000e6);
+        _lendOutWholePool();
+        address payout = makeAddr("payout");
+        _requestWithdrawal(1_000e6, payout);
+
+        _deposit(makeAddr("newLender"), 400e6); // partial fill
+        assertEq(usdc.balanceOf(payout), 400e6);
+
+        vm.prank(makeAddr("newLender"));
+        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        credit.withdrawFunds(1e6);
+        assertEq(credit.queuedWithdrawals(lender), 600e6);
     }
 
     function testWithdrawalRequestRejectsMoreThanDeposited() public {

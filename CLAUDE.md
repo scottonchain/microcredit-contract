@@ -57,6 +57,7 @@ Inherits `PageRank` (graph + computation) and OpenZeppelin `EIP712`. The file is
 - `reservedLiquidity`: USDC committed to approved but undisbursed loans
 - `lendingUtilizationCap`: max fraction of pool that can be lent or reserved (default 90%)
 - `liquidityBuffer` / `liquidityThreshold`: share of deposits / absolute USDC kept liquid (default 5% / 0)
+- `totalQueuedWithdrawals`: USDC owed to the FIFO withdrawal queue (`requestWithdrawalMeta`); held back from loans and direct withdrawals. Each deposit, repayment or withdrawal pays at most `QUEUE_FILLS_PER_CALL` (10) queued requests; anyone can call `processWithdrawalQueue(maxItems)` to drain the rest
 
 **Loan lifecycle:**
 1. `requestLoan()` / `requestLoanMeta()`: validate and reserve liquidity, create the loan record; interest accrues from here

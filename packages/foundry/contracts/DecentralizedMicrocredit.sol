@@ -28,6 +28,10 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     uint256 private constant CENT = 10_000; // 0.01 USDC (6 decimals)
     uint256 private constant GRACE_PERIOD = 1 days; // no interest accrues during the first day
     uint256 private constant ATTESTER_REWARD_RATE = 50_000; // 5% of principal, in SCALE
+    /// @notice Queued withdrawals paid at most per deposit, repayment or withdrawal, so a long
+    ///         queue cannot push those calls past the block gas limit. {processWithdrawalQueue}
+    ///         drains the rest.
+    uint256 public constant QUEUE_FILLS_PER_CALL = 10;
 
     bytes32 private constant LOAN_REQUEST_TYPEHASH =
         keccak256("LoanRequest(address borrower,uint256 amount,uint256 nonce,uint256 deadline)");
@@ -196,6 +200,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     WithdrawalQueueItem[] private withdrawalQueue;
     uint256 private withdrawalHead;
     mapping(address => uint256) public queuedWithdrawals; // per lender, still waiting in the queue
+    uint256 public totalQueuedWithdrawals; // sum of queuedWithdrawals; liquidity owed to the queue first
 
     // ───────────────────────────── events ─────────────────────────────
 
@@ -355,7 +360,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         require(amount > 0, "Amount > 0");
         _pullUsdc(msg.sender, amount);
         _recordDeposit(msg.sender, amount);
-        _tryFillWithdrawalQueue();
+        _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
     /// @notice Withdraw immediately. Queued withdrawals are paid first, and funds already queued
@@ -363,11 +368,12 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     function withdrawFunds(uint256 amount) external {
         require(amount > 0, "Amount > 0");
         require(lenderDeposits[msg.sender] - queuedWithdrawals[msg.sender] >= amount, "Insufficient balance");
-        _tryFillWithdrawalQueue();
+        _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
 
         uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
         require(
-            usdc.balanceOf(address(this)) >= reservedLiquidity + amount + bufferRequired + liquidityThreshold,
+            usdc.balanceOf(address(this))
+                >= reservedLiquidity + totalQueuedWithdrawals + amount + bufferRequired + liquidityThreshold,
             "LIQUIDITY_BELOW_THRESHOLD"
         );
 
@@ -609,7 +615,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         _recordDeposit(req.receiver, req.amount);
         emit MetaDeposit(req.lender, req.amount, req.receiver, req.amount);
 
-        _tryFillWithdrawalQueue();
+        _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
     /// @notice Gasless deposit of exactly `permit.value`, authorized by the permit alone.
@@ -622,7 +628,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         _recordDeposit(lender, permit.value);
         emit MetaDeposit(lender, permit.value, lender, permit.value);
 
-        _tryFillWithdrawalQueue();
+        _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
     /// @notice Queue a gasless withdrawal; it is paid immediately as far as liquidity allows.
@@ -636,6 +642,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         );
         require(lenderDeposits[req.lender] - queuedWithdrawals[req.lender] >= req.amount, "Insufficient balance");
         queuedWithdrawals[req.lender] += req.amount;
+        totalQueuedWithdrawals += req.amount;
 
         uint256 queueId = withdrawalQueue.length;
         withdrawalQueue.push(
@@ -643,7 +650,13 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         );
         emit MetaWithdrawalRequested(req.lender, queueId, req.amount, req.to);
 
-        _tryFillWithdrawalQueue();
+        _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
+    }
+
+    /// @notice Pays up to `maxItems` queued withdrawals from available liquidity. Anyone may call
+    ///         it; payouts only ever go to each request's signed recipient.
+    function processWithdrawalQueue(uint256 maxItems) external {
+        _tryFillWithdrawalQueue(maxItems);
     }
 
     /// @notice Gasless attestation signed by the attester.
@@ -688,7 +701,9 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     {
         _totalDeposits = totalDeposits;
         _reservedFunds = reservedLiquidity;
-        _availableFunds = usdc.balanceOf(address(this)) - _reservedFunds;
+        uint256 committed = _reservedFunds + totalQueuedWithdrawals;
+        uint256 balance = usdc.balanceOf(address(this));
+        _availableFunds = balance > committed ? balance - committed : 0;
         _lenderCount = lenderCount;
     }
 
@@ -864,7 +879,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
         uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
         require(
-            usdc.balanceOf(address(this)) - reservedLiquidity >= amount + bufferRequired + liquidityThreshold,
+            usdc.balanceOf(address(this)) - reservedLiquidity
+                >= amount + totalQueuedWithdrawals + bufferRequired + liquidityThreshold,
             "LIQUIDITY_BELOW_THRESHOLD"
         );
 
@@ -924,7 +940,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         if (owed - paid < CENT) {
             _closeLoan(loan);
         }
-        _tryFillWithdrawalQueue();
+        _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
     function _closeLoan(Loan storage loan) internal {
@@ -974,12 +990,12 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         }
     }
 
-    /// @dev Pays queued withdrawals in FIFO order while liquidity stays above the guards. Called
-    ///      from every path that adds liquidity, and before direct withdrawals.
-    function _tryFillWithdrawalQueue() internal {
+    /// @dev Pays up to `maxItems` queued withdrawals in FIFO order while liquidity stays above
+    ///      the guards. Called from every path that adds liquidity, and before direct withdrawals.
+    function _tryFillWithdrawalQueue(uint256 maxItems) internal {
         uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
 
-        while (withdrawalHead < withdrawalQueue.length) {
+        for (uint256 visited = 0; visited < maxItems && withdrawalHead < withdrawalQueue.length; visited++) {
             WithdrawalQueueItem storage item = withdrawalQueue[withdrawalHead];
             if (!item.active || item.remaining == 0) {
                 item.active = false;
@@ -995,6 +1011,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             uint256 pay = item.remaining <= available ? item.remaining : available;
 
             queuedWithdrawals[item.lender] -= pay;
+            totalQueuedWithdrawals -= pay;
             item.remaining -= pay;
             _payOut(item.lender, item.to, pay);
             emit MetaWithdrawalFilled(withdrawalHead, pay);
