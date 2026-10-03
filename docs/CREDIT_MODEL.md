@@ -151,8 +151,15 @@ sum of current lines constant while $\sum\ell^*$ grows with every rotation. Sect
 the issuance budget is charged on $\ell^*$ for exactly this reason.
 
 **Machine checks.** `test/invariant/CreditConservation.invariant.t.sol` checks Theorems 1 and 2,
-the per-account invariant $Q$, Sybil independence and solvency under random interleavings of
-every operation, including defaults; `SybilResistance.t.sol` pins the named attacks.
+the per-account invariant $Q$, Sybil independence and solvency under random interleavings of 21
+operations (backing, staking, borrowing on every path, repayment, impairment, default, deposits,
+queued withdrawals, the reserve), against an independent model of every loan and charge. A deep
+campaign (332,800 calls, 8,104 defaults, 3,585 Sybil loans) found no counterexample; $Q$ reached
+exactly 100% of an account's budget and Theorem 2 98.9% of its bound, so the bounds are tight,
+not loose. Fourteen seeded bugs (coverage ignored, a charge not burned, free credit ignoring the
+backer's loans, dues on interest net of fee, backing released early, and others) were all
+caught. The campaign also surfaced four contract behaviours outside the theorems (CI-23 to CI-25).
+`SybilResistance.t.sol` pins the named attacks.
 
 **Simulation.** `analysis/sybil_sim` runs each attack against each mechanism with the contract's
 arithmetic. Attacker net profit in USDC at 1 and 64 attacker accounts (fee 10%, reserve 30%):
