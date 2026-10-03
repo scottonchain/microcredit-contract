@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Decentralized microcredit lending protocol built with Solidity (Foundry) and Next.js. Borrowers obtain collateral-free USDC loans backed by credit: their own (granted from history or by an institution) or credit that others back them with from theirs. Credit is conserved, so Sybil accounts cannot manufacture it: `docs/CREDIT_MODEL.md` states and proves the bounds (lenders' loss never exceeds issued lines plus dues paid; history earns no more than its dues), and `docs/CREDIT_INTEGRITY_ISSUES.md` tracks every issue against them and must be kept current. Lenders deposit to a shared pool. Meta-transactions (EIP-712) and EIP-2612 permits enable gasless operations via relayers.
+Decentralized microcredit lending protocol built with Solidity (Foundry) and Next.js. Borrowers obtain collateral-free USDC loans backed by credit: their own (granted from history or by an institution) or credit that others back them with from theirs. Credit is conserved, so Sybil accounts cannot manufacture it: `docs/CREDIT_MODEL.md` states and proves the bounds (lenders' loss never exceeds issued lines plus dues paid; history earns no more than its dues), and `docs/CREDIT_INTEGRITY_ISSUES.md` tracks every issue against them and must be kept current. `docs/ECONOMICS.md` covers flows, returns and parameter choice; `docs/DEPLOYMENT.md` the production runbook. Lenders deposit to a shared pool. Meta-transactions (EIP-712) and EIP-2612 permits enable gasless operations via relayers.
 
 ## Monorepo Structure
 
