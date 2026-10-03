@@ -324,7 +324,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
     }
 
     function testAdminSettersAreOwnerOnly() public {
-        bytes[] memory calls = new bytes[](16);
+        bytes[] memory calls = new bytes[](19);
         calls[0] = abi.encodeCall(credit.setOracle, (stranger));
         calls[1] = abi.encodeCall(credit.setScoreProvider, (IScoreProvider(stranger)));
         calls[2] = abi.encodeCall(credit.setEffrRate, (1));
@@ -341,6 +341,9 @@ contract LoanAccountingTest is MicrocreditTestBase {
         calls[13] = abi.encodeCall(credit.releaseReserve, (0));
         calls[14] = abi.encodeCall(credit.transferOwnership, (stranger));
         calls[15] = abi.encodeCall(credit.acceptOwnership, ());
+        calls[16] = abi.encodeCall(credit.setGuardian, (stranger));
+        calls[17] = abi.encodeCall(credit.pause, ());
+        calls[18] = abi.encodeCall(credit.unpause, ());
 
         for (uint256 i = 0; i < calls.length; i++) {
             vm.prank(stranger);
@@ -348,6 +351,39 @@ contract LoanAccountingTest is MicrocreditTestBase {
             assertFalse(ok);
             assertEq(ret, abi.encodeWithSelector(DecentralizedMicrocredit.NotOwner.selector));
         }
+    }
+
+    /// @dev The guardian stops new lending at once (an owner behind a timelock cannot); repayments
+    ///      and exits continue, and only the owner resumes lending.
+    function testGuardianPausesNewLendingOnly() public {
+        address guardian = makeAddr("guardian");
+        vm.prank(owner);
+        credit.setGuardian(guardian);
+        uint256 loanId = _openLoan(PRINCIPAL);
+        vm.prank(borrower);
+        uint256 reserved = credit.requestLoan(1e6);
+
+        vm.prank(guardian);
+        credit.pause();
+        vm.prank(borrower);
+        vm.expectRevert(DecentralizedMicrocredit.LendingPaused.selector);
+        credit.requestLoan(1e6);
+        vm.expectRevert(DecentralizedMicrocredit.LendingPaused.selector);
+        credit.disburseLoan(reserved);
+
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        usdc.mint(borrower, owed);
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), owed);
+        credit.repayLoan(loanId, owed);
+        vm.stopPrank();
+
+        vm.prank(guardian);
+        vm.expectRevert(DecentralizedMicrocredit.NotOwner.selector);
+        credit.unpause();
+        vm.prank(owner);
+        credit.unpause();
+        credit.disburseLoan(reserved);
     }
 
     /// @dev Production hands the protocol to a timelock or multisig; the handover takes two steps.

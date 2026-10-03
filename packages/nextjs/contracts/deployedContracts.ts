@@ -1765,6 +1765,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "guardian",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "impairLoan",
           inputs: [
             {
@@ -1997,6 +2010,26 @@ const deployedContracts = {
               name: "",
               type: "address",
               internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "pause",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "paused",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
             },
           ],
           stateMutability: "view",
@@ -2522,6 +2555,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "setGuardian",
+          inputs: [
+            {
+              name: "newGuardian",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "setLendingUtilizationCap",
           inputs: [
             {
@@ -2862,6 +2908,13 @@ const deployedContracts = {
               internalType: "address",
             },
           ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "unpause",
+          inputs: [],
           outputs: [],
           stateMutability: "nonpayable",
         },
@@ -3757,6 +3810,11 @@ const deployedContracts = {
         {
           type: "error",
           name: "InvalidTerm",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "LendingPaused",
           inputs: [],
         },
         {
