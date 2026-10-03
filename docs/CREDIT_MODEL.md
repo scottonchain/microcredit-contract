@@ -188,7 +188,7 @@ Theorem 2 does not say nothing can go wrong. It says where an attacker has to go
 | Fresh accounts, rings, wash trades | nothing | $\ell=d=s=0$ |
 | An honest backer (persuade, bribe, impersonate a friend) | what that backer commits to the attacker's accounts | the backer's own choice; charged to the backer |
 | The issuer (fool its policy, buy identities it trusts, compromise the oracle) | the lines it issues to the attacker | the issuance budget (and, with CI-17, the issuer's capital first) |
-| Governance (the owner key) | anything: overrides, `maxLoanAmount`, the provider | a self-administered timelock run by a multisig (`DeployProduction.s.sol`); overrides and `maxLoanAmount` remain unbudgeted (CI-6) |
+| Governance (the owner key) | anything: overrides, `maxLoanAmount`, the provider | a self-administered timelock run by a multisig (`DeployProduction.s.sol`), with a guardian that can only pause; overrides and `maxLoanAmount` remain unbudgeted (CI-6) |
 
 So the protocol's security reduces to issuance and governance, which is where it should be: those
 are the only places credit is created. The rest of this document is about making issuance safe.
@@ -294,7 +294,8 @@ implements the first half and specifies the second:
   `maxIncreasePerReport`. By Theorem 2', lenders' potential loss on oracle lines is at most
   `maxTotalScore` × `maxLoanAmount` / `SCALE` at any time; realised losses can recur at most
   once per line lifetime (a loan's term plus the late period), which is what issuer capital and
-  a governance response are for. `testCompromisedOracleCannotRotateItsBudget` runs the rotation
+  a governance response are for: the guardian multisig can `pause` new lending at once, while
+  changes to the provider wait out the timelock. `testCompromisedOracleCannotRotateItsBudget` runs the rotation
   against the real pool.
 - **Pooled first-loss capital (implemented).** Anyone, typically an institution or the operator
   standing behind the lines it issues, can add to the first-loss reserve with `fundReserve`. It

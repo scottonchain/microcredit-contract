@@ -47,7 +47,7 @@ Node >= 20.18.3 and Foundry are required.
 
 ### Core Contract: `DecentralizedMicrocredit.sol`
 
-Inherits OpenZeppelin `EIP712`. A single `owner` with two-step handover (`transferOwnership`, `acceptOwnership`) so production can give it to a timelock or multisig. The file is grouped into constants, types, state, events, errors, admin, lending pool, loans, credit & backing, meta-transactions, views and internals.
+Inherits OpenZeppelin `EIP712`. A single `owner` with two-step handover (`transferOwnership`, `acceptOwnership`) so production can give it to a timelock or multisig, and a `guardian` that can `pause` new loans and disbursements at once (repayments, defaults and exits continue); only the owner can `unpause`. The file is grouped into constants, types, state, events, errors, admin, lending pool, loans, credit & backing, meta-transactions, views and internals.
 
 **Single pool lending model**: All lenders deposit USDC to one shared pool; all borrowers draw from the same pool. Lenders hold non-transferable shares (`sharesOf`, `totalShares`); `convertToShares` / `convertToAssets` follow OpenZeppelin ERC4626 with a 6-decimal virtual offset. Interest is recognised on repayment (cash basis): `_repay` settles accrued interest before principal, and the interest, less `protocolFeeBps` (max `MAX_PROTOCOL_FEE_BPS`, 20%), raises the share price. The owner withdraws fees with `claimProtocolFees`.
 
