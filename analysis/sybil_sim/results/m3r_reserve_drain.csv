@@ -1,0 +1,513 @@
+mechanism,via,case,protocol_fee_pct,reserve_pct,lender_share_pct,drain,breakeven_share_pct,attack_profit,counterfactual_profit,farm_gain,farm_gain_closed_form,honest_lender_loss_increase,honest_lender_loss_closed_form,accounting_residual
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,0.0,0.0,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,0.0,0.5,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,0.0,1.0,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,0.0,2.0,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,25.0,0.0,70.0,-4.89825,0.0,-4.89825,-4.89825,-4.89825,-4.89825,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,25.0,0.5,70.0,-4.89825,-0.349875,-4.548375,-4.548375,-4.548375,-4.548375,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,25.0,1.0,70.0,-4.89825,-0.69975,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,25.0,2.0,70.0,-5.598,-1.3995,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,50.0,0.0,70.0,-3.2655,0.0,-3.2655,-3.2655,-3.2655,-3.2655,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,50.0,0.5,70.0,-3.2655,-0.69975,-2.56575,-2.56575,-2.56575,-2.56575,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,50.0,1.0,70.0,-3.2655,-1.3995,-1.866,-1.866,-1.866,-1.866,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,50.0,2.0,70.0,-4.665,-2.799,-1.866,-1.866,-1.866,-1.866,0.0
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,70.0,0.0,70.0,-1.9593,0.0,-1.9593,-1.9593,-1.9593,-1.9593,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,70.0,0.5,70.0,-1.9593,-0.97965,-0.97965,-0.97965,-0.97965,-0.97965,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,70.0,1.0,70.0,-1.9593,-1.9593,-0.0,-0.0,-0.0,-0.0,0.0
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,70.0,2.0,70.0,-3.9186,-3.9186,-0.0,-0.0,-0.0,-0.0,0.0
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,75.0,0.0,70.0,-1.63275,0.0,-1.63275,-1.63275,-1.63275,-1.63275,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,75.0,0.5,70.0,-1.63275,-1.049625,-0.583125,-0.583125,-0.583125,-0.583125,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,75.0,1.0,70.0,-1.63275,-2.09925,0.4665,0.4665,0.4665,0.4665,0.0
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,75.0,2.0,70.0,-3.732,-4.1985,0.4665,0.4665,0.4665,0.4665,0.0
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,80.0,0.0,70.0,-1.3062,0.0,-1.3062,-1.3062,-1.3062,-1.3062,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,80.0,0.5,70.0,-1.3062,-1.1196,-0.1866,-0.1866,-0.1866,-0.1866,0.0
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,80.0,1.0,70.0,-1.3062,-2.2392,0.933,0.933,0.933,0.933,0.0
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,80.0,2.0,70.0,-3.5454,-4.4784,0.933,0.933,0.933,0.933,0.0
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,90.0,0.0,70.0,-0.6531,0.0,-0.6531,-0.6531,-0.6531,-0.6531,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,90.0,0.5,70.0,-0.6531,-1.25955,0.60645,0.60645,0.60645,0.60645,0.0
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,90.0,1.0,70.0,-0.6531,-2.5191,1.866,1.866,1.866,1.866,0.0
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,90.0,2.0,70.0,-3.1722,-5.0382,1.866,1.866,1.866,1.866,0.0
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,95.0,0.0,70.0,-0.32655,0.0,-0.32655,-0.32655,-0.32655,-0.32655,1e-06
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,95.0,0.5,70.0,-0.32655,-1.329525,1.002975,1.002975,1.002975,1.002975,0.0
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,95.0,1.0,70.0,-0.32655,-2.65905,2.3325,2.3325,2.3325,2.3325,0.0
+M3r conservation_reserve_dues,defaults,deployed,0.0,30.0,95.0,2.0,70.0,-2.9856,-5.3181,2.3325,2.3325,2.3325,2.3325,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,0.0,0.0,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,0.0,0.5,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,0.0,1.0,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,0.0,2.0,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,25.0,0.0,77.7778,-5.1315,0.0,-5.1315,-5.1315,-4.1985,-4.1985,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,25.0,0.5,77.7778,-5.1315,-0.349875,-4.781625,-4.781625,-3.848625,-3.848625,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,25.0,1.0,77.7778,-5.1315,-0.69975,-4.43175,-4.43175,-3.49875,-3.49875,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,25.0,2.0,77.7778,-5.83125,-1.3995,-4.43175,-4.43175,-3.49875,-3.49875,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,50.0,0.0,77.7778,-3.732,0.0,-3.732,-3.732,-2.799,-2.799,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,50.0,0.5,77.7778,-3.732,-0.69975,-3.03225,-3.03225,-2.09925,-2.09925,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,50.0,1.0,77.7778,-3.732,-1.3995,-2.3325,-2.3325,-1.3995,-1.3995,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,50.0,2.0,77.7778,-5.1315,-2.799,-2.3325,-2.3325,-1.3995,-1.3995,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,70.0,0.0,77.7778,-2.6124,0.0,-2.6124,-2.6124,-1.6794,-1.6794,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,70.0,0.5,77.7778,-2.6124,-0.97965,-1.63275,-1.63275,-0.69975,-0.69975,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,70.0,1.0,77.7778,-2.6124,-1.9593,-0.6531,-0.6531,0.2799,0.2799,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,70.0,2.0,77.7778,-4.5717,-3.9186,-0.6531,-0.6531,0.2799,0.2799,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,75.0,0.0,77.7778,-2.3325,0.0,-2.3325,-2.3325,-1.3995,-1.3995,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,75.0,0.5,77.7778,-2.3325,-1.049625,-1.282875,-1.282875,-0.349875,-0.349875,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,75.0,1.0,77.7778,-2.3325,-2.09925,-0.23325,-0.23325,0.69975,0.69975,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,75.0,2.0,77.7778,-4.43175,-4.1985,-0.23325,-0.23325,0.69975,0.69975,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,80.0,0.0,77.7778,-2.0526,0.0,-2.0526,-2.0526,-1.1196,-1.1196,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,80.0,0.5,77.7778,-2.0526,-1.1196,-0.933,-0.933,-0.0,0.0,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,80.0,1.0,77.7778,-2.0526,-2.2392,0.1866,0.1866,1.1196,1.1196,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,80.0,2.0,77.7778,-4.2918,-4.4784,0.1866,0.1866,1.1196,1.1196,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,90.0,0.0,77.7778,-1.4928,0.0,-1.4928,-1.4928,-0.5598,-0.5598,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,90.0,0.5,77.7778,-1.4928,-1.25955,-0.23325,-0.23325,0.69975,0.69975,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,90.0,1.0,77.7778,-1.4928,-2.5191,1.0263,1.0263,1.9593,1.9593,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,90.0,2.0,77.7778,-4.0119,-5.0382,1.0263,1.0263,1.9593,1.9593,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,95.0,0.0,77.7778,-1.2129,0.0,-1.2129,-1.2129,-0.2799,-0.2799,1e-06
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,95.0,0.5,77.7778,-1.2129,-1.329525,0.116625,0.116625,1.049625,1.049625,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,95.0,1.0,77.7778,-1.2129,-2.65905,1.44615,1.44615,2.37915,2.37915,0.0
+M3r conservation_reserve_dues,defaults,study default,10.0,30.0,95.0,2.0,77.7778,-3.87195,-5.3181,1.44615,1.44615,2.37915,2.37915,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,0.0,0.0,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,0.0,0.5,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,0.0,1.0,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,0.0,2.0,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,25.0,0.0,45.0,-3.148875,0.0,-3.148875,-3.148875,-3.148875,-3.148875,1e-06
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,25.0,0.5,45.0,-3.148875,-0.641437,-2.507438,-2.507437,-2.507437,-2.507437,1e-06
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,25.0,1.0,45.0,-3.148875,-1.282875,-1.866,-1.866,-1.866,-1.866,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,25.0,2.0,45.0,-4.43175,-2.56575,-1.866,-1.866,-1.866,-1.866,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,50.0,0.0,45.0,-2.09925,0.0,-2.09925,-2.09925,-2.09925,-2.09925,1e-06
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,50.0,0.5,45.0,-2.09925,-1.282875,-0.816375,-0.816375,-0.816375,-0.816375,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,50.0,1.0,45.0,-2.09925,-2.56575,0.4665,0.4665,0.4665,0.4665,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,50.0,2.0,45.0,-4.665,-5.1315,0.4665,0.4665,0.4665,0.4665,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,70.0,0.0,45.0,-1.25955,0.0,-1.25955,-1.25955,-1.25955,-1.25955,1e-06
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,70.0,0.5,45.0,-1.25955,-1.796025,0.536475,0.536475,0.536475,0.536475,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,70.0,1.0,45.0,-1.25955,-3.59205,2.3325,2.3325,2.3325,2.3325,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,70.0,2.0,45.0,-4.8516,-7.1841,2.3325,2.3325,2.3325,2.3325,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,75.0,0.0,45.0,-1.049625,0.0,-1.049625,-1.049625,-1.049625,-1.049625,1e-06
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,75.0,0.5,45.0,-1.049625,-1.924313,0.874687,0.874688,0.874687,0.874688,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,75.0,1.0,45.0,-1.049625,-3.848625,2.799,2.799,2.799,2.799,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,75.0,2.0,45.0,-4.89825,-7.69725,2.799,2.799,2.799,2.799,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,80.0,0.0,45.0,-0.8397,0.0,-0.8397,-0.8397,-0.8397,-0.8397,1e-06
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,80.0,0.5,45.0,-0.8397,-2.0526,1.2129,1.2129,1.2129,1.2129,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,80.0,1.0,45.0,-0.8397,-4.1052,3.2655,3.2655,3.2655,3.2655,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,80.0,2.0,45.0,-4.9449,-8.2104,3.2655,3.2655,3.2655,3.2655,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,90.0,0.0,45.0,-0.41985,0.0,-0.41985,-0.41985,-0.41985,-0.41985,1e-06
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,90.0,0.5,45.0,-0.41985,-2.309175,1.889325,1.889325,1.889325,1.889325,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,90.0,1.0,45.0,-0.41985,-4.61835,4.1985,4.1985,4.1985,4.1985,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,90.0,2.0,45.0,-5.0382,-9.2367,4.1985,4.1985,4.1985,4.1985,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,95.0,0.0,45.0,-0.209925,0.0,-0.209925,-0.209925,-0.209925,-0.209925,1e-06
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,95.0,0.5,45.0,-0.209925,-2.437463,2.227537,2.227537,2.227537,2.227537,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,95.0,1.0,45.0,-0.209925,-4.874925,4.665,4.665,4.665,4.665,0.0
+M3r conservation_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,95.0,2.0,45.0,-5.08485,-9.74985,4.665,4.665,4.665,4.665,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,0.0,0.0,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,0.0,0.5,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,0.0,1.0,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,0.0,2.0,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,25.0,0.0,20.0,-1.3995,0.0,-1.3995,-1.3995,-1.3995,-1.3995,1e-06
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,25.0,0.5,20.0,-1.3995,-0.933,-0.4665,-0.4665,-0.4665,-0.4665,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,25.0,1.0,20.0,-1.3995,-1.866,0.4665,0.4665,0.4665,0.4665,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,25.0,2.0,20.0,-3.2655,-3.732,0.4665,0.4665,0.4665,0.4665,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,50.0,0.0,20.0,-0.933,0.0,-0.933,-0.933,-0.933,-0.933,1e-06
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,50.0,0.5,20.0,-0.933,-1.866,0.933,0.933,0.933,0.933,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,50.0,1.0,20.0,-0.933,-3.732,2.799,2.799,2.799,2.799,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,50.0,2.0,20.0,-4.665,-7.464,2.799,2.799,2.799,2.799,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,70.0,0.0,20.0,-0.5598,0.0,-0.5598,-0.5598,-0.5598,-0.5598,1e-06
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,70.0,0.5,20.0,-0.5598,-2.6124,2.0526,2.0526,2.0526,2.0526,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,70.0,1.0,20.0,-0.5598,-5.2248,4.665,4.665,4.665,4.665,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,70.0,2.0,20.0,-5.7846,-10.4496,4.665,4.665,4.665,4.665,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,75.0,0.0,20.0,-0.4665,0.0,-0.4665,-0.4665,-0.4665,-0.4665,1e-06
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,75.0,0.5,20.0,-0.4665,-2.799,2.3325,2.3325,2.3325,2.3325,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,75.0,1.0,20.0,-0.4665,-5.598,5.1315,5.1315,5.1315,5.1315,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,75.0,2.0,20.0,-6.0645,-11.196,5.1315,5.1315,5.1315,5.1315,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,80.0,0.0,20.0,-0.3732,0.0,-0.3732,-0.3732,-0.3732,-0.3732,1e-06
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,80.0,0.5,20.0,-0.3732,-2.9856,2.6124,2.6124,2.6124,2.6124,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,80.0,1.0,20.0,-0.3732,-5.9712,5.598,5.598,5.598,5.598,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,80.0,2.0,20.0,-6.3444,-11.9424,5.598,5.598,5.598,5.598,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,90.0,0.0,20.0,-0.1866,0.0,-0.1866,-0.1866,-0.1866,-0.1866,1e-06
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,90.0,0.5,20.0,-0.1866,-3.3588,3.1722,3.1722,3.1722,3.1722,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,90.0,1.0,20.0,-0.1866,-6.7176,6.531,6.531,6.531,6.531,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,90.0,2.0,20.0,-6.9042,-13.4352,6.531,6.531,6.531,6.531,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,95.0,0.0,20.0,-0.0933,0.0,-0.0933,-0.0933,-0.0933,-0.0933,1e-06
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,95.0,0.5,20.0,-0.0933,-3.5454,3.4521,3.4521,3.4521,3.4521,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,95.0,1.0,20.0,-0.0933,-7.0908,6.9975,6.9975,6.9975,6.9975,0.0
+M3r conservation_reserve_dues,defaults,maximum reserve,0.0,80.0,95.0,2.0,20.0,-7.1841,-14.1816,6.9975,6.9975,6.9975,6.9975,0.0
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,0.0,0.0,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,0.0,0.5,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,0.0,1.0,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,0.0,2.0,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,25.0,0.0,70.0,-4.89825,0.0,-4.89825,-4.89825,-4.89825,-4.89825,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,25.0,0.5,70.0,-4.548375,0.0,-4.548375,-4.548375,-4.548375,-4.548375,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,25.0,1.0,70.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,25.0,2.0,70.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,50.0,0.0,70.0,-3.2655,0.0,-3.2655,-3.2655,-3.2655,-3.2655,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,50.0,0.5,70.0,-2.56575,0.0,-2.56575,-2.56575,-2.56575,-2.56575,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,50.0,1.0,70.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,50.0,2.0,70.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,70.0,0.0,70.0,-1.9593,0.0,-1.9593,-1.9593,-1.9593,-1.9593,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,70.0,0.5,70.0,-0.97965,0.0,-0.97965,-0.97965,-0.97965,-0.97965,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,70.0,1.0,70.0,-0.0,0.0,-0.0,-0.0,0.0,-0.0,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,70.0,2.0,70.0,-0.0,0.0,-0.0,-0.0,0.0,-0.0,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,75.0,0.0,70.0,-1.63275,0.0,-1.63275,-1.63275,-1.63275,-1.63275,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,75.0,0.5,70.0,-0.583125,0.0,-0.583125,-0.583125,-0.583125,-0.583125,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,75.0,1.0,70.0,0.4665,0.0,0.4665,0.4665,0.4665,0.4665,0.0
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,75.0,2.0,70.0,0.4665,0.0,0.4665,0.4665,0.4665,0.4665,0.0
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,80.0,0.0,70.0,-1.3062,0.0,-1.3062,-1.3062,-1.3062,-1.3062,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,80.0,0.5,70.0,-0.1866,0.0,-0.1866,-0.1866,-0.1866,-0.1866,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,80.0,1.0,70.0,0.933,0.0,0.933,0.933,0.933,0.933,0.0
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,80.0,2.0,70.0,0.933,0.0,0.933,0.933,0.933,0.933,0.0
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,90.0,0.0,70.0,-0.6531,0.0,-0.6531,-0.6531,-0.6531,-0.6531,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,90.0,0.5,70.0,0.60645,0.0,0.60645,0.60645,0.60645,0.60645,0.0
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,90.0,1.0,70.0,1.866,0.0,1.866,1.866,1.866,1.866,0.0
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,90.0,2.0,70.0,1.866,0.0,1.866,1.866,1.866,1.866,0.0
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,95.0,0.0,70.0,-0.32655,0.0,-0.32655,-0.32655,-0.32655,-0.32655,1e-06
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,95.0,0.5,70.0,1.002975,0.0,1.002975,1.002975,1.002975,1.002975,0.0
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,95.0,1.0,70.0,2.3325,0.0,2.3325,2.3325,2.3325,2.3325,0.0
+M3r conservation_reserve_dues,release,deployed,0.0,30.0,95.0,2.0,70.0,2.3325,0.0,2.3325,2.3325,2.3325,2.3325,0.0
+M3r conservation_reserve_dues,release,study default,10.0,30.0,0.0,0.0,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,0.0,0.5,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,0.0,1.0,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,0.0,2.0,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,25.0,0.0,77.7778,-5.1315,0.0,-5.1315,-5.1315,-4.1985,-4.1985,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,25.0,0.5,77.7778,-4.781625,0.0,-4.781625,-4.781625,-3.848625,-3.848625,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,25.0,1.0,77.7778,-4.43175,0.0,-4.43175,-4.43175,-3.49875,-3.49875,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,25.0,2.0,77.7778,-4.43175,0.0,-4.43175,-4.43175,-3.49875,-3.49875,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,50.0,0.0,77.7778,-3.732,0.0,-3.732,-3.732,-2.799,-2.799,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,50.0,0.5,77.7778,-3.03225,0.0,-3.03225,-3.03225,-2.09925,-2.09925,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,50.0,1.0,77.7778,-2.3325,0.0,-2.3325,-2.3325,-1.3995,-1.3995,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,50.0,2.0,77.7778,-2.3325,0.0,-2.3325,-2.3325,-1.3995,-1.3995,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,70.0,0.0,77.7778,-2.6124,0.0,-2.6124,-2.6124,-1.6794,-1.6794,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,70.0,0.5,77.7778,-1.63275,0.0,-1.63275,-1.63275,-0.69975,-0.69975,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,70.0,1.0,77.7778,-0.6531,0.0,-0.6531,-0.6531,0.2799,0.2799,0.0
+M3r conservation_reserve_dues,release,study default,10.0,30.0,70.0,2.0,77.7778,-0.6531,0.0,-0.6531,-0.6531,0.2799,0.2799,0.0
+M3r conservation_reserve_dues,release,study default,10.0,30.0,75.0,0.0,77.7778,-2.3325,0.0,-2.3325,-2.3325,-1.3995,-1.3995,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,75.0,0.5,77.7778,-1.282875,0.0,-1.282875,-1.282875,-0.349875,-0.349875,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,75.0,1.0,77.7778,-0.23325,0.0,-0.23325,-0.23325,0.69975,0.69975,0.0
+M3r conservation_reserve_dues,release,study default,10.0,30.0,75.0,2.0,77.7778,-0.23325,0.0,-0.23325,-0.23325,0.69975,0.69975,0.0
+M3r conservation_reserve_dues,release,study default,10.0,30.0,80.0,0.0,77.7778,-2.0526,0.0,-2.0526,-2.0526,-1.1196,-1.1196,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,80.0,0.5,77.7778,-0.933,0.0,-0.933,-0.933,0.0,0.0,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,80.0,1.0,77.7778,0.1866,0.0,0.1866,0.1866,1.1196,1.1196,0.0
+M3r conservation_reserve_dues,release,study default,10.0,30.0,80.0,2.0,77.7778,0.1866,0.0,0.1866,0.1866,1.1196,1.1196,0.0
+M3r conservation_reserve_dues,release,study default,10.0,30.0,90.0,0.0,77.7778,-1.4928,0.0,-1.4928,-1.4928,-0.5598,-0.5598,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,90.0,0.5,77.7778,-0.23325,0.0,-0.23325,-0.23325,0.69975,0.69975,0.0
+M3r conservation_reserve_dues,release,study default,10.0,30.0,90.0,1.0,77.7778,1.0263,0.0,1.0263,1.0263,1.9593,1.9593,0.0
+M3r conservation_reserve_dues,release,study default,10.0,30.0,90.0,2.0,77.7778,1.0263,0.0,1.0263,1.0263,1.9593,1.9593,0.0
+M3r conservation_reserve_dues,release,study default,10.0,30.0,95.0,0.0,77.7778,-1.2129,0.0,-1.2129,-1.2129,-0.2799,-0.2799,1e-06
+M3r conservation_reserve_dues,release,study default,10.0,30.0,95.0,0.5,77.7778,0.116625,0.0,0.116625,0.116625,1.049625,1.049625,0.0
+M3r conservation_reserve_dues,release,study default,10.0,30.0,95.0,1.0,77.7778,1.44615,0.0,1.44615,1.44615,2.37915,2.37915,0.0
+M3r conservation_reserve_dues,release,study default,10.0,30.0,95.0,2.0,77.7778,1.44615,0.0,1.44615,1.44615,2.37915,2.37915,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,0.0,0.0,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,0.0,0.5,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,0.0,1.0,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,0.0,2.0,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,25.0,0.0,45.0,-3.148875,0.0,-3.148875,-3.148875,-3.148875,-3.148875,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,25.0,0.5,45.0,-2.507438,0.0,-2.507438,-2.507437,-2.507437,-2.507437,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,25.0,1.0,45.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,25.0,2.0,45.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,50.0,0.0,45.0,-2.09925,0.0,-2.09925,-2.09925,-2.09925,-2.09925,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,50.0,0.5,45.0,-0.816375,0.0,-0.816375,-0.816375,-0.816375,-0.816375,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,50.0,1.0,45.0,0.4665,0.0,0.4665,0.4665,0.4665,0.4665,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,50.0,2.0,45.0,0.4665,0.0,0.4665,0.4665,0.4665,0.4665,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,70.0,0.0,45.0,-1.25955,0.0,-1.25955,-1.25955,-1.25955,-1.25955,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,70.0,0.5,45.0,0.536475,0.0,0.536475,0.536475,0.536475,0.536475,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,70.0,1.0,45.0,2.3325,0.0,2.3325,2.3325,2.3325,2.3325,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,70.0,2.0,45.0,2.3325,0.0,2.3325,2.3325,2.3325,2.3325,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,75.0,0.0,45.0,-1.049625,0.0,-1.049625,-1.049625,-1.049625,-1.049625,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,75.0,0.5,45.0,0.874687,0.0,0.874687,0.874688,0.874687,0.874688,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,75.0,1.0,45.0,2.799,0.0,2.799,2.799,2.799,2.799,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,75.0,2.0,45.0,2.799,0.0,2.799,2.799,2.799,2.799,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,80.0,0.0,45.0,-0.8397,0.0,-0.8397,-0.8397,-0.8397,-0.8397,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,80.0,0.5,45.0,1.2129,0.0,1.2129,1.2129,1.2129,1.2129,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,80.0,1.0,45.0,3.2655,0.0,3.2655,3.2655,3.2655,3.2655,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,80.0,2.0,45.0,3.2655,0.0,3.2655,3.2655,3.2655,3.2655,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,90.0,0.0,45.0,-0.41985,0.0,-0.41985,-0.41985,-0.41985,-0.41985,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,90.0,0.5,45.0,1.889325,0.0,1.889325,1.889325,1.889325,1.889325,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,90.0,1.0,45.0,4.1985,0.0,4.1985,4.1985,4.1985,4.1985,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,90.0,2.0,45.0,4.1985,0.0,4.1985,4.1985,4.1985,4.1985,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,95.0,0.0,45.0,-0.209925,0.0,-0.209925,-0.209925,-0.209925,-0.209925,1e-06
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,95.0,0.5,45.0,2.227537,0.0,2.227537,2.227537,2.227537,2.227537,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,95.0,1.0,45.0,4.665,0.0,4.665,4.665,4.665,4.665,0.0
+M3r conservation_reserve_dues,release,calibration's full recommendation,0.0,55.0,95.0,2.0,45.0,4.665,0.0,4.665,4.665,4.665,4.665,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,0.0,0.0,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,0.0,0.5,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,0.0,1.0,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,0.0,2.0,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,25.0,0.0,20.0,-1.3995,0.0,-1.3995,-1.3995,-1.3995,-1.3995,1e-06
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,25.0,0.5,20.0,-0.4665,0.0,-0.4665,-0.4665,-0.4665,-0.4665,1e-06
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,25.0,1.0,20.0,0.4665,0.0,0.4665,0.4665,0.4665,0.4665,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,25.0,2.0,20.0,0.4665,0.0,0.4665,0.4665,0.4665,0.4665,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,50.0,0.0,20.0,-0.933,0.0,-0.933,-0.933,-0.933,-0.933,1e-06
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,50.0,0.5,20.0,0.933,0.0,0.933,0.933,0.933,0.933,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,50.0,1.0,20.0,2.799,0.0,2.799,2.799,2.799,2.799,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,50.0,2.0,20.0,2.799,0.0,2.799,2.799,2.799,2.799,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,70.0,0.0,20.0,-0.5598,0.0,-0.5598,-0.5598,-0.5598,-0.5598,1e-06
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,70.0,0.5,20.0,2.0526,0.0,2.0526,2.0526,2.0526,2.0526,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,70.0,1.0,20.0,4.665,0.0,4.665,4.665,4.665,4.665,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,70.0,2.0,20.0,4.665,0.0,4.665,4.665,4.665,4.665,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,75.0,0.0,20.0,-0.4665,0.0,-0.4665,-0.4665,-0.4665,-0.4665,1e-06
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,75.0,0.5,20.0,2.3325,0.0,2.3325,2.3325,2.3325,2.3325,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,75.0,1.0,20.0,5.1315,0.0,5.1315,5.1315,5.1315,5.1315,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,75.0,2.0,20.0,5.1315,0.0,5.1315,5.1315,5.1315,5.1315,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,80.0,0.0,20.0,-0.3732,0.0,-0.3732,-0.3732,-0.3732,-0.3732,1e-06
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,80.0,0.5,20.0,2.6124,0.0,2.6124,2.6124,2.6124,2.6124,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,80.0,1.0,20.0,5.598,0.0,5.598,5.598,5.598,5.598,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,80.0,2.0,20.0,5.598,0.0,5.598,5.598,5.598,5.598,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,90.0,0.0,20.0,-0.1866,0.0,-0.1866,-0.1866,-0.1866,-0.1866,1e-06
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,90.0,0.5,20.0,3.1722,0.0,3.1722,3.1722,3.1722,3.1722,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,90.0,1.0,20.0,6.531,0.0,6.531,6.531,6.531,6.531,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,90.0,2.0,20.0,6.531,0.0,6.531,6.531,6.531,6.531,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,95.0,0.0,20.0,-0.0933,0.0,-0.0933,-0.0933,-0.0933,-0.0933,1e-06
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,95.0,0.5,20.0,3.4521,0.0,3.4521,3.4521,3.4521,3.4521,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,95.0,1.0,20.0,6.9975,0.0,6.9975,6.9975,6.9975,6.9975,0.0
+M3r conservation_reserve_dues,release,maximum reserve,0.0,80.0,95.0,2.0,20.0,6.9975,0.0,6.9975,6.9975,6.9975,6.9975,0.0
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,0.0,0.0,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,0.0,0.5,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,0.0,1.0,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,0.0,2.0,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,25.0,0.0,70.0,-4.89825,0.0,-4.89825,-4.89825,-4.89825,-4.89825,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,25.0,0.5,70.0,-5.248125,-0.349875,-4.89825,-4.89825,-4.89825,-4.89825,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,25.0,1.0,70.0,-5.598,-0.69975,-4.89825,-4.89825,-4.89825,-4.89825,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,25.0,2.0,70.0,-6.29775,-1.3995,-4.89825,-4.89825,-4.89825,-4.89825,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,50.0,0.0,70.0,-3.2655,0.0,-3.2655,-3.2655,-3.2655,-3.2655,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,50.0,0.5,70.0,-3.96525,-0.69975,-3.2655,-3.2655,-3.2655,-3.2655,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,50.0,1.0,70.0,-4.665,-1.3995,-3.2655,-3.2655,-3.2655,-3.2655,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,50.0,2.0,70.0,-6.0645,-2.799,-3.2655,-3.2655,-3.2655,-3.2655,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,70.0,0.0,70.0,-1.9593,0.0,-1.9593,-1.9593,-1.9593,-1.9593,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,70.0,0.5,70.0,-2.93895,-0.97965,-1.9593,-1.9593,-1.9593,-1.9593,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,70.0,1.0,70.0,-3.9186,-1.9593,-1.9593,-1.9593,-1.9593,-1.9593,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,70.0,2.0,70.0,-5.8779,-3.9186,-1.9593,-1.9593,-1.9593,-1.9593,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,75.0,0.0,70.0,-1.63275,0.0,-1.63275,-1.63275,-1.63275,-1.63275,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,75.0,0.5,70.0,-2.682375,-1.049625,-1.63275,-1.63275,-1.63275,-1.63275,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,75.0,1.0,70.0,-3.732,-2.09925,-1.63275,-1.63275,-1.63275,-1.63275,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,75.0,2.0,70.0,-5.83125,-4.1985,-1.63275,-1.63275,-1.63275,-1.63275,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,80.0,0.0,70.0,-1.3062,0.0,-1.3062,-1.3062,-1.3062,-1.3062,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,80.0,0.5,70.0,-2.4258,-1.1196,-1.3062,-1.3062,-1.3062,-1.3062,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,80.0,1.0,70.0,-3.5454,-2.2392,-1.3062,-1.3062,-1.3062,-1.3062,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,80.0,2.0,70.0,-5.7846,-4.4784,-1.3062,-1.3062,-1.3062,-1.3062,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,90.0,0.0,70.0,-0.6531,0.0,-0.6531,-0.6531,-0.6531,-0.6531,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,90.0,0.5,70.0,-1.91265,-1.25955,-0.6531,-0.6531,-0.6531,-0.6531,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,90.0,1.0,70.0,-3.1722,-2.5191,-0.6531,-0.6531,-0.6531,-0.6531,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,90.0,2.0,70.0,-5.6913,-5.0382,-0.6531,-0.6531,-0.6531,-0.6531,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,95.0,0.0,70.0,-0.32655,0.0,-0.32655,-0.32655,-0.32655,-0.32655,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,95.0,0.5,70.0,-1.656075,-1.329525,-0.32655,-0.32655,-0.32655,-0.32655,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,95.0,1.0,70.0,-2.9856,-2.65905,-0.32655,-0.32655,-0.32655,-0.32655,1e-06
+M3e earmarked_reserve_dues,defaults,deployed,0.0,30.0,95.0,2.0,70.0,-5.64465,-5.3181,-0.32655,-0.32655,-0.32655,-0.32655,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,0.0,0.0,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,0.0,0.5,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,0.0,1.0,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,0.0,2.0,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,0.0
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,25.0,0.0,77.7778,-5.1315,0.0,-5.1315,-5.1315,-4.1985,-4.1985,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,25.0,0.5,77.7778,-5.481375,-0.349875,-5.1315,-5.1315,-4.1985,-4.1985,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,25.0,1.0,77.7778,-5.83125,-0.69975,-5.1315,-5.1315,-4.1985,-4.1985,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,25.0,2.0,77.7778,-6.531,-1.3995,-5.1315,-5.1315,-4.1985,-4.1985,0.0
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,50.0,0.0,77.7778,-3.732,0.0,-3.732,-3.732,-2.799,-2.799,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,50.0,0.5,77.7778,-4.43175,-0.69975,-3.732,-3.732,-2.799,-2.799,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,50.0,1.0,77.7778,-5.1315,-1.3995,-3.732,-3.732,-2.799,-2.799,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,50.0,2.0,77.7778,-6.531,-2.799,-3.732,-3.732,-2.799,-2.799,0.0
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,70.0,0.0,77.7778,-2.6124,0.0,-2.6124,-2.6124,-1.6794,-1.6794,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,70.0,0.5,77.7778,-3.59205,-0.97965,-2.6124,-2.6124,-1.6794,-1.6794,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,70.0,1.0,77.7778,-4.5717,-1.9593,-2.6124,-2.6124,-1.6794,-1.6794,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,70.0,2.0,77.7778,-6.531,-3.9186,-2.6124,-2.6124,-1.6794,-1.6794,0.0
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,75.0,0.0,77.7778,-2.3325,0.0,-2.3325,-2.3325,-1.3995,-1.3995,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,75.0,0.5,77.7778,-3.382125,-1.049625,-2.3325,-2.3325,-1.3995,-1.3995,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,75.0,1.0,77.7778,-4.43175,-2.09925,-2.3325,-2.3325,-1.3995,-1.3995,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,75.0,2.0,77.7778,-6.531,-4.1985,-2.3325,-2.3325,-1.3995,-1.3995,0.0
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,80.0,0.0,77.7778,-2.0526,0.0,-2.0526,-2.0526,-1.1196,-1.1196,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,80.0,0.5,77.7778,-3.1722,-1.1196,-2.0526,-2.0526,-1.1196,-1.1196,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,80.0,1.0,77.7778,-4.2918,-2.2392,-2.0526,-2.0526,-1.1196,-1.1196,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,80.0,2.0,77.7778,-6.531,-4.4784,-2.0526,-2.0526,-1.1196,-1.1196,0.0
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,90.0,0.0,77.7778,-1.4928,0.0,-1.4928,-1.4928,-0.5598,-0.5598,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,90.0,0.5,77.7778,-2.75235,-1.25955,-1.4928,-1.4928,-0.5598,-0.5598,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,90.0,1.0,77.7778,-4.0119,-2.5191,-1.4928,-1.4928,-0.5598,-0.5598,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,90.0,2.0,77.7778,-6.531,-5.0382,-1.4928,-1.4928,-0.5598,-0.5598,0.0
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,95.0,0.0,77.7778,-1.2129,0.0,-1.2129,-1.2129,-0.2799,-0.2799,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,95.0,0.5,77.7778,-2.542425,-1.329525,-1.2129,-1.2129,-0.2799,-0.2799,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,95.0,1.0,77.7778,-3.87195,-2.65905,-1.2129,-1.2129,-0.2799,-0.2799,1e-06
+M3e earmarked_reserve_dues,defaults,study default,10.0,30.0,95.0,2.0,77.7778,-6.531,-5.3181,-1.2129,-1.2129,-0.2799,-0.2799,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,0.0,0.0,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,0.0,0.5,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,0.0,1.0,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,0.0,2.0,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,25.0,0.0,45.0,-3.148875,0.0,-3.148875,-3.148875,-3.148875,-3.148875,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,25.0,0.5,45.0,-3.790313,-0.641437,-3.148875,-3.148875,-3.148875,-3.148875,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,25.0,1.0,45.0,-4.43175,-1.282875,-3.148875,-3.148875,-3.148875,-3.148875,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,25.0,2.0,45.0,-5.714625,-2.56575,-3.148875,-3.148875,-3.148875,-3.148875,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,50.0,0.0,45.0,-2.09925,0.0,-2.09925,-2.09925,-2.09925,-2.09925,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,50.0,0.5,45.0,-3.382125,-1.282875,-2.09925,-2.09925,-2.09925,-2.09925,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,50.0,1.0,45.0,-4.665,-2.56575,-2.09925,-2.09925,-2.09925,-2.09925,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,50.0,2.0,45.0,-7.23075,-5.1315,-2.09925,-2.09925,-2.09925,-2.09925,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,70.0,0.0,45.0,-1.25955,0.0,-1.25955,-1.25955,-1.25955,-1.25955,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,70.0,0.5,45.0,-3.055575,-1.796025,-1.25955,-1.25955,-1.25955,-1.25955,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,70.0,1.0,45.0,-4.8516,-3.59205,-1.25955,-1.25955,-1.25955,-1.25955,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,70.0,2.0,45.0,-8.44365,-7.1841,-1.25955,-1.25955,-1.25955,-1.25955,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,75.0,0.0,45.0,-1.049625,0.0,-1.049625,-1.049625,-1.049625,-1.049625,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,75.0,0.5,45.0,-2.973938,-1.924313,-1.049625,-1.049625,-1.049625,-1.049625,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,75.0,1.0,45.0,-4.89825,-3.848625,-1.049625,-1.049625,-1.049625,-1.049625,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,75.0,2.0,45.0,-8.746875,-7.69725,-1.049625,-1.049625,-1.049625,-1.049625,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,80.0,0.0,45.0,-0.8397,0.0,-0.8397,-0.8397,-0.8397,-0.8397,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,80.0,0.5,45.0,-2.8923,-2.0526,-0.8397,-0.8397,-0.8397,-0.8397,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,80.0,1.0,45.0,-4.9449,-4.1052,-0.8397,-0.8397,-0.8397,-0.8397,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,80.0,2.0,45.0,-9.0501,-8.2104,-0.8397,-0.8397,-0.8397,-0.8397,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,90.0,0.0,45.0,-0.41985,0.0,-0.41985,-0.41985,-0.41985,-0.41985,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,90.0,0.5,45.0,-2.729025,-2.309175,-0.41985,-0.41985,-0.41985,-0.41985,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,90.0,1.0,45.0,-5.0382,-4.61835,-0.41985,-0.41985,-0.41985,-0.41985,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,90.0,2.0,45.0,-9.65655,-9.2367,-0.41985,-0.41985,-0.41985,-0.41985,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,95.0,0.0,45.0,-0.209925,0.0,-0.209925,-0.209925,-0.209925,-0.209925,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,95.0,0.5,45.0,-2.647388,-2.437463,-0.209925,-0.209925,-0.209925,-0.209925,1e-06
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,95.0,1.0,45.0,-5.08485,-4.874925,-0.209925,-0.209925,-0.209925,-0.209925,0.0
+M3e earmarked_reserve_dues,defaults,calibration's full recommendation,0.0,55.0,95.0,2.0,45.0,-9.959775,-9.74985,-0.209925,-0.209925,-0.209925,-0.209925,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,0.0,0.0,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,0.0,0.5,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,0.0,1.0,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,0.0,2.0,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,25.0,0.0,20.0,-1.3995,0.0,-1.3995,-1.3995,-1.3995,-1.3995,1e-06
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,25.0,0.5,20.0,-2.3325,-0.933,-1.3995,-1.3995,-1.3995,-1.3995,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,25.0,1.0,20.0,-3.2655,-1.866,-1.3995,-1.3995,-1.3995,-1.3995,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,25.0,2.0,20.0,-5.1315,-3.732,-1.3995,-1.3995,-1.3995,-1.3995,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,50.0,0.0,20.0,-0.933,0.0,-0.933,-0.933,-0.933,-0.933,1e-06
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,50.0,0.5,20.0,-2.799,-1.866,-0.933,-0.933,-0.933,-0.933,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,50.0,1.0,20.0,-4.665,-3.732,-0.933,-0.933,-0.933,-0.933,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,50.0,2.0,20.0,-8.397,-7.464,-0.933,-0.933,-0.933,-0.933,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,70.0,0.0,20.0,-0.5598,0.0,-0.5598,-0.5598,-0.5598,-0.5598,1e-06
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,70.0,0.5,20.0,-3.1722,-2.6124,-0.5598,-0.5598,-0.5598,-0.5598,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,70.0,1.0,20.0,-5.7846,-5.2248,-0.5598,-0.5598,-0.5598,-0.5598,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,70.0,2.0,20.0,-11.0094,-10.4496,-0.5598,-0.5598,-0.5598,-0.5598,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,75.0,0.0,20.0,-0.4665,0.0,-0.4665,-0.4665,-0.4665,-0.4665,1e-06
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,75.0,0.5,20.0,-3.2655,-2.799,-0.4665,-0.4665,-0.4665,-0.4665,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,75.0,1.0,20.0,-6.0645,-5.598,-0.4665,-0.4665,-0.4665,-0.4665,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,75.0,2.0,20.0,-11.6625,-11.196,-0.4665,-0.4665,-0.4665,-0.4665,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,80.0,0.0,20.0,-0.3732,0.0,-0.3732,-0.3732,-0.3732,-0.3732,1e-06
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,80.0,0.5,20.0,-3.3588,-2.9856,-0.3732,-0.3732,-0.3732,-0.3732,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,80.0,1.0,20.0,-6.3444,-5.9712,-0.3732,-0.3732,-0.3732,-0.3732,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,80.0,2.0,20.0,-12.3156,-11.9424,-0.3732,-0.3732,-0.3732,-0.3732,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,90.0,0.0,20.0,-0.1866,0.0,-0.1866,-0.1866,-0.1866,-0.1866,1e-06
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,90.0,0.5,20.0,-3.5454,-3.3588,-0.1866,-0.1866,-0.1866,-0.1866,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,90.0,1.0,20.0,-6.9042,-6.7176,-0.1866,-0.1866,-0.1866,-0.1866,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,90.0,2.0,20.0,-13.6218,-13.4352,-0.1866,-0.1866,-0.1866,-0.1866,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,95.0,0.0,20.0,-0.0933,0.0,-0.0933,-0.0933,-0.0933,-0.0933,1e-06
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,95.0,0.5,20.0,-3.6387,-3.5454,-0.0933,-0.0933,-0.0933,-0.0933,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,95.0,1.0,20.0,-7.1841,-7.0908,-0.0933,-0.0933,-0.0933,-0.0933,0.0
+M3e earmarked_reserve_dues,defaults,maximum reserve,0.0,80.0,95.0,2.0,20.0,-14.2749,-14.1816,-0.0933,-0.0933,-0.0933,-0.0933,0.0
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,0.0,0.0,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,0.0,0.5,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,0.0,1.0,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,0.0,2.0,70.0,-6.531,0.0,-6.531,-6.531,-6.531,-6.531,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,25.0,0.0,70.0,-4.89825,0.0,-4.89825,-4.89825,-4.89825,-4.89825,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,25.0,0.5,70.0,-4.89825,0.0,-4.89825,-4.89825,-4.89825,-4.89825,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,25.0,1.0,70.0,-4.89825,0.0,-4.89825,-4.89825,-4.89825,-4.89825,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,25.0,2.0,70.0,-4.89825,0.0,-4.89825,-4.89825,-4.89825,-4.89825,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,50.0,0.0,70.0,-3.2655,0.0,-3.2655,-3.2655,-3.2655,-3.2655,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,50.0,0.5,70.0,-3.2655,0.0,-3.2655,-3.2655,-3.2655,-3.2655,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,50.0,1.0,70.0,-3.2655,0.0,-3.2655,-3.2655,-3.2655,-3.2655,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,50.0,2.0,70.0,-3.2655,0.0,-3.2655,-3.2655,-3.2655,-3.2655,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,70.0,0.0,70.0,-1.9593,0.0,-1.9593,-1.9593,-1.9593,-1.9593,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,70.0,0.5,70.0,-1.9593,0.0,-1.9593,-1.9593,-1.9593,-1.9593,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,70.0,1.0,70.0,-1.9593,0.0,-1.9593,-1.9593,-1.9593,-1.9593,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,70.0,2.0,70.0,-1.9593,0.0,-1.9593,-1.9593,-1.9593,-1.9593,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,75.0,0.0,70.0,-1.63275,0.0,-1.63275,-1.63275,-1.63275,-1.63275,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,75.0,0.5,70.0,-1.63275,0.0,-1.63275,-1.63275,-1.63275,-1.63275,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,75.0,1.0,70.0,-1.63275,0.0,-1.63275,-1.63275,-1.63275,-1.63275,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,75.0,2.0,70.0,-1.63275,0.0,-1.63275,-1.63275,-1.63275,-1.63275,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,80.0,0.0,70.0,-1.3062,0.0,-1.3062,-1.3062,-1.3062,-1.3062,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,80.0,0.5,70.0,-1.3062,0.0,-1.3062,-1.3062,-1.3062,-1.3062,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,80.0,1.0,70.0,-1.3062,0.0,-1.3062,-1.3062,-1.3062,-1.3062,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,80.0,2.0,70.0,-1.3062,0.0,-1.3062,-1.3062,-1.3062,-1.3062,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,90.0,0.0,70.0,-0.6531,0.0,-0.6531,-0.6531,-0.6531,-0.6531,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,90.0,0.5,70.0,-0.6531,0.0,-0.6531,-0.6531,-0.6531,-0.6531,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,90.0,1.0,70.0,-0.6531,0.0,-0.6531,-0.6531,-0.6531,-0.6531,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,90.0,2.0,70.0,-0.6531,0.0,-0.6531,-0.6531,-0.6531,-0.6531,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,95.0,0.0,70.0,-0.32655,0.0,-0.32655,-0.32655,-0.32655,-0.32655,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,95.0,0.5,70.0,-0.32655,0.0,-0.32655,-0.32655,-0.32655,-0.32655,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,95.0,1.0,70.0,-0.32655,0.0,-0.32655,-0.32655,-0.32655,-0.32655,1e-06
+M3e earmarked_reserve_dues,release,deployed,0.0,30.0,95.0,2.0,70.0,-0.32655,0.0,-0.32655,-0.32655,-0.32655,-0.32655,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,0.0,0.0,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,0.0,0.5,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,0.0,1.0,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,0.0,2.0,77.7778,-6.531,0.0,-6.531,-6.531,-5.598,-5.598,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,25.0,0.0,77.7778,-5.1315,0.0,-5.1315,-5.1315,-4.1985,-4.1985,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,25.0,0.5,77.7778,-5.1315,0.0,-5.1315,-5.1315,-4.1985,-4.1985,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,25.0,1.0,77.7778,-5.1315,0.0,-5.1315,-5.1315,-4.1985,-4.1985,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,25.0,2.0,77.7778,-5.1315,0.0,-5.1315,-5.1315,-4.1985,-4.1985,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,50.0,0.0,77.7778,-3.732,0.0,-3.732,-3.732,-2.799,-2.799,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,50.0,0.5,77.7778,-3.732,0.0,-3.732,-3.732,-2.799,-2.799,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,50.0,1.0,77.7778,-3.732,0.0,-3.732,-3.732,-2.799,-2.799,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,50.0,2.0,77.7778,-3.732,0.0,-3.732,-3.732,-2.799,-2.799,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,70.0,0.0,77.7778,-2.6124,0.0,-2.6124,-2.6124,-1.6794,-1.6794,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,70.0,0.5,77.7778,-2.6124,0.0,-2.6124,-2.6124,-1.6794,-1.6794,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,70.0,1.0,77.7778,-2.6124,0.0,-2.6124,-2.6124,-1.6794,-1.6794,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,70.0,2.0,77.7778,-2.6124,0.0,-2.6124,-2.6124,-1.6794,-1.6794,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,75.0,0.0,77.7778,-2.3325,0.0,-2.3325,-2.3325,-1.3995,-1.3995,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,75.0,0.5,77.7778,-2.3325,0.0,-2.3325,-2.3325,-1.3995,-1.3995,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,75.0,1.0,77.7778,-2.3325,0.0,-2.3325,-2.3325,-1.3995,-1.3995,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,75.0,2.0,77.7778,-2.3325,0.0,-2.3325,-2.3325,-1.3995,-1.3995,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,80.0,0.0,77.7778,-2.0526,0.0,-2.0526,-2.0526,-1.1196,-1.1196,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,80.0,0.5,77.7778,-2.0526,0.0,-2.0526,-2.0526,-1.1196,-1.1196,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,80.0,1.0,77.7778,-2.0526,0.0,-2.0526,-2.0526,-1.1196,-1.1196,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,80.0,2.0,77.7778,-2.0526,0.0,-2.0526,-2.0526,-1.1196,-1.1196,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,90.0,0.0,77.7778,-1.4928,0.0,-1.4928,-1.4928,-0.5598,-0.5598,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,90.0,0.5,77.7778,-1.4928,0.0,-1.4928,-1.4928,-0.5598,-0.5598,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,90.0,1.0,77.7778,-1.4928,0.0,-1.4928,-1.4928,-0.5598,-0.5598,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,90.0,2.0,77.7778,-1.4928,0.0,-1.4928,-1.4928,-0.5598,-0.5598,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,95.0,0.0,77.7778,-1.2129,0.0,-1.2129,-1.2129,-0.2799,-0.2799,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,95.0,0.5,77.7778,-1.2129,0.0,-1.2129,-1.2129,-0.2799,-0.2799,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,95.0,1.0,77.7778,-1.2129,0.0,-1.2129,-1.2129,-0.2799,-0.2799,1e-06
+M3e earmarked_reserve_dues,release,study default,10.0,30.0,95.0,2.0,77.7778,-1.2129,0.0,-1.2129,-1.2129,-0.2799,-0.2799,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,0.0,0.0,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,0.0,0.5,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,0.0,1.0,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,0.0,2.0,45.0,-4.1985,0.0,-4.1985,-4.1985,-4.1985,-4.1985,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,25.0,0.0,45.0,-3.148875,0.0,-3.148875,-3.148875,-3.148875,-3.148875,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,25.0,0.5,45.0,-3.148875,0.0,-3.148875,-3.148875,-3.148875,-3.148875,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,25.0,1.0,45.0,-3.148875,0.0,-3.148875,-3.148875,-3.148875,-3.148875,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,25.0,2.0,45.0,-3.148875,0.0,-3.148875,-3.148875,-3.148875,-3.148875,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,50.0,0.0,45.0,-2.09925,0.0,-2.09925,-2.09925,-2.09925,-2.09925,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,50.0,0.5,45.0,-2.09925,0.0,-2.09925,-2.09925,-2.09925,-2.09925,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,50.0,1.0,45.0,-2.09925,0.0,-2.09925,-2.09925,-2.09925,-2.09925,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,50.0,2.0,45.0,-2.09925,0.0,-2.09925,-2.09925,-2.09925,-2.09925,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,70.0,0.0,45.0,-1.25955,0.0,-1.25955,-1.25955,-1.25955,-1.25955,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,70.0,0.5,45.0,-1.25955,0.0,-1.25955,-1.25955,-1.25955,-1.25955,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,70.0,1.0,45.0,-1.25955,0.0,-1.25955,-1.25955,-1.25955,-1.25955,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,70.0,2.0,45.0,-1.25955,0.0,-1.25955,-1.25955,-1.25955,-1.25955,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,75.0,0.0,45.0,-1.049625,0.0,-1.049625,-1.049625,-1.049625,-1.049625,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,75.0,0.5,45.0,-1.049625,0.0,-1.049625,-1.049625,-1.049625,-1.049625,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,75.0,1.0,45.0,-1.049625,0.0,-1.049625,-1.049625,-1.049625,-1.049625,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,75.0,2.0,45.0,-1.049625,0.0,-1.049625,-1.049625,-1.049625,-1.049625,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,80.0,0.0,45.0,-0.8397,0.0,-0.8397,-0.8397,-0.8397,-0.8397,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,80.0,0.5,45.0,-0.8397,0.0,-0.8397,-0.8397,-0.8397,-0.8397,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,80.0,1.0,45.0,-0.8397,0.0,-0.8397,-0.8397,-0.8397,-0.8397,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,80.0,2.0,45.0,-0.8397,0.0,-0.8397,-0.8397,-0.8397,-0.8397,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,90.0,0.0,45.0,-0.41985,0.0,-0.41985,-0.41985,-0.41985,-0.41985,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,90.0,0.5,45.0,-0.41985,0.0,-0.41985,-0.41985,-0.41985,-0.41985,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,90.0,1.0,45.0,-0.41985,0.0,-0.41985,-0.41985,-0.41985,-0.41985,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,90.0,2.0,45.0,-0.41985,0.0,-0.41985,-0.41985,-0.41985,-0.41985,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,95.0,0.0,45.0,-0.209925,0.0,-0.209925,-0.209925,-0.209925,-0.209925,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,95.0,0.5,45.0,-0.209925,0.0,-0.209925,-0.209925,-0.209925,-0.209925,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,95.0,1.0,45.0,-0.209925,0.0,-0.209925,-0.209925,-0.209925,-0.209925,1e-06
+M3e earmarked_reserve_dues,release,calibration's full recommendation,0.0,55.0,95.0,2.0,45.0,-0.209925,0.0,-0.209925,-0.209925,-0.209925,-0.209925,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,0.0,0.0,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,0.0,0.5,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,0.0,1.0,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,0.0,2.0,20.0,-1.866,0.0,-1.866,-1.866,-1.866,-1.866,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,25.0,0.0,20.0,-1.3995,0.0,-1.3995,-1.3995,-1.3995,-1.3995,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,25.0,0.5,20.0,-1.3995,0.0,-1.3995,-1.3995,-1.3995,-1.3995,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,25.0,1.0,20.0,-1.3995,0.0,-1.3995,-1.3995,-1.3995,-1.3995,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,25.0,2.0,20.0,-1.3995,0.0,-1.3995,-1.3995,-1.3995,-1.3995,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,50.0,0.0,20.0,-0.933,0.0,-0.933,-0.933,-0.933,-0.933,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,50.0,0.5,20.0,-0.933,0.0,-0.933,-0.933,-0.933,-0.933,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,50.0,1.0,20.0,-0.933,0.0,-0.933,-0.933,-0.933,-0.933,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,50.0,2.0,20.0,-0.933,0.0,-0.933,-0.933,-0.933,-0.933,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,70.0,0.0,20.0,-0.5598,0.0,-0.5598,-0.5598,-0.5598,-0.5598,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,70.0,0.5,20.0,-0.5598,0.0,-0.5598,-0.5598,-0.5598,-0.5598,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,70.0,1.0,20.0,-0.5598,0.0,-0.5598,-0.5598,-0.5598,-0.5598,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,70.0,2.0,20.0,-0.5598,0.0,-0.5598,-0.5598,-0.5598,-0.5598,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,75.0,0.0,20.0,-0.4665,0.0,-0.4665,-0.4665,-0.4665,-0.4665,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,75.0,0.5,20.0,-0.4665,0.0,-0.4665,-0.4665,-0.4665,-0.4665,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,75.0,1.0,20.0,-0.4665,0.0,-0.4665,-0.4665,-0.4665,-0.4665,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,75.0,2.0,20.0,-0.4665,0.0,-0.4665,-0.4665,-0.4665,-0.4665,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,80.0,0.0,20.0,-0.3732,0.0,-0.3732,-0.3732,-0.3732,-0.3732,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,80.0,0.5,20.0,-0.3732,0.0,-0.3732,-0.3732,-0.3732,-0.3732,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,80.0,1.0,20.0,-0.3732,0.0,-0.3732,-0.3732,-0.3732,-0.3732,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,80.0,2.0,20.0,-0.3732,0.0,-0.3732,-0.3732,-0.3732,-0.3732,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,90.0,0.0,20.0,-0.1866,0.0,-0.1866,-0.1866,-0.1866,-0.1866,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,90.0,0.5,20.0,-0.1866,0.0,-0.1866,-0.1866,-0.1866,-0.1866,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,90.0,1.0,20.0,-0.1866,0.0,-0.1866,-0.1866,-0.1866,-0.1866,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,90.0,2.0,20.0,-0.1866,0.0,-0.1866,-0.1866,-0.1866,-0.1866,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,95.0,0.0,20.0,-0.0933,0.0,-0.0933,-0.0933,-0.0933,-0.0933,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,95.0,0.5,20.0,-0.0933,0.0,-0.0933,-0.0933,-0.0933,-0.0933,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,95.0,1.0,20.0,-0.0933,0.0,-0.0933,-0.0933,-0.0933,-0.0933,1e-06
+M3e earmarked_reserve_dues,release,maximum reserve,0.0,80.0,95.0,2.0,20.0,-0.0933,0.0,-0.0933,-0.0933,-0.0933,-0.0933,1e-06
