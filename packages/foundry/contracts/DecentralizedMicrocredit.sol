@@ -185,6 +185,7 @@ contract DecentralizedMicrocredit is EIP712 {
 
     IERC20 public immutable usdc;
     address public owner;
+    address public pendingOwner; // set by transferOwnership, takes over on acceptOwnership
     address public oracle;
 
     // Interest: every loan's APR is fixed at effrRate + riskPremium when it is created.
@@ -270,6 +271,8 @@ contract DecentralizedMicrocredit is EIP712 {
 
     event ParameterUpdated(bytes32 indexed parameter, uint256 value);
     event LiquidityLimitsUpdated(uint256 bufferBp, uint256 threshold);
+    event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event OracleUpdated(address oracle);
     event ScoreProviderUpdated(address provider);
     event RelayerWhitelisted(address indexed relayer, bool allowed);
@@ -396,6 +399,20 @@ contract DecentralizedMicrocredit is EIP712 {
     }
 
     // ───────────────────────────── admin ─────────────────────────────
+
+    /// @notice Start handing the protocol to `newOwner` (in production a timelock or multisig);
+    ///         it takes effect when `newOwner` calls {acceptOwnership}.
+    function transferOwnership(address newOwner) external onlyOwner {
+        pendingOwner = newOwner;
+        emit OwnershipTransferStarted(owner, newOwner);
+    }
+
+    function acceptOwnership() external {
+        require(msg.sender == pendingOwner, NotOwner());
+        emit OwnershipTransferred(owner, msg.sender);
+        owner = msg.sender;
+        pendingOwner = address(0);
+    }
 
     function setOracle(address _oracle) external onlyOwner {
         require(_oracle != address(0), ZeroAddress());
