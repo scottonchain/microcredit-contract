@@ -27,7 +27,7 @@ export default function PopulatePage() {
   const [numLenders, setNumLenders] = useState(3);
   const [numBorrowers, setNumBorrowers] = useState(25);
   const [includeLenderAttestations, setIncludeLenderAttestations] = useState(true);
-  const [attestationProbability, setAttestationProbability] = useState(75); // 75% chance = 25% chance of not attesting
+  const [attestationProbability, setAttestationProbability] = useState(75); // 75% chance = 25% chance of not backing
   const [nextLoanId, setNextLoanId] = useState(1); // Track the next loan ID to use
 
   // Seeded random number generator
@@ -98,7 +98,7 @@ export default function PopulatePage() {
     setStatus("⏳ Starting population...");
     setProgress(0);
     setCurrentStep(0);
-    setTotalSteps(5); // Deposits, Attestations, PageRank, Borrower Registration, Loans (request + disburse)
+    setTotalSteps(5); // Deposits, Credit lines + backing, (no ranking step), Borrower gas, Loans (request + disburse)
 
     // Verify contract is deployed by trying to read a simple function
     try {
@@ -246,14 +246,14 @@ export default function PopulatePage() {
     setProgress(0.25); // 25% complete after deposits
     setStatus("✅ Deposits complete");
 
-    // 2) Attestations
+    // 2) Credit lines and backing
     setCurrentStep(2);
-    setStatus("⏳ Processing attestations...");
+    setStatus("⏳ Granting credit lines and recording backing...");
     let attestCount = 0;
     let actualLenderToBorrowerAttestations = 0;
     const lenderToLenderAttestations = includeLenderAttestations ? 1 : 0;
     
-    // Lender to Borrower attestations
+    // Lender-to-borrower backing
     // Grant each lender its credit line as the contract owner (Anvil impersonation; local only).
     setStatus("⏳ Granting lenders credit lines...");
     const contractOwner = (await publicClient.readContract({
@@ -293,7 +293,7 @@ export default function PopulatePage() {
       });
       for (let borrowerIndex = 0; borrowerIndex < borrowers.length; borrowerIndex++) {
         const B = borrowers[borrowerIndex];
-        // Apply probability - only attest if random number is within the probability range
+        // Apply probability - only back if random number is within the probability range
         // Use seeded random for reproducible results
         const seed = lenderIndex * 1000 + borrowerIndex;
         const randomValue = seededRandom(seed) * 100;
@@ -301,7 +301,7 @@ export default function PopulatePage() {
           actualLenderToBorrowerAttestations++;
           attestCount++;
           setStatus(`⏳ Lender ${L.address.slice(0, 6)}... backing borrower ${B.address.slice(0, 6)}... (${attestCount}/${actualLenderToBorrowerAttestations + lenderToLenderAttestations})`);
-          setProgress(0.25 + (attestCount / (actualLenderToBorrowerAttestations + lenderToLenderAttestations)) * 0.25); // 25-50% for attestations
+          setProgress(0.25 + (attestCount / (actualLenderToBorrowerAttestations + lenderToLenderAttestations)) * 0.25); // 25-50% for backing
           
           try {
             const txHash = await walletClient.writeContract({ 
@@ -316,22 +316,22 @@ export default function PopulatePage() {
             // Add a small delay between transactions to prevent overwhelming the chain
             await new Promise(resolve => setTimeout(resolve, 100));
           } catch (error) {
-            console.error(`Failed to record attestation from ${L.address} to ${B.address}:`, error);
-            setStatus(`❌ Failed to record attestation ${attestCount}/${actualLenderToBorrowerAttestations + lenderToLenderAttestations}`);
+            console.error(`Failed to record backing from ${L.address} to ${B.address}:`, error);
+            setStatus(`❌ Failed to record backing ${attestCount}/${actualLenderToBorrowerAttestations + lenderToLenderAttestations}`);
             throw error;
           }
         } else {
-          // Skip this attestation based on probability
-          console.log(`Skipping attestation from ${L.address.slice(0, 6)}... to ${B.address.slice(0, 6)}... (probability: ${attestationProbability}%, random: ${randomValue.toFixed(1)})`);
+          // Skip this backing based on probability
+          console.log(`Skipping backing from ${L.address.slice(0, 6)}... to ${B.address.slice(0, 6)}... (probability: ${attestationProbability}%, random: ${randomValue.toFixed(1)})`);
         }
       }
     }
     
-    // Lender to Lender attestations (if enabled)
+    // Lender-to-lender backing (if enabled)
     if (includeLenderAttestations) {
-      setStatus("⏳ Processing lender-to-lender attestations...");
+      setStatus("⏳ Recording lender-to-lender backing...");
       
-      // Randomly select one lender-to-lender attestation
+      // Randomly select one lender-to-lender backing
       if (lenders.length >= 2) {
         // Generate two different random indices using seeded random
         let lender1Index, lender2Index;
@@ -350,8 +350,8 @@ export default function PopulatePage() {
         });
         
         attestCount++;
-        setStatus(`⏳ Lender ${L1.address.slice(0, 6)}... attesting to lender ${L2.address.slice(0, 6)}... (${attestCount}/${actualLenderToBorrowerAttestations + 1})`);
-        setProgress(0.25 + (attestCount / (actualLenderToBorrowerAttestations + 1)) * 0.25); // 25-50% for attestations
+        setStatus(`⏳ Lender ${L1.address.slice(0, 6)}... backing lender ${L2.address.slice(0, 6)}... (${attestCount}/${actualLenderToBorrowerAttestations + 1})`);
+        setProgress(0.25 + (attestCount / (actualLenderToBorrowerAttestations + 1)) * 0.25); // 25-50% for backing
         
         try {
                                 const txHash = await walletClient.writeContract({ 
@@ -366,29 +366,28 @@ export default function PopulatePage() {
           // Add a small delay between transactions to prevent overwhelming the chain
           await new Promise(resolve => setTimeout(resolve, 100));
         } catch (error) {
-          console.error(`Failed to record attestation from ${L1.address} to ${L2.address}:`, error);
-          setStatus(`❌ Failed to record attestation ${attestCount}/${actualLenderToBorrowerAttestations + 1}`);
+          console.error(`Failed to record backing from ${L1.address} to ${L2.address}:`, error);
+          setStatus(`❌ Failed to record backing ${attestCount}/${actualLenderToBorrowerAttestations + 1}`);
           throw error;
         }
       }
     }
-    setProgress(0.5); // 50% complete after attestations
-    setStatus("✅ Attestations recorded");
-
-    // 3) No ranking step: credit comes only from granted lines and backing.
-    setCurrentStep(3);
-    setProgress(0.75);
+    setProgress(0.5); // 50% complete after backing
     setStatus("✅ Credit lines granted and backing recorded");
 
-  // 4) Register Borrowers (so they show up in admin page)
+    // 3) No ranking step: credit comes only from granted lines, dues and backing.
+    setCurrentStep(3);
+    setProgress(0.75);
+
+  // 4) Give borrowers ETH for gas (backing in step 2 already lists them on the admin page)
   setCurrentStep(4);
-  setStatus("⏳ Registering borrowers...");
-  setProgress(0.8); // 80% complete after borrower registration
+  setStatus("⏳ Giving borrowers ETH for gas...");
+  setProgress(0.8); // 80% complete after funding borrowers
   
   for (let i = 0; i < borrowers.length; i++) {
     const B = borrowers[i];
-    setStatus(`⏳ Registering borrower ${i + 1}/${borrowers.length} for ${B.address.slice(0, 6)}...`);
-    setProgress(0.75 + (i / borrowers.length) * 0.05); // 75-80% for borrower registration
+    setStatus(`⏳ Giving borrower ${i + 1}/${borrowers.length} (${B.address.slice(0, 6)}...) ETH for gas...`);
+    setProgress(0.75 + (i / borrowers.length) * 0.05); // 75-80% for funding borrowers
     
     try {
       // Give borrower some ETH for gas
@@ -403,18 +402,17 @@ export default function PopulatePage() {
         }) 
       });
       
-      // Note: Borrowers will be automatically registered when they receive attestations
-      // The recordAttestation function adds both attester and borrower to the PageRank nodes
-      // For now, we'll skip explicit registration and let the attestations handle it
-      console.log(`✅ Borrower ${B.address} will be registered via attestations`);
+      // No registration step: back() in step 2 adds borrowers to getBackedBorrowers, which the
+      // admin page lists.
+      console.log(`✅ Borrower ${B.address} funded with ETH for gas`);
       
     } catch (error) {
-      console.error(`Failed to register borrower ${B.address}:`, error);
-      setStatus(`❌ Failed to register borrower ${i + 1}/${borrowers.length}`);
+      console.error(`Failed to fund borrower ${B.address}:`, error);
+      setStatus(`❌ Failed to fund borrower ${i + 1}/${borrowers.length}`);
     }
   }
-  setProgress(0.8); // 80% complete after borrower registration
-  setStatus("✅ Borrowers registered");
+  setProgress(0.8); // 80% complete after funding borrowers
+  setStatus("✅ Borrowers funded");
 
     // 5) Loan Requests and Disbursements - Borrowers request loans for 80% or 100% of their max amount
   setCurrentStep(5);
@@ -512,7 +510,7 @@ export default function PopulatePage() {
   const lenderToLenderAttestationsCreated = includeLenderAttestations && lenders.length >= 2 ? 1 : 0;
   const totalAttestationsCreated = actualLenderToBorrowerAttestations + lenderToLenderAttestationsCreated;
   const totalDeposited = lenderDeposits.reduce((sum, deposit) => sum + Number(deposit) / 1e6, 0);
-  setStatus(`🎉 Population complete! Created ${numLenders} lenders (total deposits: $${totalDeposited.toFixed(2)}), ${numBorrowers} borrowers, ${totalAttestationsCreated} attestations (${actualLenderToBorrowerAttestations} lender-to-borrower at ${attestationProbability}% probability${includeLenderAttestations ? `, ${lenderToLenderAttestationsCreated} lender-to-lender` : ''}), and ${loanRequestsCreated} loan requests (all disbursed).`);
+  setStatus(`🎉 Population complete! Created ${numLenders} lenders (total deposits: $${totalDeposited.toFixed(2)}), ${numBorrowers} borrowers, ${totalAttestationsCreated} backings (${actualLenderToBorrowerAttestations} lender-to-borrower at ${attestationProbability}% probability${includeLenderAttestations ? `, ${lenderToLenderAttestationsCreated} lender-to-lender` : ''}), and ${loanRequestsCreated} loan requests (all disbursed).`);
   }
 
   if (loading) return (
@@ -615,16 +613,16 @@ export default function PopulatePage() {
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
             <label htmlFor="includeLenderAttestations" className="ml-2 block text-sm text-gray-700">
-              Include lender-to-lender attestations
+              Include lender-to-lender backing
             </label>
           </div>
           <p className="text-xs text-gray-600 mt-1">
-            When enabled, one random lender will attest to another random lender, creating a single lender-to-lender trust relationship.
+            When enabled, one random lender backs another with 10 USDC of its credit.
           </p>
         </div>
         <div className="mt-4">
           <label htmlFor="attestationProbability" className="block text-sm font-medium text-gray-700 mb-2">
-            Lender-to-Borrower Attestation Probability: {attestationProbability}%
+            Lender-to-Borrower Backing Probability: {attestationProbability}%
           </label>
           <input
             id="attestationProbability"
@@ -636,15 +634,15 @@ export default function PopulatePage() {
             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
           />
           <p className="text-xs text-gray-600 mt-1">
-            Probability that a lender will attest to a borrower. Lower values create more realistic, sparse attestation networks.
+            Probability that a lender backs a given borrower. Lower values give fewer, sparser backings.
           </p>
         </div>
         <div className="mt-4 p-3 bg-blue-100 rounded-md">
           <p className="text-sm text-blue-800">
-            <strong>Summary:</strong> This will create {numLenders} lenders (each depositing $400) and {numBorrowers} borrowers, 
-            resulting in ~{Math.round((numLenders * numBorrowers * attestationProbability) / 100)} lender-to-borrower attestations (at {attestationProbability}% probability)
-            {includeLenderAttestations && numLenders >= 2 && `, plus 1 random lender-to-lender attestation`}
-            {includeLenderAttestations && numLenders < 2 && ` (lender-to-lender attestations skipped - need at least 2 lenders)`}
+            <strong>Summary:</strong> This will create {numLenders} lenders (each given a full credit line to back from) and {numBorrowers} borrowers, 
+            resulting in ~{Math.round((numLenders * numBorrowers * attestationProbability) / 100)} lender-to-borrower backings (at {attestationProbability}% probability)
+            {includeLenderAttestations && numLenders >= 2 && `, plus 1 random lender-to-lender backing`}
+            {includeLenderAttestations && numLenders < 2 && ` (lender-to-lender backing skipped: needs at least 2 lenders)`}
             , and borrowers will request loans for 80% or 100% of their maximum allowed amount. Total funding pool: ${numLenders * 400}.
           </p>
         </div>

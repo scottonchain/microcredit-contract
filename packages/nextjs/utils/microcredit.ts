@@ -10,6 +10,8 @@ export const MICROCREDIT_ADDRESS = deployment.DecentralizedMicrocredit.address a
 export const MICROCREDIT_ABI = deployment.DecentralizedMicrocredit.abi;
 export const USDC_ADDRESS = deployment.MockUSDC?.address as `0x${string}` | undefined;
 export const USDC_ABI = deployment.MockUSDC?.abi;
+/** OracleScoreProvider ABI. Read its live address from DecentralizedMicrocredit.scoreProvider(). */
+export const SCORE_PROVIDER_ABI = deployment.OracleScoreProvider.abi;
 
 /** Raw JSON-RPC endpoint for local-only tooling that calls anvil_* methods directly. */
 export const ANVIL_RPC_URL = "http://127.0.0.1:8545";

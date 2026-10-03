@@ -25,7 +25,8 @@ const LendPage: NextPage = () => {
   const [usdcBalance, setUsdcBalance] = useState<bigint>(0n);
   // Allowance no longer needed in permit-only flow
   const [withdrawAmount, setWithdrawAmount] = useState("");
-  // "Max" withdraws every share (the contract treats maxUint256 as "everything"), leaving no dust.
+  // "Max" takes what can be paid now (maxWithdrawable). When that is the whole balance it withdraws
+  // every share instead (the contract treats maxUint256 as "everything"), leaving no dust.
   const [withdrawAll, setWithdrawAll] = useState(false);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -83,7 +84,14 @@ const LendPage: NextPage = () => {
     functionName: "lenderPrincipal",
     args: [connectedAddress as `0x${string}` | undefined],
   });
-  const refetchLenderPosition = () => Promise.all([refetchLenderBalance(), refetchLenderPrincipal()]);
+  // What a withdrawal pays out now; any larger amount is queued and paid as loans are repaid.
+  const { data: maxWithdrawable, refetch: refetchMaxWithdrawable } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "maxWithdrawable",
+    args: [connectedAddress as `0x${string}` | undefined],
+  });
+  const refetchLenderPosition = () =>
+    Promise.all([refetchLenderBalance(), refetchLenderPrincipal(), refetchMaxWithdrawable()]);
 
   const { data: poolApyBp } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
@@ -93,6 +101,12 @@ const LendPage: NextPage = () => {
   const { data: loanRateBp } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "getLoanRate",
+  });
+
+  // Funded by a share of repaid interest; pays uncovered default losses before the share price moves.
+  const { data: firstLossReserve } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "firstLossReserve",
   });
   
   const poolRatePercent = poolApyBp !== undefined ? (Number(poolApyBp) / 100).toFixed(2) : undefined;
@@ -446,6 +460,13 @@ const LendPage: NextPage = () => {
                 <div className="text-sm text-gray-600">Total (Deposits + Interest)</div>
               </div>
             </div>
+            <p className="text-sm text-gray-600 text-center mt-4">
+              First-loss reserve:{" "}
+              <span className="font-semibold">
+                {firstLossReserve !== undefined ? formatUSDC(firstLossReserve) : "-"}
+              </span>
+              , pays default losses before your balance
+            </p>
 
             {/* Deposit Funds */}
             <div className="divider my-6"></div>
@@ -518,7 +539,7 @@ const LendPage: NextPage = () => {
             {/* Caption: one approval, no gas */}
             <p className="text-xs text-gray-500 mt-2">One approval, no gas. We’ll ask you to approve this deposit; our relayer handles the transaction.</p>
 
-            <p className="text-xs text-gray-500 mt-3">*Interest is credited to the pool as borrowers repay. The Funding Pool APY is a projection from current utilisation, net of the protocol fee.</p>
+            <p className="text-xs text-gray-500 mt-3">*Interest is credited to the pool as borrowers repay. The Funding Pool APY is a projection from current utilisation, net of the protocol fee and the reserve share.</p>
             
 
             
@@ -545,9 +566,15 @@ const LendPage: NextPage = () => {
                   />
                   <button
                     type="button"
+                    disabled={maxWithdrawable === 0n}
                     onClick={() => {
-                      setWithdrawAmount((Number(lenderBalance) / 1e6).toFixed(2));
-                      setWithdrawAll(true);
+                      if (maxWithdrawable !== undefined && maxWithdrawable < lenderBalance) {
+                        setWithdrawAmount((Number(roundDownToCent(maxWithdrawable)) / 1e6).toFixed(2));
+                        setWithdrawAll(false);
+                      } else {
+                        setWithdrawAmount((Number(lenderBalance) / 1e6).toFixed(2));
+                        setWithdrawAll(true);
+                      }
                     }}
                     className="btn btn-outline"
                   >
@@ -567,6 +594,13 @@ const LendPage: NextPage = () => {
                     {withdrawLoading ? "Withdrawing..." : "Withdraw"}
                   </button>
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Available to withdraw now:{" "}
+                  <span className="font-semibold">
+                    {maxWithdrawable !== undefined ? formatUSDC(maxWithdrawable) : "-"}
+                  </span>
+                  . Larger amounts are queued and paid as loans are repaid.
+                </p>
               </>
             )}
           </div>
