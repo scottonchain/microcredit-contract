@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast";
 import { AddressInput } from "~~/components/scaffold-eth";
 import { DocumentDuplicateIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { useAddressDisplayName } from "~~/hooks/useAddressDisplayName";
+import { useUsdcWrite } from "~~/hooks/useUsdc";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 import { relayerErrorMessage } from "~~/utils/contractErrors";
@@ -71,7 +72,7 @@ function BackForm() {
     args: [connectedAddress, (borrower || undefined) as `0x${string}` | undefined],
   });
   const { writeContractAsync: writeCreditAsync } = useScaffoldWriteContract({ contractName: "DecentralizedMicrocredit" });
-  const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({ contractName: "MockUSDC" });
+  const writeUsdc = useUsdcWrite();
 
   const amount = parseUsdc(amountInput);
   const backedNow = currentBacking ? currentBacking[0] + currentBacking[1] : 0n;
@@ -112,7 +113,7 @@ function BackForm() {
     if (!connectedAddress || stakeShortfall === 0n) return;
     setStakeLoading(true);
     try {
-      await writeUsdcAsync({ functionName: "approve", args: [MICROCREDIT_ADDRESS, stakeShortfall] });
+      await writeUsdc("approve", [MICROCREDIT_ADDRESS, stakeShortfall]);
       await writeCreditAsync({ functionName: "stake", args: [stakeShortfall] });
       await refreshCredit();
       toast.success(`Staked ${formatUSDC(stakeShortfall)}`, { position: "top-center" });

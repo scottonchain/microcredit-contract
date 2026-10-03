@@ -11,7 +11,7 @@ import { formatUSDC } from "~~/utils/format";
 import { relayerErrorMessage } from "~~/utils/contractErrors";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
-import { MICRO_DOMAIN, TYPES, USDC_PERMIT_DOMAIN, splitSignature } from "~~/utils/eip712";
+import { MICRO_DOMAIN, type PermitDomain, TYPES, readPermitDomain, splitSignature } from "~~/utils/eip712";
 import {
   CHAIN_ID,
   LENS_ABI,
@@ -142,39 +142,21 @@ const BorrowPage: NextPage = () => {
 
   const publicClient = usePublicClient({ chainId: CHAIN_ID });
 
-  // Cache USDC token name for EIP-2612 domain (avoid hardcoding to prevent invalid signatures)
-  const [usdcTokenName, setUsdcTokenName] = useState<string | undefined>(undefined);
+  // The token's EIP-2612 domain, read from the token and checked against its DOMAIN_SEPARATOR
+  // (MockUSDC and Circle's USDC differ in name and version).
+  const [usdcPermitDomain, setUsdcPermitDomain] = useState<PermitDomain | undefined>(undefined);
   useEffect(() => {
     let cancelled = false;
-    const loadName = async () => {
-      try {
-        if (!publicClient || !USDC_ADDRESS || !USDC_ABI) return;
-        const name = (await publicClient.readContract({
-          address: USDC_ADDRESS,
-          abi: USDC_ABI,
-          functionName: "name",
-          args: [],
-        })) as string;
-        if (!cancelled) setUsdcTokenName(name);
-      } catch (e) {
-        // Fallback handled below with default name
-        console.warn("Unable to read USDC token name; falling back to 'USD Coin'", e);
-      }
-    };
-    loadName();
+    if (!publicClient || !USDC_ADDRESS) return;
+    readPermitDomain(publicClient, USDC_ADDRESS, CHAIN_ID)
+      .then(domain => {
+        if (!cancelled) setUsdcPermitDomain(domain);
+      })
+      .catch(e => console.error("Unable to read the USDC permit domain", e));
     return () => {
       cancelled = true;
     };
   }, [publicClient]);
-
-  // Dev-only domain sanity: warn if token name differs
-  useEffect(() => {
-    if (usdcTokenName && process.env.NODE_ENV !== "production") {
-      if (usdcTokenName !== "USD Coin") {
-        console.warn(`[permit-domain] USDC token name is "${usdcTokenName}". Ensure relayer & client use the exact same domain name.`);
-      }
-    }
-  }, [usdcTokenName]);
 
   // Note: No approval fallback. Repayments require ERC-2612 permit. Dev escape hatch is intentionally disabled by default.
 
@@ -264,7 +246,6 @@ const BorrowPage: NextPage = () => {
   const borrowAndDisburseTypes = { BorrowAndDisburse: TYPES.BorrowAndDisburse };
 
   // ERC-2612 permit domain; uses the on-chain token name when available ("USD Coin" for MockUSDC).
-  const usdcPermitDomain = USDC_ADDRESS ? USDC_PERMIT_DOMAIN(CHAIN_ID, USDC_ADDRESS, usdcTokenName) : undefined;
   const permitTypes = { Permit: TYPES.Permit };
 
   // Preview loan terms when amount or repayment period changes
@@ -788,7 +769,7 @@ const BorrowPage: NextPage = () => {
                         console.count("permit:sign");
                         signingRef.current = true;
                         const permitSig = await signTypedDataAsync({
-                          domain: usdcPermitDomain as any,
+                          domain: usdcPermitDomain,
                           types: permitTypes as any,
                           primaryType: "Permit",
                           message: permitMsg as any,
@@ -913,7 +894,7 @@ const BorrowPage: NextPage = () => {
                           console.count("permit:sign");
                           signingRef.current = true;
                           const permitSig = await signTypedDataAsync({
-                            domain: usdcPermitDomain as any,
+                            domain: usdcPermitDomain,
                             types: permitTypes as any,
                             primaryType: "Permit",
                             message: permitMsg as any,

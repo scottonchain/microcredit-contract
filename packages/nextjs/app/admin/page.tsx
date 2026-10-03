@@ -11,6 +11,7 @@ import { createPublicClient, formatUnits, http, isAddress, parseUnits, zeroAddre
 import { localhost } from "viem/chains";
 import Link from "next/link";
 import { useIsAdmin } from "~~/hooks/useIsAdmin";
+import { useUsdcWrite } from "~~/hooks/useUsdc";
 import {
   ANVIL_RPC_URL,
   CHAIN_ID,
@@ -182,7 +183,7 @@ const FirstLossReservePanel = ({ isOwner }: { isOwner: boolean }) => {
     functionName: "firstLossReserve",
   });
   const { writeContractAsync } = useScaffoldWriteContract({ contractName: "DecentralizedMicrocredit" });
-  const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({ contractName: "MockUSDC" });
+  const writeUsdc = useUsdcWrite();
 
   const newBps = parseFixed(shareInput, 2); // a percentage with two decimals is a number of basis points
   const shareTooHigh = newBps !== null && maxReserveBps !== undefined && newBps > maxReserveBps;
@@ -221,7 +222,7 @@ const FirstLossReservePanel = ({ isOwner }: { isOwner: boolean }) => {
     if (!fundAmount) return;
     setBusy("fund");
     try {
-      await writeUsdcAsync({ functionName: "approve", args: [MICROCREDIT_ADDRESS, fundAmount] });
+      await writeUsdc("approve", [MICROCREDIT_ADDRESS, fundAmount]);
       await writeContractAsync({ functionName: "fundReserve", args: [fundAmount] });
       setFundInput("");
     } catch (error) {

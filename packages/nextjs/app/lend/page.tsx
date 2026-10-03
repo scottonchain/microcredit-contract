@@ -12,7 +12,8 @@ import { BanknotesIcon, PlusIcon, EyeIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import HowItWorks from "~~/components/HowItWorks";
-import { MICRO_DOMAIN, TYPES, USDC_PERMIT_DOMAIN, roundDownToCent, splitSignature } from "~~/utils/eip712";
+import { useUsdcBalance } from "~~/hooks/useUsdc";
+import { MICRO_DOMAIN, TYPES, readPermitDomain, roundDownToCent, splitSignature } from "~~/utils/eip712";
 import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
 
 const LendPage: NextPage = () => {
@@ -30,7 +31,6 @@ const LendPage: NextPage = () => {
   const [withdrawAll, setWithdrawAll] = useState(false);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [mintLoading, setMintLoading] = useState(false);
 
   // Helper function to safely parse deposit amount to BigInt (snap to cent)
   const parseDepositAmount = (amount: string): bigint | null => {
@@ -61,10 +61,6 @@ const LendPage: NextPage = () => {
   const { data: usdcAddress } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "usdc",
-  });
-
-  const { writeContractAsync: writeUSDCAsync } = useScaffoldWriteContract({
-    contractName: "MockUSDC",
   });
 
   const publicClient = usePublicClient({ chainId: CHAIN_ID });
@@ -148,9 +144,12 @@ const LendPage: NextPage = () => {
   const availableLoans: bigint[] = [];
 
   // Read USDC balance and allowance
-  const { data: usdcBalanceData, refetch: refetchUsdcBalance } = useScaffoldReadContract({
-    contractName: "MockUSDC",
-    functionName: "balanceOf",
+  const { data: usdcBalanceData, refetch: refetchUsdcBalance } = useUsdcBalance(connectedAddress);
+
+  // Payouts the token refused to deliver to this address (e.g. while Circle had it blacklisted).
+  const { data: heldPayout, refetch: refetchHeldPayout } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "unclaimedPayouts",
     args: [connectedAddress as `0x${string}` | undefined],
   });
 
@@ -183,7 +182,7 @@ const LendPage: NextPage = () => {
       let permitPayload: { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` } | undefined;
       try {
         const usdcAddr = (usdcAddress || USDC_ADDRESS) as `0x${string}` | undefined;
-        if (!usdcAddr || !USDC_ABI) throw new Error("Missing USDC config");
+        if (!usdcAddr) throw new Error("Missing USDC config");
 
         const permitNonce = (await publicClient.readContract({
           address: usdcAddr,
@@ -192,16 +191,7 @@ const LendPage: NextPage = () => {
           args: [lender],
         })) as bigint;
 
-        // Try to read token name; fallback to USD Coin
-        let tokenName = "USD Coin";
-        try {
-          tokenName = (await publicClient.readContract({
-            address: usdcAddr,
-            abi: USDC_ABI,
-            functionName: "name",
-            args: [],
-          })) as string;
-        } catch {}
+        const permitDomain = await readPermitDomain(publicClient, usdcAddr, CHAIN_ID);
 
         const permitMsg = {
           owner: lender,
@@ -212,7 +202,7 @@ const LendPage: NextPage = () => {
         } as const;
 
         const sigPermit = await signTypedDataAsync({
-          domain: USDC_PERMIT_DOMAIN(CHAIN_ID, usdcAddr, tokenName) as any,
+          domain: permitDomain,
           types: { Permit: TYPES.Permit } as any,
           primaryType: "Permit",
           message: permitMsg as any,
@@ -322,84 +312,6 @@ const LendPage: NextPage = () => {
     }
   };
 
-  const handleClaimYield = async () => {
-    // TODO: Implement claim yield functionality when contract is updated
-  };
-
-  const handleDebugDeposit = async () => {
-    if (!connectedAddress) return;
-    
-    try {
-      console.log("🔍 Debugging deposit for address:", connectedAddress);
-      console.log("🔍 Lender balance from contract:", lenderBalance);
-      console.log("🔍 Pool info:", poolInfo);
-      console.log("🔍 USDC balance:", usdcBalance);
-      // allowance removed in permit-only flow
-      
-      // Force refetch all data
-      await Promise.all([refetchPoolInfo(), refetchLenderPosition(), refetchUsdcBalance()]);
-      
-      console.log("🔍 After refetch - Lender balance:", lenderBalance);
-      console.log("🔍 After refetch - Pool info:", poolInfo);
-      console.log("🔍 After refetch - USDC balance:", usdcBalance);
-      // console.log("🔍 After refetch - USDC allowance:", usdcAllowance);
-      
-      // Check if user has any USDC
-      if (usdcBalance === 0n) {
-        console.log("🔍 User has no USDC balance. They need to mint some first.");
-        setErrorMessage("You have no USDC balance. Please use the 'Mint 1000 USDC' button to get some test tokens.");
-      } else {
-        console.log("🔍 User has USDC balance:", formatUSDC(usdcBalance));
-      }
-      
-      // Permit-only flow, no allowance needed
-      
-    } catch (error) {
-      console.error("Debug error:", error);
-    }
-  };
-
-  const handleMintUSDC = async () => {
-    if (!connectedAddress) return;
-    
-    setMintLoading(true);
-    try {
-      const mintAmount = BigInt(1000 * 1e6); // Mint 1000 USDC
-      console.log("🔍 Minting", formatUSDC(mintAmount), "to", connectedAddress);
-      
-      await writeUSDCAsync({
-        functionName: "mint",
-        args: [connectedAddress, mintAmount],
-      });
-      
-      // Refetch balance after minting
-      await refetchUsdcBalance();
-      setErrorMessage(null);
-      
-      // Auto-approve after minting for convenience
-      if (MICROCREDIT_ADDRESS) {
-        console.log("🔍 Auto-approving USDC spending for DecentralizedMicrocredit...");
-        try {
-          const maxAmount = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
-          await writeUSDCAsync({
-            functionName: "approve",
-            args: [MICROCREDIT_ADDRESS, maxAmount],
-          });
-          // no allowance in permit-only flow
-          console.log("🔍 Auto-approval successful");
-        } catch (approvalError) {
-          console.log("🔍 Auto-approval failed, user can approve manually:", approvalError);
-        }
-      }
-      
-    } catch (error: any) {
-      console.error("Mint error:", error);
-      setErrorMessage(`Mint failed: ${error?.message || "Unknown error"}`);
-    } finally {
-      setMintLoading(false);
-    }
-  };
-
   // Attestation submit removed
 
   // imported helpers handle color & formatting
@@ -498,6 +410,27 @@ const LendPage: NextPage = () => {
               {" · "}Realised pool return since launch:{" "}
               <span className="font-semibold">{poolReturnPct !== undefined ? `${poolReturnPct.toFixed(2)}%` : "-"}</span>
             </p>
+            {heldPayout !== undefined && heldPayout > 0n && (
+              <div className="alert alert-warning mt-4">
+                <span>
+                  {formatUSDC(heldPayout)} of your withdrawals could not be delivered: the USDC token refused the
+                  transfer to this address. It is held for you and can be claimed once the token allows it.
+                </span>
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    try {
+                      await writeContractAsync({ functionName: "claimPayout", args: [connectedAddress as `0x${string}`] });
+                      await Promise.all([refetchHeldPayout(), refetchUsdcBalance()]);
+                    } catch (e: any) {
+                      setErrorMessage(`Claim failed: ${e?.message || "Unknown error"}`);
+                    }
+                  }}
+                >
+                  Claim
+                </button>
+              </div>
+            )}
 
             {/* Deposit Funds */}
             <div className="divider my-6"></div>
