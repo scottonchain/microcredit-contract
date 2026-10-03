@@ -260,7 +260,7 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         assertEq(credit.protocolFees(), fee);
         assertEq(credit.firstLossReserve(), reserve);
         assertEq(credit.totalAssets(), POOL + interest - fee - reserve);
-        assertEq(credit.duesPaid(brighton), interest - fee, "the reserve share protects lenders, so it counts as dues");
+        assertEq(credit.duesPaid(brighton), reserve, "only the reserve share counts as dues");
     }
 
     /// @dev The reserve pays what stake does not recover, before the share price moves.
@@ -308,6 +308,36 @@ contract LoanLifecycleTest is MicrocreditTestBase {
 
         assertEq(credit.firstLossReserve(), 0);
         assertEq(credit.totalAssets(), POOL, "lenders lose nothing");
+    }
+
+    /// @dev The reserve is a junior claim: a provision it can absorb leaves the share price where
+    ///      it is, and its cash is lent like any other.
+    function testReserveAbsorbsProvisionsBeforeTheSharePrice() public {
+        address institution = makeAddr("institution");
+        usdc.mint(institution, 50e6);
+        vm.startPrank(institution);
+        usdc.approve(address(credit), 50e6);
+        credit.fundReserve(50e6);
+        vm.stopPrank();
+        assertEq(credit.lenderCash(), POOL + 50e6, "reserve cash is pool cash");
+
+        address dana = makeAddr("dana");
+        _backWithCredit(carol, dana, 30e6);
+        vm.prank(dana);
+        uint256 loanId = credit.requestLoan(30e6);
+        credit.disburseLoan(loanId);
+        vm.warp(_dueAt(loanId) + 1);
+        credit.impairLoan(loanId);
+        assertEq(credit.totalAssets(), POOL, "the provision is inside the reserve");
+
+        vm.prank(owner);
+        vm.expectRevert(DecentralizedMicrocredit.ExceedsReserve.selector);
+        credit.releaseReserve(20e6 + 1); // 30 of the 50 are absorbing the provision
+
+        vm.warp(_defaultableAt(loanId));
+        credit.markDefaulted(loanId);
+        assertEq(credit.totalAssets(), POOL);
+        assertEq(credit.firstLossReserve(), 20e6);
     }
 
     function testReserveSettersAreBoundedAndOwnerOnly() public {
