@@ -380,12 +380,31 @@ The protocol forbids passing on received backing. That is the one-hop restrictio
 network, where Avery's line to Brighton and Brighton's line to Carlos together let Carlos borrow
 along the path: borrowing capacity between two agents is the max-flow between them, and a default
 is paid along the path, each intermediary compensating the next and losing the link to the
-defaulter (Karlan et al. 2009). The bound of Theorem 2 survives (every edge is still a commitment
-of its source's own credit), and Dandekar et al. (2011) show such networks keep liquidity within a
+defaulter (Karlan et al. 2009). Dandekar et al. (2011) show such networks keep liquidity within a
 constant factor of a central currency on well-connected graphs; Ramseyer, Goel and Mazières (2020)
 add aggregate borrowing limits per agent that bound what a defaulting coalition can cost the rest.
-Multi-hop routing would raise honest liquidity, at the cost of path selection on-chain or a
-routing proof from the caller. It is the right extension once one-hop backing is in use.
+
+`analysis/liquidity` measures the price of the restriction on small-world, preferential-attachment
+and community graphs (1,000 accounts, 20% holding a line, trust 25 per edge, loans of 50):
+
+- **One hop costs about half the liquidity.** In the steady state of repeated loans, the share of
+  borrowers without credit who can borrow is 0.41 under one hop and 0.83 under two hops on the
+  small-world graph (2.0 to 3.1 times one-hop across graphs); two hops close 71 to 86% of the gap
+  to a central pool, three hops 93 to 99%. To match two-hop liquidity, one hop needs about twice as
+  much issued credit, and by Theorem 2 a proportionally larger loss bound.
+- **The gain comes from relaying, and relaying moves liability to people who did not choose it.**
+  About half of multi-hop volume enters the borrower through an account that holds no credit of its
+  own, and a similar share is supplied by credit holders not adjacent to the borrower, who are
+  charged on default for a borrower they never chose. If every intermediary must stand behind its
+  hop with credit of its own, multi-hop liquidity collapses to exactly one-hop liquidity.
+- **The Sybil bound holds in every regime.** Attacker extraction equals the cut and is identical for
+  1 and for 1,000 Sybil accounts, at most the attack edges times the trust per edge.
+
+So multi-hop routing is a liquidity gain bought with a different liability rule: holders must
+accept charges for borrowers reached through intermediaries they trust. That is a product and
+legal decision as much as a technical one (path selection on-chain or a routing proof, roughly
+1.5 to 8 storage slots more per routed loan). The one-hop rule keeps every charge on an account
+that chose the borrower (CI-20).
 
 ## 7. Lender fairness
 

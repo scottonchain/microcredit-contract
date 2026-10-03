@@ -1,0 +1,5 @@
+regime,target_static,q_onehop_static,issuance_multiple_static,target_steady,q_onehop_steady,issuance_multiple_steady
+2-hop,0.978333,0.513636,2.56818,0.828,0.425,2.125
+3-hop,1,0.545455,2.72727,0.9575,0.621311,3.10656
+unbounded,1,0.545455,2.72727,0.999,0.763636,3.81818
+centralised,1,0.545455,2.72727,1,0.763636,3.81818
