@@ -409,7 +409,14 @@ contract LoanAccountingTest is MicrocreditTestBase {
     }
 
     function testLimitSettersValidateBounds() public {
+        uint256 premium = credit.riskPremium();
+        uint256 effr = credit.effrRate();
         vm.startPrank(owner);
+        vm.expectRevert(DecentralizedMicrocredit.AboveOneHundredPercent.selector);
+        credit.setEffrRate(10_000 - premium + 1); // APR above 100%
+        vm.expectRevert(DecentralizedMicrocredit.AboveOneHundredPercent.selector);
+        credit.setRiskPremium(10_000 - effr + 1);
+        credit.setRiskPremium(10_000 - effr);
         vm.expectRevert(DecentralizedMicrocredit.AboveOneHundredPercent.selector);
         credit.setLendingUtilizationCap(10_001);
         vm.expectRevert(DecentralizedMicrocredit.AboveOneHundredPercent.selector);
