@@ -134,12 +134,40 @@ Sybil influence in credit networks and in SybilLimit-style defences, where it is
 
 *The role of coverage $\kappa$.* The proof uses only $\kappa\le1$, so with fixed lines the bound
 would hold even with $\kappa=1$. Coverage matters when the issuer revises a line downward, or a
-backer defaults: it stops new borrowing against credit that is no longer there, so the bound holds
-with the line in force at the time each exposure is created (CI-15).
+backer defaults: it stops new borrowing against credit that is no longer there (CI-15).
+
+**Theorem 2' (lines that change).** Let $\ell^*(a)$ be the highest line the account has held since
+it last had no open loans and no backing commitments. Then at every time
+$U \le \sum_a \big(\ell^*(a)+d(a)\big)$.
+
+*Proof.* Lowering a line does not change the left side of $Q(a)$, so $Q(a)$ keeps holding with the
+highest line in place of the current one; raising it only helps. When the account has no open
+loans and no commitments, $r(a)=c(a)=0$ and its potential exposure is zero, so the maximum can
+restart there. Summing as before gives the bound on $U$. $\square$
+
+The bound is in terms of $\ell^*$, not the current line, and that difference is an attack: an
+issuer that raises one account's line, lets it borrow, lowers it and raises another's keeps the
+sum of current lines constant while $\sum\ell^*$ grows with every rotation. Section 4.2 shows how
+the issuance budget is charged on $\ell^*$ for exactly this reason.
 
 **Machine checks.** `test/invariant/CreditConservation.invariant.t.sol` checks Theorems 1 and 2,
-Sybil independence and solvency under random interleavings of every operation, including
-defaults; `SybilResistance.t.sol` pins the named attacks.
+the per-account invariant $Q$, Sybil independence and solvency under random interleavings of
+every operation, including defaults; `SybilResistance.t.sol` pins the named attacks.
+
+**Simulation.** `analysis/sybil_sim` runs each attack against each mechanism with the contract's
+arithmetic. Attacker net profit in USDC at 1 and 64 attacker accounts (fee 10%, reserve 30%):
+
+| Attack | Old PageRank | "25% of principal" rule | Implemented |
+| --- | --- | --- | --- |
+| Ring of fresh accounts (pure ring) | 0 → 305 | 0 → 0 | 0 → 0 |
+| $100 deposit roots, withdrawn (pure ring) | 0 → 5,818 | 0 → 0 | 0 → 0 |
+| Recycled stake seed, interest-free repayments, 4 cycles | n/a | 100 → 6,400 | 0 → 0 |
+| Recycled stake seed, 30-day repayments | n/a | 24 → 1,551 | −0.54 → −34 |
+| Collusive backer with a 100 line | 190 → 886 | 100 → 100 | 100 → 100 |
+| Lender who also borrows (A7), lender share 50% | n/a | 18 → 1,182 | −3.73 → −239 |
+
+The collusive backer's 100 is its own issued line, which Theorem 2 charges to the issuer; it does
+not grow with accounts.
 
 ### What is left to attack
 
@@ -210,14 +238,21 @@ default first. With $\pi$ = reserve share the attacker's profit per unit of inte
 $r-1+s(1-f-r)\le -f\le 0$ for every $s$, and the default it can fund is absorbed by the reserve it
 funded (`testAttackerWhoIsAlsoALenderCannotFarmDues`, which fails under the old rule).
 
-*The residual case.* The reserve is pooled. If other borrowers' defaults exhaust it between an
-attacker's interest payment and its own default, while the attacker holds lender share $s$, the
-attacker has also collected $s$ of the protection its contribution gave the pool, and its profit
-per unit of interest becomes $r-1+s(1-f)$. That is positive only when $s>(1-r)/(1-f)$: with the
-deployed $r=0.3$ and $f=0$, an attacker must own more than 70% of the pool, wait for an exogenous
-loss larger than the reserve, and gains at most $s-0.7$ of the interest it paid. A per-account
-earmark (each account's dues absorb only that account's losses) removes even this; it is tracked
-as CI-21, with the cost that earmarked dues never return to lenders as general protection.
+*The residual case.* The reserve is pooled, so an attacker that is also a lender holding share
+$s$ can collect $s$ of its own contribution back if the reserve shrinks between its interest
+payment and its default. The simulation derives the gain in closed form and checks it on a
+256-point grid: per unit of interest it is $r-1+s(1-f)$ once the farm's contribution has fully
+left the reserve, positive only when $s>(1-r)/(1-f)$ (70% of the pool at the deployed $r=0.3$,
+$f=0$). The reserve can shrink two ways:
+
+- *An owner release.* This gave an absolute profit (+1.87 per account per 100 USDC-year at
+  $s=90\%$). Closed in ce99679: `releaseReserve` keeps all dues ever paid, so only external
+  capital and surplus can be released.
+- *Other borrowers' defaults.* Here the gain is a loss transfer under stress, not a profit: at
+  $s=90\%$ the attacker still loses 0.65 per account (against 2.52 without the farm), and a
+  lender who sees the defaults coming does better by exiting. Earmarking the reserve behind dues
+  in use removes it in simulation, at the cost that the earmarked part stops cushioning other
+  defaults (CI-21).
 
 **What the protocol does.** `duesPaid[borrower]` accumulates the reserve share of every interest
 payment and is added to granted credit; it is lost on default, like everything else the account
@@ -239,12 +274,18 @@ Diamond (1984) is the standard account of why this works only if the issuer bear
 own judgement: a delegated monitor needs a contract that makes misreporting costly. The protocol
 implements the first half and specifies the second:
 
-- **Issuance budget (implemented).** `OracleScoreProvider` keeps the sum of the scores it has
-  published and rejects a report that would take the total above `maxTotalScore`. Total
-  oracle-issued credit is therefore at most `maxTotalScore` × `maxLoanAmount` / `SCALE`, and by
-  Theorem 2 so is lenders' exposure to the oracle. A compromised workflow can misallocate its
-  budget; it cannot mint beyond it. This is the bound the reviewer asked for ("a compromised
-  workflow can misallocate but cannot mint credit"), stated in terms Theorem 2 makes exact.
+- **Issuance budget (implemented).** A budget on the sum of current scores is not enough: by
+  Theorem 2' exposure is bounded by each account's highest line since its line was last unused,
+  and a compromised workflow could rotate one budget through many accounts in consecutive
+  reports. So `OracleScoreProvider` charges the budget on that highest line: lowering a score cuts
+  the account's credit at once, but its budget stays held (`budgetHeld`) until `releaseBudget`
+  sees the account with no open loans and no backing commitments in the pool. The sum of held
+  budget is capped by `maxTotalScore`, and one report may raise it by at most
+  `maxIncreasePerReport`. By Theorem 2', lenders' potential loss on oracle lines is at most
+  `maxTotalScore` × `maxLoanAmount` / `SCALE` at any time; realised losses can recur at most
+  once per line lifetime (a loan's term plus the late period), which is what issuer capital and
+  a governance response are for. `testCompromisedOracleCannotRotateItsBudget` runs the rotation
+  against the real pool.
 - **Pooled first-loss capital (implemented).** Anyone, typically an institution or the operator
   standing behind the lines it issues, can add to the first-loss reserve with `fundReserve`. It
   pays default losses before lenders and is never returned to the payer.
@@ -329,7 +370,7 @@ secured backing, so the provision can be low; the default settles the exact loss
 | Vouching locks the voucher's capacity; default costs the voucher | `back` commits; Theorem 2's charge step |
 | No credit from nothing; no uniform fallback | $\ell=d=s=0 \Rightarrow$ zero capacity; no fallback exists |
 | Repayment grows capacity | Only as dues (Theorem 3 shows larger on-chain rules are farmable); larger lines via issuers |
-| Oracle cannot mint beyond an on-chain bound | Issuance budget in `OracleScoreProvider` |
+| Oracle cannot mint beyond an on-chain bound | Issuance budget charged on held lines (Theorem 2'), rotation test |
 | First-loss reserve | `firstLossReserve` |
 | Default plus run never favours the first exiter | `impairLoan` once past due (CI-8) |
 
