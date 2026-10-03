@@ -1,0 +1,127 @@
+mechanism,attack,variant,world,n,accounts,net_profit,extracted,interest_paid,stake_lost,lender_pnl,honest_lender_loss,honest_stake_lost,honest_credit_burned,honest_capacity_change,protocol_fees,reserve_change,reverted_calls,accounting_residual
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.011,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0221,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.078,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0659,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.1685,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.2956,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.4751,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,unrooted,1,2,175.284,175.284,0.0,0.0,0.0,175.284,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,unrooted,2,3,265.9402,265.9402,0.0,0.0,0.0,265.9402,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,unrooted,4,5,416.6974,416.6974,0.0,0.0,0.0,416.6974,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,unrooted,8,9,662.337,662.337,0.0,0.0,0.0,662.337,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,unrooted,16,17,1007.1474,1007.1474,0.0,0.0,0.0,1007.1474,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,unrooted,32,33,1397.4178,1397.4178,0.0,0.0,0.0,1397.4178,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,unrooted,64,65,1819.3698,1819.3698,0.0,0.0,0.0,1819.3698,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,community,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,15.7713,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,community,2,3,4.8926,4.8926,0.0,0.0,0.0,4.892605,0.0,0.0,15.0877,0.0,0.0,0,-5e-06
+M0 pagerank_vouch,A1 ring,ring + beneficiary,community,4,5,10.502,10.502,0.0,0.0,0.0,10.502002,0.0,0.0,12.1483,0.0,0.0,0,-2e-06
+M0 pagerank_vouch,A1 ring,ring + beneficiary,community,8,9,19.4244,19.4244,0.0,0.0,0.0,19.424403,0.0,0.0,9.8651,0.0,0.0,0,-3e-06
+M0 pagerank_vouch,A1 ring,ring + beneficiary,community,16,17,33.1953,33.1953,0.0,0.0,0.0,33.195301,0.0,0.0,3.7615,0.0,0.0,0,-1e-06
+M0 pagerank_vouch,A1 ring,ring + beneficiary,community,32,33,22.4806,22.4806,0.0,0.0,0.0,22.480601,0.0,0.0,-3.1694,0.0,0.0,0,-1e-06
+M0 pagerank_vouch,A1 ring,ring + beneficiary,community,64,65,24.812,24.812,0.0,0.0,0.0,24.812001,0.0,0.0,-9.8656,0.0,0.0,0,-1e-06
+M0 pagerank_vouch,A1 ring,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,demo,2,2,11.3206,11.3206,0.0,0.0,0.0,11.3206,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,demo,4,4,22.6412,22.6412,0.0,0.0,0.0,22.6412,0.0,0.0,-0.0111,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,demo,8,8,38.0952,38.0952,0.0,0.0,0.0,38.0952,0.0,0.0,-0.0111,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,demo,16,16,76.1904,76.1904,0.0,0.0,0.0,76.1904,0.0,0.0,-0.0111,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,demo,32,32,152.3808,152.3808,0.0,0.0,0.0,152.3808,0.0,0.0,-0.3073,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,demo,64,64,304.7616,304.7616,0.0,0.0,0.0,304.7616,0.0,0.0,-0.6455,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,unrooted,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,unrooted,2,2,181.818,181.818,0.0,0.0,0.0,181.818,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,unrooted,4,4,363.636,363.636,0.0,0.0,0.0,363.636,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,unrooted,8,8,727.272,727.272,0.0,0.0,0.0,727.272,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,unrooted,16,16,1454.544,1454.544,0.0,0.0,0.0,1454.544,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,unrooted,32,32,2909.088,2909.088,0.0,0.0,0.0,2909.088,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,unrooted,64,64,5818.176,5818.176,0.0,0.0,0.0,5818.176,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,community,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,community,2,2,106.542,106.542,0.0,0.0,0.0,106.542001,0.0,0.0,-0.9918,0.0,0.0,0,-1e-06
+M0 pagerank_vouch,A1 ring,pure ring,community,4,4,208.6124,208.6124,0.0,0.0,0.0,208.612401,0.0,0.0,-0.7111,0.0,0.0,0,-1e-06
+M0 pagerank_vouch,A1 ring,pure ring,community,8,8,401.9896,401.9896,0.0,0.0,0.0,401.989601,0.0,0.0,-3.0022,0.0,0.0,0,-1e-06
+M0 pagerank_vouch,A1 ring,pure ring,community,16,16,669.7664,669.7664,0.0,0.0,0.0,669.766405,0.0,0.0,-4.424,0.0,0.0,0,-5e-06
+M0 pagerank_vouch,A1 ring,pure ring,community,32,32,1148.7168,1148.7168,0.0,0.0,0.0,1148.716804,0.0,0.0,-5.041,0.0,0.0,0,-4e-06
+M0 pagerank_vouch,A1 ring,pure ring,community,64,64,2046.2528,2046.2528,0.0,0.0,0.0,2046.252805,0.0,0.0,-7.614,0.0,0.0,0,-5e-06
+M0 pagerank_vouch,A2 stranger lift,,demo,1,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0221,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,demo,2,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.0668,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,demo,4,6,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.055,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,demo,8,10,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.1117,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,demo,16,18,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.1418,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,demo,32,34,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.319,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,demo,64,66,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.4952,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,unrooted,1,3,248.265,248.265,0.0,0.0,0.0,248.265,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,unrooted,2,4,350.519,350.519,0.0,0.0,0.0,350.519,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,unrooted,4,6,538.7292,538.7292,0.0,0.0,0.0,538.7292,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,unrooted,8,10,905.6034,905.6034,0.0,0.0,0.0,905.6034,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,unrooted,16,18,1634.6236,1634.6236,0.0,0.0,0.0,1634.6236,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,unrooted,32,34,3089.9858,3089.9858,0.0,0.0,0.0,3089.9858,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,unrooted,64,66,5999.5366,5999.5366,0.0,0.0,0.0,5999.5366,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,community,1,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16.3783,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,community,2,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,15.9775,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,community,4,6,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16.2719,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,community,8,10,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16.8562,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,community,16,18,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16.3569,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,community,32,34,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,15.8441,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,community,64,66,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,15.5285,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,1,2,180.4047,180.4047,0.0,0.0,0.0,180.4047,0.0,0.0,-82.9427,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,2,3,271.2583,271.2583,0.0,0.0,0.0,271.2583,0.0,0.0,-85.6386,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,4,5,432.9378,432.9378,0.0,0.0,0.0,432.9378,0.0,0.0,-87.524,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,8,9,688.377,688.377,0.0,0.0,0.0,688.377,0.0,0.0,-88.4947,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,16,17,1045.7474,1045.7474,0.0,0.0,0.0,1045.7474,0.0,0.0,-89.4847,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,32,33,1430.4418,1430.4418,0.0,0.0,0.0,1430.4418,0.0,0.0,-89.4847,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,64,65,1853.2258,1853.2258,0.0,0.0,0.0,1853.2258,0.0,0.0,-89.4847,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,unrooted,1,2,180.3937,180.3937,0.0,0.0,0.0,180.3937,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,unrooted,2,3,271.2916,271.2916,0.0,0.0,0.0,271.2916,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,unrooted,4,5,432.8538,432.8538,0.0,0.0,0.0,432.8538,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,unrooted,8,9,688.377,688.377,0.0,0.0,0.0,688.377,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,unrooted,16,17,1045.7474,1045.7474,0.0,0.0,0.0,1045.7474,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,unrooted,32,33,1430.4418,1430.4418,0.0,0.0,0.0,1430.4418,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,unrooted,64,65,1853.2258,1853.2258,0.0,0.0,0.0,1853.2258,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,community,1,2,169.9367,169.9367,0.0,0.0,0.0,169.936705,0.0,0.0,14.9409,0.0,0.0,0,-5e-06
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,community,2,3,271.1113,271.1113,0.0,0.0,0.0,271.111303,0.0,0.0,5.8755,0.0,0.0,0,-3e-06
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,community,4,5,433.6842,433.6842,0.0,0.0,0.0,433.684202,0.0,0.0,-146.2832,0.0,0.0,0,-2e-06
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,community,8,9,690.909,690.909,0.0,0.0,0.0,690.909004,0.0,0.0,-372.0738,0.0,0.0,0,-4e-06
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,community,16,17,1048.3378,1048.3378,0.0,0.0,0.0,1048.337804,0.0,0.0,-599.6833,0.0,0.0,0,-4e-06
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,community,32,33,1451.8274,1451.8274,0.0,0.0,0.0,1451.827405,0.0,0.0,-764.9284,0.0,0.0,0,-5e-06
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,community,64,65,1853.2258,1853.2258,0.0,0.0,0.0,1853.225801,0.0,0.0,-874.9783,0.0,0.0,0,-1e-06
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,2,2,181.818,181.818,0.0,0.0,0.0,181.818,0.0,0.0,-87.524,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,4,4,363.636,363.636,0.0,0.0,0.0,363.636,0.0,0.0,-87.524,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,8,8,727.272,727.272,0.0,0.0,0.0,727.272,0.0,0.0,-88.4947,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,16,16,1454.544,1454.544,0.0,0.0,0.0,1454.544,0.0,0.0,-88.4947,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,32,32,2909.088,2909.088,0.0,0.0,0.0,2909.088,0.0,0.0,-89.4847,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,64,64,5818.176,5818.176,0.0,0.0,0.0,5818.176,0.0,0.0,-0.1799,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,unrooted,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,unrooted,2,2,181.818,181.818,0.0,0.0,0.0,181.818,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,unrooted,4,4,363.636,363.636,0.0,0.0,0.0,363.636,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,unrooted,8,8,727.272,727.272,0.0,0.0,0.0,727.272,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,unrooted,16,16,1454.544,1454.544,0.0,0.0,0.0,1454.544,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,unrooted,32,32,2909.088,2909.088,0.0,0.0,0.0,2909.088,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,unrooted,64,64,5818.176,5818.176,0.0,0.0,0.0,5818.176,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,community,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,community,2,2,181.818,181.818,0.0,0.0,0.0,181.818002,0.0,0.0,-367.9617,0.0,0.0,0,-2e-06
+M0 pagerank_vouch,A3 deposit roots,pure ring,community,4,4,363.636,363.636,0.0,0.0,0.0,363.636003,0.0,0.0,-371.7342,0.0,0.0,0,-3e-06
+M0 pagerank_vouch,A3 deposit roots,pure ring,community,8,8,727.272,727.272,0.0,0.0,0.0,727.272001,0.0,0.0,-378.6353,0.0,0.0,0,-1e-06
+M0 pagerank_vouch,A3 deposit roots,pure ring,community,16,16,1454.544,1454.544,0.0,0.0,0.0,1454.544002,0.0,0.0,-321.1185,0.0,0.0,0,-2e-06
+M0 pagerank_vouch,A3 deposit roots,pure ring,community,32,32,2909.088,2909.088,0.0,0.0,0.0,2909.088003,0.0,0.0,-241.8236,0.0,0.0,0,-3e-06
+M0 pagerank_vouch,A3 deposit roots,pure ring,community,64,64,5567.744,5567.744,0.0,0.0,0.0,5567.744005,0.0,0.0,-22.8087,0.0,0.0,0,-5e-06
+M0 pagerank_vouch,A5 collusive backer,,demo,1,2,189.4957,189.4957,0.0,0.0,0.0,189.4957,0.0,0.0,-0.797,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,demo,2,3,261.977,261.977,0.0,0.0,0.0,261.977,0.0,0.0,-0.7842,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,demo,4,5,372.2044,372.2044,0.0,0.0,0.0,372.2044,0.0,0.0,-0.7714,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,demo,8,9,509.756,509.756,0.0,0.0,0.0,509.756,0.0,0.0,-0.9264,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,demo,16,17,647.368,647.368,0.0,0.0,0.0,647.368,0.0,0.0,-0.9922,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,demo,32,33,780.3136,780.3136,0.0,0.0,0.0,780.3136,0.0,0.0,-0.5467,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,demo,64,65,885.9648,885.9648,0.0,0.0,0.0,885.9648,0.0,0.0,-0.2606,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,unrooted,1,2,189.4847,189.4847,0.0,0.0,0.0,189.4847,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,unrooted,2,3,261.977,261.977,0.0,0.0,0.0,261.977,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,unrooted,4,5,372.2044,372.2044,0.0,0.0,0.0,372.2044,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,unrooted,8,9,509.756,509.756,0.0,0.0,0.0,509.756,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,unrooted,16,17,654.248,654.248,0.0,0.0,0.0,654.248,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,unrooted,32,33,780.3136,780.3136,0.0,0.0,0.0,780.3136,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,unrooted,64,65,885.9648,885.9648,0.0,0.0,0.0,885.9648,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,community,1,2,104.7619,104.7619,0.0,0.0,0.0,104.761901,0.0,0.0,16.4339,0.0,0.0,0,-1e-06
+M0 pagerank_vouch,A5 collusive backer,,community,2,3,103.9214,103.9214,0.0,0.0,0.0,103.921401,0.0,0.0,17.3667,0.0,0.0,0,-1e-06
+M0 pagerank_vouch,A5 collusive backer,,community,4,5,103.96,103.96,0.0,0.0,0.0,103.960001,0.0,0.0,2.5186,0.0,0.0,0,-1e-06
+M0 pagerank_vouch,A5 collusive backer,,community,8,9,100.0,100.0,0.0,0.0,0.0,100.000005,0.0,0.0,2.5429,0.0,0.0,0,-5e-06
+M0 pagerank_vouch,A5 collusive backer,,community,16,17,100.0,100.0,0.0,0.0,0.0,100.000005,0.0,0.0,4.4809,0.0,0.0,0,-5e-06
+M0 pagerank_vouch,A5 collusive backer,,community,32,33,100.0,100.0,0.0,0.0,0.0,100.000005,0.0,0.0,15.5001,0.0,0.0,0,-5e-06
+M0 pagerank_vouch,A5 collusive backer,,community,64,65,100.0,100.0,0.0,0.0,0.0,100.000005,0.0,0.0,15.2817,0.0,0.0,0,-5e-06

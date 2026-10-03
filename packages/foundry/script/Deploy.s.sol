@@ -3,15 +3,16 @@ pragma solidity ^0.8.30;
 
 import { Script, console } from "forge-std/Script.sol";
 import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
+import { MicrocreditLens } from "../contracts/MicrocreditLens.sol";
 import { MockUSDC } from "../contracts/MockUSDC.sol";
-import { OracleScoreProvider } from "../contracts/OracleScoreProvider.sol";
+import { ICreditUsage, OracleScoreProvider } from "../contracts/OracleScoreProvider.sol";
 
 /**
  * @notice Deploys MockUSDC (unless deployment-config.json points at a live one) and
  *         DecentralizedMicrocredit, then seeds the local demo state.
  * @dev Run with `yarn deploy`. Uses Anvil's deterministic accounts:
  *        9 Alexis: deployer, owner, oracle and score reporter (the local stand-in for the
- *          Chainlink CRE forwarder; the Next.js /api/oracle/refresh route publishes as Alexis)
+ *          Chainlink CRE forwarder)
  *        2 Avery: backer, with 92 USDC of granted credit to back others with
  *        3 Brighton: borrower, with a 25 USDC line of his own (from history or an institution)
  *        4 Diana, 5 Eve: background borrowers that bring pool utilisation to 89%
@@ -28,6 +29,12 @@ contract DeployScript is Script {
     uint256 internal constant MAX_LOAN = 100e6; // 100 USDC at a 100% credit score
     uint256 internal constant POOL_SEED = 10_000e6;
     uint256 internal constant MAX_SCORE_AGE = 7 days;
+    // Oracle issuance budget: at most 50 full lines (5,000 USDC at maxLoan 100), half the seeded pool.
+    uint256 internal constant ISSUANCE_BUDGET = 50e6;
+    // Share of interest into the first-loss reserve: covers expected loss at 3% annual default
+    // probability, the most the 500 bps premium prices (analysis/credit_risk). The calibration's
+    // full recommendation, which also builds a 99% buffer over three years, is 5,500.
+    uint256 internal constant RESERVE_BPS = 3_000;
 
     DecentralizedMicrocredit internal credit;
 
@@ -38,10 +45,13 @@ contract DeployScript is Script {
         address usdc = _resolveUsdc();
         credit = new DecentralizedMicrocredit(EFFR_BPS, RISK_PREMIUM_BPS, MAX_LOAN, usdc, alexis);
         console.log("DecentralizedMicrocredit deployed at:", address(credit));
+        console.log("MicrocreditLens deployed at:", address(new MicrocreditLens(credit)));
 
-        OracleScoreProvider scores = new OracleScoreProvider(alexis, alexis, MAX_SCORE_AGE);
+        OracleScoreProvider scores = new OracleScoreProvider(alexis, alexis, MAX_SCORE_AGE, ISSUANCE_BUDGET);
         credit.setScoreProvider(scores);
+        scores.setLending(ICreditUsage(address(credit)));
         console.log("OracleScoreProvider deployed at:", address(scores));
+        credit.setReserveBps(RESERVE_BPS);
 
         // Seed the lending pool.
         MockUSDC(usdc).mint(alexis, POOL_SEED);

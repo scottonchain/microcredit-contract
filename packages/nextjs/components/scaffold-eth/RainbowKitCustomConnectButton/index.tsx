@@ -3,7 +3,7 @@
 // @refresh reset
 import { useEffect, useState } from "react";
 import { Balance } from "../Balance";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useUsdcBalance } from "~~/hooks/useUsdc";
 import { useAccount } from "wagmi";
 import { AddressInfoDropdown } from "./AddressInfoDropdown";
 import { AddressQRCodeModal } from "./AddressQRCodeModal";
@@ -41,19 +41,8 @@ export const RainbowKitCustomConnectButton = () => {
     }
   }, [connectedAddress]);
 
-  // USDC contract address (static) for balance display
-  const { data: usdcAddress } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "usdc" as any,
-  });
-
-  // Fetch USDC balance for connected account using the same logic as lend/page.tsx
-  const { data: usdcBalanceData } = useScaffoldReadContract({
-    contractName: "MockUSDC",
-    functionName: "balanceOf",
-    args: [connectedAddress as `0x${string}`],
-    query: { refetchInterval: 4000, enabled: Boolean(usdcAddress && connectedAddress) },
-  });
+  // USDC balance of the connected account (MockUSDC locally, Circle's USDC on a live chain)
+  const { data: usdcBalanceData } = useUsdcBalance(connectedAddress, 4000);
 
   return (
     <ConnectButton.Custom>

@@ -6,7 +6,10 @@ import { useAccount } from "wagmi";
 import { useIsAdmin } from "~~/hooks/useIsAdmin";
 import { ADMIN_PATHS } from "~~/utils/isAdmin";
 
-/** Sends connected non-admins away from admin-only routes. */
+/**
+ * Sends connected non-admins away from admin-only routes. Redirects only on a definite "not
+ * admin"; while the check is unresolved the admin pages show their loading state.
+ */
 export default function AdminRouteGuard() {
   const pathname = usePathname();
   const router = useRouter();
@@ -14,7 +17,7 @@ export default function AdminRouteGuard() {
   const { admin, loading } = useIsAdmin();
 
   useEffect(() => {
-    // Wait until both the wallet and the admin check have settled.
+    // Wait for a connected wallet and a resolved owner/oracle check (see useIsAdmin).
     if (!isConnected || loading) return;
 
     const wantsAdminArea = ADMIN_PATHS.some(

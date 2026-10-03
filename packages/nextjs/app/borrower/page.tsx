@@ -11,8 +11,16 @@ import { formatUSDC } from "~~/utils/format";
 import { relayerErrorMessage } from "~~/utils/contractErrors";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
-import { MICRO_DOMAIN, TYPES, USDC_PERMIT_DOMAIN, splitSignature } from "~~/utils/eip712";
-import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
+import { MICRO_DOMAIN, type PermitDomain, TYPES, readPermitDomain, splitSignature } from "~~/utils/eip712";
+import {
+  CHAIN_ID,
+  LENS_ABI,
+  LENS_ADDRESS,
+  MICROCREDIT_ABI,
+  MICROCREDIT_ADDRESS,
+  USDC_ABI,
+  USDC_ADDRESS,
+} from "~~/utils/microcredit";
 
 const BorrowPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -24,7 +32,7 @@ const BorrowPage: NextPage = () => {
 
   // Fetch pool info for total participants
   const { data: poolInfo } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
+    contractName: "MicrocreditLens",
     functionName: "getPoolInfo",
   });
 
@@ -42,6 +50,17 @@ const BorrowPage: NextPage = () => {
   const { data: borrowLimit } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "getBorrowLimit",
+    args: [connectedAddress],
+  });
+  // While paused, new loans and disbursements revert (LendingPaused); repayments still work.
+  const { data: lendingPaused } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "paused",
+  });
+  // Interest you have paid (net of the protocol fee): the part of your own credit you earned.
+  const { data: duesPaid } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "duesPaid",
     args: [connectedAddress],
   });
 
@@ -123,39 +142,21 @@ const BorrowPage: NextPage = () => {
 
   const publicClient = usePublicClient({ chainId: CHAIN_ID });
 
-  // Cache USDC token name for EIP-2612 domain (avoid hardcoding to prevent invalid signatures)
-  const [usdcTokenName, setUsdcTokenName] = useState<string | undefined>(undefined);
+  // The token's EIP-2612 domain, read from the token and checked against its DOMAIN_SEPARATOR
+  // (MockUSDC and Circle's USDC differ in name and version).
+  const [usdcPermitDomain, setUsdcPermitDomain] = useState<PermitDomain | undefined>(undefined);
   useEffect(() => {
     let cancelled = false;
-    const loadName = async () => {
-      try {
-        if (!publicClient || !USDC_ADDRESS || !USDC_ABI) return;
-        const name = (await publicClient.readContract({
-          address: USDC_ADDRESS,
-          abi: USDC_ABI,
-          functionName: "name",
-          args: [],
-        })) as string;
-        if (!cancelled) setUsdcTokenName(name);
-      } catch (e) {
-        // Fallback handled below with default name
-        console.warn("Unable to read USDC token name; falling back to 'USD Coin'", e);
-      }
-    };
-    loadName();
+    if (!publicClient || !USDC_ADDRESS) return;
+    readPermitDomain(publicClient, USDC_ADDRESS, CHAIN_ID)
+      .then(domain => {
+        if (!cancelled) setUsdcPermitDomain(domain);
+      })
+      .catch(e => console.error("Unable to read the USDC permit domain", e));
     return () => {
       cancelled = true;
     };
   }, [publicClient]);
-
-  // Dev-only domain sanity: warn if token name differs
-  useEffect(() => {
-    if (usdcTokenName && process.env.NODE_ENV !== "production") {
-      if (usdcTokenName !== "USD Coin") {
-        console.warn(`[permit-domain] USDC token name is "${usdcTokenName}". Ensure relayer & client use the exact same domain name.`);
-      }
-    }
-  }, [usdcTokenName]);
 
   // Note: No approval fallback. Repayments require ERC-2612 permit. Dev escape hatch is intentionally disabled by default.
 
@@ -245,12 +246,11 @@ const BorrowPage: NextPage = () => {
   const borrowAndDisburseTypes = { BorrowAndDisburse: TYPES.BorrowAndDisburse };
 
   // ERC-2612 permit domain; uses the on-chain token name when available ("USD Coin" for MockUSDC).
-  const usdcPermitDomain = USDC_ADDRESS ? USDC_PERMIT_DOMAIN(CHAIN_ID, USDC_ADDRESS, usdcTokenName) : undefined;
   const permitTypes = { Permit: TYPES.Permit };
 
   // Preview loan terms when amount or repayment period changes
   const { data: previewTermsData } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
+    contractName: "MicrocreditLens",
     functionName: "previewLoanTerms",
     args: [
       connectedAddress as `0x${string}` | undefined,
@@ -314,13 +314,13 @@ const BorrowPage: NextPage = () => {
   const defaultableAt = dueAt !== undefined && latePeriod !== undefined ? dueAt + Number(latePeriod) : undefined;
   const formatDate = (secs: number) => new Date(secs * 1000).toLocaleDateString();
 
-  // Outstanding rounded — disable when inactive; keep result object
+  // Outstanding rounded to the cent; the contract returns 0 once the loan is closed.
   const outRoundedRes = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
+    contractName: "MicrocreditLens",
     functionName: "getOutstandingRoundedToCent" as any,
     args: activeLoanId !== undefined ? ([activeLoanId as bigint] as any) : undefined,
     query: {
-      enabled: activeLoanId !== undefined && loanIsActive,
+      enabled: activeLoanId !== undefined,
       refetchOnMount: "always",
       refetchOnWindowFocus: "always",
       staleTime: 0,
@@ -516,6 +516,9 @@ const BorrowPage: NextPage = () => {
           <div className="text-xs text-gray-500 mb-1">Credit Limit</div>
           <div className="text-2xl font-bold">{borrowLimit !== undefined ? formatUSDC(borrowLimit[0]) : "—"}</div>
           <div className="text-xs text-gray-400">your credit + backing</div>
+          {duesPaid !== undefined && duesPaid > 0n && borrowLimit !== undefined && borrowLimit[0] > 0n && (
+            <div className="text-xs text-gray-500 mt-1">includes {formatUSDC(duesPaid)} earned from interest you paid into the reserve</div>
+          )}
         </div>
         <div className="bg-base-100 rounded-lg p-4 shadow text-center">
           <div className="text-xs text-gray-500 mb-1">Max Loan</div>
@@ -575,6 +578,8 @@ const BorrowPage: NextPage = () => {
         </div>
       )}
 
+      {lendingPaused && <div className="alert alert-warning mb-6">New lending is paused. You can still repay.</div>}
+
       {/* Loan Request Form (shown when credit exists and there is no active loan) */}
       {!loanIsActive && hasCredit && (
         <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
@@ -631,6 +636,7 @@ const BorrowPage: NextPage = () => {
             <button
               className="btn btn-primary w-full md:w-auto"
               disabled={
+                lendingPaused ||
                 isLoading ||
                 signingRef.current ||
                 !loanAmount ||
@@ -731,8 +737,8 @@ const BorrowPage: NextPage = () => {
                       if (!publicClient) throw new Error("Missing contracts");
                       // Read canonical outstanding rounded to cent (contract view)
                       const out = (await publicClient.readContract({
-                        address: MICROCREDIT_ADDRESS,
-                        abi: MICROCREDIT_ABI,
+                        address: LENS_ADDRESS,
+                        abi: LENS_ABI,
                         functionName: "getOutstandingRoundedToCent",
                         args: [activeLoanId as bigint],
                       })) as bigint;
@@ -763,7 +769,7 @@ const BorrowPage: NextPage = () => {
                         console.count("permit:sign");
                         signingRef.current = true;
                         const permitSig = await signTypedDataAsync({
-                          domain: usdcPermitDomain as any,
+                          domain: usdcPermitDomain,
                           types: permitTypes as any,
                           primaryType: "Permit",
                           message: permitMsg as any,
@@ -888,7 +894,7 @@ const BorrowPage: NextPage = () => {
                           console.count("permit:sign");
                           signingRef.current = true;
                           const permitSig = await signTypedDataAsync({
-                            domain: usdcPermitDomain as any,
+                            domain: usdcPermitDomain,
                             types: permitTypes as any,
                             primaryType: "Permit",
                             message: permitMsg as any,

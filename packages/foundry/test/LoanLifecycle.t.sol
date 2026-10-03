@@ -233,6 +233,156 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         assertEq(credit.stakeOf(blake), 0);
     }
 
+    // ───────────────────────────── first-loss reserve ─────────────────────────────
+
+    function _repayAll(uint256 loanId) internal {
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        usdc.mint(brighton, owed);
+        vm.startPrank(brighton);
+        usdc.approve(address(credit), owed);
+        credit.repayLoan(loanId, owed);
+        vm.stopPrank();
+    }
+
+    function testReserveTakesItsShareOfInterest() public {
+        vm.startPrank(owner);
+        credit.setProtocolFeeBps(1_000);
+        credit.setReserveBps(2_000);
+        vm.stopPrank();
+
+        uint256 loanId = _borrow(LOAN);
+        vm.warp(vm.getBlockTimestamp() + 180 days);
+        uint256 interest = credit.getCurrentOutstandingAmount(loanId) - LOAN;
+        _repayAll(loanId);
+
+        uint256 fee = (interest * 1_000) / 10_000;
+        uint256 reserve = (interest * 2_000) / 10_000;
+        assertEq(credit.protocolFees(), fee);
+        assertEq(credit.firstLossReserve(), reserve);
+        assertEq(credit.totalAssets(), POOL + interest - fee - reserve);
+        assertEq(credit.duesPaid(brighton), reserve, "only the reserve share counts as dues");
+    }
+
+    /// @dev The reserve pays what stake does not recover, before the share price moves.
+    function testReservePaysUncoveredLossBeforeLenders() public {
+        vm.prank(owner);
+        credit.setReserveBps(5_000);
+        uint256 first = _borrow(LOAN);
+        vm.warp(vm.getBlockTimestamp() + 365 days);
+        _repayAll(first);
+        uint256 reserve = credit.firstLossReserve();
+        uint256 assets = credit.totalAssets();
+        assertGt(reserve, 0);
+
+        // An unsecured loss larger than the reserve: the reserve is used up, lenders take the rest.
+        address dana = makeAddr("dana");
+        _backWithCredit(carol, dana, 30e6);
+        vm.prank(dana);
+        uint256 loanId = credit.requestLoan(30e6);
+        credit.disburseLoan(loanId);
+        vm.warp(_defaultableAt(loanId));
+        credit.markDefaulted(loanId);
+
+        assertEq(credit.firstLossReserve(), 0);
+        assertEq(credit.totalAssets(), assets - (30e6 - reserve));
+    }
+
+    /// @dev An institution standing behind the credit it grants posts first-loss capital.
+    function testAnyoneCanFundTheReserveAndItAbsorbsLossesFirst() public {
+        address institution = makeAddr("institution");
+        usdc.mint(institution, 30e6);
+        vm.startPrank(institution);
+        usdc.approve(address(credit), 30e6);
+        credit.fundReserve(30e6);
+        vm.stopPrank();
+        assertEq(credit.firstLossReserve(), 30e6);
+        assertEq(credit.totalAssets(), POOL, "first-loss capital is not lenders' asset");
+
+        address dana = makeAddr("dana");
+        _backWithCredit(carol, dana, 30e6);
+        vm.prank(dana);
+        uint256 loanId = credit.requestLoan(30e6);
+        credit.disburseLoan(loanId);
+        vm.warp(_defaultableAt(loanId));
+        credit.markDefaulted(loanId);
+
+        assertEq(credit.firstLossReserve(), 0);
+        assertEq(credit.totalAssets(), POOL, "lenders lose nothing");
+    }
+
+    /// @dev The reserve is a junior claim: a provision it can absorb leaves the share price where
+    ///      it is, and its cash is lent like any other.
+    function testReserveAbsorbsProvisionsBeforeTheSharePrice() public {
+        address institution = makeAddr("institution");
+        usdc.mint(institution, 50e6);
+        vm.startPrank(institution);
+        usdc.approve(address(credit), 50e6);
+        credit.fundReserve(50e6);
+        vm.stopPrank();
+        assertEq(credit.lenderCash(), POOL + 50e6, "reserve cash is pool cash");
+
+        address dana = makeAddr("dana");
+        _backWithCredit(carol, dana, 30e6);
+        vm.prank(dana);
+        uint256 loanId = credit.requestLoan(30e6);
+        credit.disburseLoan(loanId);
+        vm.warp(_dueAt(loanId) + 1);
+        credit.impairLoan(loanId);
+        assertEq(credit.totalAssets(), POOL, "the provision is inside the reserve");
+
+        vm.prank(owner);
+        vm.expectRevert(DecentralizedMicrocredit.ExceedsReserve.selector);
+        credit.releaseReserve(20e6 + 1); // 30 of the 50 are absorbing the provision
+
+        vm.warp(_defaultableAt(loanId));
+        credit.markDefaulted(loanId);
+        assertEq(credit.totalAssets(), POOL);
+        assertEq(credit.firstLossReserve(), 20e6);
+    }
+
+    function testReserveSettersAreBoundedAndOwnerOnly() public {
+        uint256 max = credit.MAX_RESERVE_BPS();
+        vm.expectRevert(DecentralizedMicrocredit.NotOwner.selector);
+        credit.setReserveBps(1);
+        vm.expectRevert(DecentralizedMicrocredit.NotOwner.selector);
+        credit.releaseReserve(0);
+
+        vm.startPrank(owner);
+        vm.expectRevert(DecentralizedMicrocredit.ReserveTooHigh.selector);
+        credit.setReserveBps(max + 1);
+        credit.setReserveBps(max);
+        vm.expectRevert(DecentralizedMicrocredit.ExceedsReserve.selector);
+        credit.releaseReserve(1);
+        vm.stopPrank();
+    }
+
+    /// @dev Surplus external capital can go to lenders; dues cannot, since they back earned credit.
+    function testOnlyCapitalBeyondDuesIsReleased() public {
+        vm.prank(owner);
+        credit.setReserveBps(5_000);
+        uint256 loanId = _borrow(LOAN);
+        vm.warp(vm.getBlockTimestamp() + 365 days);
+        _repayAll(loanId);
+        uint256 dues = credit.totalDuesPaid();
+        assertEq(credit.firstLossReserve(), dues);
+
+        address institution = makeAddr("institution");
+        usdc.mint(institution, 10e6);
+        vm.startPrank(institution);
+        usdc.approve(address(credit), 10e6);
+        credit.fundReserve(10e6);
+        vm.stopPrank();
+        uint256 assets = credit.totalAssets();
+
+        vm.startPrank(owner);
+        vm.expectRevert(DecentralizedMicrocredit.ExceedsReserve.selector);
+        credit.releaseReserve(10e6 + 1);
+        credit.releaseReserve(10e6);
+        vm.stopPrank();
+        assertEq(credit.firstLossReserve(), dues);
+        assertEq(credit.totalAssets(), assets + 10e6);
+    }
+
     function testPartialRepaymentReducesTheCharge() public {
         uint256 loanId = _borrow(LOAN);
         vm.warp(vm.getBlockTimestamp() + 2 days);
@@ -298,5 +448,76 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         vm.prank(oneTooMany);
         vm.expectRevert(DecentralizedMicrocredit.TooManyBackers.selector);
         credit.back(brighton, 1e6);
+
+        // A backer that withdraws frees its slot for someone else.
+        vm.prank(makeAddr("backer1"));
+        credit.back(brighton, 0);
+        vm.prank(oneTooMany);
+        credit.back(brighton, 1e6);
+        assertEq(credit.getBackings(brighton).length, max);
+    }
+
+    /// @dev Found by invariant fuzzing: empty or dust edges from fresh accounts could fill a
+    ///      borrower's backer slots for free. Every slot now carries at least MIN_BACKING of real,
+    ///      drawable credit.
+    function testBackerSlotsCannotBeFilledForFree() public {
+        for (uint256 i = 0; i < 40; i++) {
+            vm.prank(makeAddr(string.concat("griefer", vm.toString(i))));
+            credit.back(brighton, 0);
+        }
+        assertEq(credit.getBackings(brighton).length, 1, "only Avery's edge");
+
+        _stake(blake, 1e6);
+        vm.prank(blake);
+        vm.expectRevert(DecentralizedMicrocredit.BackingTooSmall.selector);
+        credit.back(brighton, 1e6 - 1);
+    }
+
+    /// @dev Found by invariant fuzzing: a loan reserved before its borrower defaulted could still be
+    ///      paid out, and a defaulter could still receive backing that parked the backer's credit.
+    function testDefaulterGetsNoNewMoneyOrBacking() public {
+        uint256 first = _borrow(20e6);
+        vm.prank(brighton);
+        uint256 reserved = credit.requestLoan(10e6);
+        vm.warp(_defaultableAt(first));
+        credit.markDefaulted(first);
+
+        vm.expectRevert(DecentralizedMicrocredit.BorrowerInDefault.selector);
+        credit.disburseLoan(reserved);
+        vm.prank(brighton);
+        credit.cancelLoan(reserved);
+
+        _stake(blake, 5e6);
+        vm.prank(blake);
+        vm.expectRevert(DecentralizedMicrocredit.BorrowerInDefault.selector);
+        credit.back(brighton, 5e6);
+    }
+
+    /// @dev Found by invariant fuzzing: with the reserve larger than the pool, a forgiven sub-cent
+    ///      balance took the pool below the reserve and totalAssets underflowed, blocking deposits
+    ///      and loans. The forgiven amount is a loss and is now taken from the reserve first.
+    function testForgivenSubCentCannotBrickThePool() public {
+        address institution = makeAddr("institution");
+        usdc.mint(institution, 2_000e6);
+        vm.startPrank(institution);
+        usdc.approve(address(credit), 2_000e6);
+        credit.fundReserve(2_000e6);
+        vm.stopPrank();
+
+        uint256 loanId = _borrow(LOAN);
+        vm.prank(lender);
+        credit.withdrawFunds(type(uint256).max);
+
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        usdc.mint(brighton, owed);
+        vm.startPrank(brighton);
+        usdc.approve(address(credit), owed - 1);
+        credit.repayLoan(loanId, owed - 1); // a unit short: closes, the unit is forgiven
+        vm.stopPrank();
+        assertEq(uint256(_status(loanId)), uint256(DecentralizedMicrocredit.LoanStatus.Repaid));
+
+        assertEq(credit.totalAssets(), 0);
+        _deposit(carol, 100e6);
+        assertApproxEqAbs(credit.lenderBalance(carol), 100e6, 2);
     }
 }

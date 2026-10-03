@@ -10,16 +10,19 @@ type MicrocreditErrorName = Extract<(typeof MICROCREDIT_ABI)[number], { type: "e
 export const CONTRACT_ERROR_MESSAGES: Record<MicrocreditErrorName, string> = {
   // access & config
   NotOwner: "Only the protocol owner can do this.",
+  LendingPaused: "New lending is paused by the protocol's guardian. Repayments and withdrawals still work.",
   NotOracle: "Only the oracle can do this.",
   UnauthorizedRelayer: "This relayer is not on the allowed list.",
   ZeroAddress: "An address is missing.",
   ZeroAmount: "Enter an amount greater than zero.",
   AboveOneHundredPercent: "The value cannot be more than 100%.",
   FeeTooHigh: "The protocol fee is above its maximum.",
+  ReserveTooHigh: "The reserve share is above its maximum.",
   ScoreTooHigh: "A score cannot be more than 100%.",
   AlreadyVerified: "This address is already KYC-verified.",
   NameTooLong: "Display names can be at most 32 characters.",
   ExceedsAccruedFees: "That is more than the protocol fees collected so far.",
+  ExceedsReserve: "That is more than the first-loss reserve holds.",
   // meta-transactions & permits
   SignatureExpired: "The signed request expired. Please try again.",
   InvalidNonce: "The signed request is out of date. Please try again.",
@@ -40,9 +43,9 @@ export const CONTRACT_ERROR_MESSAGES: Record<MicrocreditErrorName, string> = {
   AprChanged: "The interest rate changed after you signed. Please review and try again.",
   LoanNotRequested: "This loan is not waiting to be paid out.",
   LoanNotActive: "This loan is not active.",
-  LoanClosed: "This loan is closed.",
   NotCancellableYet: "Only the borrower can cancel this loan for now.",
   NotYetDefaultable: "This loan is not overdue long enough to be marked defaulted.",
+  NotOverdue: "This loan is not past its due date yet.",
   NotBorrower: "Only the borrower can do this.",
   WrongBorrower: "This loan belongs to a different borrower.",
   MustSendToBorrower: "Loan funds can only go to the borrower.",
@@ -51,6 +54,7 @@ export const CONTRACT_ERROR_MESSAGES: Record<MicrocreditErrorName, string> = {
   // backing & stake
   SelfBacking: "You cannot back yourself.",
   TooManyBackers: "This borrower already has the maximum number of backers.",
+  BackingTooSmall: "Backing must be at least 1 USDC.",
   InsufficientCredit: "You do not have that much free credit or stake to back with.",
   BackingInUse: "That backing is covering money the borrower still owes. You can lower it once they repay.",
   StakeCommitted: "That stake is committed to backing someone. Withdraw the backing first.",
