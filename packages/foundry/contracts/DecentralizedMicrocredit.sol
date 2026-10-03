@@ -290,6 +290,7 @@ contract DecentralizedMicrocredit is EIP712 {
     /// @dev How a repayment was split; `fee` is the protocol's cut of `interest`.
     event RepaymentApplied(uint256 indexed loanId, uint256 interest, uint256 principal, uint256 fee);
     event ProtocolFeesClaimed(address indexed to, uint256 amount);
+    event ReserveFunded(address indexed from, uint256 amount);
     event ReserveReleased(uint256 amount);
     event Staked(address indexed account, uint256 amount);
     event Unstaked(address indexed account, uint256 amount);
@@ -449,6 +450,15 @@ contract DecentralizedMicrocredit is EIP712 {
         require(bps <= MAX_RESERVE_BPS, ReserveTooHigh());
         reserveBps = bps;
         emit ParameterUpdated("reserveBps", bps);
+    }
+
+    /// @notice Add first-loss capital: an issuer, institution or the operator standing behind the
+    ///         pool's credit. It pays default losses before lenders and is never returned to the payer.
+    function fundReserve(uint256 amount) external {
+        require(amount > 0, ZeroAmount());
+        _pullUsdc(msg.sender, amount);
+        firstLossReserve += amount;
+        emit ReserveFunded(msg.sender, amount);
     }
 
     /// @notice Return part of the first-loss reserve to lenders once it exceeds what the pool needs.
