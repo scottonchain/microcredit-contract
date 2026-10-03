@@ -142,6 +142,8 @@ contract DeployProductionScript is Script {
         }
 
         d.credit.setScoreProvider(d.scores);
+        // The multisig can pause new lending at once; unpausing goes through the timelock.
+        d.credit.setGuardian(cfg.admin);
         d.credit.setReserveBps(cfg.reserveBps);
         d.credit.setProtocolFeeBps(cfg.protocolFeeBps);
         if (cfg.relayer != address(0)) {
@@ -231,6 +233,8 @@ contract DeployProductionScript is Script {
         require(credit.reserveBps() == cfg.reserveBps, "check: reserveBps");
         require(credit.protocolFeeBps() == cfg.protocolFeeBps, "check: protocolFeeBps");
         require(address(credit.scoreProvider()) == address(scores), "check: scoreProvider");
+        require(credit.guardian() == cfg.admin, "check: guardian");
+        require(!credit.paused(), "check: paused");
         require(credit.oracle() == cfg.admin, "check: oracle must be ADMIN");
         require(credit.relayerWhitelistEnabled() == (cfg.relayer != address(0)), "check: relayer whitelist");
         if (cfg.relayer != address(0)) require(credit.relayerWhitelist(cfg.relayer), "check: relayer");

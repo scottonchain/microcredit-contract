@@ -10,6 +10,7 @@ type MicrocreditErrorName = Extract<(typeof MICROCREDIT_ABI)[number], { type: "e
 export const CONTRACT_ERROR_MESSAGES: Record<MicrocreditErrorName, string> = {
   // access & config
   NotOwner: "Only the protocol owner can do this.",
+  LendingPaused: "New lending is paused by the protocol's guardian. Repayments and withdrawals still work.",
   NotOracle: "Only the oracle can do this.",
   UnauthorizedRelayer: "This relayer is not on the allowed list.",
   ZeroAddress: "An address is missing.",

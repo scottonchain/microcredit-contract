@@ -187,6 +187,8 @@ contract DecentralizedMicrocredit is EIP712 {
     IERC20 public immutable usdc;
     address public owner;
     address public pendingOwner; // set by transferOwnership, takes over on acceptOwnership
+    address public guardian; // may pause new lending at once; only the owner unpauses
+    bool public paused; // stops new loans and disbursements; repayments, defaults and exits go on
     address public oracle;
 
     // Interest: every loan's APR is fixed at effrRate + riskPremium when it is created.
@@ -319,6 +321,7 @@ contract DecentralizedMicrocredit is EIP712 {
 
     // access & config
     error NotOwner();
+    error LendingPaused();
     error NotOracle();
     error UnauthorizedRelayer();
     error ZeroAddress();
@@ -415,6 +418,24 @@ contract DecentralizedMicrocredit is EIP712 {
         emit OwnershipTransferred(owner, msg.sender);
         owner = msg.sender;
         pendingOwner = address(0);
+    }
+
+    function setGuardian(address newGuardian) external onlyOwner {
+        guardian = newGuardian;
+        emit ParameterUpdated("guardian", uint256(uint160(newGuardian)));
+    }
+
+    /// @notice Stop new loans and disbursements, e.g. if the oracle or an issuer is compromised.
+    ///         Callable by the guardian, which can act faster than a timelocked owner.
+    function pause() external {
+        require(msg.sender == guardian || msg.sender == owner, NotOwner());
+        paused = true;
+        emit ParameterUpdated("paused", 1);
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+        emit ParameterUpdated("paused", 0);
     }
 
     function setOracle(address _oracle) external onlyOwner {
@@ -1236,6 +1257,7 @@ contract DecentralizedMicrocredit is EIP712 {
      *      the liquidity buffer, then reserves the principal.
      */
     function _originateLoan(address borrower, uint256 amount, uint256 term) internal returns (uint256 loanId) {
+        require(!paused, LendingPaused());
         require(amount > 0, ZeroAmount());
         require(term >= MIN_LOAN_TERM && term <= MAX_LOAN_TERM, InvalidTerm());
         require(defaultedLoans[borrower] == 0, BorrowerInDefault());
@@ -1284,6 +1306,7 @@ contract DecentralizedMicrocredit is EIP712 {
     function _disburseLoan(uint256 loanId, address to) internal returns (uint256 principal) {
         Loan storage loan = loans[loanId];
         require(loan.status == LoanStatus.Requested, LoanNotRequested());
+        require(!paused, LendingPaused());
         require(defaultedLoans[loan.borrower] == 0, BorrowerInDefault());
         loan.status = LoanStatus.Active;
         loan.disbursedAt = block.timestamp;
