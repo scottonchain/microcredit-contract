@@ -10,7 +10,7 @@ import { MockUSDC } from "../contracts/MockUSDC.sol";
  *         DecentralizedMicrocredit, then seeds the local demo state.
  * @dev Run with `yarn deploy`. Uses Anvil's deterministic accounts:
  *        9 Alexis: deployer, owner and oracle
- *        2 Avery: attester
+ *        2 Avery: attester (staked, so her vouch counts)
  *        3 Brighton: borrower
  *        4 Diana, 5 Eve: background borrowers that bring pool utilisation to 89%
  */
@@ -42,19 +42,24 @@ contract DeployScript is Script {
         credit.depositFunds(POOL_SEED);
         console.log("Seeded lending pool with 10,000 USDC");
 
-        // Diana + Eve bring utilisation to 89%: the most we can lend while leaving a slot for
-        // Brighton's 100 USDC demo loan under the 90% cap ($8,899 + $100 <= $9,000).
+        // Diana + Eve bring utilisation to 89%: the most we can lend while leaving room for
+        // a max-size (100 USDC) loan for Brighton under the 90% cap ($8,899 + $100 <= $9,000).
         // Lender APY ~ 8.3% (= 9.33% loan rate x 89% utilisation).
+        // Their loans are far above the first-loan cap, so lift it while seeding them.
+        uint256 firstLoanCap = credit.firstLoanCap();
         credit.setMaxLoanAmount(POOL_SEED);
+        credit.setFirstLoanCap(POOL_SEED);
         _seedBorrower(DIANA_PK, 6_500e6);
         _seedBorrower(EVE_PK, 2_399e6);
         credit.setMaxLoanAmount(MAX_LOAN);
+        credit.setFirstLoanCap(firstLoanCap);
         console.log("Background borrowers: Diana $6,500 + Eve $2,399 = $8,899 lent (89%)");
 
         // Established scores for the operator and the attester, so Avery's attestation
         // carries weight in PageRank.
         credit.setScoreOverride(alexis, 950_000); // 95%
         credit.setScoreOverride(vm.addr(AVERY_PK), 920_000); // 92%
+        _stakeAsAttester(usdc, AVERY_PK, credit.minVouchStake());
 
         _setDisplayName(AVERY_PK, "Avery");
         _setDisplayName(BRIGHTON_PK, "Brighton");
@@ -87,6 +92,17 @@ contract DeployScript is Script {
         vm.startBroadcast(ALEXIS_PK);
 
         credit.disburseLoan(loanId);
+    }
+
+    /// @dev Mints `amount` to `pk` and stakes it, enough for one vouch.
+    function _stakeAsAttester(address usdc, uint256 pk, uint256 amount) internal {
+        MockUSDC(usdc).mint(vm.addr(pk), amount);
+        vm.stopBroadcast();
+        vm.startBroadcast(pk);
+        MockUSDC(usdc).approve(address(credit), amount);
+        credit.stake(amount);
+        vm.stopBroadcast();
+        vm.startBroadcast(ALEXIS_PK);
     }
 
     function _setDisplayName(uint256 pk, string memory name) internal {

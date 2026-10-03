@@ -11,6 +11,7 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
 
     function setUp() public {
         _deploy(750, 250, 10_000e6); // 7.5% EFFR + 2.5% premium, $10k max loan at a 100% score
+        _relaxSybilGuards();
         usdc.mint(owner, 1_000_000e6);
         usdc.mint(borrower, 1_000e6);
         usdc.mint(lender, 1_000_000e6);
@@ -20,7 +21,9 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         credit.depositFunds(500_000e6);
         vm.stopPrank();
 
-        // Give the borrower a PageRank-derived score.
+        // Give the borrower a PageRank-derived score, anchored by a KYC-verified attester.
+        vm.prank(oracle);
+        credit.markKYCVerified(lender);
         vm.prank(lender);
         credit.recordAttestation(borrower, 800_000);
     }
@@ -139,7 +142,11 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         // Fresh pool funded by a single lender.
         vm.prank(owner);
         DecentralizedMicrocredit pool = new DecentralizedMicrocredit(750, 250, type(uint256).max, address(usdc), oracle);
-        vm.startPrank(lender);
+        vm.startPrank(owner);
+        pool.setMinVouchStake(0);
+        pool.setFirstLoanCap(type(uint256).max);
+        vm.stopPrank();
+        vm.startPrank(lender); // the lender's own balance anchors the attestation
         usdc.approve(address(pool), 100_000e6);
         pool.depositFunds(100_000e6);
         pool.recordAttestation(borrower, 800_000);

@@ -34,9 +34,12 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
 
     function setUp() public {
         _deploy(433, 500, 100e6);
+        _relaxSybilGuards();
         _deposit(poolLender, POOL);
         vm.prank(owner);
         credit.setScoreOverride(borrower, 500_000); // 50% -> may borrow up to 50 USDC
+        vm.prank(oracle);
+        credit.markKYCVerified(attester); // trust anchor for attestations
     }
 
     // ───────────────────────────── helpers ─────────────────────────────

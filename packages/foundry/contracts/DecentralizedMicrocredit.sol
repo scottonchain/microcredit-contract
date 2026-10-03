@@ -18,6 +18,10 @@ import { PageRank } from "./PageRank.sol";
  *         Lenders own the pool through non-transferable shares. Interest is recognised when it
  *         is repaid (cash basis): repayments settle accrued interest first, and the interest,
  *         less the protocol fee, raises the share price for every lender.
+ *
+ *         Sybil guards: vouching locks attester stake, trust must flow from an anchor (admin
+ *         override, lender balance or KYC), and a borrower's loans are capped at firstLoanCap
+ *         until one has been repaid in full.
  * @dev DEMO CONTRACT. PageRank is recomputed on-chain after every attestation; in production
  *      that work (and credit score updates) is meant to move to an off-chain oracle.
  */
@@ -201,12 +205,22 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     // Attestations and credit
     mapping(address => Attestation[]) private borrowerAttestations;
+    mapping(address => mapping(address => uint256)) private _attestationSlot; // attester => borrower => index + 1
     address[] private _attesters;
     mapping(address => bool) private _attesterSeen;
     mapping(address => bool) public isKYCVerified;
     // Admin-assigned scores. When non-zero, getCreditScore returns this instead of PageRank.
     mapping(address => uint256) public scoreOverrides;
     mapping(address => string) public displayNames;
+
+    // Sybil guards
+    uint256 public minVouchStake; // USDC an attester must have staked per active vouch
+    uint256 public firstLoanCap; // max principal across a borrower's active loans until one is repaid
+    mapping(address => uint256) public attesterStake;
+    uint256 public totalAttesterStake; // held here, outside the lending pool
+    mapping(address => uint256) public activeVouches; // attestations with weight > 0, per attester
+    mapping(address => uint256) public activeLoanCount; // per borrower, requested and not yet closed
+    mapping(address => uint256) public completedLoans; // per borrower, repaid in full
 
     // Meta-transactions
     mapping(address => uint256) public nonces;
@@ -238,6 +252,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     /// @dev How a repayment was split; `fee` is the protocol's cut of `interest`.
     event RepaymentApplied(uint256 indexed loanId, uint256 interest, uint256 principal, uint256 fee);
     event ProtocolFeesClaimed(address indexed to, uint256 amount);
+    event Staked(address indexed attester, uint256 amount);
+    event Unstaked(address indexed attester, uint256 amount);
     event MetaLoanRequested(address indexed borrower, uint256 amount, uint256 loanId);
     event MetaLoanDisbursed(address indexed borrower, uint256 indexed loanId, uint256 amount);
     event MetaLoanRepaid(address indexed borrower, uint256 indexed loanId, uint256 amount);
@@ -267,6 +283,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         personalizationCap = 100 * 1e6;
         lendingUtilizationCap = 9000; // 90%
         liquidityBuffer = 500; // 5%
+        minVouchStake = 50e6;
+        firstLoanCap = 50e6;
     }
 
     modifier onlyOwner() {
@@ -305,6 +323,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         emit ParameterUpdated("kycBonus", _kycBonus);
     }
 
+    /// @dev A non-zero base makes every graph node a trust anchor of its own, which lets an
+    ///      unanchored Sybil ring score again. Keep it at 0 unless the graph is permissioned.
     function setBasePersonalization(uint256 _base) external onlyOwner {
         basePersonalization = _base;
         emit ParameterUpdated("basePersonalization", _base);
@@ -359,6 +379,18 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         protocolFees -= amount;
         _pushUsdc(to, amount);
         emit ProtocolFeesClaimed(to, amount);
+    }
+
+    /// @notice USDC an attester must stake per active vouch. Applies to new vouches and unstaking.
+    function setMinVouchStake(uint256 amount) external onlyOwner {
+        minVouchStake = amount;
+        emit ParameterUpdated("minVouchStake", amount);
+    }
+
+    /// @notice Max principal across a borrower's active loans until one has been repaid in full.
+    function setFirstLoanCap(uint256 amount) external onlyOwner {
+        firstLoanCap = amount;
+        emit ParameterUpdated("firstLoanCap", amount);
     }
 
     function setRelayerWhitelistEnabled(bool enabled) external onlyOwner {
@@ -470,9 +502,30 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     // ───────────────────────────── attestations & credit ─────────────────────────────
 
+    /// @notice Stake USDC that backs your vouches. It is held outside the lending pool.
+    function stake(uint256 amount) external {
+        require(amount > 0, "Amount > 0");
+        _pullUsdc(msg.sender, amount);
+        attesterStake[msg.sender] += amount;
+        totalAttesterStake += amount;
+        emit Staked(msg.sender, amount);
+    }
+
+    /// @notice Withdraw stake not needed by your active vouches (minVouchStake each).
+    function unstake(uint256 amount) external {
+        uint256 staked = attesterStake[msg.sender];
+        require(amount > 0 && amount <= staked, "Insufficient stake");
+        require(staked - amount >= minVouchStake * activeVouches[msg.sender], "Stake locked by vouches");
+        attesterStake[msg.sender] = staked - amount;
+        totalAttesterStake -= amount;
+        _pushUsdc(msg.sender, amount);
+        emit Unstaked(msg.sender, amount);
+    }
+
     /**
-     * @notice Vouch for `borrower` with confidence `weight` (0..SCALE). Re-attesting updates the
-     *         weight. PageRank is recomputed immediately (demo only).
+     * @notice Vouch for `borrower` with confidence `weight` (0..SCALE); 0 revokes. Each active
+     *         vouch needs minVouchStake staked, and a vouch cannot be lowered or revoked while
+     *         the borrower has an active loan. PageRank is recomputed immediately (demo only).
      */
     function recordAttestation(address borrower, uint256 weight) external {
         _recordAttestation(msg.sender, borrower, weight);
@@ -495,12 +548,32 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
      */
     function getCreditScore(address user) public view returns (uint256) {
         if (scoreOverrides[user] != 0) return scoreOverrides[user];
+        // With no trust anchor in the graph PageRank ranks every node alike: no evidence of trust.
+        if (!pagerankPersonalized) return 0;
 
         uint256 maxPageRank = getMaxPageRankScore();
         if (maxPageRank == 0) return 0;
 
         uint256 x = (pagerankScores[user] * 1000) / maxPageRank; // 0..1000
         return (SCALE * x) / (x + 100);
+    }
+
+    /**
+     * @notice Max total principal across `borrower`'s active loans (score x maxLoanAmount, at
+     *         most firstLoanCap until a loan is repaid in full) and how much of it is unused.
+     */
+    function getBorrowLimit(address borrower) public view returns (uint256 limit, uint256 available) {
+        limit = Math.mulDiv(maxLoanAmount, getCreditScore(borrower), SCALE);
+        if (completedLoans[borrower] == 0 && limit > firstLoanCap) {
+            limit = firstLoanCap;
+        }
+        uint256 active = _activePrincipal(borrower);
+        available = limit > active ? limit - active : 0;
+    }
+
+    function getVouchWeight(address attester, address borrower) public view returns (uint256) {
+        uint256 slot = _attestationSlot[attester][borrower];
+        return slot == 0 ? 0 : borrowerAttestations[borrower][slot - 1].weight;
     }
 
     /// @notice Share of a 5%-of-principal reward pot owed to `attester`, by attestation weight.
@@ -967,8 +1040,11 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         uint256 score = getCreditScore(borrower);
         require(score > 0, "Score > 0");
 
-        uint256 limit = Math.mulDiv(maxLoanAmount, score, SCALE);
-        require(_activePrincipal(borrower) + amount <= limit, "Outstanding loans exceed max");
+        uint256 committed = _activePrincipal(borrower) + amount;
+        require(committed <= Math.mulDiv(maxLoanAmount, score, SCALE), "Outstanding loans exceed max");
+        if (completedLoans[borrower] == 0) {
+            require(committed <= firstLoanCap, "First loan cap exceeded");
+        }
 
         uint256 assets = totalAssets();
         uint256 maxCommitment = (assets * lendingUtilizationCap) / BASIS_POINTS;
@@ -1000,6 +1076,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             _borrowers.push(borrower);
         }
         _borrowerLoans[borrower].push(loanId);
+        activeLoanCount[borrower] += 1;
         emit LoanRequested(borrower, loanId, amount, effrRate + riskPremium);
     }
 
@@ -1052,10 +1129,13 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
-    /// @dev Any principal still unpaid (under a cent, see {_repay}) is written off.
+    /// @dev Closes a repaid loan. Any principal still unpaid (under a cent, see {_repay}) is
+    ///      written off.
     function _closeLoan(Loan storage loan) internal {
         totalLentOut -= loan.principal - loan.principalRepaid;
         loan.isActive = false;
+        activeLoanCount[loan.borrower] -= 1;
+        completedLoans[loan.borrower] += 1;
     }
 
     /// @dev Simple interest on the original principal since origination; none in the first day.
@@ -1074,21 +1154,28 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             _attesters.push(attester);
         }
 
+        uint256 previous = getVouchWeight(attester, borrower);
+        if (weight < previous) {
+            require(activeLoanCount[borrower] == 0, "Vouch locked by active loan");
+        }
+        if (previous == 0 && weight > 0) {
+            activeVouches[attester] += 1;
+            require(attesterStake[attester] >= minVouchStake * activeVouches[attester], "Stake required");
+        } else if (previous > 0 && weight == 0) {
+            activeVouches[attester] -= 1;
+        }
+
         _addPagerankNode(attester);
         _addPagerankNode(borrower);
         _setPagerankEdge(attester, borrower, weight);
 
         Attestation[] storage attests = borrowerAttestations[borrower];
-        bool updated = false;
-        for (uint256 i = 0; i < attests.length; i++) {
-            if (attests[i].attester == attester) {
-                attests[i].weight = weight;
-                updated = true;
-                break;
-            }
-        }
-        if (!updated) {
+        uint256 slot = _attestationSlot[attester][borrower];
+        if (slot == 0) {
             attests.push(Attestation({ attester: attester, weight: weight }));
+            _attestationSlot[attester][borrower] = attests.length;
+        } else {
+            attests[slot - 1].weight = weight;
         }
 
         emit Attested(attester, borrower, weight);
