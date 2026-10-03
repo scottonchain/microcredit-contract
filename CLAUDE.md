@@ -12,7 +12,7 @@ Two packages managed via yarn workspaces:
 - `packages/foundry`: Solidity contracts, Forge tests, deployment scripts
 - `packages/nextjs`: Next.js 15 frontend with App Router
 
-Repo-level `scripts/` holds `start-anvil.sh` (`yarn chain`), `demo.sh` (`yarn demo`), `restart.sh` (`yarn restart`) and the Playwright walkthrough in `scripts/demo/`. `analysis/` holds the Python models behind `docs/CREDIT_MODEL.md`: `sybil_sim` (attacks against each credit mechanism, by number of Sybil accounts) and `credit_risk` (Vasicek calibration of the risk premium and reserve); each has a README, a `run.py` and unittest tests (needs numpy, scipy, matplotlib). `lib/openzeppelin-contracts` is a git submodule and also vendors forge-std (`git submodule update --init --recursive`).
+Repo-level `scripts/` holds `start-anvil.sh` (`yarn chain`), `demo.sh` (`yarn demo`), `restart.sh` (`yarn restart`) and the Playwright walkthrough in `scripts/demo/`. `analysis/` holds the Python models behind `docs/CREDIT_MODEL.md`: `sybil_sim` (attacks against each credit mechanism, by number of Sybil accounts), `credit_risk` (Vasicek calibration of the risk premium and reserve), `issuer_policy` (reference oracle policy: identity-gated, Bayesian, within the held budget) and `liquidity` (the price of one-hop backing against multi-hop credit networks); each has a README, a `run.py` and unittest tests (needs numpy, scipy, matplotlib). `lib/openzeppelin-contracts` is a git submodule and also vendors forge-std (`git submodule update --init --recursive`).
 
 ## Commands
 
