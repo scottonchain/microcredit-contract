@@ -18,12 +18,14 @@ this model are tracked in [`CREDIT_INTEGRITY_ISSUES.md`](CREDIT_INTEGRITY_ISSUES
    account to another; it never creates it. This is "trust is risk" (Litos and Zindros 2017) and
    the one-hop case of a credit network (Karlan, Möbius, Rosenblat and Szeidl 2009; Dandekar et al.
    2011), and the bound is the min-cut between the attacker's accounts and everyone else.
-3. **History alone can earn only what it has paid.** Any on-chain rule that grants a pseudonymous
-   account more credit for a repayment history than the value that history transferred to
-   lenders can be farmed: one seed, recycled across fresh accounts, yields profit linear in the
-   number of accounts (Theorem 3). The reviewer's proposal "repayment raises capacity by 25% of
-   principal" fails this way at zero cost. The largest safe rule is the one implemented: earned
-   credit equals interest paid net of the protocol fee.
+3. **History alone can earn only what it has put out of its own reach.** Any on-chain rule that
+   grants a pseudonymous account more credit for a repayment history than the value that history
+   irrevocably handed to lenders can be farmed: one seed, recycled across fresh accounts, yields
+   profit linear in the number of accounts (Theorem 3). The reviewer's proposal "repayment raises
+   capacity by 25% of principal" fails this way at zero cost. Interest paid to lenders is not
+   enough either: an attacker who is also a lender gets its share back (found by simulation,
+   attack A7). The implemented rule counts only the share of interest paid into the first-loss
+   reserve, which no lender can withdraw and which absorbs the very default it could fund.
 4. **Larger credit from history needs an accountable issuer.** History is information about the
    probability of default; turning it into a larger line requires someone who bears the loss if
    the information is wrong: an institution (delegated monitoring, Diamond 1984) or a costly
@@ -49,7 +51,7 @@ Accounts $a \in \mathcal{A}$ are free to create. For each account the contract s
 | Symbol | Meaning | Contract |
 | --- | --- | --- |
 | $\ell(a)$ | issued line: score × `maxLoanAmount`, from the owner (override) or the oracle | `getCreditScore`, `maxLoanAmount` |
-| $d(a)$ | dues: interest paid on the account's loans, net of the protocol fee | `duesPaid` |
+| $d(a)$ | dues: the share of the interest on the account's loans paid into the first-loss reserve | `duesPaid` |
 | $\lambda(a)$ | credit charged to the account as a backer when borrowers it backed defaulted | `creditLoss` |
 | $\delta(a)$ | 1 once the account has defaulted on a loan of its own | `defaultedLoans` |
 | $G(a) = (1-\delta(a))\max(0,\ \ell(a)+d(a)-\lambda(a))$ | granted credit | `grantedCredit` |
@@ -167,8 +169,8 @@ backs it.
 ### 4.1 History: the dues bound
 
 A history rule $f$ maps an account's on-chain record $h$ (loans taken and repaid) to extra
-credit. Write $\pi(h)$ for the value the history transferred to lenders: interest paid net of the
-protocol fee.
+credit. Write $\pi(h)$ for the value the history put irrevocably on the lenders' side: value the
+account paid and that neither it nor anyone it controls can recover.
 
 **Theorem 3 (farming).** Suppose identities are free, and some history $h$ that a fresh account
 can complete using recyclable capital (capital returned at the end of $h$) has $f(h) > \pi(h)$.
@@ -178,33 +180,50 @@ default on all of them, for profit at least $n\,\big(f(h)-\pi(h)\big)$.
 *Proof.* Secured backing makes $h$ reachable with recyclable capital: stake $K$, back fresh
 account $i$ with it, let $i$ borrow and repay, withdraw the backing (allowed once $i$ owes
 nothing) and repeat with $i+1$. The stake is never slashed. Each account ends with $f(h)$ of credit
-of its own and has paid $\pi(h)$; borrowing $f(h)$ and defaulting nets $f(h)-\pi(h)$ per account. $\square$
+of its own and has given up $\pi(h)$; borrowing $f(h)$ and defaulting nets $f(h)-\pi(h)$ per
+account. $\square$
 
-**Corollary.** Absent identity costs, the largest history rule for which Theorem 2 still holds is
-$f(h)=\pi(h)$: it is safe (it is $d$ in Theorem 2, so earned credit adds no net lender loss),
-and any rule exceeding it on a reproducible history is farmable. This is the on-chain form of
-Friedman and Resnick's (2001) "pay your dues" result for cheap pseudonyms and of Bulow and
+**Corollary.** Absent identity costs, no history rule may exceed $\pi(h)$. This is the on-chain
+form of Friedman and Resnick's (2001) "pay your dues" result for cheap pseudonyms and of Bulow and
 Rogoff's (1989) result that lending cannot rest on reputation alone, only on sanctions: here
 walking away is creating a new address, and there is nothing to sanction. Friedman and Resnick
 also show the dues cost disappears only with identities that cannot be replaced (issued once per
 person by a trusted party), which is exactly the identity-cost route of 4.2. Resnick and Sami
 (2009) show the same tension for transitive trust in general: a protocol that is sybilproof in
-their sense must sometimes refuse transactions that are profitable in expectation. The dues bound
-is that cost, made explicit and minimal.
+their sense must sometimes refuse transactions that are profitable in expectation.
 
 *The reviewer's rule, concretely.* Under "capacity rises by 25% of repaid principal, up to 100",
 seed $K=100$ of stake and four borrow-and-repay cycles inside the 24-hour interest-free window give
 a fresh account 100 of its own capacity at a cost of gas. With $n$ accounts the attacker extracts
-$100n$ and the seed is never at risk. Thirty-day cycles cost about 0.77 each and change nothing.
-The same holds if an oracle reads `completedLoans` and grants credit for it: the policy, not the
-venue, is what is farmable. `analysis/sybil_sim` reproduces this for every mechanism.
+$100n$ and the seed is never at risk (`analysis/sybil_sim`, attack A4: 6,400 USDC at $n=64$).
+Thirty-day cycles cost about 0.77 each and change nothing. The same holds if an oracle reads
+`completedLoans` and grants credit for it: the policy, not the venue, is what is farmable.
 
-**What the protocol does.** `duesPaid[borrower]` accumulates the interest part of every
-repayment net of the protocol fee and is added to granted credit. A borrower who has paid 30 USDC
-of interest has 30 USDC more credit of their own; to extract it by defaulting they must first have
-given it to lenders. It is lost on default, like everything else the account holds. This is
-deliberately small: it is a floor anyone can reach without permission, not the main source of
-credit.
+*What counts as $\pi$.* The first version of this rule counted all interest paid net of the
+protocol fee, on the reasoning that it reached lenders. The simulation found the flaw (attack A7):
+an attacker that is also a lender with pool share $s$ gets $s$ of that interest back through its
+shares, withdraws while its dues-funded loans are still current, and leaves the default to the
+other lenders. Its profit per unit of interest is $s(1-f-r)-f$ for fee share $f$ and reserve share
+$r$, positive for any $s>0$ when $f=0$. Interest to lenders is therefore not out of the payer's
+reach. The reserve share is: lenders cannot withdraw it, and as a junior claim it absorbs the
+default first. With $\pi$ = reserve share the attacker's profit per unit of interest is
+$r-1+s(1-f-r)\le -f\le 0$ for every $s$, and the default it can fund is absorbed by the reserve it
+funded (`testAttackerWhoIsAlsoALenderCannotFarmDues`, which fails under the old rule).
+
+*The residual case.* The reserve is pooled. If other borrowers' defaults exhaust it between an
+attacker's interest payment and its own default, while the attacker holds lender share $s$, the
+attacker has also collected $s$ of the protection its contribution gave the pool, and its profit
+per unit of interest becomes $r-1+s(1-f)$. That is positive only when $s>(1-r)/(1-f)$: with the
+deployed $r=0.3$ and $f=0$, an attacker must own more than 70% of the pool, wait for an exogenous
+loss larger than the reserve, and gains at most $s-0.7$ of the interest it paid. A per-account
+earmark (each account's dues absorb only that account's losses) removes even this; it is tracked
+as CI-21, with the cost that earmarked dues never return to lenders as general protection.
+
+**What the protocol does.** `duesPaid[borrower]` accumulates the reserve share of every interest
+payment and is added to granted credit; it is lost on default, like everything else the account
+holds. At the deployed 30% reserve share, a borrower who pays 10 USDC of interest earns 3 USDC of
+credit of their own. This is deliberately small: it is a floor anyone can reach without
+permission, not the main source of credit.
 
 ### 4.2 Identity cost and institutions
 
@@ -239,19 +258,41 @@ implements the first half and specifies the second:
 Stake is cash. It is the only source that recovers money for lenders on default, and it carries
 no identity assumption at all.
 
-## 5. What backing is worth to lenders
+## 5. What backing is worth to lenders, and what the premium must cover
 
 Burning a backer's credit recovers nothing. For lenders, loss given default on an
 unsecured-backed loan is the same as on an unbacked one; what backing changes is the probability
 of default, because a backer who loses credit when the borrower defaults screens and monitors
-(Stiglitz 1990; Besley and Coate 1995; Ghatak and Guinnane 1999). Two consequences:
+(Stiglitz 1990; Besley and Coate 1995; Ghatak and Guinnane 1999). How large that effect is remains
+an empirical question: Giné and Karlan (2014) found that removing joint liability did not raise
+default in Philippine microcredit groups. So the calibration treats unsecured backing only as a
+lower PD, a hypothesis, and stake as the only loss-reducing security.
 
-- Lenders' protection is stake (secured backing) and the **first-loss reserve**: `reserveBps` of
-  every interest payment accumulates in `firstLossReserve`, which pays the uncovered part of each
-  default before it reaches the share price. Sizing is in `analysis/credit_risk` (Vasicek one-factor
-  model, Monte Carlo for small pools).
-- A single APR for secured and unsecured exposure overprices the first and may underprice the
-  second; risk-based pricing by the secured share is a natural next step (CI-18).
+`analysis/credit_risk` calibrates the pool with the one-factor (Vasicek 2002; Gordy 2003) model,
+the Basel other-retail correlation and a sensitivity grid, with LGD 100% on unsecured principal,
+an explicit conversion between per-loan and annual PD for 30-day loans, and Monte Carlo checks
+for small pools and for re-lending after write-offs. Base case (Basel correlation, 15% return on
+risk capital, 85% utilisation):
+
+| Annual PD | Per 30-day loan | Expected loss | 99.9% loss | Break-even premium | Recommended premium | Reserve share covering EL |
+| --- | --- | --- | --- | --- | --- | --- |
+| 3% | 0.25% | 3.0% | 14.2% | 467 bps | 600 bps | 29% |
+| 5% | 0.42% | 5.0% | 16.8% | 677 bps | 800 bps | 41% |
+| 10% | 0.86% | 10.0% | 23.4% | 1,201 bps | 1,400 bps | 55% |
+
+Consequences for the protocol:
+
+- The deployed 500 bps premium prices annual PD up to about 3% (2.6% once idle liquidity is
+  counted). Microcredit portfolios at 5 to 10% need 800 to 1,400 bps; at correlation 0.15,
+  1,100 to 1,950. The premium is a deployment decision, and this is the table to make it with.
+- A reserve funded from lenders' own interest cannot raise their expected return; it moves losses
+  in time and keeps the share price steady. That is why the reserve is a junior claim inside the
+  pool rather than idle USDC (which would cost 0.36 to 0.56% APY): its cash is lent, and
+  provisions and losses up to its size leave the share price unchanged. External first-loss
+  capital (`fundReserve`) is different: it does raise lenders' expected return.
+- A stake-secured share $q$ of principal scales the required premium by $(1-q)$; 26% secured makes
+  500 bps adequate at PD 5%. Pricing the premium on the unsecured share is CI-18; it needs secured
+  backing locked to the loan it priced, or a backer could swap stake for credit after the fact.
 
 ## 6. Generalisation: multi-hop credit
 
@@ -304,6 +345,8 @@ secured backing, so the provision can be low; the default settles the exact loss
 - Douceur, J. (2002). The Sybil attack. *IPTPS*.
 - Friedman, E. and Resnick, P. (2001). The social cost of cheap pseudonyms. *Journal of Economics and Management Strategy* 10(2).
 - Ghatak, M. and Guinnane, T. (1999). The economics of lending with joint liability: theory and practice. *Journal of Development Economics* 60(1).
+- Giné, X. and Karlan, D. (2014). Group versus individual liability: short and long term evidence from Philippine microcredit lending groups. *Journal of Development Economics* 107.
+- Gordy, M. (2003). A risk-factor model foundation for ratings-based bank capital rules. *Journal of Financial Intermediation* 12(3).
 - Karlan, D., Möbius, M., Rosenblat, T. and Szeidl, A. (2009). Trust and social collateral. *Quarterly Journal of Economics* 124(3).
 - Litos, O. S. T. and Zindros, D. (2017). Trust is risk: a decentralized financial trust platform. *Financial Cryptography and Data Security*.
 - Ramseyer, G., Goel, A. and Mazières, D. (2020). Liquidity in credit networks with constrained agents. *The Web Conference (WWW)*.
