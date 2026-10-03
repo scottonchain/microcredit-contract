@@ -112,13 +112,26 @@ const LendPage: NextPage = () => {
   const poolRatePercent = poolApyBp !== undefined ? (Number(poolApyBp) / 100).toFixed(2) : undefined;
   const loanRatePercent = loanRateBp !== undefined ? (Number(loanRateBp) / 100).toFixed(2) : undefined;
 
-  // Interest is credited to the pool when borrowers repay, so this only grows on repayment.
-  const interestEarned =
-    lenderBalance !== undefined && lenderPrincipal !== undefined
-      ? lenderBalance > lenderPrincipal
-        ? lenderBalance - lenderPrincipal
-        : 0n
+  // Interest is credited to the pool when borrowers repay; losses and provisions on overdue loans
+  // lower it. Negative when the lender is down on its deposits.
+  const netEarnings =
+    lenderBalance !== undefined && lenderPrincipal !== undefined ? lenderBalance - lenderPrincipal : undefined;
+  const netEarningsPct =
+    netEarnings !== undefined && lenderPrincipal !== undefined && lenderPrincipal > 0n
+      ? (Number(netEarnings) / Number(lenderPrincipal)) * 100
       : undefined;
+
+  // Principal lent or reserved, as a share of the pool (basis points).
+  const { data: utilisationBp } = useScaffoldReadContract({
+    contractName: "MicrocreditLens",
+    functionName: "getUtilisation",
+  });
+  // Value now of what 1 USDC bought at launch: the pool's realised return, losses included.
+  const { data: sharePrice } = useScaffoldReadContract({
+    contractName: "MicrocreditLens",
+    functionName: "sharePrice",
+  });
+  const poolReturnPct = sharePrice !== undefined ? (Number(sharePrice) / 1e6 - 1) * 100 : undefined;
 
   // Remove placeholder arrays and fetch on-chain data
   const { data: poolInfo, refetch: refetchPoolInfo } = useScaffoldReadContract({
@@ -436,10 +449,20 @@ const LendPage: NextPage = () => {
                 <div className="text-sm text-gray-600">Your Deposits</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-green-500">
-                  <span className="font-medium">{interestEarned !== undefined ? formatUSDC(interestEarned) : "-"}</span>
+                <div
+                  className={`text-2xl font-bold ${netEarnings !== undefined && netEarnings < 0n ? "text-red-500" : "text-green-500"}`}
+                >
+                  <span className="font-medium">
+                    {netEarnings === undefined
+                      ? "-"
+                      : netEarnings < 0n
+                        ? `-${formatUSDC(-netEarnings)}`
+                        : formatUSDC(netEarnings)}
+                  </span>
                 </div>
-                <div className="text-sm text-gray-600">Interest Earned*</div>
+                <div className="text-sm text-gray-600">
+                  Net Earnings*{netEarningsPct !== undefined ? ` (${netEarningsPct.toFixed(2)}%)` : ""}
+                </div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-purple-500">
@@ -457,7 +480,7 @@ const LendPage: NextPage = () => {
                 <div className="text-2xl font-bold text-orange-500">
                   {lenderBalance !== undefined ? formatUSDC(lenderBalance) : "-"}
                 </div>
-                <div className="text-sm text-gray-600">Total (Deposits + Interest)</div>
+                <div className="text-sm text-gray-600">Current Value</div>
               </div>
             </div>
             <p className="text-sm text-gray-600 text-center mt-4">
@@ -466,6 +489,14 @@ const LendPage: NextPage = () => {
                 {firstLossReserve !== undefined ? formatUSDC(firstLossReserve) : "-"}
               </span>
               , pays default losses before your balance
+            </p>
+            <p className="text-sm text-gray-600 text-center mt-1">
+              Pool utilisation:{" "}
+              <span className="font-semibold">
+                {utilisationBp !== undefined ? `${(Number(utilisationBp) / 100).toFixed(2)}%` : "-"}
+              </span>
+              {" · "}Realised pool return since launch:{" "}
+              <span className="font-semibold">{poolReturnPct !== undefined ? `${poolReturnPct.toFixed(2)}%` : "-"}</span>
             </p>
 
             {/* Deposit Funds */}
@@ -539,7 +570,7 @@ const LendPage: NextPage = () => {
             {/* Caption: one approval, no gas */}
             <p className="text-xs text-gray-500 mt-2">One approval, no gas. We’ll ask you to approve this deposit; our relayer handles the transaction.</p>
 
-            <p className="text-xs text-gray-500 mt-3">*Interest is credited to the pool as borrowers repay. The Funding Pool APY is a projection from current utilisation, net of the protocol fee and the reserve share.</p>
+            <p className="text-xs text-gray-500 mt-3">*Interest is credited to the pool as borrowers repay; default losses beyond the reserve, and provisions on overdue loans, reduce it. The Funding Pool APY is a projection from current utilisation, net of the protocol fee and the reserve share; the realised return is what the pool has actually earned.</p>
             
 
             

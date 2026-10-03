@@ -3953,6 +3953,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getUtilisation",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "maxWithdrawable",
           inputs: [
             {
@@ -3998,6 +4011,19 @@ const deployedContracts = {
             },
             {
               name: "payment",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "sharePrice",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
               type: "uint256",
               internalType: "uint256",
             },

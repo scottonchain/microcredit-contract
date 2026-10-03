@@ -225,6 +225,27 @@ contract ShareAccountingTest is MicrocreditTestBase {
         assertEq(lens.getFundingPoolAPY(), 450);
     }
 
+    /// @dev CI-9: lenders see utilisation and the pool's realised return, losses included.
+    function testLensShowsUtilisationAndRealisedReturn() public {
+        _deposit(alice, 1_000e6);
+        assertEq(lens.sharePrice(), 1e6, "1 USDC at launch is worth 1 USDC");
+        assertEq(lens.getUtilisation(), 0);
+
+        _borrowAndRepayAfterAYear(); // 10 USDC of interest on a 1,000 USDC pool
+        assertApproxEqAbs(lens.sharePrice(), 1.01e6, DUST, "repaid interest is realised");
+
+        uint256 loanId = _openLoan(LOAN);
+        assertEq(lens.getUtilisation(), (LOAN * 10_000) / credit.totalAssets());
+        assertApproxEqAbs(lens.sharePrice(), 1.01e6, DUST, "interest accrued but unpaid is not");
+
+        (,,,, uint256 dueAt) = credit.getLoanTerms(loanId);
+        vm.warp(dueAt + credit.LATE_PERIOD() + 1);
+        credit.markDefaulted(loanId);
+        // No backers and no reserve: the 100 USDC loss falls on the 1,010 USDC pool.
+        assertApproxEqAbs(lens.sharePrice(), 0.91e6, DUST, "an uncovered default is realised too");
+        assertLt(credit.lenderBalance(alice), credit.lenderPrincipal(alice), "Alice is down on her deposit");
+    }
+
     // ───────────────────────────── impairment (run fairness) ─────────────────────────────
 
     /// @dev Hermes, PR #3 round 2: a default plus a run must not let the first exiter take more

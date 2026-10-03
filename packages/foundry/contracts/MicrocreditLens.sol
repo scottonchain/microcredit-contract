@@ -11,6 +11,8 @@ import { DecentralizedMicrocredit } from "./DecentralizedMicrocredit.sol";
  */
 contract MicrocreditLens {
     uint256 internal constant CENT = 10_000; // 0.01 USDC (6 decimals)
+    /// @dev Shares 1 USDC mints in an empty pool (the pool's 6-decimal virtual offset).
+    uint256 internal constant LAUNCH_SHARES_PER_USDC = 1e12;
 
     DecentralizedMicrocredit public immutable credit;
 
@@ -22,12 +24,24 @@ contract MicrocreditLens {
     ///         protocol fee and the reserve share, before default losses. Realised only as
     ///         borrowers repay.
     function getFundingPoolAPY() external view returns (uint256) {
+        uint256 bps = credit.BASIS_POINTS();
+        uint256 grossBp = (credit.getLoanRate() * getUtilisation()) / bps;
+        return (grossBp * (bps - credit.protocolFeeBps() - credit.reserveBps())) / bps;
+    }
+
+    /// @notice Principal lent out or reserved for approved loans, as a share of `totalAssets`, in
+    ///         BASIS_POINTS. Can exceed the utilisation cap after losses shrink `totalAssets`.
+    function getUtilisation() public view returns (uint256) {
         uint256 assets = credit.totalAssets();
         if (assets == 0) return 0;
-        uint256 bps = credit.BASIS_POINTS();
-        uint256 utilisationBp = ((credit.totalLentOut() + credit.reservedLiquidity()) * bps) / assets;
-        uint256 grossBp = (credit.getLoanRate() * utilisationBp) / bps;
-        return (grossBp * (bps - credit.protocolFeeBps() - credit.reserveBps())) / bps;
+        return ((credit.totalLentOut() + credit.reservedLiquidity()) * credit.BASIS_POINTS()) / assets;
+    }
+
+    /// @notice What the shares 1 USDC bought at launch are worth now, in USDC (6 decimals, so
+    ///         1e6 means no change): the pool's realised return since launch, net of the fee, the
+    ///         reserve share, losses and provisions. Interest counts only once repaid.
+    function sharePrice() external view returns (uint256) {
+        return credit.convertToAssets(LAUNCH_SHARES_PER_USDC);
     }
 
     /**
