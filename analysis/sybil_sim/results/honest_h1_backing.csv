@@ -1,0 +1,7 @@
+mechanism,brighton_limit,avery_limit,avery_limit_after_brighton_borrows_50,total_capacity
+M0 pagerank_vouch,89.4847,92.0,92.0,181.4847
+M1 hermes_history,75.0,42.0,42.0,117.0
+M2 conservation,75.0,42.0,42.0,117.0
+M3 conservation_dues,75.0,42.0,42.0,117.0
+M3r conservation_reserve_dues,75.0,42.0,42.0,117.0
+M4 credit_network_multihop,75.0,92.0,42.0,167.0
