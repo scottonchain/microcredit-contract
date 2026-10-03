@@ -30,6 +30,7 @@ contract PageRankVerificationTest is MicrocreditTestBase {
 
     function setUp() public {
         _deploy(500, 2000, 10_000e6);
+        _relaxSybilGuards();
     }
 
     function _attest(address from, address to, uint256 weight) internal {
@@ -143,16 +144,31 @@ contract PageRankVerificationTest is MicrocreditTestBase {
     }
 
     function testCreditScoreCurve() public {
+        vm.prank(oracle);
+        credit.markKYCVerified(NODE1); // the only trust anchor
         _attest(NODE1, NODE2, 800_000);
         _attest(NODE1, NODE3, 400_000);
 
         uint256 maxPr = credit.getMaxPageRankScore();
-        assertEq(maxPr, credit.getPageRankScore(NODE2));
+        assertEq(maxPr, credit.getPageRankScore(NODE1), "the anchor holds the most trust");
         // The top node maps to x = 1000 -> SCALE * 1000 / 1100.
-        assertEq(credit.getCreditScore(NODE2), (SCALE * 1000) / 1100);
+        assertEq(credit.getCreditScore(NODE1), (SCALE * 1000) / 1100);
 
-        uint256 x = (credit.getPageRankScore(NODE3) * 1000) / maxPr;
-        assertEq(credit.getCreditScore(NODE3), (SCALE * x) / (x + 100));
+        address[2] memory vouched = [NODE2, NODE3];
+        for (uint256 i = 0; i < vouched.length; i++) {
+            uint256 x = (credit.getPageRankScore(vouched[i]) * 1000) / maxPr;
+            assertEq(credit.getCreditScore(vouched[i]), (SCALE * x) / (x + 100));
+        }
+        assertGt(credit.getCreditScore(NODE2), credit.getCreditScore(NODE3));
         assertEq(credit.getCreditScore(makeAddr("unknown")), 0);
+    }
+
+    /// @dev Without an anchor PageRank still matches NetworkX (uniform personalization), but a
+    ///      uniform ranking is no evidence of trust, so it yields no credit score.
+    function testUnanchoredGraphGivesNoCreditScore() public {
+        _attest(NODE1, NODE2, 800_000);
+        assertGt(credit.getPageRankScore(NODE2), 0);
+        assertEq(credit.getCreditScore(NODE1), 0);
+        assertEq(credit.getCreditScore(NODE2), 0);
     }
 }

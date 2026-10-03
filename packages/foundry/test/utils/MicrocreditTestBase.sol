@@ -47,6 +47,15 @@ abstract contract MicrocreditTestBase is Test {
         credit = new DecentralizedMicrocredit(effrRate, riskPremium, maxLoanAmount, address(usdc), oracle);
     }
 
+    /// @dev For suites testing other behaviour: vouching needs no stake and first loans are
+    ///      uncapped. SybilResistance.t.sol runs against the defaults.
+    function _relaxSybilGuards() internal {
+        vm.startPrank(owner);
+        credit.setMinVouchStake(0);
+        credit.setFirstLoanCap(type(uint256).max);
+        vm.stopPrank();
+    }
+
     function _deposit(address lender, uint256 amount) internal {
         usdc.mint(lender, amount);
         vm.startPrank(lender);

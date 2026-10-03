@@ -17,6 +17,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
 
     function setUp() public {
         _deploy(750, 250, 10_000e6);
+        _relaxSybilGuards();
         _deposit(makeAddr("poolLender"), 100_000e6);
         vm.prank(owner);
         credit.setScoreOverride(borrower, SCALE);

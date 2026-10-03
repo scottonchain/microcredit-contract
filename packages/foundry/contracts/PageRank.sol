@@ -28,6 +28,9 @@ abstract contract PageRank {
     /// @notice Latest PageRank score per node, scaled to PR_SCALE.
     mapping(address => uint256) public pagerankScores;
     mapping(address => mapping(address => uint256)) private pagerankStochasticEdges;
+    /// @dev Whether the last run had any node with positive personalization weight. Without one
+    ///      the vector falls back to uniform (as NetworkX does), which ranks every node alike.
+    bool internal pagerankPersonalized;
 
     /// @dev Raw (unnormalized) teleportation weight for `node`.
     function _personalizationWeight(address node) internal view virtual returns (uint256);
@@ -89,6 +92,7 @@ abstract contract PageRank {
             }
         }
         delete pagerankNodes;
+        pagerankPersonalized = false;
     }
 
     // ───────────────────────────── computation ─────────────────────────────
@@ -97,14 +101,17 @@ abstract contract PageRank {
         uint256 n = pagerankNodes.length;
         if (n == 0) return 0;
 
-        // Start from the uniform distribution (NetworkX default).
-        uint256 initialScore = PR_SCALE / n;
+        uint256[] memory personalization;
+        (personalization, pagerankPersonalized) = _buildPersonalizationVector();
+
+        // Start from the personalization vector rather than NetworkX's uniform start: the fixed
+        // point is the same, and nodes that no trust reaches stay at exactly zero instead of
+        // decaying towards it until the coarse tolerance stops the iteration.
         for (uint256 i = 0; i < n; i++) {
-            pagerankScores[pagerankNodes[i]] = initialScore;
+            pagerankScores[pagerankNodes[i]] = personalization[i];
         }
 
         _createStochasticGraph();
-        uint256[] memory personalization = _buildPersonalizationVector();
 
         bool converged = false;
         while (iterations < PR_MAX_ITER && !converged) {
@@ -131,9 +138,9 @@ abstract contract PageRank {
 
     /**
      * @dev Each node's weight is {_personalizationWeight}, normalized so the vector sums to
-     *      PR_SCALE. Falls back to uniform when every weight is zero.
+     *      PR_SCALE. Falls back to uniform when every weight is zero (`personalized` false).
      */
-    function _buildPersonalizationVector() private view returns (uint256[] memory vector) {
+    function _buildPersonalizationVector() private view returns (uint256[] memory vector, bool personalized) {
         uint256 n = pagerankNodes.length;
         vector = new uint256[](n);
 
@@ -143,8 +150,9 @@ abstract contract PageRank {
             totalWeight += vector[i];
         }
 
+        personalized = totalWeight > 0;
         for (uint256 i = 0; i < n; i++) {
-            vector[i] = totalWeight == 0 ? PR_SCALE / n : (vector[i] * PR_SCALE) / totalWeight;
+            vector[i] = personalized ? (vector[i] * PR_SCALE) / totalWeight : PR_SCALE / n;
         }
     }
 
