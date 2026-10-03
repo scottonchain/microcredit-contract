@@ -18,18 +18,25 @@ export function useIsAdmin() {
     functionName: "oracle",
   });
 
+  // The guardian needs the admin page to reach its pause button.
+  const { data: guardian } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "guardian",
+  });
+
   const isOwner = !!me && !!owner && me === owner.toLowerCase();
   const isOracle = !!me && !!oracle && me === oracle.toLowerCase();
-  const admin = isOwner || isOracle || isWhitelisted(me);
+  const isGuardian = !!me && !!guardian && me === guardian.toLowerCase();
+  const admin = isOwner || isOracle || isGuardian || isWhitelisted(me);
 
-  // Unknown until the wallet has settled and both reads have returned. Before mount (the server
+  // Unknown until the wallet has settled and the role reads have returned. Before mount (the server
   // render and the first client render) wagmi reports "disconnected" without having tried to
   // reconnect yet. A read that is still disabled (contract address not resolved yet) reports
   // isLoading false with no data, so missing data, not isLoading, marks it as unresolved.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const walletSettling = !mounted || status === "connecting" || status === "reconnecting";
-  const readsPending = owner === undefined || oracle === undefined;
+  const readsPending = owner === undefined || oracle === undefined || guardian === undefined;
   const loading = !admin && (walletSettling || (status === "connected" && readsPending));
 
   return { admin, loading, address, owner, oracle } as const;

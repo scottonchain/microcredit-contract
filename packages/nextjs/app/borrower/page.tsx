@@ -44,6 +44,11 @@ const BorrowPage: NextPage = () => {
     functionName: "getBorrowLimit",
     args: [connectedAddress],
   });
+  // While paused, new loans and disbursements revert (LendingPaused); repayments still work.
+  const { data: lendingPaused } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "paused",
+  });
   // Interest you have paid (net of the protocol fee): the part of your own credit you earned.
   const { data: duesPaid } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
@@ -584,6 +589,8 @@ const BorrowPage: NextPage = () => {
         </div>
       )}
 
+      {lendingPaused && <div className="alert alert-warning mb-6">New lending is paused. You can still repay.</div>}
+
       {/* Loan Request Form (shown when credit exists and there is no active loan) */}
       {!loanIsActive && hasCredit && (
         <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
@@ -640,6 +647,7 @@ const BorrowPage: NextPage = () => {
             <button
               className="btn btn-primary w-full md:w-auto"
               disabled={
+                lendingPaused ||
                 isLoading ||
                 signingRef.current ||
                 !loanAmount ||
