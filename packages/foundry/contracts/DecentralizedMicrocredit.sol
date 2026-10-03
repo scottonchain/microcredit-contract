@@ -251,6 +251,7 @@ contract DecentralizedMicrocredit is EIP712 {
     mapping(address => uint256) public creditCommitted; // granted credit committed to backing, per backer
     mapping(address => uint256) public creditLoss; // backed defaults charged against granted credit
     mapping(address => uint256) public duesPaid; // interest paid on own loans into the first-loss reserve
+    uint256 public totalDuesPaid; // all dues ever paid: the part of the reserve that can never be released
     mapping(address => uint256) public activeLoanCount; // per borrower, requested and not yet closed
     mapping(address => uint256) public completedLoans; // per borrower, repaid in full
     mapping(address => uint256) public defaultedLoans; // per borrower; any default blocks borrowing
@@ -482,10 +483,16 @@ contract DecentralizedMicrocredit is EIP712 {
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
-    /// @notice Hand part of the first-loss reserve to lenders once it exceeds what the pool needs.
-    ///         Only the part not already absorbing provisions on overdue loans can be released.
+    /**
+     * @notice Hand part of the first-loss reserve to lenders once it exceeds what the pool needs:
+     *         only what is beyond both the provisions on overdue loans and all dues ever paid.
+     * @dev Dues back earned credit. Releasing them would let a dominant lender recapture its own
+     *      dues through its shares and then default on the credit they granted
+     *      (docs/CREDIT_MODEL.md 4.1, residual case), so only external capital and surplus are
+     *      releasable.
+     */
     function releaseReserve(uint256 amount) external onlyOwner {
-        require(amount + totalImpaired <= firstLossReserve, ExceedsReserve());
+        require(amount + Math.max(totalImpaired, totalDuesPaid) <= firstLossReserve, ExceedsReserve());
         firstLossReserve -= amount;
         emit ReserveReleased(amount);
     }
@@ -1312,6 +1319,7 @@ contract DecentralizedMicrocredit is EIP712 {
             totalImpaired -= recovered;
             _outstandingPrincipal[loan.borrower] -= principal;
             duesPaid[loan.borrower] += toReserve;
+            totalDuesPaid += toReserve;
             lenderCash += paid - fee;
             protocolFees += fee;
             firstLossReserve += toReserve;

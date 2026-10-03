@@ -4,7 +4,7 @@ pragma solidity ^0.8.30;
 import { Test } from "forge-std/Test.sol";
 import { DecentralizedMicrocredit } from "../../contracts/DecentralizedMicrocredit.sol";
 import { MockUSDC } from "../../contracts/MockUSDC.sol";
-import { OracleScoreProvider } from "../../contracts/OracleScoreProvider.sol";
+import { ICreditUsage, OracleScoreProvider } from "../../contracts/OracleScoreProvider.sol";
 
 /**
  * @dev Shared fixture for DecentralizedMicrocredit tests: deploys the contract against the real
@@ -52,8 +52,10 @@ abstract contract MicrocreditTestBase is Test {
         vm.prank(owner);
         credit = new DecentralizedMicrocredit(effrRate, riskPremium, maxLoanAmount, address(usdc), oracle);
         scores = new OracleScoreProvider(owner, oracle, MAX_SCORE_AGE, ISSUANCE_BUDGET);
-        vm.prank(owner);
+        vm.startPrank(owner);
         credit.setScoreProvider(scores);
+        scores.setLending(ICreditUsage(address(credit)));
+        vm.stopPrank();
     }
 
     /// @dev Publishes `score` for `user` as the off-chain scorer would, in a new epoch.

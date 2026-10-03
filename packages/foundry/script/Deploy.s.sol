@@ -4,7 +4,7 @@ pragma solidity ^0.8.30;
 import { Script, console } from "forge-std/Script.sol";
 import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
 import { MockUSDC } from "../contracts/MockUSDC.sol";
-import { OracleScoreProvider } from "../contracts/OracleScoreProvider.sol";
+import { ICreditUsage, OracleScoreProvider } from "../contracts/OracleScoreProvider.sol";
 
 /**
  * @notice Deploys MockUSDC (unless deployment-config.json points at a live one) and
@@ -47,6 +47,7 @@ contract DeployScript is Script {
 
         OracleScoreProvider scores = new OracleScoreProvider(alexis, alexis, MAX_SCORE_AGE, ISSUANCE_BUDGET);
         credit.setScoreProvider(scores);
+        scores.setLending(ICreditUsage(address(credit)));
         console.log("OracleScoreProvider deployed at:", address(scores));
         credit.setReserveBps(RESERVE_BPS);
 

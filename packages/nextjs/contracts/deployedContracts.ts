@@ -2750,6 +2750,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "totalDuesPaid",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "totalImpaired",
           inputs: [],
           outputs: [
@@ -3978,6 +3991,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "budgetHeld",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "creditScore",
           inputs: [
             {
@@ -4093,6 +4125,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "lending",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract ICreditUsage",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "maxIncreasePerReport",
           inputs: [],
           outputs: [
@@ -4189,6 +4234,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "releaseBudget",
+          inputs: [
+            {
+              name: "users",
+              type: "address[]",
+              internalType: "address[]",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "renounceOwnership",
           inputs: [],
           outputs: [],
@@ -4250,6 +4308,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "setLending",
+          inputs: [
+            {
+              name: "newLending",
+              type: "address",
+              internalType: "contract ICreditUsage",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "setMaxScoreAge",
           inputs: [
             {
@@ -4295,6 +4366,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "totalHeld",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "totalScore",
           inputs: [],
           outputs: [
@@ -4318,6 +4402,25 @@ const deployedContracts = {
           ],
           outputs: [],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "BudgetReleased",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
         },
         {
           type: "event",
@@ -4359,6 +4462,19 @@ const deployedContracts = {
               type: "uint256",
               indexed: false,
               internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "LendingUpdated",
+          inputs: [
+            {
+              name: "lending",
+              type: "address",
+              indexed: false,
+              internalType: "address",
             },
           ],
           anonymous: false,
@@ -4459,6 +4575,11 @@ const deployedContracts = {
         {
           type: "error",
           name: "IssuanceBudgetExceeded",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "LendingNotSet",
           inputs: [],
         },
         {

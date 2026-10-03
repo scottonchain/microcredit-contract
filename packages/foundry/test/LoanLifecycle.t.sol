@@ -356,19 +356,31 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         vm.stopPrank();
     }
 
-    function testReleasedReserveGoesToLenders() public {
+    /// @dev Surplus external capital can go to lenders; dues cannot, since they back earned credit.
+    function testOnlyCapitalBeyondDuesIsReleased() public {
         vm.prank(owner);
         credit.setReserveBps(5_000);
         uint256 loanId = _borrow(LOAN);
         vm.warp(vm.getBlockTimestamp() + 365 days);
         _repayAll(loanId);
-        uint256 reserve = credit.firstLossReserve();
+        uint256 dues = credit.totalDuesPaid();
+        assertEq(credit.firstLossReserve(), dues);
+
+        address institution = makeAddr("institution");
+        usdc.mint(institution, 10e6);
+        vm.startPrank(institution);
+        usdc.approve(address(credit), 10e6);
+        credit.fundReserve(10e6);
+        vm.stopPrank();
         uint256 assets = credit.totalAssets();
 
-        vm.prank(owner);
-        credit.releaseReserve(reserve);
-        assertEq(credit.firstLossReserve(), 0);
-        assertEq(credit.totalAssets(), assets + reserve);
+        vm.startPrank(owner);
+        vm.expectRevert(DecentralizedMicrocredit.ExceedsReserve.selector);
+        credit.releaseReserve(10e6 + 1);
+        credit.releaseReserve(10e6);
+        vm.stopPrank();
+        assertEq(credit.firstLossReserve(), dues);
+        assertEq(credit.totalAssets(), assets + 10e6);
     }
 
     function testPartialRepaymentReducesTheCharge() public {
