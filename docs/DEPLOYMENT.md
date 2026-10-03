@@ -45,6 +45,10 @@ No `--broadcast` happens before all three are recorded.
   goes in `.env` or shell history.
 - If the CRE workflow is ready, you have the chain's forwarder address, the workflow owner and
   the workflow id. If not, leave all three unset.
+- The fork tests pass against Circle's USDC:
+  `BASE_SEPOLIA_RPC_URL=https://sepolia.base.org forge test --match-path 'test/fork/*'`. They
+  cover what MockUSDC does not: USDC's permit domain and its blacklist (CI-27). For another chain,
+  point the suite's USDC constant and RPC at that chain first.
 
 ## Step 1. Dry run
 
@@ -58,8 +62,8 @@ There is no `--broadcast`, so nothing is sent. `--sender` makes the simulated ad
 deployer's real nonce. Check the output:
 
 - The chain id is the target chain, and the deployer is the intended address.
-- The USDC line names the expected token (Circle USDC reports `USD Coin` and `USDC`), and the
-  address matches Circle's list.
+- The USDC line names the expected token (symbol `USDC`; the name is `USD Coin` or `USDC`
+  depending on the chain, e.g. `USDC` on Base Sepolia), and the address matches Circle's list.
 - ADMIN is the multisig.
 - Every parameter matches the approved table. "Most oracle-issued credit lent at once" is the
   approved exposure (`ISSUANCE_BUDGET_LINES x MAX_LOAN`).
