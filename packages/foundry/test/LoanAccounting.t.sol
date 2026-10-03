@@ -324,7 +324,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
     }
 
     function testAdminSettersAreOwnerOnly() public {
-        bytes[] memory calls = new bytes[](12);
+        bytes[] memory calls = new bytes[](16);
         calls[0] = abi.encodeCall(credit.setOracle, (stranger));
         calls[1] = abi.encodeCall(credit.setScoreProvider, (IScoreProvider(stranger)));
         calls[2] = abi.encodeCall(credit.setEffrRate, (1));
@@ -337,6 +337,10 @@ contract LoanAccountingTest is MicrocreditTestBase {
         calls[9] = abi.encodeCall(credit.setScoreOverride, (stranger, 1));
         calls[10] = abi.encodeCall(credit.setProtocolFeeBps, (1));
         calls[11] = abi.encodeCall(credit.claimProtocolFees, (stranger, 0));
+        calls[12] = abi.encodeCall(credit.setReserveBps, (1));
+        calls[13] = abi.encodeCall(credit.releaseReserve, (0));
+        calls[14] = abi.encodeCall(credit.transferOwnership, (stranger));
+        calls[15] = abi.encodeCall(credit.acceptOwnership, ());
 
         for (uint256 i = 0; i < calls.length; i++) {
             vm.prank(stranger);
@@ -344,6 +348,28 @@ contract LoanAccountingTest is MicrocreditTestBase {
             assertFalse(ok);
             assertEq(ret, abi.encodeWithSelector(DecentralizedMicrocredit.NotOwner.selector));
         }
+    }
+
+    /// @dev Production hands the protocol to a timelock or multisig; the handover takes two steps.
+    function testOwnershipTransferNeedsAcceptance() public {
+        address timelock = makeAddr("timelock");
+        vm.prank(owner);
+        credit.transferOwnership(timelock);
+        assertEq(credit.owner(), owner, "pending until accepted");
+        assertEq(credit.pendingOwner(), timelock);
+
+        vm.prank(stranger);
+        vm.expectRevert(DecentralizedMicrocredit.NotOwner.selector);
+        credit.acceptOwnership();
+
+        vm.prank(timelock);
+        credit.acceptOwnership();
+        assertEq(credit.owner(), timelock);
+        assertEq(credit.pendingOwner(), address(0));
+
+        vm.prank(owner);
+        vm.expectRevert(DecentralizedMicrocredit.NotOwner.selector);
+        credit.setRiskPremium(1);
     }
 
     function testLimitSettersValidateBounds() public {
