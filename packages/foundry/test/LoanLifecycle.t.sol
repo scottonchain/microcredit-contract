@@ -448,5 +448,76 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         vm.prank(oneTooMany);
         vm.expectRevert(DecentralizedMicrocredit.TooManyBackers.selector);
         credit.back(brighton, 1e6);
+
+        // A backer that withdraws frees its slot for someone else.
+        vm.prank(makeAddr("backer1"));
+        credit.back(brighton, 0);
+        vm.prank(oneTooMany);
+        credit.back(brighton, 1e6);
+        assertEq(credit.getBackings(brighton).length, max);
+    }
+
+    /// @dev Found by invariant fuzzing: empty or dust edges from fresh accounts could fill a
+    ///      borrower's backer slots for free. Every slot now carries at least MIN_BACKING of real,
+    ///      drawable credit.
+    function testBackerSlotsCannotBeFilledForFree() public {
+        for (uint256 i = 0; i < 40; i++) {
+            vm.prank(makeAddr(string.concat("griefer", vm.toString(i))));
+            credit.back(brighton, 0);
+        }
+        assertEq(credit.getBackings(brighton).length, 1, "only Avery's edge");
+
+        _stake(blake, 1e6);
+        vm.prank(blake);
+        vm.expectRevert(DecentralizedMicrocredit.BackingTooSmall.selector);
+        credit.back(brighton, 1e6 - 1);
+    }
+
+    /// @dev Found by invariant fuzzing: a loan reserved before its borrower defaulted could still be
+    ///      paid out, and a defaulter could still receive backing that parked the backer's credit.
+    function testDefaulterGetsNoNewMoneyOrBacking() public {
+        uint256 first = _borrow(20e6);
+        vm.prank(brighton);
+        uint256 reserved = credit.requestLoan(10e6);
+        vm.warp(_defaultableAt(first));
+        credit.markDefaulted(first);
+
+        vm.expectRevert(DecentralizedMicrocredit.BorrowerInDefault.selector);
+        credit.disburseLoan(reserved);
+        vm.prank(brighton);
+        credit.cancelLoan(reserved);
+
+        _stake(blake, 5e6);
+        vm.prank(blake);
+        vm.expectRevert(DecentralizedMicrocredit.BorrowerInDefault.selector);
+        credit.back(brighton, 5e6);
+    }
+
+    /// @dev Found by invariant fuzzing: with the reserve larger than the pool, a forgiven sub-cent
+    ///      balance took the pool below the reserve and totalAssets underflowed, blocking deposits
+    ///      and loans. The forgiven amount is a loss and is now taken from the reserve first.
+    function testForgivenSubCentCannotBrickThePool() public {
+        address institution = makeAddr("institution");
+        usdc.mint(institution, 2_000e6);
+        vm.startPrank(institution);
+        usdc.approve(address(credit), 2_000e6);
+        credit.fundReserve(2_000e6);
+        vm.stopPrank();
+
+        uint256 loanId = _borrow(LOAN);
+        vm.prank(lender);
+        credit.withdrawFunds(type(uint256).max);
+
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        usdc.mint(brighton, owed);
+        vm.startPrank(brighton);
+        usdc.approve(address(credit), owed - 1);
+        credit.repayLoan(loanId, owed - 1); // a unit short: closes, the unit is forgiven
+        vm.stopPrank();
+        assertEq(uint256(_status(loanId)), uint256(DecentralizedMicrocredit.LoanStatus.Repaid));
+
+        assertEq(credit.totalAssets(), 0);
+        _deposit(carol, 100e6);
+        assertApproxEqAbs(credit.lenderBalance(carol), 100e6, 2);
     }
 }

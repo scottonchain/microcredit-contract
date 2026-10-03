@@ -185,7 +185,7 @@ contract CreditConservationInvariantTest is MicrocreditTestBase {
         uint256 uncovered = exposure > reserve ? exposure - reserve : 0;
         assertLe(
             handler.realisedLoss() + uncovered,
-            issued + handler.reserveReleased() + handler.totalRoundingDust(),
+            issued + handler.reserveReleased() + handler.reserveForgiven() + handler.totalRoundingDust(),
             "I8: lenders bear loss beyond the issued lines"
         );
     }
@@ -377,7 +377,7 @@ contract CreditConservationInvariantTest is MicrocreditTestBase {
 
         assertEq(credit.protocolFees() + handler.feesClaimed(), handler.feesAccrued(), "ledger: protocol fees");
         assertEq(
-            credit.firstLossReserve() + handler.reserveUsed() + handler.reserveReleased(),
+            credit.firstLossReserve() + handler.reserveUsed() + handler.reserveReleased() + handler.reserveForgiven(),
             handler.reserveIn() + handler.reserveFunded(),
             "ledger: first-loss reserve"
         );

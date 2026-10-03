@@ -131,6 +131,8 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
     uint256 public reserveUsed;
     uint256 public reserveReleased;
     uint256 public reserveFunded;
+    uint256 public reserveForgiven; // sub-cent balances forgiven at closing, absorbed by the reserve
+    uint256 internal _reserveBeforeRepay;
     uint256 public forgiven; // unpaid principal written off when a loan closes under a cent
     uint256 public donated;
 
@@ -432,6 +434,7 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
         }
 
         _call("repay");
+        _reserveBeforeRepay = credit.firstLossReserve();
         vm.prank(borrower);
         usdc.approve(address(credit), amount);
         vm.prank(borrower);
@@ -842,6 +845,7 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
         dues[m.borrower] += toReserve;
         if (owed - paid < CENT) {
             forgiven += m.principal - m.principalRepaid;
+            reserveForgiven += Math.min(m.principal - m.principalRepaid, _reserveBeforeRepay + toReserve);
             m.impaired = 0;
             m.status = DecentralizedMicrocredit.LoanStatus.Repaid;
         }
@@ -1006,6 +1010,7 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
             || selector == DecentralizedMicrocredit.NotOverdue.selector
             || selector == DecentralizedMicrocredit.SelfBacking.selector
             || selector == DecentralizedMicrocredit.TooManyBackers.selector
+            || selector == DecentralizedMicrocredit.BackingTooSmall.selector
             || selector == DecentralizedMicrocredit.InsufficientCredit.selector
             || selector == DecentralizedMicrocredit.BackingInUse.selector
             || selector == DecentralizedMicrocredit.StakeCommitted.selector

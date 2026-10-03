@@ -52,6 +52,7 @@ contract DecentralizedMicrocredit is EIP712 {
     uint256 public constant RESERVATION_TTL = 7 days;
     /// @notice Bounds the backers per borrower, and so the work of limits and defaults.
     uint256 public constant MAX_BACKERS_PER_BORROWER = 32;
+    uint256 public constant MIN_BACKING = 1e6; // 1 USDC: every backer slot carries a real guarantee
     /// @dev Virtual shares and assets, as in OpenZeppelin's ERC4626 with a 6-decimal offset: the
     ///      first deposit cannot be front-run into a rounding loss. They hold a negligible slice
     ///      of the pool, so balances can read a few millionths of a cent low.
@@ -360,6 +361,7 @@ contract DecentralizedMicrocredit is EIP712 {
     // backing & stake
     error SelfBacking();
     error TooManyBackers();
+    error BackingTooSmall();
     error InsufficientCredit();
     error BackingInUse();
     error StakeCommitted();
@@ -708,10 +710,11 @@ contract DecentralizedMicrocredit is EIP712 {
     /**
      * @notice Back `borrower` with `amount` USDC of your own credit; a lower amount reduces the
      *         backing and 0 withdraws it. New backing commits your free granted credit first,
-     *         then free stake, and your own capacity falls by exactly what the borrower gains.
-     *         Backing cannot be cut below what the borrower owes on open loans. If the borrower
-     *         defaults, committed stake is slashed into the pool and committed credit is burned
-     *         from your granted credit.
+     *         then free stake, and your own capacity falls by at least what the borrower gains
+     *         (by more only while you borrow against backing you received, since your cover is
+     *         counted conservatively). Backing cannot be cut below what the borrower owes on open
+     *         loans. If the borrower defaults, committed stake is slashed into the pool and
+     *         committed credit is burned from your granted credit.
      */
     function back(address borrower, uint256 amount) external {
         _setBacking(msg.sender, borrower, amount);
@@ -990,7 +993,9 @@ contract DecentralizedMicrocredit is EIP712 {
      *         therefore leave the share price where it is.
      */
     function totalAssets() public view returns (uint256) {
-        return lenderCash + totalLentOut - Math.max(totalImpaired, firstLossReserve);
+        uint256 pool = lenderCash + totalLentOut;
+        uint256 junior = Math.max(totalImpaired, firstLossReserve);
+        return pool > junior ? pool - junior : 0;
     }
 
     function convertToShares(uint256 assets) public view returns (uint256) {
@@ -1279,6 +1284,7 @@ contract DecentralizedMicrocredit is EIP712 {
     function _disburseLoan(uint256 loanId, address to) internal returns (uint256 principal) {
         Loan storage loan = loans[loanId];
         require(loan.status == LoanStatus.Requested, LoanNotRequested());
+        require(defaultedLoans[loan.borrower] == 0, BorrowerInDefault());
         loan.status = LoanStatus.Active;
         loan.disbursedAt = block.timestamp;
 
@@ -1339,6 +1345,7 @@ contract DecentralizedMicrocredit is EIP712 {
         uint256 unpaid = loan.principal - loan.principalRepaid;
         if (status == LoanStatus.Repaid) {
             totalLentOut -= unpaid;
+            firstLossReserve -= Math.min(unpaid, firstLossReserve); // the forgiven sub-cent is a loss
             totalImpaired -= loan.impaired;
             loan.impaired = 0;
             completedLoans[loan.borrower] += 1;
@@ -1420,6 +1427,8 @@ contract DecentralizedMicrocredit is EIP712 {
     /// @dev Sets `backer`'s backing of `borrower` to `amount` (see {back}).
     function _setBacking(address backer, address borrower, uint256 amount) internal {
         require(borrower != backer, SelfBacking());
+        // Tiny or empty edges would only take backer slots (MAX_BACKERS_PER_BORROWER).
+        require(amount == 0 || amount >= MIN_BACKING, BackingTooSmall());
         Backing[] storage edges = _backings[borrower];
         uint256 slot = _backingSlot[backer][borrower];
         if (slot == 0) {
@@ -1437,6 +1446,7 @@ contract DecentralizedMicrocredit is EIP712 {
         uint256 current = edge.secured + edge.unsecured;
 
         if (amount > current) {
+            require(defaultedLoans[borrower] == 0, BorrowerInDefault());
             uint256 extra = amount - current;
             (uint256 freeCredit, uint256 freeStake) = getFreeCredit(backer);
             uint256 fromCredit = Math.min(extra, freeCredit);
@@ -1457,6 +1467,16 @@ contract DecentralizedMicrocredit is EIP712 {
             require(_activePrincipal(borrower) <= limit, BackingInUse());
         }
         emit Backed(backer, borrower, edge.secured, edge.unsecured);
+        if (amount == 0) {
+            // Free the slot: move the last edge into it.
+            uint256 last = edges.length - 1;
+            delete _backingSlot[backer][borrower];
+            if (slot - 1 != last) {
+                edges[slot - 1] = edges[last];
+                _backingSlot[edges[last].backer][borrower] = slot;
+            }
+            edges.pop();
+        }
     }
 
     /**

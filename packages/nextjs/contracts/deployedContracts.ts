@@ -680,6 +680,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "MIN_BACKING",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "MIN_LOAN_TERM",
           inputs: [],
           outputs: [
@@ -3674,6 +3687,11 @@ const deployedContracts = {
         {
           type: "error",
           name: "BackingInUse",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BackingTooSmall",
           inputs: [],
         },
         {
