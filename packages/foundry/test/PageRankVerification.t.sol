@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
+import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
 import { MicrocreditTestBase } from "./utils/MicrocreditTestBase.sol";
 
 /**
@@ -134,7 +135,7 @@ contract PageRankVerificationTest is MicrocreditTestBase {
         _attest(NODE1, NODE2, 800_000);
 
         vm.prank(makeAddr("stranger"));
-        vm.expectRevert("Owner or oracle only");
+        vm.expectRevert(DecentralizedMicrocredit.NotOwnerOrOracle.selector);
         credit.clearPageRankState();
 
         vm.prank(oracle);

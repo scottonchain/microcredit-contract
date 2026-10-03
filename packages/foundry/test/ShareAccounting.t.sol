@@ -134,7 +134,7 @@ contract ShareAccountingTest is MicrocreditTestBase {
         vm.prank(owner);
         credit.setLendingUtilizationCap(10_000); // so the 5% buffer is what binds
         vm.prank(borrower);
-        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
         credit.requestLoan(1e6);
     }
 
@@ -199,7 +199,7 @@ contract ShareAccountingTest is MicrocreditTestBase {
         vm.startPrank(owner);
         credit.setProtocolFeeBps(1_000);
         uint256 maxFee = credit.MAX_PROTOCOL_FEE_BPS();
-        vm.expectRevert("Fee too high");
+        vm.expectRevert(DecentralizedMicrocredit.FeeTooHigh.selector);
         credit.setProtocolFeeBps(maxFee + 1);
         vm.stopPrank();
 
@@ -207,14 +207,14 @@ contract ShareAccountingTest is MicrocreditTestBase {
         _borrowAndRepayAfterAYear();
 
         vm.prank(alice);
-        vm.expectRevert("Owner only");
+        vm.expectRevert(DecentralizedMicrocredit.NotOwner.selector);
         credit.claimProtocolFees(alice, 1);
         vm.prank(alice);
-        vm.expectRevert("Owner only");
+        vm.expectRevert(DecentralizedMicrocredit.NotOwner.selector);
         credit.setProtocolFeeBps(0);
 
         vm.prank(owner);
-        vm.expectRevert("Exceeds accrued fees");
+        vm.expectRevert(DecentralizedMicrocredit.ExceedsAccruedFees.selector);
         credit.claimProtocolFees(treasury, 1e6 + 1);
     }
 
@@ -232,7 +232,7 @@ contract ShareAccountingTest is MicrocreditTestBase {
         _deposit(alice, 1); // classic inflation setup: tiny first deposit, then a large donation
         usdc.mint(alice, 10_000e6);
         vm.prank(alice);
-        usdc.transfer(address(credit), 10_000e6);
+        assertTrue(usdc.transfer(address(credit), 10_000e6));
 
         _deposit(bob, 1_000e6);
         assertEq(credit.totalAssets(), 1_000e6 + 1);

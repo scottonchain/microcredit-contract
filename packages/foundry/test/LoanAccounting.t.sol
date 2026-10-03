@@ -174,7 +174,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
         vm.stopPrank();
 
         vm.prank(borrower);
-        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
         credit.requestLoan(96_000e6);
 
         vm.prank(borrower);
@@ -189,7 +189,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
         credit.requestLoan(PRINCIPAL); // keeps reservedLiquidity above one loan's principal
 
         uint256 loanId = _openLoan(PRINCIPAL);
-        vm.expectRevert("Already disbursed");
+        vm.expectRevert(DecentralizedMicrocredit.LoanNotRequested.selector);
         credit.disburseLoan(loanId);
         assertEq(usdc.balanceOf(borrower), PRINCIPAL);
         assertEq(credit.reservedLiquidity(), PRINCIPAL);
@@ -201,7 +201,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
         usdc.mint(borrower, PRINCIPAL);
         vm.startPrank(borrower);
         usdc.approve(address(credit), PRINCIPAL);
-        vm.expectRevert("Not disbursed");
+        vm.expectRevert(DecentralizedMicrocredit.LoanNotActive.selector);
         credit.repayLoan(loanId, PRINCIPAL);
         vm.stopPrank();
     }
@@ -209,7 +209,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
     function testOnlyBorrowerCanRepayDirectly() public {
         uint256 loanId = _openLoan(PRINCIPAL);
         vm.prank(stranger);
-        vm.expectRevert("Borrower only");
+        vm.expectRevert(DecentralizedMicrocredit.NotBorrower.selector);
         credit.repayLoan(loanId, 1);
     }
 
@@ -256,13 +256,13 @@ contract LoanAccountingTest is MicrocreditTestBase {
         assertEq(credit.getCreditScore(borrower), 0, "falls back to PageRank (no attestations)");
 
         vm.prank(owner);
-        vm.expectRevert("Score exceeds SCALE");
+        vm.expectRevert(DecentralizedMicrocredit.ScoreTooHigh.selector);
         credit.setScoreOverride(borrower, SCALE + 1);
     }
 
     function testRequestLoanRequiresScore() public {
         vm.prank(stranger);
-        vm.expectRevert("Score > 0");
+        vm.expectRevert(DecentralizedMicrocredit.NoCreditScore.selector);
         credit.requestLoan(1e6);
     }
 
@@ -274,13 +274,13 @@ contract LoanAccountingTest is MicrocreditTestBase {
         assertEq(credit.displayNames(borrower), "Brighton");
 
         vm.prank(borrower);
-        vm.expectRevert("Name too long");
+        vm.expectRevert(DecentralizedMicrocredit.NameTooLong.selector);
         credit.setDisplayName("this display name is far too long!");
     }
 
     function testKycVerificationIsOracleOnly() public {
         vm.prank(stranger);
-        vm.expectRevert("Oracle only");
+        vm.expectRevert(DecentralizedMicrocredit.NotOracle.selector);
         credit.markKYCVerified(borrower);
 
         vm.prank(oracle);
@@ -288,7 +288,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
         assertTrue(credit.isKYCVerified(borrower));
 
         vm.prank(oracle);
-        vm.expectRevert("Already verified");
+        vm.expectRevert(DecentralizedMicrocredit.AlreadyVerified.selector);
         credit.markKYCVerified(borrower);
     }
 
@@ -316,7 +316,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
     }
 
     function testAdminSettersAreOwnerOnly() public {
-        bytes[] memory calls = new bytes[](12);
+        bytes[] memory calls = new bytes[](16);
         calls[0] = abi.encodeCall(credit.setOracle, (stranger));
         calls[1] = abi.encodeCall(credit.setKycBonus, (1));
         calls[2] = abi.encodeCall(credit.setBasePersonalization, (1));
@@ -329,22 +329,26 @@ contract LoanAccountingTest is MicrocreditTestBase {
         calls[9] = abi.encodeCall(credit.setRelayerWhitelistEnabled, (true));
         calls[10] = abi.encodeCall(credit.setRelayerWhitelisted, (stranger, true));
         calls[11] = abi.encodeCall(credit.setScoreOverride, (stranger, 1));
+        calls[12] = abi.encodeCall(credit.setProtocolFeeBps, (1));
+        calls[13] = abi.encodeCall(credit.claimProtocolFees, (stranger, 0));
+        calls[14] = abi.encodeCall(credit.setMinVouchStake, (1));
+        calls[15] = abi.encodeCall(credit.setFirstLoanCap, (1));
 
         for (uint256 i = 0; i < calls.length; i++) {
             vm.prank(stranger);
             (bool ok, bytes memory ret) = address(credit).call(calls[i]);
             assertFalse(ok);
-            assertEq(ret, abi.encodeWithSignature("Error(string)", "Owner only"));
+            assertEq(ret, abi.encodeWithSelector(DecentralizedMicrocredit.NotOwner.selector));
         }
     }
 
     function testLimitSettersValidateBounds() public {
         vm.startPrank(owner);
-        vm.expectRevert("Cap cannot exceed 100%");
+        vm.expectRevert(DecentralizedMicrocredit.AboveOneHundredPercent.selector);
         credit.setLendingUtilizationCap(10_001);
-        vm.expectRevert("Buffer > 100%");
+        vm.expectRevert(DecentralizedMicrocredit.AboveOneHundredPercent.selector);
         credit.setLiquidityLimits(10_001, 0);
-        vm.expectRevert("Invalid oracle");
+        vm.expectRevert(DecentralizedMicrocredit.ZeroAddress.selector);
         credit.setOracle(address(0));
         vm.stopPrank();
     }

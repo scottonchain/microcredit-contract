@@ -132,7 +132,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _borrowRequest(40e6, LOAN_APR - 1);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
         vm.prank(relayer);
-        vm.expectRevert("APR changed");
+        vm.expectRevert(DecentralizedMicrocredit.AprChanged.selector);
         credit.borrowAndDisburseMeta(req, sig);
     }
 
@@ -149,7 +149,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _borrowRequest(30e6, LOAN_APR);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
         vm.prank(relayer);
-        vm.expectRevert("Outstanding loans exceed max");
+        vm.expectRevert(DecentralizedMicrocredit.BorrowLimitExceeded.selector);
         credit.borrowAndDisburseMeta(req, sig);
     }
 
@@ -163,7 +163,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _borrowRequest(9_600e6, LOAN_APR);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
         vm.prank(relayer);
-        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
         credit.borrowAndDisburseMeta(req, sig);
     }
 
@@ -201,14 +201,14 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         });
         bytes memory sig = _signAttestRequest(attesterPk, req);
         vm.prank(relayer);
-        vm.expectRevert("Self-attestation");
+        vm.expectRevert(DecentralizedMicrocredit.SelfAttestation.selector);
         credit.attestMeta(req, sig);
 
         req.borrower = borrower;
         req.weight = SCALE + 1;
         sig = _signAttestRequest(attesterPk, req);
         vm.prank(relayer);
-        vm.expectRevert("Weight too high");
+        vm.expectRevert(DecentralizedMicrocredit.WeightTooHigh.selector);
         credit.attestMeta(req, sig);
     }
 
@@ -261,7 +261,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         bytes memory sig = _signDepositRequest(lenderPk, req);
         DecentralizedMicrocredit.PermitData memory permit = _signPermit(lenderPk, 999e6, _deadline());
         vm.prank(relayer);
-        vm.expectRevert("Permit value too low");
+        vm.expectRevert(DecentralizedMicrocredit.PermitValueTooLow.selector);
         credit.depositWithPermitMeta(req, sig, permit);
     }
 
@@ -348,11 +348,11 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         });
         bytes memory sig = _signRequestWithdrawal(lenderPk, again);
         vm.prank(relayer);
-        vm.expectRevert("Insufficient balance");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientBalance.selector);
         credit.requestWithdrawalMeta(again, sig);
 
         vm.prank(lender);
-        vm.expectRevert("Insufficient balance");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientBalance.selector);
         credit.withdrawFunds(1);
     }
 
@@ -392,7 +392,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         // nor funds a direct withdrawal.
         usdc.mint(address(credit), 1_500e6);
         vm.prank(poolLender);
-        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
         credit.withdrawFunds(1);
         assertEq(usdc.balanceOf(payout), 0);
     }
@@ -411,7 +411,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(poolLender), 500e6);
 
         vm.prank(poolLender);
-        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
         credit.withdrawFunds(1);
     }
 
@@ -444,7 +444,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         vm.prank(owner);
         credit.setMaxLoanAmount(type(uint256).max);
         vm.prank(borrower);
-        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
         credit.requestLoan(391e6);
         vm.prank(borrower);
         credit.requestLoan(390e6);
@@ -459,7 +459,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         address payout = _queuedRequestsThenRefill(21);
 
         vm.prank(poolLender);
-        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
         credit.withdrawFunds(291e6);
         vm.prank(poolLender);
         credit.withdrawFunds(290e6);
@@ -479,7 +479,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(payout), 400e6);
 
         vm.prank(makeAddr("newLender"));
-        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
         credit.withdrawFunds(1e6);
         assertEq(credit.queuedWithdrawals(lender), 600e6);
     }
@@ -491,7 +491,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         });
         bytes memory sig = _signRequestWithdrawal(lenderPk, req);
         vm.prank(relayer);
-        vm.expectRevert("Insufficient balance");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientBalance.selector);
         credit.requestWithdrawalMeta(req, sig);
     }
 
@@ -545,7 +545,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         permit.s = bytes32(uint256(permit.s) ^ 1);
 
         vm.prank(relayer);
-        vm.expectRevert("Permit failed");
+        vm.expectRevert(DecentralizedMicrocredit.PermitFailed.selector);
         credit.depositPermitOnlyMeta(lender, permit);
     }
 
@@ -621,7 +621,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.RepayRequest memory stale = _repayRequest(loanId, owed - 20_000);
         bytes memory sig = _signRepayRequest(borrowerPk, stale);
         vm.prank(relayer);
-        vm.expectRevert("OUTSTANDING_CHANGED");
+        vm.expectRevert(DecentralizedMicrocredit.OutstandingChanged.selector);
         credit.repayLoanMeta(stale, sig, _noPermit());
 
         DecentralizedMicrocredit.RepayRequest memory close = _repayRequest(loanId, owed - 5_000);

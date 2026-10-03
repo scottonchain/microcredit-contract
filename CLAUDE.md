@@ -62,15 +62,19 @@ Inherits `PageRank` (graph + computation) and OpenZeppelin `EIP712`. The file is
 - `totalQueuedShares` / `totalQueuedWithdrawals()`: shares locked in the FIFO withdrawal queue (`requestWithdrawalMeta`) and their USDC value, held back from loans and direct withdrawals. Queued shares keep earning until paid. Each deposit, repayment or withdrawal pays at most `QUEUE_FILLS_PER_CALL` (10) queued requests; anyone can call `processWithdrawalQueue(maxItems)` to drain the rest
 - `withdrawFunds` and `requestWithdrawalMeta` take a USDC amount; `type(uint256).max` means the whole unqueued balance
 
-**Loan lifecycle:**
-1. `requestLoan()` / `requestLoanMeta()`: validate and reserve liquidity, create the loan record; interest accrues from here
-2. `disburseLoan()` / `disburseLoanMeta()`: move principal from reserved to the borrower (only once per loan)
-3. `borrowAndDisburseMeta()`: steps 1 and 2 in one relayed transaction (what the borrower UI uses)
+**Loan lifecycle** (`LoanStatus`: Requested → Active → Repaid | Defaulted, or Requested → Cancelled; `getLoanTerms` returns status, term, requestedAt, disbursedAt, dueAt):
+1. `requestLoan()` / `requestLoanMeta()`: validate and reserve liquidity, create the loan record with a `DEFAULT_LOAN_TERM` (30 days) term
+2. `disburseLoan()` / `disburseLoanMeta()`: move principal from reserved to the borrower; interest accrues and the term runs from here
+3. `borrowAndDisburseMeta()`: steps 1 and 2 in one relayed transaction with the signed `repaymentPeriod` as term (1 to 365 days); what the borrower UI uses
 4. `repayLoan()` / `repayWithPermit()` (UI) / `repayLoanMeta()`: repay; partial repayments reduce the balance
+5. `cancelLoan()`: release an undisbursed loan's reservation (the borrower any time, anyone after `RESERVATION_TTL`, 7 days)
+6. `markDefaulted()`: anyone, once `LATE_PERIOD` (30 days) past due. Writes off the unpaid principal, slashes the borrower's vouchers by vouch weight (each up to their stake) into `lenderCash`, and blocks the borrower from borrowing again (`defaultedLoans`). Lenders absorb any uncovered loss through the share price
 
-Every origination path goes through `_originateLoan` (score limit across active loans, utilisation cap, liquidity buffer); every repayment goes through `_repay` (pulls `min(amount, outstanding)`, closes when less than a cent remains).
+Every origination path goes through `_originateLoan` (term bounds, default check, score limit and first-loan cap across outstanding principal, utilisation cap, liquidity buffer); every repayment goes through `_repay` (pulls `min(amount, outstanding)`, closes when less than a cent remains).
 
-**Interest accrual:** Fixed APR = EFFR + riskPremium (basis points, 10000 = 100%), set at origination. 24-hour grace period; no interest in the first day. `getCurrentOutstandingAmount()` = principal + simple interest − `repaid`. Interest accrues on the original principal until the loan closes. Balances < 1 cent (10,000 in 6-decimal USDC) are forgiven.
+**Interest accrual:** Fixed APR = EFFR + riskPremium (basis points, 10000 = 100%), set at origination. 24-hour grace period; no interest in the first day after disbursement. `getCurrentOutstandingAmount()` = principal + simple interest − `repaid`. Interest accrues on the original principal until the loan closes. Balances < 1 cent (10,000 in 6-decimal USDC) are forgiven.
+
+**Errors:** the contract reverts with custom errors (declared in its errors section). `packages/nextjs/utils/contractErrors.ts` maps every ABI error name to plain-language text, typed so a new error without a message fails `next:check-types`; the relayer routes return `{ error, code }` with that text, and scaffold's `getParsedError` uses it for wallet transactions.
 
 **Credit score gating:** Max borrow = `creditScore × maxLoanAmount / SCALE` (`Math.mulDiv`), summed across the borrower's active loans. Credit score is an admin override (`setScoreOverride`) if set, otherwise derived from PageRank.
 
@@ -86,7 +90,7 @@ Iteration starts from the personalization vector (same fixed point as NetworkX's
 
 ### Sybil guards
 
-- **Vouch stake:** `stake` / `unstake` hold attester USDC outside the pool (`attesterStake`, `totalAttesterStake`). Each active vouch (weight > 0) needs `minVouchStake` (default 50 USDC) staked. A vouch cannot be lowered or revoked while the borrower has an active loan (`activeLoanCount`), and stake cannot fall below `minVouchStake × activeVouches`. Slashing on default is not implemented yet.
+- **Vouch stake:** `stake` / `unstake` hold attester USDC outside the pool (`attesterStake`, `totalAttesterStake`). Each active vouch (weight > 0) needs `minVouchStake` (default 50 USDC) staked. A vouch cannot be lowered or revoked while the borrower has an active loan (`activeLoanCount`), and stake cannot fall below `minVouchStake × activeVouches`. On default, `markDefaulted` slashes vouchers (see the loan lifecycle). At most `MAX_VOUCHERS_PER_BORROWER` (32) attestations per borrower keep slashing bounded.
 - **First-loan cap:** a borrower's active principal is capped at `firstLoanCap` (default 50 USDC) until `completedLoans > 0`. `getBorrowLimit(borrower)` returns `(limit, available)`.
 - Attestation updates are O(1) through `_attestationSlot`; `getVouchWeight(attester, borrower)`.
 
@@ -138,6 +142,7 @@ Network configuration is in `packages/nextjs/scaffold.config.ts` (default: Found
 All suites extend `test/utils/MicrocreditTestBase.sol` (real MockUSDC, EIP-712/EIP-2612 signing helpers that rebuild typehashes from their type strings):
 - `DecentralizedMicrocredit.t.sol`: core lending, limits, liquidity, withdrawals
 - `ShareAccounting.t.sol`: share price, interest-first repayment, protocol fee, buffer vs exits, stray transfers
+- `LoanLifecycle.t.sol`: terms, due dates, cancellation, default write-down and voucher slashing
 - `SybilResistance.t.sol`: HermesCRBot persona regressions (ring, unanchored attester), vouch stake and locks, first-loan cap. The only suite on default guard settings; the others call `_relaxSybilGuards()`
 - `LoanAccounting.t.sol`: interest, partial/full repayment, admin permissions, views
 - `MetaTransactions.t.sol`: signature, nonce, deadline and relayer-whitelist rules
