@@ -6,6 +6,7 @@ import {
   createPublicClient,
   http,
   createWalletClient,
+  parseEventLogs,
   parseUnits,
   toHex,
 } from "viem";
@@ -28,7 +29,6 @@ export default function PopulatePage() {
   const [numBorrowers, setNumBorrowers] = useState(25);
   const [includeLenderAttestations, setIncludeLenderAttestations] = useState(true);
   const [attestationProbability, setAttestationProbability] = useState(75); // 75% chance = 25% chance of not backing
-  const [nextLoanId, setNextLoanId] = useState(1); // Track the next loan ID to use
 
   // Seeded random number generator
   const seededRandom = (seed: number) => {
@@ -414,91 +414,79 @@ export default function PopulatePage() {
   setProgress(0.8); // 80% complete after funding borrowers
   setStatus("✅ Borrowers funded");
 
-    // 5) Loan Requests and Disbursements - Borrowers request loans for 80% or 100% of their max amount
+    // 5) Loan Requests and Disbursements - Borrowers request loans for 80% or 100% of what they can borrow
   setCurrentStep(5);
   setStatus("⏳ Processing loan requests and disbursements...");
   setProgress(0.85); // 85% complete after loan requests
   
   let loanRequestsCreated = 0;
   
-  // Get the contract's maxLoanAmount
-  console.log(`Attempting to read maxLoanAmount from contract at ${MICROCREDIT_ADDRESS}`);
-  const contractMaxLoanAmount = await publicClient.readContract({
-    address: MICROCREDIT_ADDRESS as `0x${string}`,
-    abi: MICROCREDIT_ABI,
-    functionName: "maxLoanAmount",
-  });
-  console.log(`Successfully read maxLoanAmount: ${contractMaxLoanAmount}`);
-  
   for (let i = 0; i < borrowers.length; i++) {
     const B = borrowers[i];
     
     try {
-      // Get borrower's credit score using getCreditScore function
-      const creditScore = await publicClient.readContract({
+      // Generated borrowers have no score: their credit is the backing from step 2, so size the
+      // loan from what getBorrowLimit says they can still borrow.
+      const [, available] = await publicClient.readContract({
         address: MICROCREDIT_ADDRESS as `0x${string}`,
         abi: MICROCREDIT_ABI,
-        functionName: "getCreditScore",
+        functionName: "getBorrowLimit",
         args: [B.address],
       });
       
-      if (creditScore > 0n) {
-        // Calculate max allowed amount based on credit score
-        // Formula: (maxLoanAmount / SCALE) * creditScore
-        // where SCALE = 1e6 and creditScore is in the same scale
-        const maxAllowed = (BigInt(contractMaxLoanAmount) * creditScore) / BigInt(1e6);
+      // Randomly choose 80% or 100% of the available amount (never more than available)
+      const use100Percent = seededRandom(1000 + i) > 0.5; // 50% chance for each
+      const loanAmount = use100Percent ? available : (available * 80n) / 100n;
+      
+      if (loanAmount > 0n) {
+        setStatus(`⏳ Borrower ${B.address.slice(0, 6)}... requesting loan for ${(Number(loanAmount) / 1e6).toFixed(2)} USDC (${use100Percent ? '100%' : '80%'} of available)...`);
         
-        if (maxAllowed > 0n) {
-          // Randomly choose 80% or 100% of max allowed amount
-          const use100Percent = seededRandom(1000 + i) > 0.5; // 50% chance for each
-          const loanAmount = use100Percent ? maxAllowed : (maxAllowed * BigInt(80)) / BigInt(100);
-          
-          setStatus(`⏳ Borrower ${B.address.slice(0, 6)}... requesting loan for ${(Number(loanAmount) / 1e6).toFixed(2)} USDC (${use100Percent ? '100%' : '80%'} of max)...`);
-          
-          const walletClient = createWalletClient({ 
-            chain: { ...localhost, id: CHAIN_ID }, 
-            transport: http(ANVIL_RPC_URL), 
-            account: B 
-          });
-          
-          const loanTxHash = await walletClient.writeContract({ 
+        const walletClient = createWalletClient({ 
+          chain: { ...localhost, id: CHAIN_ID }, 
+          transport: http(ANVIL_RPC_URL), 
+          account: B 
+        });
+        
+        const loanTxHash = await walletClient.writeContract({ 
+          address: MICROCREDIT_ADDRESS as `0x${string}`, 
+          abi: MICROCREDIT_ABI, 
+          functionName: "requestLoan", 
+          args: [loanAmount],
+          gas: 5000000n // 5 million gas
+        });
+        const loanReceipt = await publicClient.waitForTransactionReceipt({ hash: loanTxHash });
+        
+        // Take the loan ID from the LoanRequested event (the deploy script has already created loans)
+        const [requested] = parseEventLogs({
+          abi: MICROCREDIT_ABI,
+          eventName: "LoanRequested",
+          logs: loanReceipt.logs,
+        });
+        if (!requested) throw new Error(`requestLoan reverted (tx ${loanTxHash})`);
+        const loanId = requested.args.loanId;
+        
+        loanRequestsCreated++;
+        console.log(`✅ Borrower ${B.address.slice(0, 6)}... requested loan ${loanId} for ${(Number(loanAmount) / 1e6).toFixed(2)} USDC`);
+        
+        // Disburse the loan immediately after requesting it
+        setStatus(`⏳ Disbursing loan ${loanId} for ${B.address.slice(0, 6)}...`);
+        try {
+          const disburseTxHash = await walletClient.writeContract({ 
             address: MICROCREDIT_ADDRESS as `0x${string}`, 
             abi: MICROCREDIT_ABI, 
-            functionName: "requestLoan", 
-            args: [loanAmount],
+            functionName: "disburseLoan", 
+            args: [loanId],
             gas: 5000000n // 5 million gas
           });
-          await publicClient.waitForTransactionReceipt({ hash: loanTxHash });
-          
-          // Use the tracked loan ID for disbursement
-          const loanId = BigInt(nextLoanId);
-          
-          loanRequestsCreated++;
-          console.log(`✅ Borrower ${B.address.slice(0, 6)}... requested loan for ${(Number(loanAmount) / 1e6).toFixed(2)} USDC`);
-          
-          // Disburse the loan immediately after requesting it
-          setStatus(`⏳ Disbursing loan ${loanId} for ${B.address.slice(0, 6)}...`);
-          try {
-            const disburseTxHash = await walletClient.writeContract({ 
-              address: MICROCREDIT_ADDRESS as `0x${string}`, 
-              abi: MICROCREDIT_ABI, 
-              functionName: "disburseLoan", 
-              args: [loanId],
-              gas: 5000000n // 5 million gas
-            });
-            await publicClient.waitForTransactionReceipt({ hash: disburseTxHash });
-            console.log(`✅ Loan ${loanId} disbursed successfully to ${B.address.slice(0, 6)}...`);
-          } catch (disburseError) {
-            console.error(`Failed to disburse loan for borrower ${B.address}:`, disburseError);
-            // Continue with other borrowers even if disbursement fails
-          }
-          
-          // Increment the loan ID counter for the next loan
-          setNextLoanId(nextLoanId + 1);
-          
-          // Add a small delay between loan requests
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await publicClient.waitForTransactionReceipt({ hash: disburseTxHash });
+          console.log(`✅ Loan ${loanId} disbursed successfully to ${B.address.slice(0, 6)}...`);
+        } catch (disburseError) {
+          console.error(`Failed to disburse loan for borrower ${B.address}:`, disburseError);
+          // Continue with other borrowers even if disbursement fails
         }
+        
+        // Add a small delay between loan requests
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     } catch (error) {
       console.error(`Failed to request loan for borrower ${B.address}:`, error);
