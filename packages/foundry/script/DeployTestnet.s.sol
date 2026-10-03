@@ -13,7 +13,11 @@ import { ICreditUsage, OracleScoreProvider } from "../contracts/OracleScoreProvi
  *         overrides or published scores), set parameters and pause without a timelock. Nothing
  *         is seeded. Refuses to run on any chain but Base Sepolia, Ethereum Sepolia or Anvil.
  * @dev Production uses DeployProduction.s.sol instead (timelock, multisig, no reporter).
- *        forge script script/DeployTestnet.s.sol --rpc-url <testnet> --broadcast --sender <you>
+ *        forge script script/DeployTestnet.s.sol --rpc-url <testnet> --broadcast --non-interactive \
+ *          --account <keystore> --sender <you>
+ *      (--non-interactive skips forge's prompt for contracts near the size limit, which otherwise
+ *      fails without a terminal; sign with a keystore from `cast wallet import`.)
+ *      Then script/TestnetScenarios.s.sol runs the persona scenarios against the deployment.
  *
  *      Environment (all optional; numbers are plain integers, `25e6` is accepted):
  *        USDC_ADDRESS           a test USDC (6 decimals); unset deploys a free-mint MockUSDC
