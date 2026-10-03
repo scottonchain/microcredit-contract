@@ -134,6 +134,17 @@ edges). Fresh accounts have $\ell=d=0$, so the bound is independent of $|S|$: it
 of the cut between the attacker's accounts and everyone else, the same quantity that bounds
 Sybil influence in credit networks and in SybilLimit-style defences, where it is the attack edges.
 
+**Corollary (lenders pay only for issued lines).** Dues are exactly the reserve's inflow from
+interest. Let $R$ be the reserve on hand, $\Lambda_L$ the part of $\Lambda$ the reserve did not pay,
+$F$ the capital added with `fundReserve`, $D$ what was released to lenders and $\varphi$ the
+forgiven sub-cent balances the reserve absorbed, so $R=\sum_a d(a)+F-(\Lambda-\Lambda_L)-D-\varphi$.
+Subtracting from Theorem 2,
+$$\Lambda_L + \max(0,\ U-R) \;\le\; \sum_a \ell(a) - F + D + \varphi \;\le\; \sum_a \ell(a) + D + \varphi.$$
+Lenders' realised loss plus what the reserve could not cover of their potential loss never exceeds
+the issued lines (plus surplus released to them, which cannot include dues, and a few sub-cent
+balances): earned credit costs lenders nothing, and external first-loss capital $F$ comes straight
+off their exposure. The invariant suite checks this as I8.
+
 *The role of coverage $\kappa$.* The proof uses only $\kappa\le1$, so with fixed lines the bound
 would hold even with $\kappa=1$. Coverage matters when the issuer revises a line downward, or a
 backer defaults: it stops new borrowing against credit that is no longer there (CI-15).
