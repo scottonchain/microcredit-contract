@@ -8,11 +8,20 @@ import { IScoreProvider } from "./interfaces/IScoreProvider.sol";
 
 /**
  * @title OracleScoreProvider
- * @notice Credit scores computed off-chain (personalized PageRank over the attestation graph,
- *         see packages/nextjs/utils/scoring) and published here in batches. Reports arrive from
- *         a Chainlink CRE workflow through its forwarder ({onReport}) or, where no forwarder is
- *         configured, from a trusted reporter account ({publishScores}).
- * @dev A report is `abi.encode(uint64 epoch, address[] users, uint256[] scores)`. Epochs must
+ * @notice Credit lines issued by an off-chain issuer and published here in batches. A score is
+ *         the share of DecentralizedMicrocredit.maxLoanAmount the account may borrow on its own
+ *         credit. Reports arrive from a Chainlink CRE workflow through its forwarder
+ *         ({onReport}) or, where no forwarder is configured, from a trusted reporter account
+ *         ({publishScores}).
+ * @dev Every published score is new unsecured credit, so the lending pool's worst-case loss
+ *      grows with the sum of scores (docs/CREDIT_MODEL.md, Theorem 2). Issuance is therefore
+ *      budgeted: the sum of current scores may not exceed `maxTotalScore`, and one report may
+ *      raise it by at most `maxIncreasePerReport`. A compromised or gamed workflow can misallocate
+ *      its budget but cannot exceed it. The issuer's policy must not derive scores from the
+ *      backing graph or from repayment counts alone: both can be produced by fresh accounts at no
+ *      cost (Theorem 3); history is information for an issuer that answers for its lines.
+ *
+ *      A report is `abi.encode(uint64 epoch, address[] users, uint256[] scores)`. Epochs must
  *      increase, so a report cannot be replayed or applied out of order. Scores read as 0 once
  *      no report has arrived for `maxScoreAge`, so a stalled oracle stops new lending instead
  *      of lending on stale trust; the workflow sends an empty report as a heartbeat when no
@@ -29,6 +38,9 @@ contract OracleScoreProvider is IScoreProvider, IReceiver, Ownable2Step {
     bytes32 public expectedWorkflowId; // zero accepts any workflow id
     address public reporter; // direct publisher; zero disables publishScores
     uint256 public maxScoreAge;
+    uint256 public maxTotalScore; // issuance budget: cap on the sum of current scores
+    uint256 public maxIncreasePerReport; // cap on how much one report may raise that sum
+    uint256 public totalScore; // sum of current scores
 
     uint64 public epoch;
     uint256 public lastReportAt;
@@ -40,6 +52,7 @@ contract OracleScoreProvider is IScoreProvider, IReceiver, Ownable2Step {
     event ForwarderUpdated(address forwarder, address workflowOwner, bytes32 workflowId);
     event ReporterUpdated(address reporter);
     event MaxScoreAgeUpdated(uint256 maxScoreAge);
+    event IssuanceLimitsUpdated(uint256 maxTotalScore, uint256 maxIncreasePerReport);
 
     error NotForwarder();
     error NotReporter();
@@ -49,10 +62,15 @@ contract OracleScoreProvider is IScoreProvider, IReceiver, Ownable2Step {
     error LengthMismatch();
     error ScoreTooHigh();
     error InvalidMaxScoreAge();
+    error IssuanceBudgetExceeded();
 
-    constructor(address initialOwner, address initialReporter, uint256 initialMaxScoreAge) Ownable(initialOwner) {
+    /// @param initialMaxTotalScore Issuance budget in score units: N x SCALE allows N full lines.
+    constructor(address initialOwner, address initialReporter, uint256 initialMaxScoreAge, uint256 initialMaxTotalScore)
+        Ownable(initialOwner)
+    {
         reporter = initialReporter;
         _setMaxScoreAge(initialMaxScoreAge);
+        _setIssuanceLimits(initialMaxTotalScore, initialMaxTotalScore);
         emit ReporterUpdated(initialReporter);
     }
 
@@ -118,6 +136,12 @@ contract OracleScoreProvider is IScoreProvider, IReceiver, Ownable2Step {
         _setMaxScoreAge(newMaxScoreAge);
     }
 
+    /// @notice Set the issuance budget and the most one report may add to issued scores. Lowering
+    ///         the budget below `totalScore` blocks reports that do not bring the sum back under it.
+    function setIssuanceLimits(uint256 newMaxTotalScore, uint256 newMaxIncreasePerReport) external onlyOwner {
+        _setIssuanceLimits(newMaxTotalScore, newMaxIncreasePerReport);
+    }
+
     // ───────────────────────────── internals ─────────────────────────────
 
     function _applyReport(bytes calldata report) internal {
@@ -127,17 +151,32 @@ contract OracleScoreProvider is IScoreProvider, IReceiver, Ownable2Step {
         if (users.length != scores.length) revert LengthMismatch();
         if (users.length > MAX_BATCH) revert BatchTooLarge();
 
+        uint256 total = totalScore;
+        uint256 increase = 0;
         for (uint256 i = 0; i < users.length; i++) {
             if (scores[i] > SCALE) revert ScoreTooHigh();
+            uint256 previous = _scores[users[i]];
+            if (scores[i] > previous) increase += scores[i] - previous;
+            total = total + scores[i] - previous;
             _scores[users[i]] = scores[i];
             if (!_isScored[users[i]]) {
                 _isScored[users[i]] = true;
                 _scoredUsers.push(users[i]);
             }
         }
+        if (increase > 0 && (total > maxTotalScore || increase > maxIncreasePerReport)) {
+            revert IssuanceBudgetExceeded();
+        }
+        totalScore = total;
         epoch = reportEpoch;
         lastReportAt = block.timestamp;
         emit ScoresPublished(reportEpoch, users.length);
+    }
+
+    function _setIssuanceLimits(uint256 newMaxTotalScore, uint256 newMaxIncreasePerReport) internal {
+        maxTotalScore = newMaxTotalScore;
+        maxIncreasePerReport = newMaxIncreasePerReport;
+        emit IssuanceLimitsUpdated(newMaxTotalScore, newMaxIncreasePerReport);
     }
 
     function _setMaxScoreAge(uint256 newMaxScoreAge) internal {

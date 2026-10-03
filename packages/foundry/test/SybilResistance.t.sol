@@ -208,6 +208,88 @@ contract SybilResistanceTest is MicrocreditTestBase {
         assertEq(_limit(carlos), 0, "credit from a defaulted backer backs nothing");
     }
 
+    // ───────────────────────────── history (Theorem 3) ─────────────────────────────
+
+    function _repayInFull(address borrower, uint256 loanId) internal {
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        uint256 held = usdc.balanceOf(borrower);
+        if (held < owed) usdc.mint(borrower, owed - held); // the attacker funds whatever interest is due
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), owed);
+        credit.repayLoan(loanId, owed);
+        vm.stopPrank();
+    }
+
+    /// @dev docs/CREDIT_MODEL.md, Theorem 3. One stake is recycled through fresh accounts, each of
+    ///      which borrows and repays inside the interest-free first day. That history costs nothing,
+    ///      so it must earn nothing: a rule such as "capacity rises by 25% of repaid principal"
+    ///      would hand each account 100 here and the attacker 100 per account, with the seed never
+    ///      at risk.
+    function testRecycledSeedBuildsHistoryThatEarnsNoCredit() public {
+        _stake(carlos, 100e6);
+        address[] memory members = _ring();
+        for (uint256 i = 0; i < RING_SIZE; i++) {
+            vm.prank(carlos);
+            credit.back(members[i], 100e6);
+            for (uint256 cycle = 0; cycle < 4; cycle++) {
+                _repayInFull(members[i], _borrow(members[i], 100e6));
+            }
+            vm.prank(carlos);
+            credit.back(members[i], 0);
+
+            assertEq(credit.completedLoans(members[i]), 4);
+            assertEq(credit.duesPaid(members[i]), 0);
+            assertEq(_limit(members[i]), 0, "history that cost nothing earns nothing");
+        }
+        assertEq(credit.stakeOf(carlos), 100e6, "the seed was never at risk");
+    }
+
+    /// @dev The same farm with 30-day loans: an account earns exactly the interest it paid, net
+    ///      of the protocol fee. Borrowing that credit and defaulting hands lenders back only what
+    ///      they were paid, so they end exactly where they started.
+    function testHistoryEarnsOnlyTheDuesItPaid() public {
+        vm.prank(owner);
+        credit.setProtocolFeeBps(1_000);
+        uint256 assetsBefore = credit.totalAssets();
+        _stake(carlos, 100e6);
+        address member = _ring()[0];
+
+        vm.prank(carlos);
+        credit.back(member, 100e6);
+        uint256 loanId = _borrow(member, 100e6);
+        vm.warp(block.timestamp + 30 days);
+        uint256 interest = credit.getCurrentOutstandingAmount(loanId) - 100e6;
+        _repayInFull(member, loanId);
+        vm.prank(carlos);
+        credit.back(member, 0);
+
+        uint256 dues = interest - (interest * 1_000) / 10_000;
+        assertGt(dues, 0);
+        assertEq(credit.duesPaid(member), dues);
+        assertEq(credit.grantedCredit(member), dues);
+        assertEq(_limit(member), dues);
+
+        _default(_borrow(member, dues));
+        assertEq(credit.grantedCredit(member), 0, "dues are forfeited on default");
+        assertEq(credit.totalAssets(), assetsBefore, "lenders lost exactly the dues they had been paid");
+    }
+
+    /// @dev Dues are credit like any other: they can back someone, which moves them.
+    function testDuesCanBackOthers() public {
+        vm.prank(avery);
+        credit.back(carlos, AVERY_CREDIT);
+        uint256 loanId = _borrow(carlos, 50e6);
+        vm.warp(block.timestamp + 90 days);
+        _repayInFull(carlos, loanId);
+
+        uint256 dues = credit.duesPaid(carlos);
+        assertGt(dues, 0);
+        vm.prank(carlos);
+        credit.back(sam, dues);
+        assertEq(_limit(sam), dues);
+        assertEq(_limit(carlos), AVERY_CREDIT, "Carlos keeps Avery's backing and has committed his dues");
+    }
+
     // ───────────────────────────── stake ─────────────────────────────
 
     function testStakeIsNotPoolLiquidity() public {

@@ -233,6 +233,91 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         assertEq(credit.stakeOf(blake), 0);
     }
 
+    // ───────────────────────────── first-loss reserve ─────────────────────────────
+
+    function _repayAll(uint256 loanId) internal {
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        usdc.mint(brighton, owed);
+        vm.startPrank(brighton);
+        usdc.approve(address(credit), owed);
+        credit.repayLoan(loanId, owed);
+        vm.stopPrank();
+    }
+
+    function testReserveTakesItsShareOfInterest() public {
+        vm.startPrank(owner);
+        credit.setProtocolFeeBps(1_000);
+        credit.setReserveBps(2_000);
+        vm.stopPrank();
+
+        uint256 loanId = _borrow(LOAN);
+        vm.warp(vm.getBlockTimestamp() + 180 days);
+        uint256 interest = credit.getCurrentOutstandingAmount(loanId) - LOAN;
+        _repayAll(loanId);
+
+        uint256 fee = (interest * 1_000) / 10_000;
+        uint256 reserve = (interest * 2_000) / 10_000;
+        assertEq(credit.protocolFees(), fee);
+        assertEq(credit.firstLossReserve(), reserve);
+        assertEq(credit.totalAssets(), POOL + interest - fee - reserve);
+        assertEq(credit.duesPaid(brighton), interest - fee, "the reserve share protects lenders, so it counts as dues");
+    }
+
+    /// @dev The reserve pays what stake does not recover, before the share price moves.
+    function testReservePaysUncoveredLossBeforeLenders() public {
+        vm.prank(owner);
+        credit.setReserveBps(5_000);
+        uint256 first = _borrow(LOAN);
+        vm.warp(vm.getBlockTimestamp() + 365 days);
+        _repayAll(first);
+        uint256 reserve = credit.firstLossReserve();
+        uint256 assets = credit.totalAssets();
+        assertGt(reserve, 0);
+
+        // An unsecured loss larger than the reserve: the reserve is used up, lenders take the rest.
+        address dana = makeAddr("dana");
+        _backWithCredit(carol, dana, 30e6);
+        vm.prank(dana);
+        uint256 loanId = credit.requestLoan(30e6);
+        credit.disburseLoan(loanId);
+        vm.warp(_defaultableAt(loanId));
+        credit.markDefaulted(loanId);
+
+        assertEq(credit.firstLossReserve(), 0);
+        assertEq(credit.totalAssets(), assets - (30e6 - reserve));
+    }
+
+    function testReserveSettersAreBoundedAndOwnerOnly() public {
+        uint256 max = credit.MAX_RESERVE_BPS();
+        vm.expectRevert(DecentralizedMicrocredit.NotOwner.selector);
+        credit.setReserveBps(1);
+        vm.expectRevert(DecentralizedMicrocredit.NotOwner.selector);
+        credit.releaseReserve(0);
+
+        vm.startPrank(owner);
+        vm.expectRevert(DecentralizedMicrocredit.ReserveTooHigh.selector);
+        credit.setReserveBps(max + 1);
+        credit.setReserveBps(max);
+        vm.expectRevert(DecentralizedMicrocredit.ExceedsReserve.selector);
+        credit.releaseReserve(1);
+        vm.stopPrank();
+    }
+
+    function testReleasedReserveGoesToLenders() public {
+        vm.prank(owner);
+        credit.setReserveBps(5_000);
+        uint256 loanId = _borrow(LOAN);
+        vm.warp(vm.getBlockTimestamp() + 365 days);
+        _repayAll(loanId);
+        uint256 reserve = credit.firstLossReserve();
+        uint256 assets = credit.totalAssets();
+
+        vm.prank(owner);
+        credit.releaseReserve(reserve);
+        assertEq(credit.firstLossReserve(), 0);
+        assertEq(credit.totalAssets(), assets + reserve);
+    }
+
     function testPartialRepaymentReducesTheCharge() public {
         uint256 loanId = _borrow(LOAN);
         vm.warp(vm.getBlockTimestamp() + 2 days);

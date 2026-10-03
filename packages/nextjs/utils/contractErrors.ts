@@ -16,10 +16,12 @@ export const CONTRACT_ERROR_MESSAGES: Record<MicrocreditErrorName, string> = {
   ZeroAmount: "Enter an amount greater than zero.",
   AboveOneHundredPercent: "The value cannot be more than 100%.",
   FeeTooHigh: "The protocol fee is above its maximum.",
+  ReserveTooHigh: "The reserve share is above its maximum.",
   ScoreTooHigh: "A score cannot be more than 100%.",
   AlreadyVerified: "This address is already KYC-verified.",
   NameTooLong: "Display names can be at most 32 characters.",
   ExceedsAccruedFees: "That is more than the protocol fees collected so far.",
+  ExceedsReserve: "That is more than the first-loss reserve holds.",
   // meta-transactions & permits
   SignatureExpired: "The signed request expired. Please try again.",
   InvalidNonce: "The signed request is out of date. Please try again.",

@@ -25,6 +25,7 @@ abstract contract MicrocreditTestBase is Test {
     uint256 internal constant SCALE = 1e6;
     uint256 internal constant DEADLINE_OFFSET = 1 hours;
     uint256 internal constant MAX_SCORE_AGE = 7 days;
+    uint256 internal constant ISSUANCE_BUDGET = 1_000e6; // a thousand full lines; tests are not budget-bound
 
     bytes32 internal constant EIP712_DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
@@ -50,7 +51,7 @@ abstract contract MicrocreditTestBase is Test {
         usdc = new MockUSDC();
         vm.prank(owner);
         credit = new DecentralizedMicrocredit(effrRate, riskPremium, maxLoanAmount, address(usdc), oracle);
-        scores = new OracleScoreProvider(owner, oracle, MAX_SCORE_AGE);
+        scores = new OracleScoreProvider(owner, oracle, MAX_SCORE_AGE, ISSUANCE_BUDGET);
         vm.prank(owner);
         credit.setScoreProvider(scores);
     }

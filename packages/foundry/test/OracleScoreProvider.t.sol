@@ -19,9 +19,18 @@ contract OracleScoreProviderTest is Test {
     address internal alice = makeAddr("alice");
     address internal bob = makeAddr("bob");
     uint256 internal constant MAX_AGE = 1 days;
+    uint256 internal constant BUDGET = 2_000_000; // two full lines
 
     function setUp() public {
-        provider = new OracleScoreProvider(owner, reporter, MAX_AGE);
+        provider = new OracleScoreProvider(owner, reporter, MAX_AGE, BUDGET);
+    }
+
+    function _report(uint64 epoch, address[] memory users, uint256[] memory values)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        return abi.encode(epoch, users, values);
     }
 
     function _report(uint64 epoch, address user, uint256 score) internal pure returns (bytes memory) {
@@ -187,7 +196,77 @@ contract OracleScoreProviderTest is Test {
         provider.setForwarder(alice, address(0), bytes32(0));
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
         provider.setMaxScoreAge(2 days);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+        provider.setIssuanceLimits(type(uint256).max, type(uint256).max);
         vm.stopPrank();
+    }
+
+    // ───────────────────────────── issuance budget ─────────────────────────────
+
+    /// @dev Every score is new unsecured credit, so the sum of scores is capped: a compromised
+    ///      workflow can move credit between accounts but not create more than the budget.
+    function testReportsCannotIssueBeyondTheBudget() public {
+        address[] memory users = new address[](3);
+        uint256[] memory values = new uint256[](3);
+        (users[0], users[1], users[2]) = (alice, bob, makeAddr("carol"));
+        (values[0], values[1], values[2]) = (1_000_000, 1_000_000, 1);
+
+        vm.startPrank(reporter);
+        vm.expectRevert(OracleScoreProvider.IssuanceBudgetExceeded.selector);
+        provider.publishScores(_report(1, users, values));
+
+        values[2] = 0;
+        provider.publishScores(_report(1, users, values));
+        assertEq(provider.totalScore(), BUDGET);
+
+        // Reallocating within the budget is allowed; the sum is what is bounded.
+        (values[0], values[1], values[2]) = (400_000, 1_000_000, 600_000);
+        provider.publishScores(_report(2, users, values));
+        assertEq(provider.totalScore(), BUDGET);
+        assertEq(provider.creditScore(users[2]), 600_000);
+        vm.stopPrank();
+    }
+
+    function testOneReportCanRaiseScoresOnlySoFar() public {
+        vm.prank(owner);
+        provider.setIssuanceLimits(BUDGET, 500_000);
+
+        vm.startPrank(reporter);
+        vm.expectRevert(OracleScoreProvider.IssuanceBudgetExceeded.selector);
+        provider.publishScores(_report(1, alice, 500_001));
+        provider.publishScores(_report(1, alice, 500_000));
+        provider.publishScores(_report(2, bob, 500_000));
+
+        // The cap counts every raise in the report, so lowering one score cannot fund a larger raise:
+        // this report adds only 100,000 net but raises scores by 600,000.
+        address[] memory users = new address[](3);
+        uint256[] memory values = new uint256[](3);
+        (users[0], users[1], users[2]) = (alice, bob, makeAddr("carol"));
+        (values[0], values[1], values[2]) = (0, 1_000_000, 100_000);
+        vm.expectRevert(OracleScoreProvider.IssuanceBudgetExceeded.selector);
+        provider.publishScores(_report(3, users, values));
+        values[2] = 0;
+        provider.publishScores(_report(3, users, values));
+        vm.stopPrank();
+        assertEq(provider.totalScore(), 1_000_000);
+    }
+
+    /// @dev After the budget is cut below what is issued, reports that only lower scores still land.
+    function testLoweringTheBudgetStillAcceptsReductions() public {
+        vm.prank(reporter);
+        provider.publishScores(_report(1, alice, 1_000_000));
+        vm.prank(owner);
+        provider.setIssuanceLimits(500_000, 500_000);
+
+        vm.startPrank(reporter);
+        provider.publishScores(_report(2, alice, 800_000));
+        assertEq(provider.totalScore(), 800_000);
+        vm.expectRevert(OracleScoreProvider.IssuanceBudgetExceeded.selector);
+        provider.publishScores(_report(3, bob, 1));
+        provider.publishScores(_report(3, alice, 400_000));
+        provider.publishScores(_report(4, bob, 100_000));
+        vm.stopPrank();
+        assertEq(provider.totalScore(), 500_000);
     }
 
     function testOwnershipTransferNeedsAcceptance() public {
