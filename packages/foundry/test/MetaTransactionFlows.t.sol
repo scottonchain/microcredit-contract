@@ -26,8 +26,8 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
     event MetaWithdrawalRequested(address indexed lender, uint256 indexed queueId, uint256 amount, address indexed to);
     event MetaWithdrawalFilled(uint256 indexed queueId, uint256 amountFilled);
     event MetaAttested(address indexed attester, address indexed borrower, uint256 weight);
-    event Deposited(address indexed lender, uint256 amount);
-    event Withdrawn(address indexed lender, address indexed to, uint256 amount);
+    event Deposited(address indexed lender, uint256 assets, uint256 shares);
+    event Withdrawn(address indexed lender, address indexed to, uint256 assets, uint256 shares);
     event LoanRequested(address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 interestRate);
     event LoanDisbursed(address indexed borrower, uint256 indexed loanId, address to, uint256 amount);
     event Attested(address indexed attester, address indexed borrower, uint256 weight);
@@ -220,12 +220,12 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.PermitData memory permit = _signPermit(lenderPk, 1_000e6, _deadline());
 
         vm.expectEmit(address(credit));
-        emit MetaDeposit(lender, 1_000e6, lender, 1_000e6);
+        emit MetaDeposit(lender, 1_000e6, lender, credit.convertToShares(1_000e6));
         vm.prank(relayer);
         credit.depositWithPermitMeta(req, sig, permit);
 
-        assertEq(credit.totalDeposits(), POOL + 1_000e6);
-        assertEq(credit.lenderDeposits(lender), 1_000e6);
+        assertEq(credit.totalAssets(), POOL + 1_000e6);
+        assertEq(credit.lenderBalance(lender), 1_000e6);
         assertEq(credit.lenderCount(), 2);
         assertEq(credit.getLenders()[1], lender);
         assertEq(credit.nonces(lender), 1);
@@ -241,12 +241,12 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.PermitData memory permit = _signPermit(lenderPk, 1_000e6, _deadline());
 
         vm.expectEmit(address(credit));
-        emit Deposited(receiver, 1_000e6);
+        emit Deposited(receiver, 1_000e6, credit.convertToShares(1_000e6));
         vm.prank(relayer);
         credit.depositWithPermitMeta(req, sig, permit);
 
-        assertEq(credit.lenderDeposits(receiver), 1_000e6);
-        assertEq(credit.lenderDeposits(lender), 0);
+        assertEq(credit.lenderBalance(receiver), 1_000e6);
+        assertEq(credit.lenderBalance(lender), 0);
         assertEq(usdc.balanceOf(lender), 0, "funds come from the signer");
     }
 
@@ -266,8 +266,8 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         _depositPermitOnly(lender, lenderPk, 500e6);
         _depositPermitOnly(lender, lenderPk, 250e6);
 
-        assertEq(credit.lenderDeposits(lender), 750e6);
-        assertEq(credit.totalDeposits(), POOL + 750e6);
+        assertEq(credit.lenderBalance(lender), 750e6);
+        assertEq(credit.totalAssets(), POOL + 750e6);
         assertEq(credit.lenderCount(), 2);
         assertEq(credit.getLenders().length, 2);
     }
@@ -285,7 +285,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
 
     /// @dev Lends every deposited USDC to `borrower`, leaving nothing liquid.
     function _lendOutWholePool() internal returns (uint256 loanId) {
-        uint256 pool = credit.totalDeposits();
+        uint256 pool = credit.totalAssets();
         vm.startPrank(owner);
         credit.setMaxLoanAmount(pool);
         credit.setScoreOverride(borrower, SCALE);
@@ -309,8 +309,8 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         _requestWithdrawal(400e6, payout);
 
         assertEq(usdc.balanceOf(payout), 400e6);
-        assertEq(credit.lenderDeposits(lender), 600e6);
-        assertEq(credit.totalDeposits(), POOL + 600e6);
+        assertEq(credit.lenderBalance(lender), 600e6);
+        assertEq(credit.totalAssets(), POOL + 600e6);
     }
 
     function testWithdrawalQueuesUntilDepositsRestoreLiquidity() public {
@@ -320,18 +320,18 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         address payout = makeAddr("payout");
         _requestWithdrawal(1_000e6, payout);
         assertEq(usdc.balanceOf(payout), 0, "queued, not paid");
-        assertEq(credit.lenderDeposits(lender), 1_000e6);
+        assertEq(credit.lenderBalance(lender), 1_000e6);
 
         // A new deposit partially fills the head of the queue...
         address other = vm.addr(0x07E4);
         _depositPermitOnly(other, 0x07E4, 400e6);
         assertEq(usdc.balanceOf(payout), 400e6);
-        assertEq(credit.lenderDeposits(lender), 600e6);
+        assertEq(credit.lenderBalance(lender), 600e6);
 
         // ...and the next one completes it.
         _depositPermitOnly(other, 0x07E4, 1_000e6);
         assertEq(usdc.balanceOf(payout), 1_000e6);
-        assertEq(credit.lenderDeposits(lender), 0);
+        assertEq(credit.lenderBalance(lender), 0);
     }
 
     function testQueuedFundsCannotBeQueuedOrWithdrawnTwice() public {
@@ -365,7 +365,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         vm.stopPrank();
 
         assertEq(usdc.balanceOf(payout), 1_000e6);
-        assertEq(credit.lenderDeposits(lender), 0);
+        assertEq(credit.lenderBalance(lender), 0);
         assertEq(credit.queuedWithdrawals(lender), 0);
     }
 
@@ -379,15 +379,29 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(payout), 1_000e6);
     }
 
+    function testStrayTransferIsNotPoolLiquidity() public {
+        _depositPermitOnly(lender, lenderPk, 1_000e6);
+        _lendOutWholePool();
+        address payout = makeAddr("payout");
+        _requestWithdrawal(1_000e6, payout);
+
+        // USDC sent straight to the contract is not lenders' cash: it neither fills the queue
+        // nor funds a direct withdrawal.
+        usdc.mint(address(credit), 1_500e6);
+        vm.prank(poolLender);
+        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        credit.withdrawFunds(1);
+        assertEq(usdc.balanceOf(payout), 0);
+    }
+
     function testDirectWithdrawalCannotJumpTheQueue() public {
         _depositPermitOnly(lender, lenderPk, 1_000e6);
         _lendOutWholePool();
         address payout = makeAddr("payout");
         _requestWithdrawal(1_000e6, payout);
 
-        // Liquidity that arrives outside a deposit or repayment still goes to the queue first:
-        // a direct withdrawal only gets what is left after the queued request is paid.
-        usdc.mint(address(credit), 1_500e6);
+        // A direct withdrawal only gets what is left after the queued request is paid.
+        _deposit(makeAddr("newLender"), 1_500e6);
         vm.prank(poolLender);
         credit.withdrawFunds(500e6);
         assertEq(usdc.balanceOf(payout), 1_000e6);
@@ -495,7 +509,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
 
         vm.prank(relayer);
         credit.depositPermitOnlyMeta(lender, permit);
-        assertEq(credit.lenderDeposits(lender), 500e6);
+        assertEq(credit.lenderBalance(lender), 500e6);
     }
 
     function testRepayLoanMetaSurvivesFrontRunPermit() public {
@@ -546,7 +560,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         _borrow(40e6);
 
         vm.expectEmit(address(credit));
-        emit Withdrawn(poolLender, poolLender, 100e6);
+        emit Withdrawn(poolLender, poolLender, 100e6, credit.convertToShares(100e6));
         vm.prank(poolLender);
         credit.withdrawFunds(100e6);
     }

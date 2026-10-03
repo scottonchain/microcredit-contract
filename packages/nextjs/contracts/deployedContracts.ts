@@ -602,6 +602,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "MAX_PROTOCOL_FEE_BPS",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "QUEUE_FILLS_PER_CALL",
           inputs: [],
           outputs: [
@@ -754,6 +767,24 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "claimProtocolFees",
+          inputs: [
+            {
+              name: "to",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "clearPageRankState",
           inputs: [],
           outputs: [],
@@ -795,6 +826,44 @@ const deployedContracts = {
             },
           ],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "convertToAssets",
+          inputs: [
+            {
+              name: "shares",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "convertToShares",
+          inputs: [
+            {
+              name: "assets",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -1357,7 +1426,7 @@ const deployedContracts = {
           inputs: [],
           outputs: [
             {
-              name: "_totalDeposits",
+              name: "_totalAssets",
               type: "uint256",
               internalType: "uint256",
             },
@@ -1413,6 +1482,38 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "lenderBalance",
+          inputs: [
+            {
+              name: "lender",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "lenderCash",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "lenderCount",
           inputs: [],
           outputs: [
@@ -1426,7 +1527,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "lenderDeposits",
+          name: "lenderPrincipal",
           inputs: [
             {
               name: "",
@@ -1634,10 +1735,55 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "queuedWithdrawals",
+          name: "protocolFeeBps",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "protocolFees",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "queuedShares",
           inputs: [
             {
               name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "queuedWithdrawals",
+          inputs: [
+            {
+              name: "lender",
               type: "address",
               internalType: "address",
             },
@@ -2123,6 +2269,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "setProtocolFeeBps",
+          inputs: [
+            {
+              name: "feeBps",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "setRelayerWhitelistEnabled",
           inputs: [
             {
@@ -2185,7 +2344,26 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "totalDeposits",
+          name: "sharesOf",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "totalAssets",
           inputs: [],
           outputs: [
             {
@@ -2211,7 +2389,33 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "totalQueuedShares",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "totalQueuedWithdrawals",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "totalShares",
           inputs: [],
           outputs: [
             {
@@ -2284,7 +2488,13 @@ const deployedContracts = {
               internalType: "address",
             },
             {
-              name: "amount",
+              name: "assets",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "shares",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -2688,6 +2898,25 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "ProtocolFeesClaimed",
+          inputs: [
+            {
+              name: "to",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "RelayerWhitelisted",
           inputs: [
             {
@@ -2701,6 +2930,37 @@ const deployedContracts = {
               type: "bool",
               indexed: false,
               internalType: "bool",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "RepaymentApplied",
+          inputs: [
+            {
+              name: "loanId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "interest",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "principal",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "fee",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
             },
           ],
           anonymous: false,
@@ -2741,7 +3001,13 @@ const deployedContracts = {
               internalType: "address",
             },
             {
-              name: "amount",
+              name: "assets",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "shares",
               type: "uint256",
               indexed: false,
               internalType: "uint256",

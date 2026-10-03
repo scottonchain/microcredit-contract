@@ -143,8 +143,8 @@ The borrower's APR is `effrRate + riskPremium`, fixed when the loan is created. 
 
 ### Lenders
 1. Deposit USDC through the *Lend* page.  
-2. Your funds are allocated automatically when loans are approved.  
-3. Withdraw principal whenever sufficient liquidity is available; requests that cannot be paid immediately are queued and filled as liquidity returns.
+2. Your deposit buys pool shares. Interest borrowers repay (less the protocol fee) raises the share price, so every lender earns pro rata; the *Lend* page shows deposits, interest earned and current balance.  
+3. Withdraw whenever liquidity is available (*Max* takes everything); requests that cannot be paid immediately are queued, keep earning, and are filled as liquidity returns.
 
 ### Attesters
 1. Create an attestation for a borrower, choosing a confidence weight. Re-attesting updates the weight.  

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 // Attestation flow moved to /attest; no need for search params here
 import type { NextPage } from "next";
+import { maxUint256 } from "viem";
 import { useAccount, usePublicClient, useSignTypedData } from "wagmi";
 import { toast } from "react-hot-toast";
 import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
@@ -23,6 +24,8 @@ const LendPage: NextPage = () => {
   const [usdcBalance, setUsdcBalance] = useState<bigint>(0n);
   // Allowance no longer needed in permit-only flow
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  // "Max" withdraws every share (the contract treats maxUint256 as "everything"), leaving no dust.
+  const [withdrawAll, setWithdrawAll] = useState(false);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [mintLoading, setMintLoading] = useState(false);
@@ -68,11 +71,18 @@ const LendPage: NextPage = () => {
   const { signTypedDataAsync } = useSignTypedData();
 
   // ────── Lender-specific data ──────
-  const { data: lenderDeposit, refetch: refetchLenderDeposit } = useScaffoldReadContract({
+  // Current value of the lender's pool shares, and what they put in (net of withdrawals).
+  const { data: lenderBalance, refetch: refetchLenderBalance } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "lenderDeposits",
+    functionName: "lenderBalance",
     args: [connectedAddress as `0x${string}` | undefined],
   });
+  const { data: lenderPrincipal, refetch: refetchLenderPrincipal } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "lenderPrincipal",
+    args: [connectedAddress as `0x${string}` | undefined],
+  });
+  const refetchLenderPosition = () => Promise.all([refetchLenderBalance(), refetchLenderPrincipal()]);
 
   const { data: poolApyBp } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
@@ -87,14 +97,13 @@ const LendPage: NextPage = () => {
   const poolRatePercent = poolApyBp !== undefined ? (Number(poolApyBp) / 100).toFixed(2) : undefined;
   const loanRatePercent = loanRateBp !== undefined ? (Number(loanRateBp) / 100).toFixed(2) : undefined;
 
-  /**
-   * Interest should accrue only when borrowers make repayments.  Until the
-   * smart-contract exposes an on-chain "lenderInterest" value we keep this at
-   * 0 so the UI doesn’t over-promise returns immediately after a deposit.
-   */
-  const interestEarned: bigint | undefined = 0n;
-
-  const totalBalance = lenderDeposit !== undefined ? lenderDeposit : undefined;
+  // Interest is credited to the pool when borrowers repay, so this only grows on repayment.
+  const interestEarned =
+    lenderBalance !== undefined && lenderPrincipal !== undefined
+      ? lenderBalance > lenderPrincipal
+        ? lenderBalance - lenderPrincipal
+        : 0n
+      : undefined;
 
   // Remove placeholder arrays and fetch on-chain data
   const { data: poolInfo, refetch: refetchPoolInfo } = useScaffoldReadContract({
@@ -207,7 +216,7 @@ const LendPage: NextPage = () => {
       console.log("Deposit meta result:", j);
 
       // Refresh state
-      await Promise.all([refetchPoolInfo(), refetchLenderDeposit(), refetchUsdcBalance()]);
+      await Promise.all([refetchPoolInfo(), refetchLenderPosition(), refetchUsdcBalance()]);
 
       setDepositAmount("");
       setErrorMessage(null);
@@ -226,7 +235,7 @@ const LendPage: NextPage = () => {
 
   const handleWithdraw = async () => {
     if (!withdrawAmount || !connectedAddress) return;
-    const amountInt = parseWithdrawAmount(withdrawAmount);
+    const amountInt = withdrawAll ? maxUint256 : parseWithdrawAmount(withdrawAmount);
     if (!amountInt) {
       setErrorMessage("Please enter a valid withdrawal amount greater than 0.");
       return;
@@ -273,8 +282,9 @@ const LendPage: NextPage = () => {
       const j = await resp.json();
       console.log("Withdrawal request meta result:", j);
 
-      await Promise.all([refetchPoolInfo(), refetchLenderDeposit(), refetchUsdcBalance()]);
+      await Promise.all([refetchPoolInfo(), refetchLenderPosition(), refetchUsdcBalance()]);
       setWithdrawAmount("");
+      setWithdrawAll(false);
       setErrorMessage(null);
       const filled = j?.amountFilledNow ? Number(BigInt(j.amountFilledNow)) / 1e6 : 0;
       if (filled > 0) toast.success(`Filled immediately: ${filled.toFixed(2)} USDC`, { position: "top-center" });
@@ -296,15 +306,15 @@ const LendPage: NextPage = () => {
     
     try {
       console.log("🔍 Debugging deposit for address:", connectedAddress);
-      console.log("🔍 Lender deposit from contract:", lenderDeposit);
+      console.log("🔍 Lender balance from contract:", lenderBalance);
       console.log("🔍 Pool info:", poolInfo);
       console.log("🔍 USDC balance:", usdcBalance);
       // allowance removed in permit-only flow
       
       // Force refetch all data
-      await Promise.all([refetchPoolInfo(), refetchLenderDeposit(), refetchUsdcBalance()]);
+      await Promise.all([refetchPoolInfo(), refetchLenderPosition(), refetchUsdcBalance()]);
       
-      console.log("🔍 After refetch - Lender deposit:", lenderDeposit);
+      console.log("🔍 After refetch - Lender balance:", lenderBalance);
       console.log("🔍 After refetch - Pool info:", poolInfo);
       console.log("🔍 After refetch - USDC balance:", usdcBalance);
       // console.log("🔍 After refetch - USDC allowance:", usdcAllowance);
@@ -409,7 +419,7 @@ const LendPage: NextPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-center">
               <div>
                 <div className="text-2xl font-bold text-blue-500">
-                  {lenderDeposit !== undefined ? formatUSDC(lenderDeposit) : "-"}
+                  {lenderPrincipal !== undefined ? formatUSDC(lenderPrincipal) : "-"}
                 </div>
                 <div className="text-sm text-gray-600">Your Deposits</div>
               </div>
@@ -433,7 +443,7 @@ const LendPage: NextPage = () => {
               </div>
               <div>
                 <div className="text-2xl font-bold text-orange-500">
-                  {totalBalance !== undefined ? formatUSDC(totalBalance) : "-"}
+                  {lenderBalance !== undefined ? formatUSDC(lenderBalance) : "-"}
                 </div>
                 <div className="text-sm text-gray-600">Total (Deposits + Interest)</div>
               </div>
@@ -443,7 +453,7 @@ const LendPage: NextPage = () => {
             <div className="divider my-6"></div>
             <h3 className="text-lg font-semibold mb-3 flex items-center">
               <PlusIcon className="h-5 w-5 mr-2" />
-              {lenderDeposit !== undefined && BigInt(lenderDeposit) > 0n ? "Deposit More Funds" : "Deposit Funds"}
+              {lenderBalance !== undefined && lenderBalance > 0n ? "Deposit More Funds" : "Deposit Funds"}
             </h3>
             
             {/* Error Message */}
@@ -510,12 +520,12 @@ const LendPage: NextPage = () => {
             {/* Caption: one approval, no gas */}
             <p className="text-xs text-gray-500 mt-2">One approval, no gas. We’ll ask you to approve this deposit; our relayer handles the transaction.</p>
 
-            <p className="text-xs text-gray-500 mt-3">*Interest displayed is a simplified projection based on current pool APR.</p>
+            <p className="text-xs text-gray-500 mt-3">*Interest is credited to the pool as borrowers repay. The Funding Pool APY is a projection from current utilisation, net of the protocol fee.</p>
             
 
             
             {/* Withdraw Funds */}
-            {lenderDeposit !== undefined && BigInt(lenderDeposit) > 0n && (
+            {lenderBalance !== undefined && lenderBalance > 0n && (
               <>
                 <div className="divider my-6"></div>
                 <h3 className="text-lg font-semibold mb-3 flex items-center">
@@ -526,19 +536,33 @@ const LendPage: NextPage = () => {
                   <input
                     type="number"
                     value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    onChange={(e) => {
+                      setWithdrawAmount(e.target.value);
+                      setWithdrawAll(false);
+                    }}
                     placeholder="Enter amount to withdraw"
                     className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     min="1"
-                    max={Number(lenderDeposit) / 1e6}
+                    max={Number(lenderBalance) / 1e6}
                   />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWithdrawAmount((Number(lenderBalance) / 1e6).toFixed(2));
+                      setWithdrawAll(true);
+                    }}
+                    className="btn btn-outline"
+                  >
+                    Max
+                  </button>
                   <button
                     onClick={handleWithdraw}
                     disabled={(() => {
                       if (!withdrawAmount || !connectedAddress || withdrawLoading) return true;
+                      if (withdrawAll) return false;
                       const parsedAmount = parseWithdrawAmount(withdrawAmount);
                       if (!parsedAmount) return true;
-                      return Number(parsedAmount) / 1e6 > Number(lenderDeposit) / 1e6;
+                      return Number(parsedAmount) / 1e6 > Number(lenderBalance) / 1e6;
                     })()}
                     className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-colors"
                   >

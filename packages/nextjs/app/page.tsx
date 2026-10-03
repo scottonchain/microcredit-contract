@@ -55,7 +55,7 @@ const Home: NextPage = () => {
 
   const { data: lenderDeposit } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "lenderDeposits",
+    functionName: "lenderBalance",
     args: [connectedAddress],
   });
 

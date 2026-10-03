@@ -20,7 +20,7 @@ export const useUserRole = () => {
   // Check if user is a lender (has deposits)
   const { data: lenderDeposit } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "lenderDeposits",
+    functionName: "lenderBalance",
     args: [connectedAddress],
   });
 

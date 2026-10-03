@@ -14,6 +14,10 @@ import { PageRank } from "./PageRank.sol";
  * @notice Single-pool, collateral-free USDC lending. Borrow limits come from a PageRank credit
  *         score over attestations; every user action also has an EIP-712 meta-transaction entry
  *         point so a relayer can pay gas.
+ *
+ *         Lenders own the pool through non-transferable shares. Interest is recognised when it
+ *         is repaid (cash basis): repayments settle accrued interest first, and the interest,
+ *         less the protocol fee, raises the share price for every lender.
  * @dev DEMO CONTRACT. PageRank is recomputed on-chain after every attestation; in production
  *      that work (and credit score updates) is meant to move to an off-chain oracle.
  */
@@ -32,6 +36,12 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     ///         queue cannot push those calls past the block gas limit. {processWithdrawalQueue}
     ///         drains the rest.
     uint256 public constant QUEUE_FILLS_PER_CALL = 10;
+    uint256 public constant MAX_PROTOCOL_FEE_BPS = 2_000; // 20% of repaid interest
+    /// @dev Virtual shares and assets, as in OpenZeppelin's ERC4626 with a 6-decimal offset: the
+    ///      first deposit cannot be front-run into a rounding loss. They hold a negligible slice
+    ///      of the pool, so balances can read a few millionths of a cent low.
+    uint256 private constant VIRTUAL_SHARES = 1e6;
+    uint256 private constant VIRTUAL_ASSETS = 1;
 
     bytes32 private constant LOAN_REQUEST_TYPEHASH =
         keccak256("LoanRequest(address borrower,uint256 amount,uint256 nonce,uint256 deadline)");
@@ -53,7 +63,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
     struct Loan {
         uint256 principal;
-        uint256 repaid; // cumulative repayments
+        uint256 repaid; // cumulative repayments, interest and principal
+        uint256 principalRepaid; // part of `repaid` applied to principal (interest is settled first)
         address borrower;
         uint256 interestRate; // APR in BASIS_POINTS, fixed at origination
         bool isActive;
@@ -69,7 +80,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     struct WithdrawalQueueItem {
         address lender;
         address to;
-        uint256 remaining; // USDC still owed to this request
+        uint256 shares; // shares still waiting; paid out at the share price when filled
         bool active;
     }
 
@@ -155,21 +166,27 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     uint256 public maxLoanAmount;
 
     // PageRank personalization (teleportation) weights, in USDC units:
-    // weight = basePersonalization + min(lenderDeposits, personalizationCap) + (KYC ? kycBonus : 0)
+    // weight = basePersonalization + min(lenderBalance, personalizationCap) + (KYC ? kycBonus : 0)
     uint256 public basePersonalization;
     uint256 public kycBonus;
     uint256 public personalizationCap;
 
-    // Pool liquidity
-    uint256 public totalDeposits; // principal deposited by lenders, net of withdrawals
-    uint256 public totalLentOut; // principal held by borrowers on active loans
+    // Pool accounting: totalAssets() = lenderCash + totalLentOut. Tracked internally rather than
+    // read from the token balance, so stray transfers cannot move the share price.
+    uint256 public lenderCash; // lenders' USDC held here, reserved included; excludes protocol fees
+    uint256 public totalLentOut; // principal still owed on disbursed, active loans
     uint256 public reservedLiquidity; // principal approved but not yet disbursed
-    uint256 public lendingUtilizationCap; // max (lent + reserved) / deposits, in BASIS_POINTS
-    uint256 public liquidityBuffer; // share of deposits kept liquid, in BASIS_POINTS
-    uint256 public liquidityThreshold; // absolute USDC kept liquid
+    uint256 public lendingUtilizationCap; // max (lent + reserved) / totalAssets, in BASIS_POINTS
+    uint256 public liquidityBuffer; // share of totalAssets new loans must leave liquid, in BASIS_POINTS
+    uint256 public liquidityThreshold; // absolute USDC new loans must leave liquid
+    uint256 public protocolFeeBps; // share of repaid interest kept by the protocol, in BASIS_POINTS
+    uint256 public protocolFees; // accrued, unclaimed protocol fees (USDC)
 
     // Lenders
-    mapping(address => uint256) public lenderDeposits;
+    mapping(address => uint256) public sharesOf;
+    uint256 public totalShares;
+    // USDC deposited, less the pro-rata cost basis of shares withdrawn; earnings = balance - this
+    mapping(address => uint256) public lenderPrincipal;
     uint256 public lenderCount;
     mapping(address => bool) private isLender;
     address[] private _lenders;
@@ -199,8 +216,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     // FIFO withdrawal queue (filled as liquidity returns)
     WithdrawalQueueItem[] private withdrawalQueue;
     uint256 private withdrawalHead;
-    mapping(address => uint256) public queuedWithdrawals; // per lender, still waiting in the queue
-    uint256 public totalQueuedWithdrawals; // sum of queuedWithdrawals; liquidity owed to the queue first
+    mapping(address => uint256) public queuedShares; // per lender, still waiting in the queue
+    uint256 public totalQueuedShares; // their value is owed to the queue before new loans or withdrawals
 
     // ───────────────────────────── events ─────────────────────────────
 
@@ -210,19 +227,25 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
     event RelayerWhitelisted(address indexed relayer, bool allowed);
     event ScoreOverrideSet(address indexed user, uint256 score);
     event KycVerified(address indexed user);
-    event Deposited(address indexed lender, uint256 amount);
-    event Withdrawn(address indexed lender, address indexed to, uint256 amount);
+    /// @dev Authoritative record of a credit to `lender` (for meta deposits, the signed receiver).
+    event Deposited(address indexed lender, uint256 assets, uint256 shares);
+    event Withdrawn(address indexed lender, address indexed to, uint256 assets, uint256 shares);
     event LoanRequested(address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 interestRate);
     event LoanDisbursed(address indexed borrower, uint256 indexed loanId, address to, uint256 amount);
     event Attested(address indexed attester, address indexed borrower, uint256 weight);
     event DisplayNameSet(address indexed user, string name);
     event LoanRepaid(address indexed borrower, uint256 indexed loanId, uint256 amount);
+    /// @dev How a repayment was split; `fee` is the protocol's cut of `interest`.
+    event RepaymentApplied(uint256 indexed loanId, uint256 interest, uint256 principal, uint256 fee);
+    event ProtocolFeesClaimed(address indexed to, uint256 amount);
     event MetaLoanRequested(address indexed borrower, uint256 amount, uint256 loanId);
     event MetaLoanDisbursed(address indexed borrower, uint256 indexed loanId, uint256 amount);
     event MetaLoanRepaid(address indexed borrower, uint256 indexed loanId, uint256 amount);
     event MetaLoanCreated(
         address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 interestRate, uint256 repaymentPeriod
     );
+    /// @dev Emitted alongside {Deposited} by the relayed deposit paths. `lender` is the payer whose
+    ///      USDC was pulled; {Deposited} names the account actually credited (`receiver`).
     event MetaDeposit(address indexed lender, uint256 amount, address indexed receiver, uint256 sharesMinted);
     event MetaWithdrawalRequested(address indexed lender, uint256 indexed queueId, uint256 amount, address indexed to);
     event MetaWithdrawalFilled(uint256 indexed queueId, uint256 amountFilled);
@@ -323,6 +346,21 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         emit LiquidityLimitsUpdated(bufferBp, threshold);
     }
 
+    /// @param feeBps Share of repaid interest kept by the protocol, in BASIS_POINTS.
+    function setProtocolFeeBps(uint256 feeBps) external onlyOwner {
+        require(feeBps <= MAX_PROTOCOL_FEE_BPS, "Fee too high");
+        protocolFeeBps = feeBps;
+        emit ParameterUpdated("protocolFeeBps", feeBps);
+    }
+
+    function claimProtocolFees(address to, uint256 amount) external onlyOwner {
+        require(to != address(0), "Bad recipient");
+        require(amount <= protocolFees, "Exceeds accrued fees");
+        protocolFees -= amount;
+        _pushUsdc(to, amount);
+        emit ProtocolFeesClaimed(to, amount);
+    }
+
     function setRelayerWhitelistEnabled(bool enabled) external onlyOwner {
         relayerWhitelistEnabled = enabled;
         emit ParameterUpdated("relayerWhitelistEnabled", enabled ? 1 : 0);
@@ -363,21 +401,19 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
-    /// @notice Withdraw immediately. Queued withdrawals are paid first, and funds already queued
-    ///         cannot be withdrawn again here.
+    /**
+     * @notice Withdraw `amount` USDC now, or everything not already queued with
+     *         `type(uint256).max`. Queued withdrawals are paid first. Exits may use the
+     *         liquidity buffer, which only limits new loans.
+     */
     function withdrawFunds(uint256 amount) external {
         require(amount > 0, "Amount > 0");
-        require(lenderDeposits[msg.sender] - queuedWithdrawals[msg.sender] >= amount, "Insufficient balance");
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
 
-        uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
-        require(
-            usdc.balanceOf(address(this))
-                >= reservedLiquidity + totalQueuedWithdrawals + amount + bufferRequired + liquidityThreshold,
-            "LIQUIDITY_BELOW_THRESHOLD"
-        );
+        (uint256 shares, uint256 assets) = _sharesForWithdrawal(msg.sender, amount);
+        require(lenderCash >= reservedLiquidity + totalQueuedWithdrawals() + assets, "LIQUIDITY_BELOW_THRESHOLD");
 
-        _payOut(msg.sender, msg.sender, amount);
+        _payOut(msg.sender, msg.sender, assets, shares);
     }
 
     // ───────────────────────────── loans ─────────────────────────────
@@ -612,8 +648,8 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         require(req.receiver != address(0), "Bad receiver");
 
         _pullUsdc(req.lender, req.amount);
-        _recordDeposit(req.receiver, req.amount);
-        emit MetaDeposit(req.lender, req.amount, req.receiver, req.amount);
+        uint256 shares = _recordDeposit(req.receiver, req.amount);
+        emit MetaDeposit(req.lender, req.amount, req.receiver, shares);
 
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
@@ -625,13 +661,17 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
         _permit(lender, permit);
         _pullUsdc(lender, permit.value);
-        _recordDeposit(lender, permit.value);
-        emit MetaDeposit(lender, permit.value, lender, permit.value);
+        uint256 shares = _recordDeposit(lender, permit.value);
+        emit MetaDeposit(lender, permit.value, lender, shares);
 
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
-    /// @notice Queue a gasless withdrawal; it is paid immediately as far as liquidity allows.
+    /**
+     * @notice Queue a gasless withdrawal of `req.amount` USDC (`type(uint256).max` for everything
+     *         not already queued); it is paid immediately as far as liquidity allows. The
+     *         matching shares are locked and keep earning until paid at the share price then.
+     */
     function requestWithdrawalMeta(RequestWithdrawal calldata req, bytes calldata sig) external onlyAllowedRelayer {
         _verifyMeta(
             req.lender,
@@ -640,15 +680,14 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
             keccak256(abi.encode(REQUEST_WITHDRAWAL_TYPEHASH, req.lender, req.amount, req.to, req.nonce, req.deadline)),
             sig
         );
-        require(lenderDeposits[req.lender] - queuedWithdrawals[req.lender] >= req.amount, "Insufficient balance");
-        queuedWithdrawals[req.lender] += req.amount;
-        totalQueuedWithdrawals += req.amount;
+        require(req.amount > 0, "Amount > 0");
+        (uint256 shares, uint256 assets) = _sharesForWithdrawal(req.lender, req.amount);
+        queuedShares[req.lender] += shares;
+        totalQueuedShares += shares;
 
         uint256 queueId = withdrawalQueue.length;
-        withdrawalQueue.push(
-            WithdrawalQueueItem({ lender: req.lender, to: req.to, remaining: req.amount, active: true })
-        );
-        emit MetaWithdrawalRequested(req.lender, queueId, req.amount, req.to);
+        withdrawalQueue.push(WithdrawalQueueItem({ lender: req.lender, to: req.to, shares: shares, active: true }));
+        emit MetaWithdrawalRequested(req.lender, queueId, assets, req.to);
 
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
@@ -681,29 +720,59 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         return effrRate + riskPremium;
     }
 
-    /// @notice Projected lender APY in BASIS_POINTS: loan rate x pool utilisation.
+    /// @notice Projected lender APY in BASIS_POINTS: loan rate x pool utilisation, net of the
+    ///         protocol fee. Realised only as borrowers repay.
     function getFundingPoolAPY() external view returns (uint256) {
-        if (totalDeposits == 0) return 0;
-        uint256 utilisationBp = ((totalLentOut + reservedLiquidity) * BASIS_POINTS) / totalDeposits;
-        return ((effrRate + riskPremium) * utilisationBp) / BASIS_POINTS;
+        uint256 assets = totalAssets();
+        if (assets == 0) return 0;
+        uint256 utilisationBp = ((totalLentOut + reservedLiquidity) * BASIS_POINTS) / assets;
+        uint256 grossBp = ((effrRate + riskPremium) * utilisationBp) / BASIS_POINTS;
+        return (grossBp * (BASIS_POINTS - protocolFeeBps)) / BASIS_POINTS;
+    }
+
+    /// @notice USDC the lenders own: cash held for them plus principal still owed by borrowers.
+    function totalAssets() public view returns (uint256) {
+        return lenderCash + totalLentOut;
+    }
+
+    function convertToShares(uint256 assets) public view returns (uint256) {
+        return Math.mulDiv(assets, totalShares + VIRTUAL_SHARES, totalAssets() + VIRTUAL_ASSETS);
+    }
+
+    function convertToAssets(uint256 shares) public view returns (uint256) {
+        return Math.mulDiv(shares, totalAssets() + VIRTUAL_ASSETS, totalShares + VIRTUAL_SHARES);
+    }
+
+    /// @notice Current USDC value of `lender`'s shares, queued ones included.
+    function lenderBalance(address lender) public view returns (uint256) {
+        return convertToAssets(sharesOf[lender]);
+    }
+
+    /// @notice Current USDC value of `lender`'s shares waiting in the withdrawal queue.
+    function queuedWithdrawals(address lender) external view returns (uint256) {
+        return convertToAssets(queuedShares[lender]);
+    }
+
+    /// @notice USDC owed to the withdrawal queue, held back from new loans and direct withdrawals.
+    function totalQueuedWithdrawals() public view returns (uint256) {
+        return convertToAssets(totalQueuedShares);
     }
 
     /**
-     * @return _totalDeposits  Net lender deposits (USDC, 6 decimals)
-     * @return _availableFunds Liquid USDC not reserved for pending disbursements
+     * @return _totalAssets    USDC owned by lenders (see {totalAssets})
+     * @return _availableFunds Liquid USDC not reserved for loans or owed to the withdrawal queue
      * @return _reservedFunds  USDC reserved for approved, undisbursed loans
      * @return _lenderCount    Unique depositors
      */
     function getPoolInfo()
         external
         view
-        returns (uint256 _totalDeposits, uint256 _availableFunds, uint256 _reservedFunds, uint256 _lenderCount)
+        returns (uint256 _totalAssets, uint256 _availableFunds, uint256 _reservedFunds, uint256 _lenderCount)
     {
-        _totalDeposits = totalDeposits;
+        _totalAssets = totalAssets();
         _reservedFunds = reservedLiquidity;
-        uint256 committed = _reservedFunds + totalQueuedWithdrawals;
-        uint256 balance = usdc.balanceOf(address(this));
-        _availableFunds = balance > committed ? balance - committed : 0;
+        uint256 committed = _reservedFunds + totalQueuedWithdrawals();
+        _availableFunds = lenderCash > committed ? lenderCash - committed : 0;
         _lenderCount = lenderCount;
     }
 
@@ -744,12 +813,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         Loan storage loan = loans[loanId];
         require(loan.isActive, "Loan inactive");
 
-        uint256 owed = loan.principal;
-        uint256 timeElapsed = block.timestamp - loan.createdAt;
-        if (timeElapsed >= GRACE_PERIOD) {
-            uint256 annualInterest = (loan.principal * loan.interestRate) / BASIS_POINTS;
-            owed += (annualInterest * timeElapsed) / SECONDS_PER_YEAR;
-        }
+        uint256 owed = loan.principal + _interestAccrued(loan);
         return owed > loan.repaid ? owed - loan.repaid : 0;
     }
 
@@ -831,23 +895,55 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         usdc.safeTransfer(to, amount);
     }
 
-    function _recordDeposit(address lender, uint256 amount) internal {
-        totalDeposits += amount;
-        lenderDeposits[lender] += amount;
+    /// @dev Mints shares for `assets` already pulled in, at the current share price.
+    function _recordDeposit(address lender, uint256 assets) internal returns (uint256 shares) {
+        shares = convertToShares(assets);
+        require(shares > 0, "Zero shares");
+        sharesOf[lender] += shares;
+        totalShares += shares;
+        lenderCash += assets;
+        lenderPrincipal[lender] += assets;
         if (!isLender[lender]) {
             isLender[lender] = true;
             lenderCount += 1;
             _lenders.push(lender);
         }
-        emit Deposited(lender, amount);
+        emit Deposited(lender, assets, shares);
     }
 
-    /// @dev Pays `amount` of `lender`'s deposit out to `to`.
-    function _payOut(address lender, address to, uint256 amount) internal {
-        lenderDeposits[lender] -= amount;
-        totalDeposits -= amount;
-        _pushUsdc(to, amount);
-        emit Withdrawn(lender, to, amount);
+    /// @dev Burns `shares` of `lender`'s and sends `assets` to `to`.
+    function _payOut(address lender, address to, uint256 assets, uint256 shares) internal {
+        lenderPrincipal[lender] -= Math.mulDiv(lenderPrincipal[lender], shares, sharesOf[lender]);
+        sharesOf[lender] -= shares;
+        totalShares -= shares;
+        lenderCash -= assets;
+        _pushUsdc(to, assets);
+        emit Withdrawn(lender, to, assets, shares);
+    }
+
+    /// @dev Shares worth at least `assets`; used whenever shares are burned for a USDC amount.
+    function _convertToSharesRoundingUp(uint256 assets) internal view returns (uint256) {
+        return Math.mulDiv(assets, totalShares + VIRTUAL_SHARES, totalAssets() + VIRTUAL_ASSETS, Math.Rounding.Ceil);
+    }
+
+    /**
+     * @dev Shares to burn (rounded up) and USDC to pay for withdrawing `amount` of `lender`'s
+     *      unqueued balance; `type(uint256).max` withdraws all of it.
+     */
+    function _sharesForWithdrawal(address lender, uint256 amount)
+        internal
+        view
+        returns (uint256 shares, uint256 assets)
+    {
+        uint256 free = sharesOf[lender] - queuedShares[lender];
+        if (amount == type(uint256).max) {
+            shares = free;
+            assets = convertToAssets(shares);
+        } else {
+            shares = _convertToSharesRoundingUp(amount);
+            assets = amount;
+        }
+        require(shares > 0 && shares <= free, "Insufficient balance");
     }
 
     /// @dev Sum of principal across the borrower's active loans.
@@ -874,13 +970,13 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         uint256 limit = Math.mulDiv(maxLoanAmount, score, SCALE);
         require(_activePrincipal(borrower) + amount <= limit, "Outstanding loans exceed max");
 
-        uint256 maxCommitment = (totalDeposits * lendingUtilizationCap) / BASIS_POINTS;
+        uint256 assets = totalAssets();
+        uint256 maxCommitment = (assets * lendingUtilizationCap) / BASIS_POINTS;
         require(reservedLiquidity + totalLentOut + amount <= maxCommitment, "Pool utilisation cap exceeded");
 
-        uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
+        uint256 bufferRequired = (assets * liquidityBuffer) / BASIS_POINTS;
         require(
-            usdc.balanceOf(address(this)) - reservedLiquidity
-                >= amount + totalQueuedWithdrawals + bufferRequired + liquidityThreshold,
+            lenderCash - reservedLiquidity >= amount + totalQueuedWithdrawals() + bufferRequired + liquidityThreshold,
             "LIQUIDITY_BELOW_THRESHOLD"
         );
 
@@ -890,6 +986,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         loans[loanId] = Loan({
             principal: amount,
             repaid: 0,
+            principalRepaid: 0,
             borrower: borrower,
             interestRate: effrRate + riskPremium,
             isActive: true,
@@ -915,6 +1012,7 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
 
         principal = loan.principal;
         reservedLiquidity -= principal;
+        lenderCash -= principal;
         totalLentOut += principal;
         _pushUsdc(to, principal);
         emit LoanDisbursed(loan.borrower, loanId, to, principal);
@@ -935,7 +1033,18 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         paid = amount < owed ? amount : owed;
         if (paid > 0) {
             _pullUsdc(payer, paid);
+
+            uint256 interestDue = _interestAccrued(loan) - (loan.repaid - loan.principalRepaid);
+            uint256 interest = paid < interestDue ? paid : interestDue;
+            uint256 principal = paid - interest;
+            uint256 fee = (interest * protocolFeeBps) / BASIS_POINTS;
+
             loan.repaid += paid;
+            loan.principalRepaid += principal;
+            totalLentOut -= principal;
+            lenderCash += paid - fee;
+            protocolFees += fee;
+            emit RepaymentApplied(loanId, interest, principal, fee);
         }
         if (owed - paid < CENT) {
             _closeLoan(loan);
@@ -943,9 +1052,17 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
+    /// @dev Any principal still unpaid (under a cent, see {_repay}) is written off.
     function _closeLoan(Loan storage loan) internal {
-        totalLentOut -= loan.principal;
+        totalLentOut -= loan.principal - loan.principalRepaid;
         loan.isActive = false;
+    }
+
+    /// @dev Simple interest on the original principal since origination; none in the first day.
+    function _interestAccrued(Loan storage loan) internal view returns (uint256) {
+        uint256 elapsed = block.timestamp - loan.createdAt;
+        if (elapsed < GRACE_PERIOD) return 0;
+        return (((loan.principal * loan.interestRate) / BASIS_POINTS) * elapsed) / SECONDS_PER_YEAR;
     }
 
     function _recordAttestation(address attester, address borrower, uint256 weight) internal {
@@ -983,40 +1100,45 @@ contract DecentralizedMicrocredit is EIP712, PageRank {
         // An admin-assigned score anchors trust directly, so the node's attestations carry it.
         if (scoreOverrides[node] != 0) return scoreOverrides[node];
 
-        uint256 deposits = lenderDeposits[node];
-        weight = basePersonalization + (deposits > personalizationCap ? personalizationCap : deposits);
+        uint256 balance = lenderBalance(node);
+        weight = basePersonalization + (balance > personalizationCap ? personalizationCap : balance);
         if (isKYCVerified[node]) {
             weight += kycBonus;
         }
     }
 
-    /// @dev Pays up to `maxItems` queued withdrawals in FIFO order while liquidity stays above
-    ///      the guards. Called from every path that adds liquidity, and before direct withdrawals.
+    /**
+     * @dev Pays up to `maxItems` queued withdrawals in FIFO order from liquidity not reserved for
+     *      loans, at the current share price. The liquidity buffer exists for exits, so the queue
+     *      may use it. Called from every path that adds liquidity, and before direct withdrawals.
+     */
     function _tryFillWithdrawalQueue(uint256 maxItems) internal {
-        uint256 bufferRequired = (totalDeposits * liquidityBuffer) / BASIS_POINTS;
-
         for (uint256 visited = 0; visited < maxItems && withdrawalHead < withdrawalQueue.length; visited++) {
             WithdrawalQueueItem storage item = withdrawalQueue[withdrawalHead];
-            if (!item.active || item.remaining == 0) {
+            if (!item.active || item.shares == 0) {
                 item.active = false;
                 withdrawalHead++;
                 continue;
             }
 
-            uint256 liquid = usdc.balanceOf(address(this));
-            uint256 locked = reservedLiquidity + bufferRequired + liquidityThreshold;
-            if (liquid <= locked || liquid - locked < CENT) break;
+            uint256 liquid = lenderCash - reservedLiquidity;
+            if (liquid < CENT) break;
 
-            uint256 available = liquid - locked;
-            uint256 pay = item.remaining <= available ? item.remaining : available;
+            uint256 owed = convertToAssets(item.shares);
+            uint256 pay = owed;
+            uint256 burn = item.shares;
+            if (owed > liquid) {
+                pay = liquid;
+                burn = Math.min(_convertToSharesRoundingUp(pay), item.shares);
+            }
 
-            queuedWithdrawals[item.lender] -= pay;
-            totalQueuedWithdrawals -= pay;
-            item.remaining -= pay;
-            _payOut(item.lender, item.to, pay);
+            queuedShares[item.lender] -= burn;
+            totalQueuedShares -= burn;
+            item.shares -= burn;
+            _payOut(item.lender, item.to, pay, burn);
             emit MetaWithdrawalFilled(withdrawalHead, pay);
 
-            if (item.remaining != 0) break; // partial fill; resume on the next liquidity event
+            if (item.shares != 0) break; // partial fill; resume on the next liquidity event
             item.active = false;
             withdrawalHead++;
         }
