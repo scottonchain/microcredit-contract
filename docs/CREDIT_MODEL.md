@@ -137,13 +137,19 @@ Sybil influence in credit networks and in SybilLimit-style defences, where it is
 **Corollary (lenders pay only for issued lines).** Dues are exactly the reserve's inflow from
 interest. Let $R$ be the reserve on hand, $\Lambda_L$ the part of $\Lambda$ the reserve did not pay,
 $F$ the capital added with `fundReserve`, $D$ what was released to lenders and $\varphi$ the
-forgiven sub-cent balances the reserve absorbed, so $R=\sum_a d(a)+F-(\Lambda-\Lambda_L)-D-\varphi$.
-Subtracting from Theorem 2,
-$$\Lambda_L + \max(0,\ U-R) \;\le\; \sum_a \ell(a) - F + D + \varphi \;\le\; \sum_a \ell(a) + D + \varphi.$$
+forgiven sub-cent balances the reserve absorbed, so $R=\sum_a d(a)+F-(\Lambda-\Lambda_L)-D-\varphi$. Then
+$$\Lambda_L + \max(0,\ U-R) \;\le\; \sum_a \ell(a) + D + \varphi.$$
+
+*Proof.* Subtracting $R$ from both sides of Theorem 2 gives
+$\Lambda_L + U - R \le \sum_a\ell(a) - F + D + \varphi$, which is the claim whenever $U\ge R$.
+Otherwise, $\Lambda_L$ last grew at a default that exhausted the reserve; at that moment $R=0$,
+so the same inequality bounded $\Lambda_L$ there, and since then $\Lambda_L$ has not moved while
+$D$ and $\varphi$ can only have grown. If the reserve was never exhausted, $\Lambda_L=0$. $\square$
+
 Lenders' realised loss plus what the reserve could not cover of their potential loss never exceeds
 the issued lines (plus surplus released to them, which cannot include dues, and a few sub-cent
-balances): earned credit costs lenders nothing, and external first-loss capital $F$ comes straight
-off their exposure. The invariant suite checks this as I8.
+balances): earned credit costs lenders nothing, and while losses outrun the reserve, external
+first-loss capital $F$ comes straight off their exposure. The invariant suite checks this as I8.
 
 *The role of coverage $\kappa$.* The proof uses only $\kappa\le1$, so with fixed lines the bound
 would hold even with $\kappa=1$. Coverage matters when the issuer revises a line downward, or a
