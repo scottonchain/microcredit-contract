@@ -342,7 +342,6 @@ contract DecentralizedMicrocredit is EIP712 {
     error AprChanged();
     error LoanNotRequested();
     error LoanNotActive();
-    error LoanClosed();
     error NotCancellableYet();
     error NotYetDefaultable();
     error NotOverdue();
@@ -973,6 +972,15 @@ contract DecentralizedMicrocredit is EIP712 {
         return convertToAssets(sharesOf[lender]);
     }
 
+    /// @notice The most `lender` can take now with {withdrawFunds}: the value of its shares not in
+    ///         the withdrawal queue, up to the cash not reserved for loans or owed to the queue.
+    function maxWithdrawable(address lender) external view returns (uint256) {
+        uint256 value = convertToAssets(sharesOf[lender] - queuedShares[lender]);
+        uint256 committed = reservedLiquidity + totalQueuedWithdrawals();
+        uint256 liquid = lenderCash > committed ? lenderCash - committed : 0;
+        return Math.min(value, liquid);
+    }
+
     /// @notice Current USDC value of `lender`'s shares waiting in the withdrawal queue.
     function queuedWithdrawals(address lender) external view returns (uint256) {
         return convertToAssets(queuedShares[lender]);
@@ -1042,13 +1050,14 @@ contract DecentralizedMicrocredit is EIP712 {
     }
 
     /**
-     * @notice Principal plus simple interest accrued since origination, less repayments.
+     * @notice Principal plus simple interest accrued since origination, less repayments; 0 once
+     *         the loan is closed (repaid, defaulted or cancelled).
      * @dev No interest accrues during the first day. Interest keeps accruing on the original
      *      principal until the loan closes; partial repayments reduce the balance, not the base.
      */
     function getCurrentOutstandingAmount(uint256 loanId) public view returns (uint256) {
         Loan storage loan = loans[loanId];
-        require(_isOpen(loan), LoanClosed());
+        if (!_isOpen(loan)) return 0;
 
         uint256 owed = loan.principal + _interestAccrued(loan);
         return owed > loan.repaid ? owed - loan.repaid : 0;
