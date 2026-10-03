@@ -314,6 +314,17 @@ implements the first half and specifies the second:
   a governance response are for: the guardian multisig can `pause` new lending at once, while
   changes to the provider wait out the timelock. `testCompromisedOracleCannotRotateItsBudget` runs the rotation
   against the real pool.
+- **Reference issuer policy (`analysis/issuer_policy`).** How the oracle's workflow should turn
+  identity and history into lines. Unverified accounts get no line whatever their history; a
+  verified tier's cap is at most the cost of a fraudulent identity of that tier, so buying
+  identities does not pay; default probability is a Beta-Binomial posterior whose evidence counts
+  only risk lenders actually bore (loans repaid inside the interest-free day, stake-secured
+  principal, dust and self-backed loans weigh nothing, each closing a farming route); lines
+  maximise expected issuer profit within the per-account cap, the held budget and the per-report
+  cap, and the backing graph is never read. In simulation, 925 reports passed the contract's
+  budget rules without a rejection, farms earned no line, predicted default rates matched realised
+  ones in every decile, and attackers buying identities lost money in every tier unless identities
+  cost far less than the issuer assumed, which is the assumption the cap rests on.
 - **Pooled first-loss capital (implemented).** Anyone, typically an institution or the operator
   standing behind the lines it issues, can add to the first-loss reserve with `fundReserve`. It
   pays default losses before lenders and is never returned to the payer.
