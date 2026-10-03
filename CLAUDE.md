@@ -82,6 +82,14 @@ Attesters create weighted directed edges (0–100% confidence) to borrowers; re-
 
 Scores are scaled to `PR_SCALE = 100000`; credit score = `SCALE * x / (x + 100)` with `x = 1000 * PR / max(PR)`. `computePageRank()` is callable by anyone and is gas-intensive; `clearPageRankState()` is owner/oracle only.
 
+Iteration starts from the personalization vector (same fixed point as NetworkX's uniform start), so nodes no trust reaches stay at exactly 0. If no graph node has personalization weight, PageRank falls back to uniform as NetworkX does (`pagerankPersonalized` false) and every credit score is 0: a uniform ranking is no evidence of trust. Keep `basePersonalization` at 0, since any base weight makes every node its own anchor.
+
+### Sybil guards
+
+- **Vouch stake:** `stake` / `unstake` hold attester USDC outside the pool (`attesterStake`, `totalAttesterStake`). Each active vouch (weight > 0) needs `minVouchStake` (default 50 USDC) staked. A vouch cannot be lowered or revoked while the borrower has an active loan (`activeLoanCount`), and stake cannot fall below `minVouchStake × activeVouches`. Slashing on default is not implemented yet.
+- **First-loan cap:** a borrower's active principal is capped at `firstLoanCap` (default 50 USDC) until `completedLoans > 0`. `getBorrowLimit(borrower)` returns `(limit, available)`.
+- Attestation updates are O(1) through `_attestationSlot`; `getVouchWeight(attester, borrower)`.
+
 ### Meta-Transactions (EIP-712)
 
 Borrowers/lenders/attesters sign typed messages; relayers submit on-chain. Entry points: `requestLoanMeta`, `disburseLoanMeta`, `borrowAndDisburseMeta`, `repayLoanMeta`, `depositWithPermitMeta`, `depositPermitOnlyMeta`, `requestWithdrawalMeta`, `attestMeta`, plus permit-only `repayWithPermit`. All share `_verifyMeta` (deadline, per-signer nonce, EIP-712/ERC-1271 signature) and the optional relayer whitelist (`onlyAllowedRelayer`, `setRelayerWhitelistEnabled()`).
@@ -112,7 +120,7 @@ Demo wallet mode (`NEXT_PUBLIC_DEMO_WALLET=true`, set automatically by `yarn dem
 
 ## Deployment
 
-`packages/foundry/script/Deploy.s.sol` (local only; broadcasts with Anvil's published keys) deploys MockUSDC (unless `deployment-config.json` points at a live token) and `DecentralizedMicrocredit` with EFFR=433 bps, risk premium=500 bps, maxLoan=100 USDC. It seeds a 10,000 USDC pool, opens background loans for Diana and Eve (89% utilisation), sets score overrides for Alexis (admin, account 9, 95%) and Avery (attester, account 2, 92%), sets display names for Avery and Brighton (borrower, account 3), and sends ETH to three demo wallets. `yarn deploy` (`scripts-js/parseArgs.js`) then runs `generateTsAbis.js` to regenerate `packages/nextjs/contracts/deployedContracts.ts`; commit that file when the ABI changes.
+`packages/foundry/script/Deploy.s.sol` (local only; broadcasts with Anvil's published keys) deploys MockUSDC (unless `deployment-config.json` points at a live token) and `DecentralizedMicrocredit` with EFFR=433 bps, risk premium=500 bps, maxLoan=100 USDC. It seeds a 10,000 USDC pool, opens background loans for Diana and Eve (89% utilisation, lifting the first-loan cap while it does), sets score overrides for Alexis (admin, account 9, 95%) and Avery (attester, account 2, 92%), stakes `minVouchStake` for Avery, sets display names for Avery and Brighton (borrower, account 3), and sends ETH to three demo wallets. `yarn deploy` (`scripts-js/parseArgs.js`) then runs `generateTsAbis.js` to regenerate `packages/nextjs/contracts/deployedContracts.ts`; commit that file when the ABI changes.
 
 Network configuration is in `packages/nextjs/scaffold.config.ts` (default: Foundry localhost).
 
@@ -130,6 +138,7 @@ Network configuration is in `packages/nextjs/scaffold.config.ts` (default: Found
 All suites extend `test/utils/MicrocreditTestBase.sol` (real MockUSDC, EIP-712/EIP-2612 signing helpers that rebuild typehashes from their type strings):
 - `DecentralizedMicrocredit.t.sol`: core lending, limits, liquidity, withdrawals
 - `ShareAccounting.t.sol`: share price, interest-first repayment, protocol fee, buffer vs exits, stray transfers
+- `SybilResistance.t.sol`: HermesCRBot persona regressions (ring, unanchored attester), vouch stake and locks, first-loan cap. The only suite on default guard settings; the others call `_relaxSybilGuards()`
 - `LoanAccounting.t.sol`: interest, partial/full repayment, admin permissions, views
 - `MetaTransactions.t.sol`: signature, nonce, deadline and relayer-whitelist rules
 - `MetaTransactionFlows.t.sol`: effects of each meta-transaction entry point
