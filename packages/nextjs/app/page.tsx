@@ -55,7 +55,7 @@ const Home: NextPage = () => {
 
   const { data: lenderDeposit } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "lenderDeposits",
+    functionName: "lenderBalance",
     args: [connectedAddress],
   });
 
@@ -111,7 +111,7 @@ const Home: NextPage = () => {
                                 <CreditCardIcon className="h-8 w-8 sm:h-16 sm:w-16 text-green-600 mx-auto mb-2 sm:mb-4" />
                                 <h2 className="text-base sm:text-3xl font-bold text-green-700 mb-1 sm:mb-4">I&apos;m a Borrower</h2>
                                 <p className="text-gray-600 mb-3 sm:mb-6 flex-1 text-xs sm:text-base hidden sm:block">
-                                  Get your address verified by asking for attestations from friends and community members. Once verified, you&apos;ll be eligible for loans according to your credit score.
+                                  Borrow against the credit you have, plus credit that friends and community members back you with from their own.
                                 </p>
                                 <div className="mt-auto">
                                   <Link
@@ -133,7 +133,7 @@ const Home: NextPage = () => {
                                 <BanknotesIcon className="h-8 w-8 sm:h-16 sm:w-16 text-blue-600 mx-auto mb-2 sm:mb-4" />
                                 <h2 className="text-base sm:text-3xl font-bold text-blue-700 mb-1 sm:mb-4">I&apos;m a Lender</h2>
                                 <p className="text-gray-600 mb-3 sm:mb-6 flex-1 text-xs sm:text-base hidden sm:block">
-                                  Deposit USDC to earn {apyDisplay} APY. In addition to the APY, this increases your credit score and allows you to make attestations or even borrow.
+                                  Deposit USDC to earn {apyDisplay} APY from the interest borrowers repay.
                                 </p>
                                 <div className="mt-auto">
                                   <div className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 sm:py-4 px-2 sm:px-6 rounded-lg text-xs sm:text-lg transition-colors">
@@ -243,12 +243,12 @@ const Home: NextPage = () => {
                   <div className="mt-6 bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-2xl p-6">
                     <div className="text-center">
                       <UserGroupIcon className="h-12 w-12 text-purple-600 mx-auto mb-3" />
-                      <h3 className="text-xl font-bold text-purple-700 mb-3">Help Others Build Credit</h3>
+                      <h3 className="text-xl font-bold text-purple-700 mb-3">Back Someone You Trust</h3>
                       <p className="text-gray-600 text-sm mb-4">
-                        Attest to friends and community members to help them build their credit scores.
+                        Lend part of your own credit to a friend. They can borrow against it, and you stand behind it.
                       </p>
                       <Link href="/attest" className="inline-block bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg text-sm transition-colors">
-                        Make Attestations
+                        Back a Borrower
                       </Link>
                     </div>
                   </div>
@@ -278,11 +278,11 @@ const Home: NextPage = () => {
             <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg text-center">
               <h2 className="text-xl font-semibold mb-4">Get Started with LoanLink</h2>
               <p className="text-gray-700 mb-4 max-w-xl mx-auto">
-                Connect your wallet to build a community-backed credit score and access fair micro-loans. Your reputation is
-                calculated entirely on-chain from social attestations.
+                Connect your wallet to access fair micro-loans backed by your community. You borrow against credit you
+                already have, or credit that people who know you back you with from their own.
               </p>
               <p className="text-gray-700 mb-6 max-w-xl mx-auto">
-                After connecting, you can request loans, lend funds to earn interest, or attest to friends’ creditworthiness.
+                After connecting, you can request loans, lend funds to earn interest, or back people you trust.
               </p>
               <p className="text-gray-700 font-medium">Use the “Connect Wallet” button in the top-right to begin.</p>
             </div>

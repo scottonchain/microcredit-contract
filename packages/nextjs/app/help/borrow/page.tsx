@@ -11,14 +11,17 @@ const BorrowHelpPage: NextPage = () => {
       </p>
       <ol className="list-decimal list-inside space-y-3 text-gray-700">
         <li>
-          <span className="font-medium">Create your attestation link.</span> On the Borrower page, copy your unique link (or QR code).
+          <span className="font-medium">Start from the credit you have.</span> Credit you earned before, or a line an
+          institution extends to you, is yours to borrow against.
         </li>
         <li>
-          <span className="font-medium">Share it with trusted peers.</span> Ask friends, family, or colleagues who know you to
-          open the link and click “Attest.” Each attestation raises your credit score.
+          <span className="font-medium">Ask people with credit to back you.</span> On the Borrower page, copy your backing link
+          (or QR code) and share it with people who know you. Backing you moves part of their own credit to you, and they stand
+          behind it if you do not repay.
         </li>
         <li>
-          <span className="font-medium">Watch your score.</span> Once your score is above 0%, the loan request form unlocks.
+          <span className="font-medium">Watch your limit.</span> Your limit is your own credit plus your backing. Once it is above
+          zero, the loan request form unlocks.
         </li>
         <li>
           <span className="font-medium">Request a loan.</span> Choose an amount and repayment period. The pool will match funds

@@ -14,6 +14,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import deployedContracts from "~~/contracts/deployedContracts";
 import scaffoldConfig from "~~/scaffold.config";
+import { contractErrorName, describeContractError } from "~~/utils/contractErrors";
 
 /**
  * Shared server-side relayer for the /api/meta/* routes. Each route receives a payload signed by
@@ -176,10 +177,12 @@ export function relayerRoute(handler: (body: Record<string, any>) => Promise<Rec
     try {
       return NextResponse.json(await handler(await req.json()));
     } catch (e: any) {
-      const status = e instanceof RelayerError ? e.status : 500;
-      const message = e?.shortMessage || e?.message || String(e);
-      console.error("[relayer] error:", message);
-      return NextResponse.json({ error: message }, { status });
+      // A contract revert is the caller's problem (400) and gets plain-language text.
+      const code = contractErrorName(e);
+      const status = e instanceof RelayerError ? e.status : code ? 400 : 500;
+      const message = describeContractError(e) || e?.shortMessage || e?.message || String(e);
+      console.error("[relayer] error:", code ?? "", message);
+      return NextResponse.json({ error: message, code }, { status });
     }
   };
 }

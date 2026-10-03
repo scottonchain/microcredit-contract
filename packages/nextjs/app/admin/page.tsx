@@ -111,10 +111,6 @@ const AdminPage: NextPage = () => {
     contractName: "DecentralizedMicrocredit",
   });
   
-  // PageRank computation state
-  const [pageRankLoading, setPageRankLoading] = useState(false);
-  const [pageRankResult, setPageRankResult] = useState<string>("");
-
   // Centralized permissions
   const hasAccess = !!admin;
 
@@ -126,78 +122,6 @@ const AdminPage: NextPage = () => {
   const availableFunds = poolInfo ? poolInfo[1] : undefined;
   const lenderCount = poolInfo ? poolInfo[3] : undefined;
 
-  const handleComputePageRank = async () => {
-    setPageRankLoading(true);
-    setPageRankResult("");
-    try {
-      console.log("🔄 Starting PageRank computation process...");
-      setPageRankResult("🔄 Starting PageRank computation process...");
-      
-      // Log current state before clearing
-      console.log("📊 Current PageRank nodes:", pageRankData?.[0]?.length || 0);
-      console.log("📊 Current PageRank scores:", pageRankData?.[1]?.length || 0);
-      
-      // Skip clearing PageRank state to avoid gas issues
-      console.log("⚠️ Skipping PageRank state clearing (gas optimization)...");
-      setPageRankResult("⚠️ Skipping PageRank state clearing (gas optimization)...");
-      console.log("✅ Proceeding directly to PageRank computation");
-      setPageRankResult("✅ Proceeding directly to PageRank computation...");
-      
-      // Then compute PageRank with detailed logging
-      console.log("🚀 Starting PageRank computation...");
-      setPageRankResult("🚀 Starting PageRank computation (this may take a while)...");
-      
-      const result = await writeContractAsync({
-        functionName: "computePageRank",
-      });
-      
-      console.log("✅ PageRank computation completed successfully!");
-      console.log("📈 Iterations completed:", result);
-      setPageRankResult(`✅ PageRank computed successfully! Iterations: ${result}`);
-      
-    } catch (error) {
-      console.error("❌ Error computing PageRank:", error);
-      
-      // Check if it's a gas limit error
-      const errorMessage = (error as Error).message;
-      if (errorMessage.includes("gas") || errorMessage.includes("Gas") || errorMessage.includes("out of gas")) {
-        setPageRankResult(`❌ Gas Limit Error: ${errorMessage}. Try reducing the number of nodes or increasing gas limit.`);
-      } else if (errorMessage.includes("execution reverted")) {
-        setPageRankResult(`❌ Execution Reverted: ${errorMessage}. Check contract state and try again.`);
-      } else {
-        setPageRankResult(`❌ Error: ${errorMessage}`);
-      }
-    } finally {
-      setPageRankLoading(false);
-    }
-  };
-
-  const handleClearPageRank = async () => {
-    setPageRankLoading(true);
-    setPageRankResult("");
-    try {
-      console.log("🧹 Attempting to clear PageRank state...");
-      setPageRankResult("🧹 Attempting to clear PageRank state...");
-      
-      await writeContractAsync({
-        functionName: "clearPageRankState",
-      });
-      
-      console.log("✅ PageRank state cleared successfully!");
-      setPageRankResult("✅ PageRank state cleared successfully!");
-    } catch (error) {
-      console.error("❌ Error clearing PageRank:", error);
-      const errorMessage = (error as Error).message;
-      
-      if (errorMessage.includes("OutOfGas")) {
-        setPageRankResult("❌ Gas Limit Error: Too many nodes to clear. Try computing PageRank directly without clearing.");
-      } else {
-        setPageRankResult(`❌ Error: ${errorMessage}`);
-      }
-    } finally {
-      setPageRankLoading(false);
-    }
-  };
 
 
 
@@ -243,36 +167,19 @@ const AdminPage: NextPage = () => {
     contractName: "DecentralizedMicrocredit",
     functionName: "getAllLoanIds",
   });
-  const { data: pageRankData } = useScaffoldReadContract({
+  // Everyone who has been backed, and everyone who has backed someone.
+  const { data: borrowerList } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "getAllPageRankScores",
+    functionName: "getBackedBorrowers",
   });
-  
-
-  
-  // Extract borrowers from PageRank nodes (addresses that have received attestations)
-  const borrowerList = pageRankData ? pageRankData[0] : undefined;
   const { data: lenderList } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "getLenders",
   });
   
-  // Calculate total attestations by summing up attestations for all borrowers
-  const totalAttestations = useMemo(() => {
-    if (!borrowerList) return 0;
-    // This is a rough estimate - in a real implementation, you'd want to fetch all attestations
-    // For now, we'll assume each borrower has attestations from each lender
-    return borrowerList.length * (lenderList?.length || 0);
-  }, [borrowerList, lenderList]);
-  
-  // Check if PageRank has been computed (any non-zero scores)
-  const hasPageRankScores = useMemo(() => {
-    if (!pageRankData || !pageRankData[1]) return false;
-    return pageRankData[1].some(score => score > 0n);
-  }, [pageRankData]);
-  const { data: attesterList } = useScaffoldReadContract({
+  const { data: backerList } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
-    functionName: "getAttesters",
+    functionName: "getBackers",
   });
 
   /* --------------------------------------------------------------------------
@@ -282,7 +189,7 @@ const AdminPage: NextPage = () => {
   const LenderRow = ({ address, index }: { address: `0x${string}`; index: number }) => {
     const { data: deposit } = useScaffoldReadContract({
       contractName: "DecentralizedMicrocredit",
-      functionName: "lenderDeposits",
+      functionName: "lenderBalance",
       args: [address],
     });
 
@@ -453,9 +360,9 @@ const AdminPage: NextPage = () => {
       args: [address],
     });
 
-    const { data: pageRankScore } = useScaffoldReadContract({
+    const { data: borrowLimit } = useScaffoldReadContract({
       contractName: "DecentralizedMicrocredit",
-      functionName: "getPageRankScore",
+      functionName: "getBorrowLimit",
       args: [address],
     });
 
@@ -501,9 +408,7 @@ const AdminPage: NextPage = () => {
         <td className={getCreditScoreColor(creditScore)}>
           {creditScore ? `${(Number(creditScore) / 1e4).toFixed(1)}%` : "-"}
         </td>
-        <td>
-          {pageRankScore ? `${(Number(pageRankScore) / 1000).toFixed(2)}%` : "-"}
-        </td>
+        <td>{borrowLimit ? formatUSDC(borrowLimit[0]) : "-"}</td>
         <td>
           {borrowerLoanIds && borrowerLoanIds.length > 0 ? (
             <BorrowerLoanAmounts loanIds={borrowerLoanIds} />
@@ -558,7 +463,7 @@ const AdminPage: NextPage = () => {
                 <th>#</th>
                 <th>Address</th>
                 <th>Credit Score</th>
-                <th>PageRank</th>
+                <th>Credit Limit</th>
                 <th>Loans</th>
                 <th>Max Loan</th>
                 <th>KYC Status</th>
@@ -592,89 +497,55 @@ const AdminPage: NextPage = () => {
     );
   };
 
-  // ──────────── ATTESTATIONS TABLE ────────────
-  const AttestationsTable = ({ borrowers }: { borrowers?: readonly `0x${string}`[] }) => {
+  // ──────────── BACKINGS TABLE ────────────
+  const BackingsTable = ({ borrowers }: { borrowers?: readonly `0x${string}`[] }) => {
     const [filter, setFilter] = useState("");
-    const [allAttestations, setAllAttestations] = useState<Array<{
-      borrower: `0x${string}`;
-      attester: `0x${string}`;
-      weight: bigint;
-    }>>([]);
+    const [allBackings, setAllBackings] = useState<
+      Array<{ borrower: `0x${string}`; backer: `0x${string}`; secured: bigint; unsecured: bigint }>
+    >([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Fetch all attestations when component mounts
     useEffect(() => {
-      const fetchAllAttestations = async () => {
-        if (!borrowers || borrowers.length === 0) {
-          setAllAttestations([]);
-          setIsLoading(false);
-          return;
-        }
-
-        const attestations: Array<{
-          borrower: `0x${string}`;
-          attester: `0x${string}`;
-          weight: bigint;
-        }> = [];
-
-        // Fetch attestations for each borrower
-        for (const borrower of borrowers) {
+      const fetchAllBackings = async () => {
+        const rows: typeof allBackings = [];
+        for (const borrower of borrowers ?? []) {
           try {
-            console.log(`Fetching attestations for borrower: ${borrower}`);
-            const attests = await publicClient.readContract({
+            const backings = (await publicClient.readContract({
               address: MICROCREDIT_ADDRESS as `0x${string}`,
               abi: MICROCREDIT_ABI,
-              functionName: "getBorrowerAttestations",
+              functionName: "getBackings",
               args: [borrower],
-            });
-
-            console.log(`Attestations for ${borrower}:`, attests);
-            
-            if (attests && Array.isArray(attests)) {
-              const list = attests as readonly any[];
-              list.forEach((a) => {
-                const attesterAddr = (a.attester ?? a[0]) as `0x${string}`;
-                const weightVal = (a.weight ?? a[1]) as bigint;
-                attestations.push({
-                  borrower,
-                  attester: attesterAddr,
-                  weight: weightVal,
-                });
-              });
+            })) as readonly { backer: `0x${string}`; secured: bigint; unsecured: bigint }[];
+            for (const { backer, secured, unsecured } of backings) {
+              if (secured + unsecured > 0n) rows.push({ borrower, backer, secured, unsecured });
             }
           } catch (error) {
-            console.error(`Failed to fetch attestations for borrower ${borrower}:`, error);
-            // Continue with other borrowers even if one fails
+            console.error(`Failed to fetch backings for ${borrower}:`, error);
           }
         }
-
-        setAllAttestations(attestations);
+        setAllBackings(rows);
         setIsLoading(false);
       };
-
-      fetchAllAttestations();
+      fetchAllBackings();
     }, [borrowers]);
 
-    // Filter attestations based on search text
-    const filteredAttestations = useMemo(() => {
-      if (!filter) return allAttestations;
-      
+    const filteredBackings = useMemo(() => {
+      if (!filter) return allBackings;
       const lowerFilter = filter.toLowerCase();
-      return allAttestations.filter(att => 
-        att.borrower.toLowerCase().includes(lowerFilter) ||
-        att.attester.toLowerCase().includes(lowerFilter)
+      return allBackings.filter(
+        row => row.borrower.toLowerCase().includes(lowerFilter) || row.backer.toLowerCase().includes(lowerFilter),
       );
-    }, [allAttestations, filter]);
+    }, [allBackings, filter]);
 
     if (!borrowers || borrowers.length === 0) return null;
 
     return (
       <div>
-        <h3 className="font-medium mb-2">Attestations</h3>
+        <h3 className="font-medium mb-2">Backings</h3>
         <div className="mb-4">
           <input
             type="text"
-            placeholder="Filter by borrower or attester address"
+            placeholder="Filter by borrower or backer address"
             value={filter}
             onChange={e => setFilter(e.target.value)}
             className="input input-bordered w-full max-w-md"
@@ -685,45 +556,41 @@ const AdminPage: NextPage = () => {
             <thead>
               <tr>
                 <th>Borrower</th>
-                <th>Attester</th>
-                <th>Strength</th>
+                <th>Backer</th>
+                <th>Secured (stake)</th>
+                <th>Unsecured (credit)</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={3} className="text-center text-gray-500 py-4">
-                    Loading attestations...
+                  <td colSpan={4} className="text-center text-gray-500 py-4">
+                    Loading backings...
                   </td>
                 </tr>
-              ) : filteredAttestations.length === 0 ? (
+              ) : filteredBackings.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="text-center text-gray-500 py-4">
-                    {filter ? 'No attestations match your filter' : 'No attestations found'}
+                  <td colSpan={4} className="text-center text-gray-500 py-4">
+                    {filter ? "No backings match your filter" : "No backings found"}
                   </td>
                 </tr>
               ) : (
-                filteredAttestations.map((att, index) => (
-                  <tr key={`${att.borrower}-${att.attester}-${index}`} className="hover text-sm">
+                filteredBackings.map(row => (
+                  <tr key={`${row.borrower}-${row.backer}`} className="hover text-sm">
                     <td>
-                      <Address address={att.borrower} />
+                      <Address address={row.borrower} />
                     </td>
                     <td>
-                      <Address address={att.attester} />
+                      <Address address={row.backer} />
                     </td>
-                    <td>{(Number(att.weight) / 10000).toFixed(1)}%</td>
+                    <td>{formatUSDC(row.secured)}</td>
+                    <td>{formatUSDC(row.unsecured)}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
-        {filteredAttestations.length > 0 && (
-          <div className="mt-2 text-sm text-gray-600">
-            Showing {filteredAttestations.length} of {allAttestations.length} attestations
-            {filter && ` (filtered by "${filter}")`}
-          </div>
-        )}
       </div>
     );
   };
@@ -919,44 +786,6 @@ const AdminPage: NextPage = () => {
             </div>
           </div>
 
-          {/* PageRank Computation - Moved to top */}
-          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">PageRank Computation</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Compute PageRank scores for all users. This is required for credit scores to work properly.
-            </p>
-            <div className="text-sm mb-4">
-              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                hasPageRankScores ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-              }`}>
-                PageRank Status: {hasPageRankScores ? 'Computed' : 'Not Computed'}
-              </span>
-              {pageRankData && (
-                <span className="ml-2 text-gray-600">
-                  ({pageRankData[0]?.length || 0} nodes)
-                </span>
-              )}
-            </div>
-            <button
-              onClick={handleComputePageRank}
-              disabled={pageRankLoading}
-              className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition-colors"
-            >
-              {pageRankLoading ? "Computing PageRank..." : "Compute PageRank"}
-            </button>
-            {pageRankResult && (
-              <div className="mt-2 text-sm">
-                <span className={pageRankResult.includes("Error") ? "text-red-500" : "text-green-500"}>
-                  {pageRankResult}
-                </span>
-              </div>
-            )}
-            <div className="mt-2 text-sm text-gray-600">
-              <p>💡 <strong>Debug Info:</strong> Open browser console (F12) to see detailed logs during PageRank computation.</p>
-              <p>⚠️ <strong>Gas Optimization:</strong> PageRank computation now skips clearing to avoid gas limits.</p>
-              <p>🔧 <strong>Current State:</strong> {pageRankData?.[0]?.length || 0} nodes, {pageRankData?.[1]?.filter(score => score > 0n).length || 0} with scores</p>
-            </div>
-          </div>
 
 
 
@@ -1056,12 +885,8 @@ const AdminPage: NextPage = () => {
                 <div className="text-sm text-gray-600">Lenders</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-orange-500">{attesterList ? attesterList.length : "-"}</div>
-                <div className="text-sm text-gray-600">Attesters</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-red-500">{totalAttestations}</div>
-                <div className="text-sm text-gray-600">Attestations</div>
+                <div className="text-2xl font-bold text-orange-500">{backerList ? backerList.length : "-"}</div>
+                <div className="text-sm text-gray-600">Backers</div>
               </div>
             </div>
           </div>
@@ -1114,7 +939,7 @@ const AdminPage: NextPage = () => {
               {/* 🔑 Casts added below fix TS2322 */}
               <LenderTable lenders={lenderList as readonly `0x${string}`[] | undefined} />
               <BorrowerTable borrowers={borrowerList as readonly `0x${string}`[] | undefined} />
-              <AttestationsTable borrowers={borrowerList as readonly `0x${string}`[] | undefined} />
+              <BackingsTable borrowers={borrowerList as readonly `0x${string}`[] | undefined} />
               <LoanTable loanIds={allLoanIds} />
             </div>
           </div>
@@ -1171,15 +996,7 @@ const AdminPage: NextPage = () => {
                         utilisationPct < capPct * 0.9 ? "bg-green-500" : "bg-yellow-500"
                       }`}
                     ></div>
-                    <span>Attester Count: {attesterList ? attesterList.length : "-"}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        utilisationPct < capPct * 0.9 ? "bg-green-500" : "bg-yellow-500"
-                      }`}
-                    ></div>
-                    <span>Attestation Count: {totalAttestations}</span>
+                    <span>Backer Count: {backerList ? backerList.length : "-"}</span>
                   </div>
                 </div>
               </div>

@@ -3,13 +3,13 @@
  *
  * Playwright script that walks through a complete microcredit lending scenario:
  *
- *   Step 1  — Brighton gets his own attestation link.  He visits /attest with his
- *             own address in the URL and sees "This is your attestation link" plus
- *             a copy button.  The PoolStatsBar at the top shows the pool size and
- *             lender APY, so the viewer can read them here without a separate step.
- *   Step 2  — Avery attests to Brighton with 80 % confidence (/attest).
- *             PageRank is computed automatically by the contract.
- *   Step 3  — Brighton requests a 50 USDC loan, 28-day term (/borrower).
+ *   Step 1  — Brighton gets his own backing link.  He already has a 25 USDC credit
+ *             line of his own.  He visits /attest with his own address in the URL and
+ *             sees "This is your backing link" plus a copy button.  The PoolStatsBar at
+ *             the top shows the pool size and lender APY.
+ *   Step 2  — Avery backs Brighton with 50 USDC of her own 92 USDC of credit (/attest).
+ *             Her limit falls to 42 as Brighton's rises to 75: credit moves, it is not created.
+ *   Step 3  — Brighton borrows 40 USDC, 28-day term (/borrower).
  *             Gasless meta-transaction — Brighton needs no ETH.
  *   Step 4  — Brighton repays the loan in full (/borrower).
  *
@@ -275,13 +275,11 @@ async function main() {
     await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => localStorage.removeItem('__demoAccount'));
 
-    // ── STEP 1: Brighton gets his own attestation link ───────────────────────
+    // ── STEP 1: Brighton gets his own backing link ───────────────────────────
     // Brighton visits /attest with his own address pre-filled in the URL.
     // The page detects that the connected address matches the borrower param
-    // and shows "This is your attestation link" with a copy button.
-    // The PoolStatsBar widget at the top of the page already shows the pool
-    // size and lender APY — no separate step needed.
-    banner(1, `${ACCOUNTS.borrower.name} gets his attestation link`);
+    // and shows "This is your backing link" with a copy button.
+    banner(1, `${ACCOUNTS.borrower.name} gets his backing link`);
     await gotoAs(
       page,
       `/attest?borrower=${ACCOUNTS.borrower.address}`,
@@ -290,26 +288,25 @@ async function main() {
     await connectWallet(page);
     await sleep(800);
 
-    // Wait for the "This is your attestation link" banner to appear
-    await waitForStatus(page, 'This is your attestation link', 10000);
-    console.log('  → "This is your attestation link" banner visible');
+    // Wait for the "This is your backing link" banner to appear
+    await waitForStatus(page, 'This is your backing link', 10000);
+    console.log('  → "This is your backing link" banner visible');
     await sleep(STEP_PAUSE);
 
-    // Click the "Copy Attestation Link" button so the viewer sees the action
-    const copyBtn = page.getByRole('button', { name: /copy attestation link/i });
+    // Click the "Copy Backing Link" button so the viewer sees the action
+    const copyBtn = page.getByRole('button', { name: /copy backing link/i });
     if (await copyBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      console.log('  → clicking Copy Attestation Link');
+      console.log('  → clicking Copy Backing Link');
       await copyBtn.click();
       await sleep(1000);
     }
     await sleep(STEP_PAUSE);
 
-    // ── STEP 2: Avery attests to Brighton ────────────────────────────────────
-    // Avery visits the same URL Brighton shared — the form is pre-filled with
-    // Brighton's address.  Avery sets confidence to 80 % and submits.
-    // PageRank is re-computed automatically by the contract when the
-    // attestation is recorded — no separate admin step required.
-    banner(2, `${ACCOUNTS.attester.name} attests to ${ACCOUNTS.borrower.name} with 80% confidence`);
+    // ── STEP 2: Avery backs Brighton ─────────────────────────────────────────
+    // Avery visits the link Brighton shared — the form is pre-filled with his
+    // address.  She backs him with 50 USDC of her own credit: her limit drops
+    // by exactly what his rises.
+    banner(2, `${ACCOUNTS.attester.name} backs ${ACCOUNTS.borrower.name} with 50 USDC of credit`);
     await gotoAs(
       page,
       `/attest?borrower=${ACCOUNTS.borrower.address}`,
@@ -318,28 +315,24 @@ async function main() {
     await connectWallet(page);
     await sleep(600);
 
-    // Wait for the "You were invited to make an attestation" banner
-    await waitForStatus(page, 'invited to make an attestation|pre-filled', 8000);
+    // Wait for the "You are invited to back" banner
+    await waitForStatus(page, 'invited to back', 8000);
     console.log(`  → ${ACCOUNTS.attester.name} sees ${ACCOUNTS.borrower.name}'s address pre-filled in the form`);
     await sleep(400);
 
-    console.log('  → setting confidence slider to 80');
-    await page.locator('input[type="range"]').evaluate((el) => {
-      el.value = '80';
-      el.dispatchEvent(new Event('input',  { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    console.log('  → entering backing amount: 50');
+    await page.locator('input[type="number"]').first().fill('50');
     await sleep(400);
 
-    console.log('  → clicking Submit Attestation');
-    await page.getByRole('button', { name: 'Submit Attestation' }).click();
-    await waitForStatus(page, 'success|submitted|attested|0x[0-9a-f]{10}', 35000);
+    console.log('  → clicking Back with $50.00');
+    await page.getByRole('button', { name: /back with/i }).click();
+    await waitForStatus(page, 'Backing Recorded', 35000);
     await sleep(STEP_PAUSE);
 
-    // ── STEP 3: Brighton requests a 50 USDC loan ─────────────────────────
+    // ── STEP 3: Brighton borrows 40 USDC ──────────────────────────────────────
     // All transactions are gasless meta-transactions paid by the relayer —
     // Brighton does not need ETH.
-    banner(3, `${ACCOUNTS.borrower.name} requests a 50 USDC loan — 28-day term`);
+    banner(3, `${ACCOUNTS.borrower.name} borrows 40 USDC for 28 days`);
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
 
@@ -359,8 +352,8 @@ async function main() {
     await sleep(400);
 
     // Fill the loan amount (number input)
-    console.log('  → entering loan amount: 50');
-    await page.locator('input[type="number"]').first().fill('50');
+    console.log('  → entering loan amount: 40');
+    await page.locator('input[type="number"]').first().fill('40');
     await sleep(400);
 
     console.log('  → clicking One-Click Borrow');

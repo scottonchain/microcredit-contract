@@ -7,265 +7,310 @@ import { toast } from "react-hot-toast";
 import { AddressInput } from "~~/components/scaffold-eth";
 import { DocumentDuplicateIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { useAddressDisplayName } from "~~/hooks/useAddressDisplayName";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
-import { AttestRequest, MICRO_DOMAIN, TYPES } from "~~/utils/eip712";
+import { relayerErrorMessage } from "~~/utils/contractErrors";
+import { getParsedError } from "~~/utils/scaffold-eth";
+import { formatUSDC } from "~~/utils/format";
+import { BackRequest, MICRO_DOMAIN, TYPES } from "~~/utils/eip712";
 import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS } from "~~/utils/microcredit";
 
 // useSearchParams() needs a Suspense boundary for the page to be prerendered at build time.
-export default function AttestPage() {
+export default function BackPage() {
   return (
     <Suspense>
-      <AttestForm />
+      <BackForm />
     </Suspense>
   );
 }
 
-function AttestForm() {
+/** Parses a USDC amount typed by the user into 6-decimal units; null when invalid. */
+const parseUsdc = (value: string): bigint | null => {
+  const parsed = Number(value);
+  if (!value.trim() || Number.isNaN(parsed) || parsed < 0) return null;
+  return BigInt(Math.round(parsed * 1e6));
+};
+
+function BackForm() {
   const searchParams = useSearchParams();
   const { address: connectedAddress } = useAccount();
   const { signTypedDataAsync } = useSignTypedData();
-
   const publicClient = usePublicClient({ chainId: CHAIN_ID });
 
-  // Attestation form state
-  const [attestBorrower, setAttestBorrower] = useState<string>("");
-  const [attestWeight, setAttestWeight] = useState<number>(80);
-  const [attestLoading, setAttestLoading] = useState(false);
-  const [arrivedViaAttestLink, setArrivedViaAttestLink] = useState(false);
-  const [submittedInfo, setSubmittedInfo] = useState<{ attester: string; attesterName?: string; borrower: string; weight: number; txHash?: string } | null>(null);
+  const [borrower, setBorrower] = useState<string>("");
+  const [amountInput, setAmountInput] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [stakeLoading, setStakeLoading] = useState(false);
+  const [arrivedViaLink, setArrivedViaLink] = useState(false);
+  const [submitted, setSubmitted] = useState<{ borrower: string; amount: bigint; txHash?: string } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
-  const borrowerDisplayName = useAddressDisplayName(attestBorrower || undefined);
-  const { displayName: attesterDisplayName } = useDisplayName();
+  const borrowerDisplayName = useAddressDisplayName(borrower || undefined);
+  const { displayName: backerDisplayName } = useDisplayName();
+  const isOwnLink = !!connectedAddress && !!borrower && connectedAddress.toLowerCase() === borrower.toLowerCase();
 
-  const copyAttestationLink = async () => {
+  // ── Your credit: granted (score x max loan) and staked; backing commits part of it ──
+  const { data: granted } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "grantedCredit",
+    args: [connectedAddress],
+  });
+  const { data: staked, refetch: refetchStake } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "stakeOf",
+    args: [connectedAddress],
+  });
+  const { data: free, refetch: refetchFree } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getFreeCredit",
+    args: [connectedAddress],
+  });
+  const { data: currentBacking, refetch: refetchBacking } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getBacking",
+    args: [connectedAddress, (borrower || undefined) as `0x${string}` | undefined],
+  });
+  const { writeContractAsync: writeCreditAsync } = useScaffoldWriteContract({ contractName: "DecentralizedMicrocredit" });
+  const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({ contractName: "MockUSDC" });
+
+  const amount = parseUsdc(amountInput);
+  const backedNow = currentBacking ? currentBacking[0] + currentBacking[1] : 0n;
+  const freeCredit = free?.[0] ?? 0n;
+  const freeStake = free?.[1] ?? 0n;
+  // Raising a backing commits free credit first, then free stake; the rest has to be staked.
+  const extra = amount !== null && amount > backedNow ? amount - backedNow : 0n;
+  const fromCredit = extra < freeCredit ? extra : freeCredit;
+  const stakeShortfall = extra - fromCredit > freeStake ? extra - fromCredit - freeStake : 0n;
+
+  const copyLink = async () => {
     if (!connectedAddress) return;
-    const url = `${window.location.origin}/attest?borrower=${connectedAddress}`;
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(`${window.location.origin}/attest?borrower=${connectedAddress}`);
       setLinkCopied(true);
-      toast.success("Attestation link copied!", { position: "top-center", duration: 2000 });
+      toast.success("Backing link copied!", { position: "top-center", duration: 2000 });
       setTimeout(() => setLinkCopied(false), 2500);
     } catch {
       toast.error("Could not copy link", { position: "top-center" });
     }
   };
 
-  // Connected user's own credit score
-  const [myScore, setMyScore] = useState<number | null>(null);
-  useEffect(() => {
-    if (!connectedAddress || !publicClient) return;
-    publicClient
-      .readContract({
-        address: MICROCREDIT_ADDRESS,
-        abi: MICROCREDIT_ABI,
-        functionName: "getCreditScore",
-        args: [connectedAddress as `0x${string}`],
-      })
-      .then((score) => setMyScore(Number(score as bigint)))
-      .catch(() => setMyScore(null));
-  }, [connectedAddress, publicClient]);
-
-  // Prefill from query params (?borrower=0x...&weight=80)
+  // Prefill from query params (?borrower=0x...&amount=50)
   useEffect(() => {
     if (!searchParams) return;
     const borrowerParam = searchParams.get("borrower");
-    const weightParam = searchParams.get("weight");
+    const amountParam = searchParams.get("amount");
     if (borrowerParam) {
-      setAttestBorrower(borrowerParam);
-      setArrivedViaAttestLink(true);
+      setBorrower(borrowerParam);
+      setArrivedViaLink(true);
     }
-    if (weightParam) {
-      const w = Number(weightParam);
-      if (!Number.isNaN(w) && w >= 1 && w <= 100) setAttestWeight(w);
-    }
+    if (amountParam && parseUsdc(amountParam) !== null) setAmountInput(amountParam);
   }, [searchParams]);
 
-  // Persist prefill in session storage so refreshes keep the form
-  useEffect(() => {
-    try {
-      if (attestBorrower) {
-        window.sessionStorage.setItem("attest_prefill_borrower", attestBorrower);
-      }
-    } catch {}
-  }, [attestBorrower]);
+  const refreshCredit = () => Promise.all([refetchStake(), refetchFree(), refetchBacking()]);
 
-  useEffect(() => {
+  const handleStake = async () => {
+    if (!connectedAddress || stakeShortfall === 0n) return;
+    setStakeLoading(true);
     try {
-      window.sessionStorage.setItem("attest_prefill_weight", String(attestWeight));
-    } catch {}
-  }, [attestWeight]);
+      await writeUsdcAsync({ functionName: "approve", args: [MICROCREDIT_ADDRESS, stakeShortfall] });
+      await writeCreditAsync({ functionName: "stake", args: [stakeShortfall] });
+      await refreshCredit();
+      toast.success(`Staked ${formatUSDC(stakeShortfall)}`, { position: "top-center" });
+    } catch (err: any) {
+      console.error("Stake error", err);
+      toast.error(`Failed to stake: ${getParsedError(err)}`);
+    } finally {
+      setStakeLoading(false);
+    }
+  };
 
-  // Main submit handler (gasless via relayer)
-  const handleAttestation = async () => {
-    if (!attestBorrower || !connectedAddress) return;
-    setAttestLoading(true);
+  // Gasless: the backer signs a BackRequest and the relayer submits it.
+  const handleBack = async () => {
+    if (!borrower || !connectedAddress || amount === null) return;
+    setLoading(true);
     try {
       if (!publicClient) throw new Error("Contract not available");
-      const attester = connectedAddress as `0x${string}`;
-      const borrower = attestBorrower as `0x${string}`;
-      const weight = BigInt(attestWeight * 10000); // percent -> SCALE(1e6)
-
-      const metaNonce = (await publicClient.readContract({
+      const backer = connectedAddress as `0x${string}`;
+      const nonce = (await publicClient.readContract({
         address: MICROCREDIT_ADDRESS,
         abi: MICROCREDIT_ABI,
         functionName: "nonces",
-        args: [attester],
+        args: [backer],
       })) as bigint;
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+      const req: BackRequest = { backer, borrower: borrower as `0x${string}`, amount, nonce, deadline };
 
-      const rq: AttestRequest = { attester, borrower, weight, nonce: metaNonce, deadline };
-
-      const sig = await signTypedDataAsync({
+      const signature = await signTypedDataAsync({
         domain: MICRO_DOMAIN(CHAIN_ID, MICROCREDIT_ADDRESS) as any,
-        types: { AttestRequest: TYPES.AttestRequest } as any,
-        primaryType: "AttestRequest",
-        message: rq as any,
+        types: { BackRequest: TYPES.BackRequest } as any,
+        primaryType: "BackRequest",
+        message: req as any,
       });
 
-      const resp = await fetch("/api/meta/attest", {
+      const resp = await fetch("/api/meta/back", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chainId: CHAIN_ID,
           contractAddress: MICROCREDIT_ADDRESS,
           req: {
-            attester,
+            backer,
             borrower,
-            weight: weight.toString(),
-            nonce: metaNonce.toString(),
+            amount: amount.toString(),
+            nonce: nonce.toString(),
             deadline: deadline.toString(),
           },
-          signature: sig,
+          signature,
         }),
       });
-      if (!resp.ok) throw new Error(await resp.text());
-      const j = await resp.json();
-      console.log("Meta attestation result:", j);
-
-      const txHash = j?.txHash || j?.hash || j?.transactionHash || undefined;
-      setSubmittedInfo({ attester, attesterName: attesterDisplayName || undefined, borrower, weight: Number(attestWeight), txHash });
-      toast.success("Attestation submitted via relayer", { position: "top-center" });
+      if (!resp.ok) throw new Error(await relayerErrorMessage(resp));
+      const result = await resp.json();
+      await refreshCredit();
+      setSubmitted({ borrower, amount, txHash: result?.txHash });
+      toast.success("Backing recorded", { position: "top-center" });
     } catch (err: any) {
-      console.error("Meta attestation error", err);
-      toast.error(`Failed to attest: ${err?.message || "Unknown error"}`);
+      console.error("Backing error", err);
+      toast.error(`Failed to back: ${err?.message || "Unknown error"}`);
     } finally {
-      setAttestLoading(false);
+      setLoading(false);
     }
   };
 
   return (
     <div className="flex items-center flex-col grow pt-10">
       <div className="px-5 w-full max-w-2xl">
-        {arrivedViaAttestLink && !submittedInfo && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6">
-            {connectedAddress ? (
-              attestBorrower && connectedAddress.toLowerCase() === attestBorrower.toLowerCase() ? (
-                <div className="text-blue-800">
-                  <h3 className="text-lg font-semibold mb-2">This is your attestation link</h3>
-                  <p className="mb-3">Share this URL so others can attest to your creditworthiness. The form is pre-filled with your address.</p>
-                  <button
-                    onClick={copyAttestationLink}
-                    className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-                  >
-                    {linkCopied ? (
-                      <><CheckIcon className="h-4 w-4" /> Copied!</>
-                    ) : (
-                      <><DocumentDuplicateIcon className="h-4 w-4" /> Copy Attestation Link</>
-                    )}
-                  </button>
-                </div>
-              ) : (
-                <div className="text-blue-800">
-                  <h3 className="text-lg font-semibold mb-1">
-                    You are invited to make an attestation for{" "}
-                    {borrowerDisplayName ? (
-                      <strong>{borrowerDisplayName}</strong>
-                    ) : (
-                      <span className="font-mono break-all">{attestBorrower}</span>
-                    )}
-                  </h3>
-                </div>
-              )
-            ) : (
-              <div className="text-blue-800">
-                <h3 className="text-lg font-semibold mb-1">Attestation link detected</h3>
+        {arrivedViaLink && !submitted && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6 text-blue-800">
+            {!connectedAddress ? (
+              <>
+                <h3 className="text-lg font-semibold mb-1">Backing link detected</h3>
                 <p>Connect your wallet to continue. The form will be pre-filled.</p>
-              </div>
+              </>
+            ) : isOwnLink ? (
+              <>
+                <h3 className="text-lg font-semibold mb-2">This is your backing link</h3>
+                <p className="mb-3">
+                  Share it with people who have credit. Backing you moves part of their credit to you.
+                </p>
+                <button
+                  onClick={copyLink}
+                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                >
+                  {linkCopied ? (
+                    <>
+                      <CheckIcon className="h-4 w-4" /> Copied!
+                    </>
+                  ) : (
+                    <>
+                      <DocumentDuplicateIcon className="h-4 w-4" /> Copy Backing Link
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              <h3 className="text-lg font-semibold">
+                You are invited to back{" "}
+                {borrowerDisplayName ? (
+                  <strong>{borrowerDisplayName}</strong>
+                ) : (
+                  <span className="font-mono break-all">{borrower}</span>
+                )}
+              </h3>
             )}
           </div>
         )}
 
-        {connectedAddress && myScore !== null && (
-          <div className="bg-base-200 border border-base-300 rounded-lg p-4 mb-6 flex items-center justify-between">
-            <div>
-              <div className="text-sm text-gray-500">Your credit score</div>
-              <div className="text-2xl font-bold">{(myScore / 10000).toFixed(1)}%</div>
+        {connectedAddress && granted !== undefined && free !== undefined && (
+          <div className="bg-base-200 border border-base-300 rounded-lg p-4 mb-6 text-sm">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <div className="text-gray-500">Your credit</div>
+                <div className="text-xl font-bold">{formatUSDC(granted)}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Staked</div>
+                <div className="text-xl font-bold">{formatUSDC(staked ?? 0n)}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Free to back</div>
+                <div className="text-xl font-bold">{formatUSDC(freeCredit + freeStake)}</div>
+              </div>
             </div>
-            <div
-              className={`radial-progress text-sm font-semibold ${
-                myScore >= 900000 ? "text-success" : myScore >= 600000 ? "text-warning" : "text-error"
-              }`}
-              style={{ "--value": String(Math.round(myScore / 10000)), "--size": "3.5rem" } as React.CSSProperties}
-            >
-              {Math.round(myScore / 10000)}%
-            </div>
+            <p className="text-gray-500 mt-3">
+              Backing moves part of your own credit to the borrower: your limit drops by what theirs gains. If they
+              default, your backing pays first. Staked USDC is slashed and committed credit is lost. Without credit or
+              stake you have nothing to back with.
+            </p>
           </div>
         )}
 
-        {!submittedInfo ? (
-          <>
-            <div className="bg-base-100 rounded-lg p-6 shadow w-full">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Borrower Address</label>
-                  <AddressInput value={attestBorrower} onChange={setAttestBorrower} placeholder="0x..." />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Confidence Level: {attestWeight}%</label>
-                  <input type="range" min="1" max="100" value={attestWeight} onChange={e=>setAttestWeight(Number(e.target.value))} className="w-full" />
-                </div>
-                <button onClick={handleAttestation} disabled={!attestBorrower || attestLoading || !connectedAddress} className="btn btn-primary w-full">
-                  {attestLoading ? "Submitting..." : "Submit Attestation"}
-                </button>
-              </div>
+        {!submitted ? (
+          <div className="bg-base-100 rounded-lg p-6 shadow w-full space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Borrower Address</label>
+              <AddressInput value={borrower} onChange={setBorrower} placeholder="0x..." />
             </div>
-
-            <div className="text-xs text-gray-500 mt-4 text-center">
-              Attestations are gasless: you sign a message and our relayer submits it on-chain.
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Back with (USDC){backedNow > 0n ? `, currently ${formatUSDC(backedNow)}` : ""}
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amountInput}
+                onChange={e => setAmountInput(e.target.value)}
+                placeholder="50"
+                className="input input-bordered w-full"
+              />
             </div>
-          </>
+            {stakeShortfall > 0n ? (
+              <button onClick={handleStake} disabled={stakeLoading || !connectedAddress} className="btn btn-secondary w-full">
+                {stakeLoading ? "Staking..." : `Stake ${formatUSDC(stakeShortfall)} to back this much`}
+              </button>
+            ) : (
+              <button
+                onClick={handleBack}
+                disabled={!borrower || amount === null || loading || !connectedAddress || isOwnLink}
+                className="btn btn-primary w-full"
+              >
+                {loading ? "Submitting..." : amount !== null ? `Back with ${formatUSDC(amount)}` : "Back"}
+              </button>
+            )}
+            <div className="text-xs text-gray-500 text-center">
+              Backing is gasless: you sign a message and our relayer submits it. Staking is a normal wallet
+              transaction.
+            </div>
+          </div>
         ) : (
           <div className="bg-base-100 rounded-lg p-6 shadow w-full">
-            <h2 className="text-xl font-semibold mb-4">Attestation Recorded</h2>
+            <h2 className="text-xl font-semibold mb-4">Backing Recorded</h2>
             <div className="space-y-3 text-sm">
               <div>
-                <div className="text-gray-600">Attester</div>
-                {submittedInfo.attesterName ? (
-                  <div className="font-semibold">{submittedInfo.attesterName}</div>
-                ) : null}
-                <div className="font-mono break-all text-xs text-gray-500">{submittedInfo.attester}</div>
+                <div className="text-gray-600">Backer</div>
+                {backerDisplayName ? <div className="font-semibold">{backerDisplayName}</div> : null}
+                <div className="font-mono break-all text-xs text-gray-500">{connectedAddress}</div>
               </div>
               <div>
                 <div className="text-gray-600">Borrower</div>
-                {borrowerDisplayName ? (
-                  <div className="font-semibold">{borrowerDisplayName}</div>
-                ) : null}
-                <div className="font-mono break-all text-xs text-gray-500">{submittedInfo.borrower}</div>
+                {borrowerDisplayName ? <div className="font-semibold">{borrowerDisplayName}</div> : null}
+                <div className="font-mono break-all text-xs text-gray-500">{submitted.borrower}</div>
               </div>
               <div>
-                <div className="text-gray-600">Confidence</div>
-                <div className="font-medium">{submittedInfo.weight}%</div>
+                <div className="text-gray-600">Backing</div>
+                <div className="font-medium">{formatUSDC(submitted.amount)}</div>
               </div>
-              {submittedInfo.txHash && (
+              {submitted.txHash && (
                 <div>
                   <div className="text-gray-600">Transaction</div>
-                  <div className="font-mono break-all text-xs text-gray-500">{submittedInfo.txHash}</div>
+                  <div className="font-mono break-all text-xs text-gray-500">{submitted.txHash}</div>
                 </div>
               )}
             </div>
             <div className="mt-6">
-              <button className="btn btn-outline" onClick={() => setSubmittedInfo(null)}>Edit</button>
+              <button className="btn btn-outline" onClick={() => setSubmitted(null)}>
+                Edit
+              </button>
             </div>
           </div>
         )}
