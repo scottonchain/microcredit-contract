@@ -214,6 +214,10 @@ contract DecentralizedMicrocredit is EIP712 {
     uint256 public liquidityThreshold; // absolute USDC new loans must leave liquid
     uint256 public protocolFeeBps; // share of repaid interest kept by the protocol, in BASIS_POINTS
     uint256 public protocolFees; // accrued, unclaimed protocol fees (USDC)
+    // Lender payouts the token refused to deliver (Circle's USDC refuses blacklisted addresses),
+    // held for the recipient outside lenderCash until claimPayout.
+    mapping(address => uint256) public unclaimedPayouts;
+    uint256 public totalUnclaimedPayouts;
     uint256 public reserveBps; // share of repaid interest that funds the first-loss reserve, in BASIS_POINTS
     // Junior claim on the pool: its cash sits in lenderCash and is lent like any other, but it
     // absorbs provisions and default losses before lenders' shares do (see totalAssets).
@@ -300,6 +304,8 @@ contract DecentralizedMicrocredit is EIP712 {
     /// @dev How a repayment was split; `fee` is the protocol's cut of `interest`.
     event RepaymentApplied(uint256 indexed loanId, uint256 interest, uint256 principal, uint256 fee);
     event ProtocolFeesClaimed(address indexed to, uint256 amount);
+    event PayoutHeld(address indexed to, uint256 amount);
+    event PayoutClaimed(address indexed to, uint256 amount);
     event ReserveFunded(address indexed from, uint256 amount);
     event ReserveReleased(uint256 amount);
     event Staked(address indexed account, uint256 amount);
@@ -980,6 +986,17 @@ contract DecentralizedMicrocredit is EIP712 {
         _tryFillWithdrawalQueue(maxItems);
     }
 
+    /// @notice Sends `to` the payouts held for it because the token refused them. Anyone may
+    ///         call it; the USDC only ever goes to `to`, and it reverts while the token still
+    ///         refuses.
+    function claimPayout(address to) external {
+        uint256 amount = unclaimedPayouts[to];
+        unclaimedPayouts[to] = 0;
+        totalUnclaimedPayouts -= amount;
+        _pushUsdc(to, amount);
+        emit PayoutClaimed(to, amount);
+    }
+
     /// @notice Gasless {back} signed by the backer.
     function backMeta(BackRequest calldata req, bytes calldata sig) external onlyAllowedRelayer {
         _verifyMeta(
@@ -1149,13 +1166,20 @@ contract DecentralizedMicrocredit is EIP712 {
         emit Deposited(lender, assets, shares);
     }
 
-    /// @dev Burns `shares` of `lender`'s and sends `assets` to `to`.
+    /// @dev Burns `shares` of `lender`'s and sends `assets` to `to`. If the token refuses the
+    ///      transfer (Circle's USDC does for blacklisted addresses), the USDC is held for `to`
+    ///      (see {claimPayout}) instead of reverting, so one refused recipient in the withdrawal
+    ///      queue cannot block the repayments, deposits and defaults that pay the queue.
     function _payOut(address lender, address to, uint256 assets, uint256 shares) internal {
         lenderPrincipal[lender] -= Math.mulDiv(lenderPrincipal[lender], shares, sharesOf[lender]);
         sharesOf[lender] -= shares;
         totalShares -= shares;
         lenderCash -= assets;
-        _pushUsdc(to, assets);
+        if (!usdc.trySafeTransfer(to, assets)) {
+            unclaimedPayouts[to] += assets;
+            totalUnclaimedPayouts += assets;
+            emit PayoutHeld(to, assets);
+        }
         emit Withdrawn(lender, to, assets, shares);
     }
 

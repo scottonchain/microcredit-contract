@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
 import { MicrocreditTestBase } from "./utils/MicrocreditTestBase.sol";
+import { BlacklistableUSDC } from "./utils/BlacklistableUSDC.sol";
 
 /// @dev State effects of each gasless (relayer-submitted) entry point.
 contract MetaTransactionFlowsTest is MicrocreditTestBase {
@@ -373,6 +374,47 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(payout), 1_000e6);
         assertEq(credit.lenderBalance(lender), 0);
         assertEq(credit.queuedWithdrawals(lender), 0);
+    }
+
+    /// @dev Circle's USDC refuses transfers to blacklisted addresses. A queued withdrawal whose
+    ///      recipient is (or becomes) blacklisted must not block repayments, deposits or other
+    ///      exits; its payout is held for the recipient instead. Found against real USDC on a
+    ///      Base Sepolia fork (test/fork/BaseSepoliaUsdc.t.sol).
+    function testRefusedQueuePayoutIsHeldAndDoesNotBlockRepayments() public {
+        vm.etch(address(usdc), address(new BlacklistableUSDC()).code);
+        BlacklistableUSDC token = BlacklistableUSDC(address(usdc));
+
+        _depositPermitOnly(lender, lenderPk, 1_000e6);
+        uint256 loanId = _lendOutWholePool();
+        address payout = makeAddr("payout");
+        _requestWithdrawal(1_000e6, payout);
+        token.setBlacklisted(payout, true);
+
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), 1_000e6);
+        credit.repayLoan(loanId, 1_000e6);
+        vm.stopPrank();
+
+        assertEq(credit.lenderBalance(lender), 0, "the lender's queued shares are paid out");
+        assertEq(credit.unclaimedPayouts(payout), 1_000e6, "and the USDC is held for the recipient");
+        assertEq(credit.totalUnclaimedPayouts(), 1_000e6);
+        assertEq(usdc.balanceOf(address(credit)), credit.lenderCash() + credit.totalUnclaimedPayouts());
+
+        // Deposits and exits go on.
+        address other = vm.addr(0x07E4);
+        _depositPermitOnly(other, 0x07E4, 100e6);
+        vm.prank(other);
+        credit.withdrawFunds(100e6);
+        assertEq(usdc.balanceOf(other), 100e6);
+
+        // The held payout reaches the recipient once the token lets it, and only the recipient.
+        vm.expectRevert(bytes("Blacklistable: account is blacklisted"));
+        credit.claimPayout(payout);
+        token.setBlacklisted(payout, false);
+        credit.claimPayout(payout);
+        assertEq(usdc.balanceOf(payout), 1_000e6);
+        assertEq(credit.unclaimedPayouts(payout), 0);
+        assertEq(credit.totalUnclaimedPayouts(), 0);
     }
 
     function testDirectDepositFillsWithdrawalQueue() public {
