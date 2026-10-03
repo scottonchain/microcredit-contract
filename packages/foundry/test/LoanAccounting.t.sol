@@ -50,7 +50,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
         uint256 loanId = _openLoan(PRINCIPAL);
         vm.warp(vm.getBlockTimestamp() + 10 days);
         uint256 exact = credit.getCurrentOutstandingAmount(loanId);
-        uint256 rounded = credit.getOutstandingRoundedToCent(loanId);
+        uint256 rounded = lens.getOutstandingRoundedToCent(loanId);
         assertEq(rounded % 10_000, 0);
         assertLe(rounded > exact ? rounded - exact : exact - rounded, 5_000);
     }
@@ -153,7 +153,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
             owed = credit.getCurrentOutstandingAmount(loanId);
             if (owed % 10_000 != 0 && owed % 10_000 < 5_000) break;
         }
-        uint256 rounded = credit.getOutstandingRoundedToCent(loanId);
+        uint256 rounded = lens.getOutstandingRoundedToCent(loanId);
         assertLt(rounded, owed, "fixture should round down");
         usdc.mint(borrower, rounded - PRINCIPAL);
 
@@ -216,17 +216,17 @@ contract LoanAccountingTest is MicrocreditTestBase {
     // ───────────────────────────── pool views ─────────────────────────────
 
     function testFundingPoolApyScalesWithUtilisation() public {
-        assertEq(credit.getFundingPoolAPY(), 0, "nothing lent yet");
+        assertEq(lens.getFundingPoolAPY(), 0, "nothing lent yet");
         vm.prank(owner);
         credit.setMaxLoanAmount(50_000e6);
         _openLoan(50_000e6); // 50% of the pool
-        assertEq(credit.getFundingPoolAPY(), RATE / 2);
+        assertEq(lens.getFundingPoolAPY(), RATE / 2);
     }
 
     function testPoolInfoExcludesReservedFunds() public {
         vm.prank(borrower);
         credit.requestLoan(PRINCIPAL); // reserved, not yet disbursed
-        (uint256 deposits, uint256 available, uint256 reserved, uint256 lenders) = credit.getPoolInfo();
+        (uint256 deposits, uint256 available, uint256 reserved, uint256 lenders) = lens.getPoolInfo();
         assertEq(deposits, 100_000e6);
         assertEq(reserved, PRINCIPAL);
         assertEq(available, 100_000e6 - PRINCIPAL);
@@ -234,13 +234,13 @@ contract LoanAccountingTest is MicrocreditTestBase {
     }
 
     function testPreviewLoanTermsUnderOneWeekIsOnePayment() public view {
-        (, uint256 payment) = credit.previewLoanTerms(borrower, 1_000e6, 3 days);
+        (, uint256 payment) = lens.previewLoanTerms(borrower, 1_000e6, 3 days);
         uint256 interest = (1_000e6 * RATE * 3 days) / (10_000 * 365 days);
         assertEq(payment, 1_000e6 + interest);
     }
 
     function testPreviewLoanTermsUsesPlatformRate() public view {
-        (uint256 rate, uint256 weekly) = credit.previewLoanTerms(borrower, 1_000e6, 28 days);
+        (uint256 rate, uint256 weekly) = lens.previewLoanTerms(borrower, 1_000e6, 28 days);
         assertEq(rate, RATE);
         uint256 interest = (1_000e6 * RATE * 28 days) / (10_000 * 365 days);
         assertEq(weekly, (1_000e6 + interest) / 4);
@@ -324,7 +324,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
     }
 
     function testAdminSettersAreOwnerOnly() public {
-        bytes[] memory calls = new bytes[](12);
+        bytes[] memory calls = new bytes[](19);
         calls[0] = abi.encodeCall(credit.setOracle, (stranger));
         calls[1] = abi.encodeCall(credit.setScoreProvider, (IScoreProvider(stranger)));
         calls[2] = abi.encodeCall(credit.setEffrRate, (1));
@@ -337,6 +337,13 @@ contract LoanAccountingTest is MicrocreditTestBase {
         calls[9] = abi.encodeCall(credit.setScoreOverride, (stranger, 1));
         calls[10] = abi.encodeCall(credit.setProtocolFeeBps, (1));
         calls[11] = abi.encodeCall(credit.claimProtocolFees, (stranger, 0));
+        calls[12] = abi.encodeCall(credit.setReserveBps, (1));
+        calls[13] = abi.encodeCall(credit.releaseReserve, (0));
+        calls[14] = abi.encodeCall(credit.transferOwnership, (stranger));
+        calls[15] = abi.encodeCall(credit.acceptOwnership, ());
+        calls[16] = abi.encodeCall(credit.setGuardian, (stranger));
+        calls[17] = abi.encodeCall(credit.pause, ());
+        calls[18] = abi.encodeCall(credit.unpause, ());
 
         for (uint256 i = 0; i < calls.length; i++) {
             vm.prank(stranger);
@@ -346,8 +353,70 @@ contract LoanAccountingTest is MicrocreditTestBase {
         }
     }
 
+    /// @dev The guardian stops new lending at once (an owner behind a timelock cannot); repayments
+    ///      and exits continue, and only the owner resumes lending.
+    function testGuardianPausesNewLendingOnly() public {
+        address guardian = makeAddr("guardian");
+        vm.prank(owner);
+        credit.setGuardian(guardian);
+        uint256 loanId = _openLoan(PRINCIPAL);
+        vm.prank(borrower);
+        uint256 reserved = credit.requestLoan(1e6);
+
+        vm.prank(guardian);
+        credit.pause();
+        vm.prank(borrower);
+        vm.expectRevert(DecentralizedMicrocredit.LendingPaused.selector);
+        credit.requestLoan(1e6);
+        vm.expectRevert(DecentralizedMicrocredit.LendingPaused.selector);
+        credit.disburseLoan(reserved);
+
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        usdc.mint(borrower, owed);
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), owed);
+        credit.repayLoan(loanId, owed);
+        vm.stopPrank();
+
+        vm.prank(guardian);
+        vm.expectRevert(DecentralizedMicrocredit.NotOwner.selector);
+        credit.unpause();
+        vm.prank(owner);
+        credit.unpause();
+        credit.disburseLoan(reserved);
+    }
+
+    /// @dev Production hands the protocol to a timelock or multisig; the handover takes two steps.
+    function testOwnershipTransferNeedsAcceptance() public {
+        address timelock = makeAddr("timelock");
+        vm.prank(owner);
+        credit.transferOwnership(timelock);
+        assertEq(credit.owner(), owner, "pending until accepted");
+        assertEq(credit.pendingOwner(), timelock);
+
+        vm.prank(stranger);
+        vm.expectRevert(DecentralizedMicrocredit.NotOwner.selector);
+        credit.acceptOwnership();
+
+        vm.prank(timelock);
+        credit.acceptOwnership();
+        assertEq(credit.owner(), timelock);
+        assertEq(credit.pendingOwner(), address(0));
+
+        vm.prank(owner);
+        vm.expectRevert(DecentralizedMicrocredit.NotOwner.selector);
+        credit.setRiskPremium(1);
+    }
+
     function testLimitSettersValidateBounds() public {
+        uint256 premium = credit.riskPremium();
+        uint256 effr = credit.effrRate();
         vm.startPrank(owner);
+        vm.expectRevert(DecentralizedMicrocredit.AboveOneHundredPercent.selector);
+        credit.setEffrRate(10_000 - premium + 1); // APR above 100%
+        vm.expectRevert(DecentralizedMicrocredit.AboveOneHundredPercent.selector);
+        credit.setRiskPremium(10_000 - effr + 1);
+        credit.setRiskPremium(10_000 - effr);
         vm.expectRevert(DecentralizedMicrocredit.AboveOneHundredPercent.selector);
         credit.setLendingUtilizationCap(10_001);
         vm.expectRevert(DecentralizedMicrocredit.AboveOneHundredPercent.selector);

@@ -146,7 +146,7 @@ The borrower's APR is `effrRate + riskPremium`, fixed when the loan is created. 
 ### Lenders
 1. Deposit USDC through the *Lend* page.  
 2. Your deposit buys pool shares. Interest borrowers repay (less the protocol fee) raises the share price, so every lender earns pro rata; the *Lend* page shows deposits, interest earned and current balance.  
-3. Withdraw whenever liquidity is available (*Max* takes everything); requests that cannot be paid immediately are queued, keep earning, and are filled as liquidity returns.
+3. Withdraw whenever liquidity is available. The *Lend* page shows what you can withdraw now, and *Max* takes that amount; requests that cannot be paid immediately are queued, keep earning, and are filled as liquidity returns.
 
 ### Backers
 1. On the *Back* page (`/attest`), back a borrower with an amount of your own credit. Your free credit line is used first; if you have none (or not enough), stake USDC to back with money instead.  

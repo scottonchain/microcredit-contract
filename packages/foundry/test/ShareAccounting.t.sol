@@ -171,7 +171,7 @@ contract ShareAccountingTest is MicrocreditTestBase {
 
         assertEq(credit.protocolFees(), 1e6);
         assertApproxEqAbs(credit.lenderBalance(alice), 1_009e6, DUST);
-        assertEq(credit.getFundingPoolAPY(), 0, "nothing lent");
+        assertEq(lens.getFundingPoolAPY(), 0, "nothing lent");
 
         vm.prank(owner);
         credit.claimProtocolFees(treasury, 1e6);
@@ -190,7 +190,7 @@ contract ShareAccountingTest is MicrocreditTestBase {
         assertApproxEqAbs(usdc.balanceOf(alice), 1_009e6, DUST);
         assertGe(usdc.balanceOf(address(credit)), credit.protocolFees());
 
-        (, uint256 available,,) = credit.getPoolInfo();
+        (, uint256 available,,) = lens.getPoolInfo();
         assertLe(available, DUST);
     }
 
@@ -222,7 +222,127 @@ contract ShareAccountingTest is MicrocreditTestBase {
         credit.setProtocolFeeBps(1_000);
         _deposit(alice, 1_000e6);
         _openLoan(500e6); // 50% utilisation of a 10% APR pool = 5% gross
-        assertEq(credit.getFundingPoolAPY(), 450);
+        assertEq(lens.getFundingPoolAPY(), 450);
+    }
+
+    /// @dev CI-9: lenders see utilisation and the pool's realised return, losses included.
+    function testLensShowsUtilisationAndRealisedReturn() public {
+        _deposit(alice, 1_000e6);
+        assertEq(lens.sharePrice(), 1e6, "1 USDC at launch is worth 1 USDC");
+        assertEq(lens.getUtilisation(), 0);
+
+        _borrowAndRepayAfterAYear(); // 10 USDC of interest on a 1,000 USDC pool
+        assertApproxEqAbs(lens.sharePrice(), 1.01e6, DUST, "repaid interest is realised");
+
+        uint256 loanId = _openLoan(LOAN);
+        assertEq(lens.getUtilisation(), (LOAN * 10_000) / credit.totalAssets());
+        assertApproxEqAbs(lens.sharePrice(), 1.01e6, DUST, "interest accrued but unpaid is not");
+
+        (,,,, uint256 dueAt) = credit.getLoanTerms(loanId);
+        vm.warp(dueAt + credit.LATE_PERIOD() + 1);
+        credit.markDefaulted(loanId);
+        // No backers and no reserve: the 100 USDC loss falls on the 1,010 USDC pool.
+        assertApproxEqAbs(lens.sharePrice(), 0.91e6, DUST, "an uncovered default is realised too");
+        assertLt(credit.lenderBalance(alice), credit.lenderPrincipal(alice), "Alice is down on her deposit");
+    }
+
+    // ───────────────────────────── impairment (run fairness) ─────────────────────────────
+
+    /// @dev Hermes, PR #3 round 2: a default plus a run must not let the first exiter take more
+    ///      than a pro-rata share. Without a provision the loan counts at full value for 30 days
+    ///      after it is due, so Alice could exit at the old price and leave the loss to Bob.
+    function testImpairmentStopsAnExitAheadOfAKnownLoss() public {
+        _deposit(alice, 500e6);
+        _deposit(bob, 500e6);
+        uint256 loanId = _openLoan(LOAN);
+        (,,,, uint256 dueAt) = credit.getLoanTerms(loanId);
+
+        vm.expectRevert(DecentralizedMicrocredit.NotOverdue.selector);
+        credit.impairLoan(loanId);
+        vm.warp(dueAt + 1);
+        credit.impairLoan(loanId); // anyone, e.g. Bob or a keeper
+        assertEq(credit.totalImpaired(), LOAN);
+        assertEq(credit.totalAssets(), 900e6);
+
+        vm.prank(alice);
+        credit.withdrawFunds(type(uint256).max);
+        assertApproxEqAbs(usdc.balanceOf(alice), 450e6, DUST, "Alice exits with her share of the loss");
+
+        vm.warp(dueAt + credit.LATE_PERIOD() + 1);
+        credit.markDefaulted(loanId);
+        assertEq(credit.totalImpaired(), 0);
+        assertApproxEqAbs(credit.lenderBalance(bob), 450e6, DUST, "Bob bears the same loss, no more");
+    }
+
+    function testImpairmentIsReleasedAsTheBorrowerRepays() public {
+        _deposit(alice, 1_000e6);
+        uint256 loanId = _openLoan(LOAN);
+        (,,,, uint256 dueAt) = credit.getLoanTerms(loanId);
+        vm.warp(dueAt + 1);
+        credit.impairLoan(loanId);
+
+        uint256 interest = credit.getCurrentOutstandingAmount(loanId) - LOAN;
+        _repay(loanId, interest + 40e6);
+        assertEq(credit.totalImpaired(), 60e6, "repaid principal leaves the provision");
+        credit.impairLoan(loanId); // re-marking is idempotent
+        assertEq(credit.totalImpaired(), 60e6);
+
+        _repay(loanId, credit.getCurrentOutstandingAmount(loanId));
+        assertEq(credit.totalImpaired(), 0);
+        assertEq(credit.totalAssets(), 1_000e6 + interest, "the provision is fully reversed");
+    }
+
+    /// @dev Only what secured backing does not cover is provisioned: slashed stake will cover the rest.
+    function testSecuredBackingIsNotProvisioned() public {
+        _deposit(alice, 1_000e6);
+        address dana = makeAddr("dana");
+        _stake(bob, 30e6);
+        vm.prank(bob);
+        credit.back(dana, 30e6);
+        vm.prank(owner);
+        credit.setScoreOverride(dana, 20_000); // 200 USDC of her own at maxLoan 10,000
+        vm.prank(dana);
+        uint256 loanId = credit.requestLoan(50e6);
+        credit.disburseLoan(loanId);
+
+        (,,,, uint256 dueAt) = credit.getLoanTerms(loanId);
+        vm.warp(dueAt + 1);
+        credit.impairLoan(loanId);
+        assertEq(credit.totalImpaired(), 20e6);
+
+        vm.warp(dueAt + credit.LATE_PERIOD() + 1);
+        uint256 assets = credit.totalAssets();
+        credit.markDefaulted(loanId);
+        assertEq(credit.totalAssets(), assets, "the default only confirms what was provisioned");
+    }
+
+    // ───────────────────────────── lender views ─────────────────────────────
+
+    /// @dev Hermes, PR #3 round 1: a lender could not see what was withdrawable.
+    function testMaxWithdrawableIsWhatWithdrawFundsPays() public {
+        _deposit(alice, 500e6);
+        _deposit(bob, 500e6);
+        assertApproxEqAbs(lens.maxWithdrawable(alice), 500e6, DUST);
+
+        _openLoan(900e6); // 100 USDC left in cash
+        assertEq(lens.maxWithdrawable(alice), 100e6, "capped by the cash on hand");
+
+        uint256 max = lens.maxWithdrawable(alice);
+        vm.prank(alice);
+        credit.withdrawFunds(max);
+        assertEq(lens.maxWithdrawable(bob), 0);
+        vm.prank(bob);
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
+        credit.withdrawFunds(1);
+    }
+
+    function testClosedLoansReadZeroOutstanding() public {
+        _deposit(alice, 1_000e6);
+        uint256 loanId = _openLoan(LOAN);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
+        _repay(loanId, credit.getCurrentOutstandingAmount(loanId));
+        assertEq(credit.getCurrentOutstandingAmount(loanId), 0);
+        assertEq(lens.getOutstandingRoundedToCent(loanId), 0);
     }
 
     // ───────────────────────────── share price integrity ─────────────────────────────

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
+import { OracleScoreProvider } from "../contracts/OracleScoreProvider.sol";
 import { MicrocreditTestBase } from "./utils/MicrocreditTestBase.sol";
 
 /**
@@ -206,6 +207,163 @@ contract SybilResistanceTest is MicrocreditTestBase {
 
         assertEq(credit.grantedCredit(avery), 0);
         assertEq(_limit(carlos), 0, "credit from a defaulted backer backs nothing");
+    }
+
+    // ───────────────────────────── history (Theorem 3) ─────────────────────────────
+
+    function _repayInFull(address borrower, uint256 loanId) internal {
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        uint256 held = usdc.balanceOf(borrower);
+        if (held < owed) usdc.mint(borrower, owed - held); // the attacker funds whatever interest is due
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), owed);
+        credit.repayLoan(loanId, owed);
+        vm.stopPrank();
+    }
+
+    /// @dev docs/CREDIT_MODEL.md, Theorem 3. One stake is recycled through fresh accounts, each of
+    ///      which borrows and repays inside the interest-free first day. That history costs nothing,
+    ///      so it must earn nothing: a rule such as "capacity rises by 25% of repaid principal"
+    ///      would hand each account 100 here and the attacker 100 per account, with the seed never
+    ///      at risk.
+    function testRecycledSeedBuildsHistoryThatEarnsNoCredit() public {
+        _stake(carlos, 100e6);
+        address[] memory members = _ring();
+        for (uint256 i = 0; i < RING_SIZE; i++) {
+            vm.prank(carlos);
+            credit.back(members[i], 100e6);
+            for (uint256 cycle = 0; cycle < 4; cycle++) {
+                _repayInFull(members[i], _borrow(members[i], 100e6));
+            }
+            vm.prank(carlos);
+            credit.back(members[i], 0);
+
+            assertEq(credit.completedLoans(members[i]), 4);
+            assertEq(credit.duesPaid(members[i]), 0);
+            assertEq(_limit(members[i]), 0, "history that cost nothing earns nothing");
+        }
+        assertEq(credit.stakeOf(carlos), 100e6, "the seed was never at risk");
+    }
+
+    /// @dev The same farm with paid interest: an account earns exactly the reserve share of the
+    ///      interest it paid. Borrowing that credit and defaulting is absorbed by the reserve it
+    ///      funded, so lenders keep everything else they were paid.
+    function testHistoryEarnsOnlyTheDuesItPaid() public {
+        vm.startPrank(owner);
+        credit.setProtocolFeeBps(1_000);
+        credit.setReserveBps(5_000);
+        vm.stopPrank();
+        uint256 assetsBefore = credit.totalAssets();
+        _stake(carlos, 100e6);
+        address member = _ring()[0];
+
+        vm.prank(carlos);
+        credit.back(member, 100e6);
+        uint256 loanId = _borrow(member, 100e6);
+        vm.warp(block.timestamp + 30 days);
+        uint256 interest = credit.getCurrentOutstandingAmount(loanId) - 100e6;
+        _repayInFull(member, loanId);
+        vm.prank(carlos);
+        credit.back(member, 0);
+
+        uint256 fee = (interest * 1_000) / 10_000;
+        uint256 dues = (interest * 5_000) / 10_000;
+        assertGt(dues, 0);
+        assertEq(credit.duesPaid(member), dues);
+        assertEq(credit.grantedCredit(member), dues);
+        assertEq(_limit(member), dues);
+
+        _default(_borrow(member, dues));
+        assertEq(credit.grantedCredit(member), 0, "dues are forfeited on default");
+        assertEq(credit.firstLossReserve(), 0, "the reserve the account funded absorbed its default");
+        assertEq(credit.totalAssets(), assetsBefore + interest - fee - dues, "lenders keep their share of the interest");
+    }
+
+    /// @dev Found by analysis/sybil_sim (attack A7). If dues were all interest net of fee, an
+    ///      attacker that is also a lender would get its pool share of that interest back, withdraw
+    ///      while its loans are current, and leave the dues-funded default to the other lenders.
+    ///      Counting only the reserve share closes it: the reserve cannot be withdrawn by lenders.
+    function testAttackerWhoIsAlsoALenderCannotFarmDues() public {
+        vm.prank(owner);
+        credit.setReserveBps(5_000); // protocol fee 0: the attacker's best case
+        address attacker = makeAddr("attacker");
+        _deposit(attacker, 10_000e6); // half the pool
+        uint256 honestBefore = credit.lenderBalance(poolLender);
+
+        _stake(carlos, 100e6); // the attacker's recyclable seed
+        address member = _ring()[0];
+        vm.prank(carlos);
+        credit.back(member, 100e6);
+        uint256 loanId = _borrow(member, 100e6);
+        vm.warp(block.timestamp + 365 days);
+        uint256 interest = credit.getCurrentOutstandingAmount(loanId) - 100e6;
+        _repayInFull(member, loanId);
+        vm.prank(carlos);
+        credit.back(member, 0);
+
+        vm.startPrank(attacker);
+        credit.withdrawFunds(type(uint256).max);
+        vm.stopPrank();
+        uint256 dues = credit.duesPaid(member);
+        _default(_borrow(member, dues));
+
+        uint256 attackerOut = usdc.balanceOf(attacker) + dues; // withdrawal plus the loan kept
+        uint256 attackerIn = 10_000e6 + interest;
+        assertLe(attackerOut, attackerIn, "the attacker cannot profit");
+        assertGe(credit.lenderBalance(poolLender), honestBefore, "the honest lender loses nothing");
+    }
+
+    /// @dev Dues are credit like any other: they can back someone, which moves them.
+    function testDuesCanBackOthers() public {
+        vm.prank(owner);
+        credit.setReserveBps(5_000);
+        vm.prank(avery);
+        credit.back(carlos, AVERY_CREDIT);
+        uint256 loanId = _borrow(carlos, 90e6);
+        vm.warp(block.timestamp + 365 days);
+        _repayInFull(carlos, loanId);
+
+        uint256 dues = credit.duesPaid(carlos);
+        assertGe(dues, credit.MIN_BACKING());
+        vm.prank(carlos);
+        credit.back(sam, dues);
+        assertEq(_limit(sam), dues);
+        assertEq(_limit(carlos), AVERY_CREDIT, "Carlos keeps Avery's backing and has committed his dues");
+    }
+
+    // ───────────────────────────── issuance (CI-6) ─────────────────────────────
+
+    /// @dev A compromised oracle with a budget of one line tries to rotate it: Sam's fakes each get
+    ///      the line, borrow, and pass it on. The budget stays held while a line is in use, so only
+    ///      one of them ever borrows against it at a time.
+    function testCompromisedOracleCannotRotateItsBudget() public {
+        vm.prank(owner);
+        scores.setIssuanceLimits(SCALE, SCALE); // one full line: 100 USDC
+        address[] memory ring = _ring();
+
+        _publishScore(ring[0], SCALE);
+        uint256 loanId = _borrow(ring[0], 100e6);
+        _publishScore(ring[0], 0);
+        vm.expectRevert(OracleScoreProvider.IssuanceBudgetExceeded.selector);
+        this.publishAsOracle(ring[1], SCALE);
+
+        address[] memory first = new address[](1);
+        first[0] = ring[0];
+        scores.releaseBudget(first);
+        assertEq(scores.totalHeld(), SCALE, "still in use: the loan is open");
+
+        // Once the line is unused again (here, the loan defaulted and was written off), the
+        // budget can move on: losses from a compromised oracle accrue at most one budget per
+        // loan lifetime, which is what issuer capital and governance response are for.
+        _default(loanId);
+        scores.releaseBudget(first);
+        assertEq(scores.totalHeld(), 0);
+        _publishScore(ring[1], SCALE);
+        assertEq(_limit(ring[1]), 100e6);
+    }
+
+    function publishAsOracle(address user, uint256 score) external {
+        _publishScore(user, score);
     }
 
     // ───────────────────────────── stake ─────────────────────────────

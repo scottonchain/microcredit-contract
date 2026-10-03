@@ -28,8 +28,8 @@ const BorrowHelpPage: NextPage = () => {
           automatically.
         </li>
         <li>
-          <span className="font-medium">Repay over time.</span> Make repayments before the due date to improve your reputation
-          for future borrowing.
+          <span className="font-medium">Repay over time.</span> Make repayments before the due date. Interest you pay adds to
+          your own credit, and institutions look at your repayment history when setting your line.
         </li>
       </ol>
 

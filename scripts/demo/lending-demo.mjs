@@ -5,8 +5,7 @@
  *
  *   Step 1  — Brighton gets his own backing link.  He already has a 25 USDC credit
  *             line of his own.  He visits /attest with his own address in the URL and
- *             sees "This is your backing link" plus a copy button.  The PoolStatsBar at
- *             the top shows the pool size and lender APY.
+ *             sees "This is your backing link" plus a copy button.
  *   Step 2  — Avery backs Brighton with 50 USDC of her own 92 USDC of credit (/attest).
  *             Her limit falls to 42 as Brighton's rises to 75: credit moves, it is not created.
  *   Step 3  — Brighton borrows 40 USDC, 28-day term (/borrower).
@@ -336,8 +335,8 @@ async function main() {
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
 
-    // Wait for the loan form to appear — it only renders once getCreditScore
-    // resolves and confirms Brighton has a non-zero credit score.
+    // Wait for the loan form to appear: it only renders once getBorrowLimit
+    // resolves and shows Brighton a credit limit above zero (his own 25 + Avery's 50).
     console.log('  → waiting for loan form to load…');
     const borrowBtn = page.getByRole('button', { name: /one.click borrow/i });
     await borrowBtn.waitFor({ state: 'visible', timeout: 30000 });

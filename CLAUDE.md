@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Decentralized microcredit lending protocol built with Solidity (Foundry) and Next.js. Borrowers obtain collateral-free USDC loans backed by credit: their own (granted from history or by an institution) or credit that others back them with from theirs. Credit is conserved, so Sybil accounts cannot manufacture it (see `docs/CREDIT_INTEGRITY_ISSUES.md`, which must be kept current). Lenders deposit to a shared pool. Meta-transactions (EIP-712) and EIP-2612 permits enable gasless operations via relayers.
+Decentralized microcredit lending protocol built with Solidity (Foundry) and Next.js. Borrowers obtain collateral-free USDC loans backed by credit: their own (granted from history or by an institution) or credit that others back them with from theirs. Credit is conserved, so Sybil accounts cannot manufacture it: `docs/CREDIT_MODEL.md` states and proves the bounds (lenders' loss never exceeds issued lines plus dues paid; history earns no more than its dues), and `docs/CREDIT_INTEGRITY_ISSUES.md` tracks every issue against them and must be kept current. `docs/ECONOMICS.md` covers flows, returns and parameter choice; `docs/DEPLOYMENT.md` the production runbook. Lenders deposit to a shared pool. Meta-transactions (EIP-712) and EIP-2612 permits enable gasless operations via relayers.
 
 ## Monorepo Structure
 
@@ -12,7 +12,7 @@ Two packages managed via yarn workspaces:
 - `packages/foundry`: Solidity contracts, Forge tests, deployment scripts
 - `packages/nextjs`: Next.js 15 frontend with App Router
 
-Repo-level `scripts/` holds `start-anvil.sh` (`yarn chain`), `demo.sh` (`yarn demo`), `restart.sh` (`yarn restart`) and the Playwright walkthrough in `scripts/demo/`. `lib/openzeppelin-contracts` is a git submodule and also vendors forge-std (`git submodule update --init --recursive`).
+Repo-level `scripts/` holds `start-anvil.sh` (`yarn chain`), `demo.sh` (`yarn demo`), `restart.sh` (`yarn restart`) and the Playwright walkthrough in `scripts/demo/`. `analysis/` holds the Python models behind `docs/CREDIT_MODEL.md`: `sybil_sim` (attacks against each credit mechanism, by number of Sybil accounts), `credit_risk` (Vasicek calibration of the risk premium and reserve), `issuer_policy` (reference oracle policy: identity-gated, Bayesian, within the held budget) and `liquidity` (the price of one-hop backing against multi-hop credit networks); each has a README, a `run.py` and unittest tests (needs numpy, scipy, matplotlib). `lib/openzeppelin-contracts` is a git submodule and also vendors forge-std (`git submodule update --init --recursive`).
 
 ## Commands
 
@@ -47,17 +47,20 @@ Node >= 20.18.3 and Foundry are required.
 
 ### Core Contract: `DecentralizedMicrocredit.sol`
 
-Inherits OpenZeppelin `EIP712`. The file is grouped into constants, types, state, events, errors, admin, lending pool, loans, credit & backing, meta-transactions, views and internals.
+Inherits OpenZeppelin `EIP712`. A single `owner` with two-step handover (`transferOwnership`, `acceptOwnership`) so production can give it to a timelock or multisig, and a `guardian` that can `pause` new loans and disbursements at once (repayments, defaults and exits continue); only the owner can `unpause`. The file is grouped into constants, types, state, events, errors, admin, lending pool, loans, credit & backing, meta-transactions, views and internals.
 
 **Single pool lending model**: All lenders deposit USDC to one shared pool; all borrowers draw from the same pool. Lenders hold non-transferable shares (`sharesOf`, `totalShares`); `convertToShares` / `convertToAssets` follow OpenZeppelin ERC4626 with a 6-decimal virtual offset. Interest is recognised on repayment (cash basis): `_repay` settles accrued interest before principal, and the interest, less `protocolFeeBps` (max `MAX_PROTOCOL_FEE_BPS`, 20%), raises the share price. The owner withdraws fees with `claimProtocolFees`.
 
 **Key state variables for liquidity:**
-- `totalAssets()` = `lenderCash` + `totalLentOut`. `lenderCash` is tracked internally (deposits, disbursements, repayments, payouts), so USDC sent straight to the contract does not move the share price
+- `totalAssets()` = `lenderCash` + `totalLentOut` − max(`totalImpaired`, `firstLossReserve`). `lenderCash` is tracked internally (deposits, disbursements, repayments, payouts), so USDC sent straight to the contract does not move the share price
+- `totalImpaired`: provisions on overdue loans. Anyone may call `impairLoan` once a loan is past due; its unpaid principal not covered by secured backing leaves `totalAssets` until repaid or defaulted, so lenders cannot exit ahead of a visible loss
+- `firstLossReserve`: a junior claim inside the pool, built from `reserveBps` (max 80%) of every interest payment and from `fundReserve` (anyone: first-loss capital). Its cash is in `lenderCash` and is lent like any other; provisions and default losses up to its size leave the share price unchanged. `releaseReserve` (owner) hands lenders only what exceeds both provisions and all dues ever paid (`totalDuesPaid`)
 - `totalLentOut`: principal still owed on disbursed, active loans
 - `reservedLiquidity`: USDC committed to approved but undisbursed loans (part of `lenderCash`)
 - `lendingUtilizationCap`: max fraction of `totalAssets` that can be lent or reserved (default 90%)
 - `liquidityBuffer` / `liquidityThreshold`: share of `totalAssets` / absolute USDC that new loans must leave liquid (default 5% / 0). Withdrawals and the queue may use it
 - `protocolFees`: accrued, unclaimed fees; outside `lenderCash`, never lent or withdrawn by lenders
+- `unclaimedPayouts(to)` / `totalUnclaimedPayouts`: lender payouts the token refused (Circle's USDC refuses blacklisted addresses), held outside `lenderCash` so a refused recipient cannot block the repayments and deposits that pay the queue; `claimPayout(to)` delivers them once the token allows
 - `lenderBalance(lender)` / `lenderPrincipal(lender)`: current value of a lender's shares / what they deposited net of the cost basis of shares withdrawn (earnings = the difference)
 - `totalQueuedShares` / `totalQueuedWithdrawals()`: shares locked in the FIFO withdrawal queue (`requestWithdrawalMeta`) and their USDC value, held back from loans and direct withdrawals. Queued shares keep earning until paid. Each deposit, repayment or withdrawal pays at most `QUEUE_FILLS_PER_CALL` (10) queued requests; anyone can call `processWithdrawalQueue(maxItems)` to drain the rest
 - `withdrawFunds` and `requestWithdrawalMeta` take a USDC amount; `type(uint256).max` means the whole unqueued balance
@@ -68,7 +71,7 @@ Inherits OpenZeppelin `EIP712`. The file is grouped into constants, types, state
 3. `borrowAndDisburseMeta()`: steps 1 and 2 in one relayed transaction with the signed `repaymentPeriod` as term (1 to 365 days); what the borrower UI uses
 4. `repayLoan()` / `repayWithPermit()` (UI) / `repayLoanMeta()`: repay; partial repayments reduce the balance
 5. `cancelLoan()`: release an undisbursed loan's reservation (the borrower any time, anyone after `RESERVATION_TTL`, 7 days)
-6. `markDefaulted()`: anyone, once `LATE_PERIOD` (30 days) past due. Writes off the unpaid principal and charges it to the borrower's backers (`_chargeBackers`), and blocks the borrower from borrowing or backing again (`defaultedLoans`). Lenders absorb any uncovered loss through the share price
+6. `markDefaulted()`: anyone, once `LATE_PERIOD` (30 days) past due. Writes off the unpaid principal and charges it to the borrower's backers (`_chargeBackers`), and blocks the borrower from borrowing or backing again (`defaultedLoans`). The first-loss reserve, then lenders (through the share price), absorb any uncovered loss
 
 Every origination path goes through `_originateLoan` (term bounds, default check, score limit and first-loan cap across outstanding principal, utilisation cap, liquidity buffer); every repayment goes through `_repay` (pulls `min(amount, outstanding)`, closes when less than a cent remains).
 
@@ -79,10 +82,10 @@ Every origination path goes through `_originateLoan` (term bounds, default check
 ### Credit model (`docs/CREDIT_INTEGRITY_ISSUES.md`)
 
 **Invariant: credit cannot be manufactured.** An account borrows only against credit it holds or credit someone who holds credit backs it with from their own. Two sources:
-- **Granted credit** `grantedCredit(a)` = `getCreditScore(a) × maxLoanAmount / SCALE − creditLoss(a)` (0 after a default of its own). `getCreditScore` is the admin override (`setScoreOverride`) if set, otherwise the `IScoreProvider` (`OracleScoreProvider`: CRE `onReport` from a pinned forwarder/workflow, or `publishScores` from a reporter; epochs must increase; stale after `maxScoreAge`). The only unsecured credit, and only the owner or oracle creates it.
+- **Granted credit** `grantedCredit(a)` = `getCreditScore(a) × maxLoanAmount / SCALE + duesPaid(a) − creditLoss(a)` (0 after a default of its own). `getCreditScore` is the admin override (`setScoreOverride`) if set, otherwise the `IScoreProvider` (`OracleScoreProvider`: CRE `onReport` from a pinned forwarder/workflow, or `publishScores` from a reporter; epochs must increase; stale after `maxScoreAge`; the budget is charged on each account's highest score since its line was last unused (`budgetHeld`, released by `releaseBudget` once the pool set with `setLending` shows no open loans and no commitments), capped by `maxTotalScore`, and one report may raise it by at most `maxIncreasePerReport`). `duesPaid` is the share of the account's interest paid into the first-loss reserve: the only credit on-chain history earns, because any larger history rule is farmable (`CREDIT_MODEL.md`, Theorem 3), and interest paid to lenders does not count since an attacker that is also a lender recaptures its share. Only the owner or the oracle issues lines.
 - **Stake** `stakeOf(a)`: USDC locked via `stake` / `unstake`, held outside the pool (`totalStaked`).
 
-**Backing** (`back` / `backMeta`, stored per borrower as `Backing { backer, secured, unsecured }`, at most `MAX_BACKERS_PER_BORROWER` = 32): raising a backing commits the backer's free granted credit first (`creditCommitted`), then free stake (`stakeCommitted`). `getFreeCredit(a)` = (granted not committed and not used by a's own loans, which draw on backing received first; stake not committed). Received backing cannot be passed on. Lowering a backing releases unsecured before secured and may not leave the borrower owing more than their limit (`BackingInUse`); committed stake cannot be unstaked (`StakeCommitted`).
+**Backing** (`back` / `backMeta`, stored per borrower as `Backing { backer, secured, unsecured }`, at most `MAX_BACKERS_PER_BORROWER` = 32): a backing is 0 or at least `MIN_BACKING` (1 USDC); raising one commits the backer's free granted credit first (`creditCommitted`), then free stake (`stakeCommitted`). `getFreeCredit(a)` = (granted not committed and not used by a's own loans, which draw on backing received first; stake not committed). Received backing cannot be passed on. Lowering a backing releases unsecured before secured and may not leave the borrower owing more than their limit (`BackingInUse`); committed stake cannot be unstaked (`StakeCommitted`).
 
 **Limit:** `getBorrowLimit(b)` = (granted − creditCommitted) + `_backingReceived(b)`, and `available` = limit − outstanding principal. `_backingReceived` counts an unsecured edge only as far as its backer's granted credit, net of the backer's own outstanding loans, still covers everything that backer committed, so lost credit stops backing others.
 
@@ -93,6 +96,10 @@ Every origination path goes through `_originateLoan` (term bounds, default check
 Borrowers/lenders/attesters sign typed messages; relayers submit on-chain. Entry points: `requestLoanMeta`, `disburseLoanMeta`, `borrowAndDisburseMeta`, `repayLoanMeta`, `depositWithPermitMeta`, `depositPermitOnlyMeta`, `requestWithdrawalMeta`, `backMeta`, plus permit-only `repayWithPermit`. All share `_verifyMeta` (deadline, per-signer nonce, EIP-712/ERC-1271 signature) and the optional relayer whitelist (`onlyAllowedRelayer`, `setRelayerWhitelistEnabled()`).
 
 The Next.js API routes at `packages/nextjs/app/api/meta/*` (`back`, `borrow`, `deposit`, `repay-one`, `request-withdrawal`) act as relayers on top of `app/api/meta/relayer.ts`, which resolves the relayer account (`RELAYER_PRIVATE_KEY`, or Anvil's first unlocked account locally), simulates, submits, waits for the receipt and decodes events.
+
+### MicrocreditLens
+
+Stateless read-only views derived from the pool's public state, kept out of `DecentralizedMicrocredit` because the pool is near the EIP-170 size limit (23,913 of 24,576 bytes; CI-26): `getFundingPoolAPY`, `getUtilisation`, `sharePrice` (realised return since launch), `getPoolInfo`, `previewLoanTerms`, `getOutstandingRoundedToCent`, `maxWithdrawable`. Every deploy script deploys one next to the pool. Put new derived views here, not in the pool.
 
 ### MockUSDC
 
@@ -118,7 +125,11 @@ Demo wallet mode (`NEXT_PUBLIC_DEMO_WALLET=true`, set automatically by `yarn dem
 
 ## Deployment
 
-`packages/foundry/script/Deploy.s.sol` (local only; broadcasts with Anvil's published keys) deploys MockUSDC (unless `deployment-config.json` points at a live token) and `DecentralizedMicrocredit` with EFFR=433 bps, risk premium=500 bps, maxLoan=100 USDC. It seeds a 10,000 USDC pool, deploys `OracleScoreProvider` (reporter Alexis, 7-day `maxScoreAge`) and sets it as the score provider, opens background loans for Diana and Eve (89% utilisation), grants credit with score overrides to Alexis (admin, account 9, 95 USDC), Avery (backer, account 2, 92 USDC) and Brighton (borrower, account 3, 25 USDC), sets display names for Avery and Brighton (borrower, account 3), and sends ETH to three demo wallets. `yarn deploy` (`scripts-js/parseArgs.js`) then runs `generateTsAbis.js` to regenerate `packages/nextjs/contracts/deployedContracts.ts`; commit that file when the ABI changes.
+`packages/foundry/script/Deploy.s.sol` (local only; broadcasts with Anvil's published keys) deploys MockUSDC (unless `deployment-config.json` points at a live token), `DecentralizedMicrocredit` and its `MicrocreditLens`, with EFFR=433 bps, risk premium=500 bps, maxLoan=100 USDC. It seeds a 10,000 USDC pool, deploys `OracleScoreProvider` (reporter Alexis, 7-day `maxScoreAge`, issuance budget of 50 full lines) and sets it as the score provider, sets the reserve share to 30% of interest, opens background loans for Diana and Eve (89% utilisation), grants credit with score overrides to Alexis (admin, account 9, 95 USDC), Avery (backer, account 2, 92 USDC) and Brighton (borrower, account 3, 25 USDC), sets display names for Avery and Brighton (borrower, account 3), and sends ETH to three demo wallets. `yarn deploy` (`scripts-js/parseArgs.js`) then runs `generateTsAbis.js` to regenerate `packages/nextjs/contracts/deployedContracts.ts`; commit that file when the ABI changes.
+
+`packages/foundry/script/DeployTestnet.s.sol` deploys for persona testing (testnets only; the deployer holds every role), and `script/TestnetScenarios.s.sol` runs the persona scenarios against it as real transactions; the live Base Sepolia deployment, its scenario results and tx hashes are in `docs/TESTNET.md`, and `test/fork/LiveDeployment.t.sol` plays the time-dependent scenarios on a fork of it.
+
+`packages/foundry/script/DeployProduction.s.sol` is the production path: env-configured (calibrated defaults), deploys a self-administered `TimelockController` for an ADMIN multisig and starts the ownership handover of both contracts to it; it only simulates unless run with `--broadcast`, which happens only after the approvals in `docs/DEPLOYMENT.md`. `test/DeployProduction.t.sol` runs it in-process.
 
 Network configuration is in `packages/nextjs/scaffold.config.ts` (default: Foundry localhost).
 
@@ -134,12 +145,14 @@ Network configuration is in `packages/nextjs/scaffold.config.ts` (default: Found
 
 All suites extend `test/utils/MicrocreditTestBase.sol` (real MockUSDC, EIP-712/EIP-2612 signing helpers that rebuild typehashes from their type strings):
 - `DecentralizedMicrocredit.t.sol`: core lending, limits, liquidity, withdrawals
-- `ShareAccounting.t.sol`: share price, interest-first repayment, protocol fee, buffer vs exits, stray transfers
-- `LoanLifecycle.t.sol`: terms, due dates, cancellation, default write-down and charging backers
-- `SybilResistance.t.sol`: credit conservation; HermesCRBot's ring attack (fresh, staked, and with one credited member), backing moves credit, locks, lost credit stops backing
+- `ShareAccounting.t.sol`: share price, interest-first repayment, protocol fee, buffer vs exits, stray transfers, impairment and run fairness
+- `LoanLifecycle.t.sol`: terms, due dates, cancellation, default write-down, charging backers, first-loss reserve
+- `SybilResistance.t.sol`: credit conservation; HermesCRBot's ring attack (fresh, staked, and with one credited member), backing moves credit, locks, lost credit stops backing, recycled-seed history farm, dues
+- `invariant/`: stateful fuzzing of the conservation theorems with Sybil actors (`CreditConservation.invariant.t.sol`, handler `CreditHandler.sol`)
 - `OracleScoreProvider.t.sol`: reporter and CRE forwarder paths, workflow pinning, epochs, batch bounds, staleness, ownership
 - `LoanAccounting.t.sol`: interest, partial/full repayment, admin permissions, views
 - `MetaTransactions.t.sol`: signature, nonce, deadline and relayer-whitelist rules
-- `MetaTransactionFlows.t.sol`: effects of each meta-transaction entry point
+- `MetaTransactionFlows.t.sol`: effects of each meta-transaction entry point, withdrawal queue, refused payouts
+- `fork/BaseSepoliaUsdc.t.sol`: against Circle's USDC on a Base Sepolia fork (permit domain "USDC"/"2", permit deposit/borrow/repay, blacklisted queue recipient); skipped unless `BASE_SEPOLIA_RPC_URL` is set: `BASE_SEPOLIA_RPC_URL=https://sepolia.base.org forge test --match-path 'test/fork/*'`
 
 The fixture deploys an `OracleScoreProvider` with `oracle` as reporter; `_publishScore(user, score)` publishes as the oracle would, and `_stake(who, amount)` mints and stakes.

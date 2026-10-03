@@ -22,8 +22,16 @@ const Home: NextPage = () => {
     args: [connectedAddress],
   });
 
+  // Gate on own (granted) credit, not the score: a defaulted account can keep a score with no
+  // credit, and an account can earn credit without a score.
+  const { data: grantedCredit } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "grantedCredit",
+    args: [connectedAddress],
+  });
+
   const creditScorePercent = creditScore ? (Number(creditScore) / 10000).toFixed(2) : "0.00";
-  const hasCreditScore = creditScore !== undefined && Number(creditScore) > 0;
+  const hasOwnCredit = grantedCredit !== undefined && grantedCredit > 0n;
 
   const getScoreColor = (score: number) => {
     if (score < 30) return "text-red-500";
@@ -46,7 +54,7 @@ const Home: NextPage = () => {
   const totalRatePct = totalRateBp !== undefined ? (totalRateBp / 100).toFixed(2) : undefined;
 
   const { data: poolApyBp } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
+    contractName: "MicrocreditLens",
     functionName: "getFundingPoolAPY",
   });
   const apyDisplay = poolApyBp !== undefined ? `${(Number(poolApyBp) / 100).toFixed(2)}%` : "—";
@@ -76,7 +84,7 @@ const Home: NextPage = () => {
               {/* Credit Score Status Section */}
               <div className="bg-base-100 rounded-lg p-3 sm:p-6 mb-4 sm:mb-8 shadow-lg">
                 <div className="text-center mb-3 sm:mb-6">
-                  {hasCreditScore ? (
+                  {hasOwnCredit ? (
                     <div className="space-y-4">
                       <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                         <div className="flex items-center justify-center space-x-2 mb-2">
@@ -87,7 +95,7 @@ const Home: NextPage = () => {
                           </span>
                         </div>
                         <p className="text-green-700 text-sm">
-                          Great! You&apos;re registered with the system and can borrow or attest to others.
+                          You have a credit line of your own: you can borrow against it or back others.
                         </p>
                       </div>
                     </div>
@@ -151,8 +159,8 @@ const Home: NextPage = () => {
                 </div>
               </div>
 
-              {/* Quick Actions for Users with Credit Scores */}
-              {hasCreditScore && (
+              {/* Quick Actions for Users with Credit of Their Own */}
+              {hasOwnCredit && (
                 <div className="bg-base-100 rounded-lg p-6 mb-8 shadow-lg">
                   <div className="text-center mb-6">
                     <h2 className="text-2xl font-bold text-gray-800 mb-2">Quick Actions</h2>
@@ -239,7 +247,7 @@ const Home: NextPage = () => {
                     </div>
                   </div>
                   
-                  {/* Attestation Section */}
+                  {/* Backing Section */}
                   <div className="mt-6 bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-2xl p-6">
                     <div className="text-center">
                       <UserGroupIcon className="h-12 w-12 text-purple-600 mx-auto mb-3" />

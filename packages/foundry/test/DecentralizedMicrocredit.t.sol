@@ -108,7 +108,7 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         credit.setEffrRate(900);
         assertEq(credit.effrRate(), 900);
 
-        (uint256 rate,) = credit.previewLoanTerms(borrower, 1_000e6, 365 days);
+        (uint256 rate,) = lens.previewLoanTerms(borrower, 1_000e6, 365 days);
         assertEq(rate, 900 + credit.riskPremium());
     }
 

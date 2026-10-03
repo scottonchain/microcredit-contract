@@ -4,9 +4,20 @@ pragma solidity ^0.8.30;
 import { Test } from "forge-std/Test.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import { OracleScoreProvider } from "../contracts/OracleScoreProvider.sol";
+import { ICreditUsage, OracleScoreProvider } from "../contracts/OracleScoreProvider.sol";
 import { IReceiver } from "../contracts/interfaces/IReceiver.sol";
 import { IScoreProvider } from "../contracts/interfaces/IScoreProvider.sol";
+
+/// @dev Stand-in for the lending pool: reports whether an account's line is in use.
+contract UsageStub is ICreditUsage {
+    mapping(address => uint256) public activeLoanCount;
+    mapping(address => uint256) public creditCommitted;
+
+    function setUsage(address account, uint256 loans, uint256 committed) external {
+        activeLoanCount[account] = loans;
+        creditCommitted[account] = committed;
+    }
+}
 
 /// @dev Off-chain scores delivered by a reporter account or a Chainlink CRE forwarder.
 contract OracleScoreProviderTest is Test {
@@ -19,9 +30,18 @@ contract OracleScoreProviderTest is Test {
     address internal alice = makeAddr("alice");
     address internal bob = makeAddr("bob");
     uint256 internal constant MAX_AGE = 1 days;
+    uint256 internal constant BUDGET = 2_000_000; // two full lines
 
     function setUp() public {
-        provider = new OracleScoreProvider(owner, reporter, MAX_AGE);
+        provider = new OracleScoreProvider(owner, reporter, MAX_AGE, BUDGET);
+    }
+
+    function _report(uint64 epoch, address[] memory users, uint256[] memory values)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        return abi.encode(epoch, users, values);
     }
 
     function _report(uint64 epoch, address user, uint256 score) internal pure returns (bytes memory) {
@@ -187,7 +207,132 @@ contract OracleScoreProviderTest is Test {
         provider.setForwarder(alice, address(0), bytes32(0));
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
         provider.setMaxScoreAge(2 days);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+        provider.setIssuanceLimits(type(uint256).max, type(uint256).max);
         vm.stopPrank();
+    }
+
+    // ───────────────────────────── issuance budget ─────────────────────────────
+
+    /// @dev Every score is new unsecured credit, so the sum of scores is capped: a compromised
+    ///      workflow can move credit between accounts but not create more than the budget.
+    function testReportsCannotIssueBeyondTheBudget() public {
+        address[] memory users = new address[](3);
+        uint256[] memory values = new uint256[](3);
+        (users[0], users[1], users[2]) = (alice, bob, makeAddr("carol"));
+        (values[0], values[1], values[2]) = (1_000_000, 1_000_000, 1);
+
+        vm.startPrank(reporter);
+        vm.expectRevert(OracleScoreProvider.IssuanceBudgetExceeded.selector);
+        provider.publishScores(_report(1, users, values));
+
+        values[2] = 0;
+        provider.publishScores(_report(1, users, values));
+        assertEq(provider.totalHeld(), BUDGET);
+        vm.stopPrank();
+    }
+
+    /// @dev The rotation attack on a plain sum-of-scores budget: give Alice the whole budget, let
+    ///      her borrow, move it to Bob, let him borrow, and so on. A lowered score keeps its budget
+    ///      until the pool shows the account's line unused.
+    function testBudgetStaysHeldWhileALineMayBeInUse() public {
+        UsageStub usage = new UsageStub();
+        vm.startPrank(owner);
+        provider.setLending(usage);
+        provider.setIssuanceLimits(1_000_000, 1_000_000); // one full line
+        vm.stopPrank();
+        vm.prank(reporter);
+        provider.publishScores(_report(1, alice, 1_000_000));
+        usage.setUsage(alice, 1, 0); // Alice borrowed against her line
+
+        address[] memory users = new address[](2);
+        uint256[] memory values = new uint256[](2);
+        (users[0], users[1]) = (alice, bob);
+        (values[0], values[1]) = (0, 1_000_000);
+        vm.prank(reporter);
+        provider.publishScores(_report(2, alice, 0));
+        assertEq(provider.creditScore(alice), 0, "her credit is cut at once");
+        assertEq(provider.totalHeld(), 1_000_000, "but her budget is held");
+        vm.prank(reporter);
+        vm.expectRevert(OracleScoreProvider.IssuanceBudgetExceeded.selector);
+        provider.publishScores(_report(3, users, values));
+
+        address[] memory alone = new address[](1);
+        alone[0] = alice;
+        provider.releaseBudget(alone); // still in use: skipped
+        assertEq(provider.totalHeld(), 1_000_000);
+        usage.setUsage(alice, 0, 5); // repaid, but backing someone with her line
+        provider.releaseBudget(alone);
+        assertEq(provider.totalHeld(), 1_000_000);
+
+        usage.setUsage(alice, 0, 0);
+        provider.releaseBudget(alone);
+        assertEq(provider.totalHeld(), 0);
+        vm.prank(reporter);
+        provider.publishScores(_report(3, users, values));
+        assertEq(provider.totalHeld(), 1_000_000);
+    }
+
+    function testReleaseNeedsTheLendingPool() public {
+        address[] memory alone = new address[](1);
+        alone[0] = alice;
+        vm.expectRevert(OracleScoreProvider.LendingNotSet.selector);
+        provider.releaseBudget(alone);
+        UsageStub usage = new UsageStub();
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+        provider.setLending(usage);
+    }
+
+    function testOneReportCanRaiseScoresOnlySoFar() public {
+        vm.prank(owner);
+        provider.setIssuanceLimits(BUDGET, 500_000);
+
+        vm.startPrank(reporter);
+        vm.expectRevert(OracleScoreProvider.IssuanceBudgetExceeded.selector);
+        provider.publishScores(_report(1, alice, 500_001));
+        provider.publishScores(_report(1, alice, 500_000));
+        provider.publishScores(_report(2, bob, 500_000));
+
+        // The cap counts every raise in the report, so lowering one score cannot fund a larger raise:
+        // this report adds only 100,000 net but raises scores by 600,000.
+        address[] memory users = new address[](3);
+        uint256[] memory values = new uint256[](3);
+        (users[0], users[1], users[2]) = (alice, bob, makeAddr("carol"));
+        (values[0], values[1], values[2]) = (0, 1_000_000, 100_000);
+        vm.expectRevert(OracleScoreProvider.IssuanceBudgetExceeded.selector);
+        provider.publishScores(_report(3, users, values));
+        values[2] = 0;
+        provider.publishScores(_report(3, users, values));
+        vm.stopPrank();
+        assertEq(provider.totalScore(), 1_000_000);
+    }
+
+    /// @dev After the budget is cut below what is held, reports that only lower scores still land,
+    ///      and raises wait until released budget brings the total back under.
+    function testLoweringTheBudgetStillAcceptsReductions() public {
+        UsageStub usage = new UsageStub();
+        vm.prank(owner);
+        provider.setLending(usage);
+        vm.prank(reporter);
+        provider.publishScores(_report(1, alice, 1_000_000));
+        vm.prank(owner);
+        provider.setIssuanceLimits(500_000, 500_000);
+
+        vm.startPrank(reporter);
+        provider.publishScores(_report(2, alice, 400_000));
+        assertEq(provider.totalScore(), 400_000);
+        vm.expectRevert(OracleScoreProvider.IssuanceBudgetExceeded.selector);
+        provider.publishScores(_report(3, bob, 1));
+        vm.stopPrank();
+
+        address[] memory alone = new address[](1);
+        alone[0] = alice;
+        provider.releaseBudget(alone);
+        assertEq(provider.totalHeld(), 400_000);
+        vm.prank(reporter);
+        provider.publishScores(_report(3, bob, 100_000));
+        assertEq(provider.totalHeld(), 500_000);
     }
 
     function testOwnershipTransferNeedsAcceptance() public {

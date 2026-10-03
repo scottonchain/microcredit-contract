@@ -1,0 +1,596 @@
+mechanism,attack,variant,world,n,accounts,net_profit,extracted,interest_paid,stake_lost,lender_pnl,honest_lender_loss,honest_stake_lost,honest_credit_burned,honest_capacity_change,protocol_fees,reserve_change,reverted_calls,accounting_residual
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.011,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0221,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.078,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0659,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.1685,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.2956,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,ring + beneficiary,demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.4751,0.0,0.0,0,0.0
+M1 hermes_history,A1 ring,ring + beneficiary,demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1,0.0
+M1 hermes_history,A1 ring,ring + beneficiary,demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M1 hermes_history,A1 ring,ring + beneficiary,demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M1 hermes_history,A1 ring,ring + beneficiary,demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M1 hermes_history,A1 ring,ring + beneficiary,demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M1 hermes_history,A1 ring,ring + beneficiary,demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M1 hermes_history,A1 ring,ring + beneficiary,demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,128,0.0
+M2 conservation,A1 ring,ring + beneficiary,demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1,0.0
+M2 conservation,A1 ring,ring + beneficiary,demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M2 conservation,A1 ring,ring + beneficiary,demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M2 conservation,A1 ring,ring + beneficiary,demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M2 conservation,A1 ring,ring + beneficiary,demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M2 conservation,A1 ring,ring + beneficiary,demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M2 conservation,A1 ring,ring + beneficiary,demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,128,0.0
+M3 conservation_dues,A1 ring,ring + beneficiary,demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1,0.0
+M3 conservation_dues,A1 ring,ring + beneficiary,demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M3 conservation_dues,A1 ring,ring + beneficiary,demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M3 conservation_dues,A1 ring,ring + beneficiary,demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M3 conservation_dues,A1 ring,ring + beneficiary,demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M3 conservation_dues,A1 ring,ring + beneficiary,demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M3 conservation_dues,A1 ring,ring + beneficiary,demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,128,0.0
+M3r conservation_reserve_dues,A1 ring,ring + beneficiary,demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1,0.0
+M3r conservation_reserve_dues,A1 ring,ring + beneficiary,demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M3r conservation_reserve_dues,A1 ring,ring + beneficiary,demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M3r conservation_reserve_dues,A1 ring,ring + beneficiary,demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M3r conservation_reserve_dues,A1 ring,ring + beneficiary,demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M3r conservation_reserve_dues,A1 ring,ring + beneficiary,demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M3r conservation_reserve_dues,A1 ring,ring + beneficiary,demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,128,0.0
+M4 credit_network_multihop,A1 ring,ring + beneficiary,demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A1 ring,ring + beneficiary,demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A1 ring,ring + beneficiary,demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A1 ring,ring + beneficiary,demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A1 ring,ring + beneficiary,demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A1 ring,ring + beneficiary,demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A1 ring,ring + beneficiary,demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,demo,2,2,11.3206,11.3206,0.0,0.0,0.0,11.3206,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,demo,4,4,22.6412,22.6412,0.0,0.0,0.0,22.6412,0.0,0.0,-0.0111,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,demo,8,8,38.0952,38.0952,0.0,0.0,0.0,38.0952,0.0,0.0,-0.0111,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,demo,16,16,76.1904,76.1904,0.0,0.0,0.0,76.1904,0.0,0.0,-0.0111,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,demo,32,32,152.3808,152.3808,0.0,0.0,0.0,152.3808,0.0,0.0,-0.3073,0.0,0.0,0,0.0
+M0 pagerank_vouch,A1 ring,pure ring,demo,64,64,304.7616,304.7616,0.0,0.0,0.0,304.7616,0.0,0.0,-0.6455,0.0,0.0,0,0.0
+M1 hermes_history,A1 ring,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A1 ring,pure ring,demo,2,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2,0.0
+M1 hermes_history,A1 ring,pure ring,demo,4,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M1 hermes_history,A1 ring,pure ring,demo,8,8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M1 hermes_history,A1 ring,pure ring,demo,16,16,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M1 hermes_history,A1 ring,pure ring,demo,32,32,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M1 hermes_history,A1 ring,pure ring,demo,64,64,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M2 conservation,A1 ring,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A1 ring,pure ring,demo,2,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2,0.0
+M2 conservation,A1 ring,pure ring,demo,4,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M2 conservation,A1 ring,pure ring,demo,8,8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M2 conservation,A1 ring,pure ring,demo,16,16,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M2 conservation,A1 ring,pure ring,demo,32,32,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M2 conservation,A1 ring,pure ring,demo,64,64,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M3 conservation_dues,A1 ring,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A1 ring,pure ring,demo,2,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2,0.0
+M3 conservation_dues,A1 ring,pure ring,demo,4,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M3 conservation_dues,A1 ring,pure ring,demo,8,8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M3 conservation_dues,A1 ring,pure ring,demo,16,16,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M3 conservation_dues,A1 ring,pure ring,demo,32,32,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M3 conservation_dues,A1 ring,pure ring,demo,64,64,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M3r conservation_reserve_dues,A1 ring,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A1 ring,pure ring,demo,2,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2,0.0
+M3r conservation_reserve_dues,A1 ring,pure ring,demo,4,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M3r conservation_reserve_dues,A1 ring,pure ring,demo,8,8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M3r conservation_reserve_dues,A1 ring,pure ring,demo,16,16,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M3r conservation_reserve_dues,A1 ring,pure ring,demo,32,32,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M3r conservation_reserve_dues,A1 ring,pure ring,demo,64,64,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M4 credit_network_multihop,A1 ring,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A1 ring,pure ring,demo,2,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A1 ring,pure ring,demo,4,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A1 ring,pure ring,demo,8,8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A1 ring,pure ring,demo,16,16,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A1 ring,pure ring,demo,32,32,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A1 ring,pure ring,demo,64,64,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,demo,1,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0221,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,demo,2,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.0668,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,demo,4,6,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.055,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,demo,8,10,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.1117,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,demo,16,18,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.1418,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,demo,32,34,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-0.319,0.0,0.0,0,0.0
+M0 pagerank_vouch,A2 stranger lift,,demo,64,66,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.4952,0.0,0.0,0,0.0
+M1 hermes_history,A2 stranger lift,,demo,1,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2,0.0
+M1 hermes_history,A2 stranger lift,,demo,2,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M1 hermes_history,A2 stranger lift,,demo,4,6,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M1 hermes_history,A2 stranger lift,,demo,8,10,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M1 hermes_history,A2 stranger lift,,demo,16,18,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M1 hermes_history,A2 stranger lift,,demo,32,34,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M1 hermes_history,A2 stranger lift,,demo,64,66,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,128,0.0
+M2 conservation,A2 stranger lift,,demo,1,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2,0.0
+M2 conservation,A2 stranger lift,,demo,2,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M2 conservation,A2 stranger lift,,demo,4,6,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M2 conservation,A2 stranger lift,,demo,8,10,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M2 conservation,A2 stranger lift,,demo,16,18,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M2 conservation,A2 stranger lift,,demo,32,34,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M2 conservation,A2 stranger lift,,demo,64,66,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,128,0.0
+M3 conservation_dues,A2 stranger lift,,demo,1,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2,0.0
+M3 conservation_dues,A2 stranger lift,,demo,2,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M3 conservation_dues,A2 stranger lift,,demo,4,6,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M3 conservation_dues,A2 stranger lift,,demo,8,10,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M3 conservation_dues,A2 stranger lift,,demo,16,18,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M3 conservation_dues,A2 stranger lift,,demo,32,34,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M3 conservation_dues,A2 stranger lift,,demo,64,66,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,128,0.0
+M3r conservation_reserve_dues,A2 stranger lift,,demo,1,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2,0.0
+M3r conservation_reserve_dues,A2 stranger lift,,demo,2,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M3r conservation_reserve_dues,A2 stranger lift,,demo,4,6,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M3r conservation_reserve_dues,A2 stranger lift,,demo,8,10,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M3r conservation_reserve_dues,A2 stranger lift,,demo,16,18,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M3r conservation_reserve_dues,A2 stranger lift,,demo,32,34,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M3r conservation_reserve_dues,A2 stranger lift,,demo,64,66,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,128,0.0
+M4 credit_network_multihop,A2 stranger lift,,demo,1,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A2 stranger lift,,demo,2,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A2 stranger lift,,demo,4,6,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A2 stranger lift,,demo,8,10,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A2 stranger lift,,demo,16,18,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A2 stranger lift,,demo,32,34,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A2 stranger lift,,demo,64,66,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,1,2,180.4047,180.4047,0.0,0.0,0.0,180.4047,0.0,0.0,-82.9427,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,2,3,271.2583,271.2583,0.0,0.0,0.0,271.2583,0.0,0.0,-85.6386,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,4,5,432.9378,432.9378,0.0,0.0,0.0,432.9378,0.0,0.0,-87.524,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,8,9,688.377,688.377,0.0,0.0,0.0,688.377,0.0,0.0,-88.4947,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,16,17,1045.7474,1045.7474,0.0,0.0,0.0,1045.7474,0.0,0.0,-89.4847,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,32,33,1430.4418,1430.4418,0.0,0.0,0.0,1430.4418,0.0,0.0,-89.4847,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,ring + beneficiary,demo,64,65,1853.2258,1853.2258,0.0,0.0,0.0,1853.2258,0.0,0.0,-89.4847,0.0,0.0,0,0.0
+M1 hermes_history,A3 deposit roots,ring + beneficiary,demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1,0.0
+M1 hermes_history,A3 deposit roots,ring + beneficiary,demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M1 hermes_history,A3 deposit roots,ring + beneficiary,demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M1 hermes_history,A3 deposit roots,ring + beneficiary,demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M1 hermes_history,A3 deposit roots,ring + beneficiary,demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M1 hermes_history,A3 deposit roots,ring + beneficiary,demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M1 hermes_history,A3 deposit roots,ring + beneficiary,demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,128,0.0
+M2 conservation,A3 deposit roots,ring + beneficiary,demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1,0.0
+M2 conservation,A3 deposit roots,ring + beneficiary,demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M2 conservation,A3 deposit roots,ring + beneficiary,demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M2 conservation,A3 deposit roots,ring + beneficiary,demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M2 conservation,A3 deposit roots,ring + beneficiary,demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M2 conservation,A3 deposit roots,ring + beneficiary,demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M2 conservation,A3 deposit roots,ring + beneficiary,demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,128,0.0
+M3 conservation_dues,A3 deposit roots,ring + beneficiary,demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1,0.0
+M3 conservation_dues,A3 deposit roots,ring + beneficiary,demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M3 conservation_dues,A3 deposit roots,ring + beneficiary,demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M3 conservation_dues,A3 deposit roots,ring + beneficiary,demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M3 conservation_dues,A3 deposit roots,ring + beneficiary,demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M3 conservation_dues,A3 deposit roots,ring + beneficiary,demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M3 conservation_dues,A3 deposit roots,ring + beneficiary,demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,128,0.0
+M3r conservation_reserve_dues,A3 deposit roots,ring + beneficiary,demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1,0.0
+M3r conservation_reserve_dues,A3 deposit roots,ring + beneficiary,demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M3r conservation_reserve_dues,A3 deposit roots,ring + beneficiary,demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M3r conservation_reserve_dues,A3 deposit roots,ring + beneficiary,demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M3r conservation_reserve_dues,A3 deposit roots,ring + beneficiary,demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M3r conservation_reserve_dues,A3 deposit roots,ring + beneficiary,demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M3r conservation_reserve_dues,A3 deposit roots,ring + beneficiary,demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,128,0.0
+M4 credit_network_multihop,A3 deposit roots,ring + beneficiary,demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A3 deposit roots,ring + beneficiary,demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A3 deposit roots,ring + beneficiary,demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A3 deposit roots,ring + beneficiary,demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A3 deposit roots,ring + beneficiary,demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A3 deposit roots,ring + beneficiary,demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A3 deposit roots,ring + beneficiary,demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,2,2,181.818,181.818,0.0,0.0,0.0,181.818,0.0,0.0,-87.524,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,4,4,363.636,363.636,0.0,0.0,0.0,363.636,0.0,0.0,-87.524,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,8,8,727.272,727.272,0.0,0.0,0.0,727.272,0.0,0.0,-88.4947,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,16,16,1454.544,1454.544,0.0,0.0,0.0,1454.544,0.0,0.0,-88.4947,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,32,32,2909.088,2909.088,0.0,0.0,0.0,2909.088,0.0,0.0,-89.4847,0.0,0.0,0,0.0
+M0 pagerank_vouch,A3 deposit roots,pure ring,demo,64,64,5818.176,5818.176,0.0,0.0,0.0,5818.176,0.0,0.0,-0.1799,0.0,0.0,0,0.0
+M1 hermes_history,A3 deposit roots,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A3 deposit roots,pure ring,demo,2,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2,0.0
+M1 hermes_history,A3 deposit roots,pure ring,demo,4,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M1 hermes_history,A3 deposit roots,pure ring,demo,8,8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M1 hermes_history,A3 deposit roots,pure ring,demo,16,16,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M1 hermes_history,A3 deposit roots,pure ring,demo,32,32,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M1 hermes_history,A3 deposit roots,pure ring,demo,64,64,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M2 conservation,A3 deposit roots,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A3 deposit roots,pure ring,demo,2,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2,0.0
+M2 conservation,A3 deposit roots,pure ring,demo,4,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M2 conservation,A3 deposit roots,pure ring,demo,8,8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M2 conservation,A3 deposit roots,pure ring,demo,16,16,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M2 conservation,A3 deposit roots,pure ring,demo,32,32,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M2 conservation,A3 deposit roots,pure ring,demo,64,64,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M3 conservation_dues,A3 deposit roots,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A3 deposit roots,pure ring,demo,2,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2,0.0
+M3 conservation_dues,A3 deposit roots,pure ring,demo,4,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M3 conservation_dues,A3 deposit roots,pure ring,demo,8,8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M3 conservation_dues,A3 deposit roots,pure ring,demo,16,16,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M3 conservation_dues,A3 deposit roots,pure ring,demo,32,32,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M3 conservation_dues,A3 deposit roots,pure ring,demo,64,64,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M3r conservation_reserve_dues,A3 deposit roots,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A3 deposit roots,pure ring,demo,2,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2,0.0
+M3r conservation_reserve_dues,A3 deposit roots,pure ring,demo,4,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4,0.0
+M3r conservation_reserve_dues,A3 deposit roots,pure ring,demo,8,8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8,0.0
+M3r conservation_reserve_dues,A3 deposit roots,pure ring,demo,16,16,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16,0.0
+M3r conservation_reserve_dues,A3 deposit roots,pure ring,demo,32,32,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32,0.0
+M3r conservation_reserve_dues,A3 deposit roots,pure ring,demo,64,64,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,64,0.0
+M4 credit_network_multihop,A3 deposit roots,pure ring,demo,1,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A3 deposit roots,pure ring,demo,2,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A3 deposit roots,pure ring,demo,4,4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A3 deposit roots,pure ring,demo,8,8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A3 deposit roots,pure ring,demo,16,16,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A3 deposit roots,pure ring,demo,32,32,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A3 deposit roots,pure ring,demo,64,64,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment",demo,1,2,25.0,25.0,0.0,0.0,0.0,25.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment",demo,2,3,50.0,50.0,0.0,0.0,0.0,50.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment",demo,4,5,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment",demo,8,9,200.0,200.0,0.0,0.0,0.0,200.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment",demo,16,17,400.0,400.0,0.0,0.0,0.0,400.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment",demo,32,33,800.0,800.0,0.0,0.0,0.0,800.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment",demo,64,65,1600.0,1600.0,0.0,0.0,0.0,1600.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment",demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment",demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment",demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment",demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment",demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment",demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment",demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment",demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment",demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment",demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment",demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment",demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment",demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment",demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment",demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment",demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment",demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment",demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment",demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment",demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment",demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment",demo,1,2,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment",demo,2,3,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment",demo,4,5,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment",demo,8,9,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment",demo,16,17,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment",demo,32,33,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment",demo,64,65,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment",demo,1,2,24.233151,25.0,0.766849,0.0,0.0,24.309835,0.0,0.0,0.0,0.076684,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment",demo,2,3,48.466302,50.0,1.533698,0.0,0.0,48.61967,0.0,0.0,0.0,0.153368,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment",demo,4,5,96.932604,100.0,3.067396,0.0,0.0,97.23934,0.0,0.0,0.0,0.306736,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment",demo,8,9,193.865208,200.0,6.134792,0.0,0.0,194.47868,0.0,0.0,0.0,0.613472,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment",demo,16,17,387.730416,400.0,12.269584,0.0,0.0,388.95736,0.0,0.0,0.0,1.226944,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment",demo,32,33,775.460832,800.0,24.539168,0.0,0.0,777.91472,0.0,0.0,0.0,2.453888,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment",demo,64,65,1550.921664,1600.0,49.078336,0.0,0.0,1555.82944,0.0,0.0,0.0,4.907776,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment",demo,1,2,-0.766849,0.0,0.766849,0.0,0.0,-0.46011,0.0,0.0,0.0,0.076684,0.230054,0,-1e-06
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment",demo,2,3,-1.533698,0.0,1.533698,0.0,0.0,-0.920221,0.0,0.0,0.0,0.153368,0.460108,0,-1e-06
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment",demo,4,5,-3.067396,0.0,3.067396,0.0,0.0,-1.840443,0.0,0.0,0.0,0.306736,0.920216,0,-1e-06
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment",demo,8,9,-6.134792,0.0,6.134792,0.0,0.0,-3.680887,0.0,0.0,0.0,0.613472,1.840432,0,-1e-06
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment",demo,16,17,-12.269584,0.0,12.269584,0.0,0.0,-7.361775,0.0,0.0,0.0,1.226944,3.680864,0,-1e-06
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment",demo,32,33,-24.539168,0.0,24.539168,0.0,0.0,-14.723551,0.0,0.0,0.0,2.453888,7.361728,0,-1e-06
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment",demo,64,65,-49.078336,0.0,49.078336,0.0,0.0,-29.447103,0.0,0.0,0.0,4.907776,14.723456,0,-1e-06
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment",demo,1,2,-0.076684,0.690165,0.766849,0.0,0.0,0.0,0.0,0.0,0.0,0.076684,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment",demo,2,3,-0.153368,1.38033,1.533698,0.0,0.0,0.0,0.0,0.0,0.0,0.153368,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment",demo,4,5,-0.306736,2.76066,3.067396,0.0,0.0,0.0,0.0,0.0,0.0,0.306736,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment",demo,8,9,-0.613472,5.52132,6.134792,0.0,0.0,0.0,0.0,0.0,0.0,0.613472,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment",demo,16,17,-1.226944,11.04264,12.269584,0.0,0.0,0.0,0.0,0.0,0.0,1.226944,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment",demo,32,33,-2.453888,22.08528,24.539168,0.0,0.0,0.0,0.0,0.0,0.0,2.453888,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment",demo,64,65,-4.907776,44.17056,49.078336,0.0,0.0,0.0,0.0,0.0,0.0,4.907776,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment",demo,1,2,-0.536795,0.230054,0.766849,0.0,0.0,-0.46011,0.0,0.0,0.0,0.076684,0.0,0,-1e-06
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment",demo,2,3,-1.07359,0.460108,1.533698,0.0,0.0,-0.920221,0.0,0.0,0.0,0.153368,0.0,0,-1e-06
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment",demo,4,5,-2.14718,0.920216,3.067396,0.0,0.0,-1.840443,0.0,0.0,0.0,0.306736,0.0,0,-1e-06
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment",demo,8,9,-4.29436,1.840432,6.134792,0.0,0.0,-3.680887,0.0,0.0,0.0,0.613472,0.0,0,-1e-06
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment",demo,16,17,-8.58872,3.680864,12.269584,0.0,0.0,-7.361775,0.0,0.0,0.0,1.226944,0.0,0,-1e-06
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment",demo,32,33,-17.17744,7.361728,24.539168,0.0,0.0,-14.723551,0.0,0.0,0.0,2.453888,0.0,0,-1e-06
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment",demo,64,65,-34.35488,14.723456,49.078336,0.0,0.0,-29.447103,0.0,0.0,0.0,4.907776,0.0,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment",demo,1,2,-0.766849,100.0,0.766849,100.0,0.0,-0.46011,0.0,0.0,0.0,0.076684,0.230054,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment",demo,2,3,-1.533698,100.0,1.533698,100.0,0.0,-0.920221,0.0,0.0,0.0,0.153368,0.460108,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment",demo,4,5,-3.067396,100.0,3.067396,100.0,0.0,-1.840443,0.0,0.0,0.0,0.306736,0.920216,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment",demo,8,9,-6.134792,100.0,6.134792,100.0,0.0,-3.680887,0.0,0.0,0.0,0.613472,1.840432,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment",demo,16,17,-12.269584,100.0,12.269584,100.0,0.0,-7.361775,0.0,0.0,0.0,1.226944,3.680864,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment",demo,32,33,-24.539168,100.0,24.539168,100.0,0.0,-14.723551,0.0,0.0,0.0,2.453888,7.361728,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment",demo,64,65,-49.078336,100.0,49.078336,100.0,0.0,-29.447103,0.0,0.0,0.0,4.907776,14.723456,0,-1e-06
+M0 pagerank_vouch,A4 wash farm,"line seed, grace repayment",demo,1,2,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,-0.8484,0.0,0.0,0,0.0
+M0 pagerank_vouch,A4 wash farm,"line seed, grace repayment",demo,2,3,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,-0.8613,0.0,0.0,0,0.0
+M0 pagerank_vouch,A4 wash farm,"line seed, grace repayment",demo,4,5,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,-0.8613,0.0,0.0,0,0.0
+M0 pagerank_vouch,A4 wash farm,"line seed, grace repayment",demo,8,9,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,-0.8743,0.0,0.0,0,0.0
+M0 pagerank_vouch,A4 wash farm,"line seed, grace repayment",demo,16,17,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,-0.6955,0.0,0.0,0,0.0
+M0 pagerank_vouch,A4 wash farm,"line seed, grace repayment",demo,32,33,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,-0.683,0.0,0.0,0,0.0
+M0 pagerank_vouch,A4 wash farm,"line seed, grace repayment",demo,64,65,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,-1.2081,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, grace repayment",demo,1,2,125.0,125.0,0.0,0.0,0.0,125.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, grace repayment",demo,2,3,150.0,150.0,0.0,0.0,0.0,150.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, grace repayment",demo,4,5,200.0,200.0,0.0,0.0,0.0,200.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, grace repayment",demo,8,9,300.0,300.0,0.0,0.0,0.0,300.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, grace repayment",demo,16,17,500.0,500.0,0.0,0.0,0.0,500.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, grace repayment",demo,32,33,900.0,900.0,0.0,0.0,0.0,900.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, grace repayment",demo,64,65,1700.0,1700.0,0.0,0.0,0.0,1700.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, grace repayment",demo,1,2,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, grace repayment",demo,2,3,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, grace repayment",demo,4,5,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, grace repayment",demo,8,9,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, grace repayment",demo,16,17,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, grace repayment",demo,32,33,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, grace repayment",demo,64,65,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, grace repayment",demo,1,2,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, grace repayment",demo,2,3,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, grace repayment",demo,4,5,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, grace repayment",demo,8,9,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, grace repayment",demo,16,17,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, grace repayment",demo,32,33,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, grace repayment",demo,64,65,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, grace repayment",demo,1,2,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, grace repayment",demo,2,3,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, grace repayment",demo,4,5,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, grace repayment",demo,8,9,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, grace repayment",demo,16,17,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, grace repayment",demo,32,33,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, grace repayment",demo,64,65,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, grace repayment",demo,1,2,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, grace repayment",demo,2,3,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, grace repayment",demo,4,5,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, grace repayment",demo,8,9,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, grace repayment",demo,16,17,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, grace repayment",demo,32,33,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, grace repayment",demo,64,65,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A4 wash farm,"line seed, 30-day repayment",demo,1,2,99.313703,100.0,0.686297,0.0,0.0,99.382332,0.0,0.0,-0.8484,0.068629,0.0,0,0.0
+M0 pagerank_vouch,A4 wash farm,"line seed, 30-day repayment",demo,2,3,98.627321,100.0,1.372679,0.0,0.0,98.764588,0.0,0.0,-0.8613,0.137267,0.0,0,0.0
+M0 pagerank_vouch,A4 wash farm,"line seed, 30-day repayment",demo,4,5,97.255155,100.0,2.744845,0.0,0.0,97.529638,0.0,0.0,-0.8613,0.274483,0.0,0,0.0
+M0 pagerank_vouch,A4 wash farm,"line seed, 30-day repayment",demo,8,9,94.512279,100.0,5.487721,0.0,0.0,95.061049,0.0,0.0,-0.8743,0.54877,0.0,0,0.0
+M0 pagerank_vouch,A4 wash farm,"line seed, 30-day repayment",demo,16,17,89.024203,100.0,10.975797,0.0,0.0,90.121776,0.0,0.0,-0.6955,1.097573,0.0,0,0.0
+M0 pagerank_vouch,A4 wash farm,"line seed, 30-day repayment",demo,32,33,78.042491,100.0,21.957509,0.0,0.0,80.238229,0.0,0.0,-0.683,2.195738,0.0,0,0.0
+M0 pagerank_vouch,A4 wash farm,"line seed, 30-day repayment",demo,64,65,56.085111,100.0,43.914889,0.0,0.0,60.476569,0.0,0.0,-1.2081,4.391458,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, 30-day repayment",demo,1,2,124.233151,125.0,0.766849,0.0,0.0,124.309835,0.0,0.0,0.0,0.076684,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, 30-day repayment",demo,2,3,148.466302,150.0,1.533698,0.0,0.0,148.61967,0.0,0.0,0.0,0.153368,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, 30-day repayment",demo,4,5,196.932604,200.0,3.067396,0.0,0.0,197.23934,0.0,0.0,0.0,0.306736,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, 30-day repayment",demo,8,9,293.865208,300.0,6.134792,0.0,0.0,294.47868,0.0,0.0,0.0,0.613472,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, 30-day repayment",demo,16,17,487.730416,500.0,12.269584,0.0,0.0,488.95736,0.0,0.0,0.0,1.226944,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, 30-day repayment",demo,32,33,875.460832,900.0,24.539168,0.0,0.0,877.91472,0.0,0.0,0.0,2.453888,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"line seed, 30-day repayment",demo,64,65,1650.921664,1700.0,49.078336,0.0,0.0,1655.82944,0.0,0.0,0.0,4.907776,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, 30-day repayment",demo,1,2,99.233151,100.0,0.766849,0.0,0.0,99.309835,0.0,0.0,0.0,0.076684,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, 30-day repayment",demo,2,3,98.466302,100.0,1.533698,0.0,0.0,98.61967,0.0,0.0,0.0,0.153368,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, 30-day repayment",demo,4,5,96.932604,100.0,3.067396,0.0,0.0,97.23934,0.0,0.0,0.0,0.306736,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, 30-day repayment",demo,8,9,93.865208,100.0,6.134792,0.0,0.0,94.47868,0.0,0.0,0.0,0.613472,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, 30-day repayment",demo,16,17,87.730416,100.0,12.269584,0.0,0.0,88.95736,0.0,0.0,0.0,1.226944,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, 30-day repayment",demo,32,33,75.460832,100.0,24.539168,0.0,0.0,77.91472,0.0,0.0,0.0,2.453888,0.0,0,0.0
+M2 conservation,A4 wash farm,"line seed, 30-day repayment",demo,64,65,50.921664,100.0,49.078336,0.0,0.0,55.82944,0.0,0.0,0.0,4.907776,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, 30-day repayment",demo,1,2,99.923316,100.690165,0.766849,0.0,0.0,100.0,0.0,0.0,0.0,0.076684,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, 30-day repayment",demo,2,3,99.846632,101.38033,1.533698,0.0,0.0,100.0,0.0,0.0,0.0,0.153368,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, 30-day repayment",demo,4,5,99.693264,102.76066,3.067396,0.0,0.0,100.0,0.0,0.0,0.0,0.306736,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, 30-day repayment",demo,8,9,99.386528,105.52132,6.134792,0.0,0.0,100.0,0.0,0.0,0.0,0.613472,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, 30-day repayment",demo,16,17,98.773056,111.04264,12.269584,0.0,0.0,100.0,0.0,0.0,0.0,1.226944,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, 30-day repayment",demo,32,33,97.546112,122.08528,24.539168,0.0,0.0,100.0,0.0,0.0,0.0,2.453888,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"line seed, 30-day repayment",demo,64,65,95.092224,144.17056,49.078336,0.0,0.0,100.0,0.0,0.0,0.0,4.907776,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, 30-day repayment",demo,1,2,99.463205,100.230054,0.766849,0.0,0.0,99.539889,0.0,0.0,0.0,0.076684,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, 30-day repayment",demo,2,3,98.92641,100.460108,1.533698,0.0,0.0,99.079778,0.0,0.0,0.0,0.153368,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, 30-day repayment",demo,4,5,97.85282,100.920216,3.067396,0.0,0.0,98.159556,0.0,0.0,0.0,0.306736,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, 30-day repayment",demo,8,9,95.70564,101.840432,6.134792,0.0,0.0,96.319112,0.0,0.0,0.0,0.613472,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, 30-day repayment",demo,16,17,91.41128,103.680864,12.269584,0.0,0.0,92.638224,0.0,0.0,0.0,1.226944,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, 30-day repayment",demo,32,33,82.82256,107.361728,24.539168,0.0,0.0,85.276448,0.0,0.0,0.0,2.453888,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"line seed, 30-day repayment",demo,64,65,65.64512,114.723456,49.078336,0.0,0.0,70.552896,0.0,0.0,0.0,4.907776,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, 30-day repayment",demo,1,2,99.233151,100.0,0.766849,0.0,0.0,99.309835,0.0,0.0,0.0,0.076684,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, 30-day repayment",demo,2,3,98.466302,100.0,1.533698,0.0,0.0,98.61967,0.0,0.0,0.0,0.153368,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, 30-day repayment",demo,4,5,96.932604,100.0,3.067396,0.0,0.0,97.23934,0.0,0.0,0.0,0.306736,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, 30-day repayment",demo,8,9,93.865208,100.0,6.134792,0.0,0.0,94.47868,0.0,0.0,0.0,0.613472,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, 30-day repayment",demo,16,17,87.730416,100.0,12.269584,0.0,0.0,88.95736,0.0,0.0,0.0,1.226944,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, 30-day repayment",demo,32,33,75.460832,100.0,24.539168,0.0,0.0,77.91472,0.0,0.0,0.0,2.453888,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"line seed, 30-day repayment",demo,64,65,50.921664,100.0,49.078336,0.0,0.0,55.82944,0.0,0.0,0.0,4.907776,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,1,2,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,2,3,200.0,200.0,0.0,0.0,0.0,200.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,4,5,400.0,400.0,0.0,0.0,0.0,400.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,8,9,800.0,800.0,0.0,0.0,0.0,800.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,16,17,1600.0,1600.0,0.0,0.0,0.0,1600.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,32,33,3200.0,3200.0,0.0,0.0,0.0,3200.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,64,65,6400.0,6400.0,0.0,0.0,0.0,6400.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,1,2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,2,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,4,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,8,9,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,16,17,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,32,33,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,64,65,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,1,2,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,2,3,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,4,5,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,8,9,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,16,17,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,32,33,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A4 wash farm,"stake seed, grace repayment, 4 cycles",demo,64,65,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,1,2,95.578636,100.0,4.421364,0.0,0.0,96.020771,0.0,0.0,0.0,0.442135,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,2,3,191.157272,200.0,8.842728,0.0,0.0,192.041542,0.0,0.0,0.0,0.88427,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,4,5,382.314544,400.0,17.685456,0.0,0.0,384.083084,0.0,0.0,0.0,1.76854,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,8,9,764.629088,800.0,35.370912,0.0,0.0,768.166168,0.0,0.0,0.0,3.53708,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,16,17,1529.258176,1600.0,70.741824,0.0,0.0,1536.332336,0.0,0.0,0.0,7.07416,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,32,33,3058.516352,3200.0,141.483648,0.0,0.0,3072.664672,0.0,0.0,0.0,14.14832,0.0,0,0.0
+M1 hermes_history,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,64,65,6117.032704,6400.0,282.967296,0.0,0.0,6145.329344,0.0,0.0,0.0,28.29664,0.0,0,0.0
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,1,2,-3.067396,0.0,3.067396,0.0,0.0,-1.840443,0.0,0.0,0.0,0.306736,0.920216,0,-1e-06
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,2,3,-6.134792,0.0,6.134792,0.0,0.0,-3.680887,0.0,0.0,0.0,0.613472,1.840432,0,-1e-06
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,4,5,-12.269584,0.0,12.269584,0.0,0.0,-7.361775,0.0,0.0,0.0,1.226944,3.680864,0,-1e-06
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,8,9,-24.539168,0.0,24.539168,0.0,0.0,-14.723551,0.0,0.0,0.0,2.453888,7.361728,0,-1e-06
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,16,17,-49.078336,0.0,49.078336,0.0,0.0,-29.447103,0.0,0.0,0.0,4.907776,14.723456,0,-1e-06
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,32,33,-98.156672,0.0,98.156672,0.0,0.0,-58.894207,0.0,0.0,0.0,9.815552,29.446912,0,-1e-06
+M2 conservation,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,64,65,-196.313344,0.0,196.313344,0.0,0.0,-117.788415,0.0,0.0,0.0,19.631104,58.893824,0,-1e-06
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,1,2,-0.309928,2.789368,3.099296,0.0,0.0,0.0,0.0,0.0,0.0,0.309928,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,2,3,-0.619856,5.578736,6.198592,0.0,0.0,0.0,0.0,0.0,0.0,0.619856,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,4,5,-1.239712,11.157472,12.397184,0.0,0.0,0.0,0.0,0.0,0.0,1.239712,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,8,9,-2.479424,22.314944,24.794368,0.0,0.0,0.0,0.0,0.0,0.0,2.479424,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,16,17,-4.958848,44.629888,49.588736,0.0,0.0,0.0,0.0,0.0,0.0,4.958848,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,32,33,-9.917696,89.259776,99.177472,0.0,0.0,0.0,0.0,0.0,0.0,9.917696,0.0,0,0.0
+M3 conservation_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,64,65,-19.835392,178.519552,198.354944,0.0,0.0,0.0,0.0,0.0,0.0,19.835392,0.0,0,0.0
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,1,2,-2.1546,0.923396,3.077996,0.0,0.0,-1.846801,0.0,0.0,0.0,0.307798,0.0,0,-1e-06
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,2,3,-4.3092,1.846792,6.155992,0.0,0.0,-3.693603,0.0,0.0,0.0,0.615596,0.0,0,-1e-06
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,4,5,-8.6184,3.693584,12.311984,0.0,0.0,-7.387207,0.0,0.0,0.0,1.231192,0.0,0,-1e-06
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,8,9,-17.2368,7.387168,24.623968,0.0,0.0,-14.774415,0.0,0.0,0.0,2.462384,0.0,0,-1e-06
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,16,17,-34.4736,14.774336,49.247936,0.0,0.0,-29.548831,0.0,0.0,0.0,4.924768,0.0,0,-1e-06
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,32,33,-68.9472,29.548672,98.495872,0.0,0.0,-59.097663,0.0,0.0,0.0,9.849536,0.0,0,-1e-06
+M3r conservation_reserve_dues,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,64,65,-137.8944,59.097344,196.991744,0.0,0.0,-118.195327,0.0,0.0,0.0,19.699072,0.0,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,1,2,-3.067396,100.0,3.067396,100.0,0.0,-1.840443,0.0,0.0,0.0,0.306736,0.920216,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,2,3,-6.134792,100.0,6.134792,100.0,0.0,-3.680887,0.0,0.0,0.0,0.613472,1.840432,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,4,5,-12.269584,100.0,12.269584,100.0,0.0,-7.361775,0.0,0.0,0.0,1.226944,3.680864,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,8,9,-24.539168,100.0,24.539168,100.0,0.0,-14.723551,0.0,0.0,0.0,2.453888,7.361728,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,16,17,-49.078336,100.0,49.078336,100.0,0.0,-29.447103,0.0,0.0,0.0,4.907776,14.723456,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,32,33,-98.156672,100.0,98.156672,100.0,0.0,-58.894207,0.0,0.0,0.0,9.815552,29.446912,0,-1e-06
+M4 credit_network_multihop,A4 wash farm,"stake seed, 30-day repayment, 4 cycles",demo,64,65,-196.313344,100.0,196.313344,100.0,0.0,-117.788415,0.0,0.0,0.0,19.631104,58.893824,0,-1e-06
+M0 pagerank_vouch,A5 collusive backer,,demo,1,2,189.4957,189.4957,0.0,0.0,0.0,189.4957,0.0,0.0,-0.797,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,demo,2,3,261.977,261.977,0.0,0.0,0.0,261.977,0.0,0.0,-0.7842,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,demo,4,5,372.2044,372.2044,0.0,0.0,0.0,372.2044,0.0,0.0,-0.7714,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,demo,8,9,509.756,509.756,0.0,0.0,0.0,509.756,0.0,0.0,-0.9264,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,demo,16,17,647.368,647.368,0.0,0.0,0.0,647.368,0.0,0.0,-0.9922,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,demo,32,33,780.3136,780.3136,0.0,0.0,0.0,780.3136,0.0,0.0,-0.5467,0.0,0.0,0,0.0
+M0 pagerank_vouch,A5 collusive backer,,demo,64,65,885.9648,885.9648,0.0,0.0,0.0,885.9648,0.0,0.0,-0.2606,0.0,0.0,0,0.0
+M1 hermes_history,A5 collusive backer,,demo,1,2,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A5 collusive backer,,demo,2,3,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A5 collusive backer,,demo,4,5,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A5 collusive backer,,demo,8,9,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A5 collusive backer,,demo,16,17,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A5 collusive backer,,demo,32,33,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A5 collusive backer,,demo,64,65,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A5 collusive backer,,demo,1,2,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A5 collusive backer,,demo,2,3,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A5 collusive backer,,demo,4,5,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A5 collusive backer,,demo,8,9,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A5 collusive backer,,demo,16,17,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A5 collusive backer,,demo,32,33,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A5 collusive backer,,demo,64,65,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A5 collusive backer,,demo,1,2,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A5 collusive backer,,demo,2,3,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A5 collusive backer,,demo,4,5,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A5 collusive backer,,demo,8,9,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A5 collusive backer,,demo,16,17,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A5 collusive backer,,demo,32,33,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A5 collusive backer,,demo,64,65,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A5 collusive backer,,demo,1,2,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A5 collusive backer,,demo,2,3,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A5 collusive backer,,demo,4,5,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A5 collusive backer,,demo,8,9,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A5 collusive backer,,demo,16,17,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A5 collusive backer,,demo,32,33,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A5 collusive backer,,demo,64,65,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A5 collusive backer,,demo,1,2,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A5 collusive backer,,demo,2,3,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A5 collusive backer,,demo,4,5,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A5 collusive backer,,demo,8,9,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A5 collusive backer,,demo,16,17,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A5 collusive backer,,demo,32,33,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A5 collusive backer,,demo,64,65,100.0,100.0,0.0,0.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,30-day repayments,demo,1,1,88.798488,89.4847,0.686212,0.0,0.0,88.867109,0.0,0.0,0.0,0.068621,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,30-day repayments,demo,2,1,88.112276,89.4847,1.372424,0.0,0.0,88.249518,0.0,0.0,0.0,0.137242,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,30-day repayments,demo,4,1,86.739852,89.4847,2.744848,0.0,0.0,87.014336,0.0,0.0,0.0,0.274484,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,30-day repayments,demo,8,1,83.995004,89.4847,5.489696,0.0,0.0,84.543972,0.0,0.0,0.0,0.548968,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,30-day repayments,demo,16,1,78.505308,89.4847,10.979392,0.0,0.0,79.603244,0.0,0.0,0.0,1.097936,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,30-day repayments,demo,32,1,67.525916,89.4847,21.958784,0.0,0.0,69.721788,0.0,0.0,0.0,2.195872,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,30-day repayments,demo,64,1,45.567132,89.4847,43.917568,0.0,0.0,49.958876,0.0,0.0,0.0,4.391744,0.0,0,0.0
+M1 hermes_history,A6 exit scam,30-day repayments,demo,1,1,93.174864,93.75,0.575136,0.0,0.0,93.232377,0.0,50.0,0.0,0.057513,0.0,0,0.0
+M1 hermes_history,A6 exit scam,30-day repayments,demo,2,1,115.893443,117.1875,1.294057,0.0,0.0,116.022848,0.0,50.0,0.0,0.129405,0.0,0,0.0
+M1 hermes_history,A6 exit scam,30-day repayments,demo,4,1,146.683978,150.0,3.316022,0.0,0.0,147.015579,0.0,50.0,0.0,0.331601,0.0,0,0.0
+M1 hermes_history,A6 exit scam,30-day repayments,demo,8,1,142.082886,150.0,7.917114,0.0,0.0,142.874595,0.0,50.0,0.0,0.791709,0.0,0,0.0
+M1 hermes_history,A6 exit scam,30-day repayments,demo,16,1,132.880702,150.0,17.119298,0.0,0.0,134.592627,0.0,50.0,0.0,1.711925,0.0,0,0.0
+M1 hermes_history,A6 exit scam,30-day repayments,demo,32,1,114.476334,150.0,35.523666,0.0,0.0,118.028691,0.0,50.0,0.0,3.552357,0.0,0,0.0
+M1 hermes_history,A6 exit scam,30-day repayments,demo,64,1,77.667598,150.0,72.332402,0.0,0.0,84.900819,0.0,50.0,0.0,7.233221,0.0,0,0.0
+M2 conservation,A6 exit scam,30-day repayments,demo,1,1,74.424864,75.0,0.575136,0.0,0.0,74.482377,0.0,50.0,0.0,0.057513,0.0,0,0.0
+M2 conservation,A6 exit scam,30-day repayments,demo,2,1,73.849728,75.0,1.150272,0.0,0.0,73.964754,0.0,50.0,0.0,0.115026,0.0,0,0.0
+M2 conservation,A6 exit scam,30-day repayments,demo,4,1,72.699456,75.0,2.300544,0.0,0.0,72.929508,0.0,50.0,0.0,0.230052,0.0,0,0.0
+M2 conservation,A6 exit scam,30-day repayments,demo,8,1,70.398912,75.0,4.601088,0.0,0.0,70.859016,0.0,50.0,0.0,0.460104,0.0,0,0.0
+M2 conservation,A6 exit scam,30-day repayments,demo,16,1,65.797824,75.0,9.202176,0.0,0.0,66.718032,0.0,50.0,0.0,0.920208,0.0,0,0.0
+M2 conservation,A6 exit scam,30-day repayments,demo,32,1,56.595648,75.0,18.404352,0.0,0.0,58.436064,0.0,50.0,0.0,1.840416,0.0,0,0.0
+M2 conservation,A6 exit scam,30-day repayments,demo,64,1,38.191296,75.0,36.808704,0.0,0.0,41.872128,0.0,50.0,0.0,3.680832,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,30-day repayments,demo,1,1,74.942487,75.517623,0.575136,0.0,0.0,75.0,0.0,50.0,0.0,0.057513,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,30-day repayments,demo,2,1,74.884577,76.038819,1.154242,0.0,0.0,75.0,0.0,50.0,0.0,0.115423,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,30-day repayments,demo,4,1,74.767555,77.092027,2.324472,0.0,0.0,75.0,0.0,50.0,0.0,0.232445,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,30-day repayments,demo,8,1,74.528627,79.242409,4.713782,0.0,0.0,75.0,0.0,50.0,0.0,0.471373,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,30-day repayments,demo,16,1,74.030589,83.724789,9.6942,0.0,0.0,75.0,0.0,50.0,0.0,0.969411,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,30-day repayments,demo,32,1,72.948401,93.464534,20.516133,0.0,0.0,75.0,0.0,50.0,0.0,2.051599,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,30-day repayments,demo,64,1,70.391709,116.474926,46.083217,0.0,0.0,75.0,0.0,50.0,0.0,4.608291,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,30-day repayments,demo,1,1,74.597404,75.17254,0.575136,0.0,0.0,74.654917,0.0,50.0,0.0,0.057513,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,30-day repayments,demo,2,1,74.193882,75.345478,1.151596,0.0,0.0,74.309041,0.0,50.0,0.0,0.115159,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,30-day repayments,demo,4,1,73.38405,75.692547,2.308497,0.0,0.0,73.614898,0.0,50.0,0.0,0.230848,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,30-day repayments,demo,8,1,71.753179,76.391489,4.63831,0.0,0.0,72.217007,0.0,50.0,0.0,0.463828,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,30-day repayments,demo,16,1,68.446119,77.808795,9.362676,0.0,0.0,69.382379,0.0,50.0,0.0,0.93626,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,30-day repayments,demo,32,1,61.646792,80.722781,19.075989,0.0,0.0,63.554376,0.0,50.0,0.0,1.907584,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,30-day repayments,demo,64,1,47.274686,86.882235,39.607549,0.0,0.0,51.235411,0.0,50.0,0.0,3.960725,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,30-day repayments,demo,1,1,74.424864,75.0,0.575136,0.0,0.0,74.482377,0.0,50.0,-50.0,0.057513,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,30-day repayments,demo,2,1,73.849728,75.0,1.150272,0.0,0.0,73.964754,0.0,50.0,-50.0,0.115026,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,30-day repayments,demo,4,1,72.699456,75.0,2.300544,0.0,0.0,72.929508,0.0,50.0,-50.0,0.230052,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,30-day repayments,demo,8,1,70.398912,75.0,4.601088,0.0,0.0,70.859016,0.0,50.0,-50.0,0.460104,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,30-day repayments,demo,16,1,65.797824,75.0,9.202176,0.0,0.0,66.718032,0.0,50.0,-50.0,0.920208,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,30-day repayments,demo,32,1,56.595648,75.0,18.404352,0.0,0.0,58.436064,0.0,50.0,-50.0,1.840416,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,30-day repayments,demo,64,1,38.191296,75.0,36.808704,0.0,0.0,41.872128,0.0,50.0,-50.0,3.680832,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,grace repayments,demo,1,1,89.4847,89.4847,0.0,0.0,0.0,89.4847,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,grace repayments,demo,2,1,89.4847,89.4847,0.0,0.0,0.0,89.4847,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,grace repayments,demo,4,1,89.4847,89.4847,0.0,0.0,0.0,89.4847,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,grace repayments,demo,8,1,89.4847,89.4847,0.0,0.0,0.0,89.4847,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,grace repayments,demo,16,1,89.4847,89.4847,0.0,0.0,0.0,89.4847,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,grace repayments,demo,32,1,89.4847,89.4847,0.0,0.0,0.0,89.4847,0.0,0.0,0.0,0.0,0.0,0,0.0
+M0 pagerank_vouch,A6 exit scam,grace repayments,demo,64,1,89.4847,89.4847,0.0,0.0,0.0,89.4847,0.0,0.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A6 exit scam,grace repayments,demo,1,1,93.75,93.75,0.0,0.0,0.0,93.75,0.0,50.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A6 exit scam,grace repayments,demo,2,1,117.1875,117.1875,0.0,0.0,0.0,117.1875,0.0,50.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A6 exit scam,grace repayments,demo,4,1,150.0,150.0,0.0,0.0,0.0,150.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A6 exit scam,grace repayments,demo,8,1,150.0,150.0,0.0,0.0,0.0,150.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A6 exit scam,grace repayments,demo,16,1,150.0,150.0,0.0,0.0,0.0,150.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A6 exit scam,grace repayments,demo,32,1,150.0,150.0,0.0,0.0,0.0,150.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M1 hermes_history,A6 exit scam,grace repayments,demo,64,1,150.0,150.0,0.0,0.0,0.0,150.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A6 exit scam,grace repayments,demo,1,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A6 exit scam,grace repayments,demo,2,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A6 exit scam,grace repayments,demo,4,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A6 exit scam,grace repayments,demo,8,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A6 exit scam,grace repayments,demo,16,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A6 exit scam,grace repayments,demo,32,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M2 conservation,A6 exit scam,grace repayments,demo,64,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,grace repayments,demo,1,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,grace repayments,demo,2,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,grace repayments,demo,4,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,grace repayments,demo,8,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,grace repayments,demo,16,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,grace repayments,demo,32,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3 conservation_dues,A6 exit scam,grace repayments,demo,64,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,grace repayments,demo,1,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,grace repayments,demo,2,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,grace repayments,demo,4,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,grace repayments,demo,8,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,grace repayments,demo,16,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,grace repayments,demo,32,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M3r conservation_reserve_dues,A6 exit scam,grace repayments,demo,64,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,0.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,grace repayments,demo,1,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,-50.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,grace repayments,demo,2,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,-50.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,grace repayments,demo,4,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,-50.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,grace repayments,demo,8,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,-50.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,grace repayments,demo,16,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,-50.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,grace repayments,demo,32,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,-50.0,0.0,0.0,0,0.0
+M4 credit_network_multihop,A6 exit scam,grace repayments,demo,64,1,75.0,75.0,0.0,0.0,0.0,75.0,0.0,50.0,-50.0,0.0,0.0,0,0.0
+M1 hermes_history,A7 self-lending dues,lender share 50%,demo,1,3,18.468999,25.0,9.33,0.0,2.798999,19.401999,0.0,0.0,0.0,0.933,0.0,0,0.0
+M1 hermes_history,A7 self-lending dues,lender share 50%,demo,2,4,36.937999,50.0,18.66,0.0,5.597999,38.803999,0.0,0.0,0.0,1.866,0.0,0,0.0
+M1 hermes_history,A7 self-lending dues,lender share 50%,demo,4,6,73.875999,100.0,37.32,0.0,11.195999,77.607999,0.0,0.0,0.0,3.732,0.0,0,0.0
+M1 hermes_history,A7 self-lending dues,lender share 50%,demo,8,10,147.751999,200.0,74.64,0.0,22.391999,155.215999,0.0,0.0,0.0,7.464,0.0,0,0.0
+M1 hermes_history,A7 self-lending dues,lender share 50%,demo,16,18,295.503999,400.0,149.28,0.0,44.783999,310.431999,0.0,0.0,0.0,14.928,0.0,0,0.0
+M1 hermes_history,A7 self-lending dues,lender share 50%,demo,32,34,591.007999,800.0,298.56,0.0,89.567999,620.863999,0.0,0.0,0.0,29.856,0.0,0,0.0
+M1 hermes_history,A7 self-lending dues,lender share 50%,demo,64,66,1182.015999,1600.0,597.12,0.0,179.135999,1241.727999,0.0,0.0,0.0,59.712,0.0,0,0.0
+M2 conservation,A7 self-lending dues,lender share 50%,demo,1,3,-6.531001,0.0,9.33,0.0,2.798999,-2.799,0.0,0.0,0.0,0.933,2.799,0,-1e-06
+M2 conservation,A7 self-lending dues,lender share 50%,demo,2,4,-13.062001,0.0,18.66,0.0,5.597999,-5.598,0.0,0.0,0.0,1.866,5.598,0,-1e-06
+M2 conservation,A7 self-lending dues,lender share 50%,demo,4,6,-26.124001,0.0,37.32,0.0,11.195999,-11.196,0.0,0.0,0.0,3.732,11.196,0,-1e-06
+M2 conservation,A7 self-lending dues,lender share 50%,demo,8,10,-52.248001,0.0,74.64,0.0,22.391999,-22.392,0.0,0.0,0.0,7.464,22.392,0,-1e-06
+M2 conservation,A7 self-lending dues,lender share 50%,demo,16,18,-104.496001,0.0,149.28,0.0,44.783999,-44.784,0.0,0.0,0.0,14.928,44.784,0,-1e-06
+M2 conservation,A7 self-lending dues,lender share 50%,demo,32,34,-208.992001,0.0,298.56,0.0,89.567999,-89.568,0.0,0.0,0.0,29.856,89.568,0,-1e-06
+M2 conservation,A7 self-lending dues,lender share 50%,demo,64,66,-417.984001,0.0,597.12,0.0,179.135999,-179.136,0.0,0.0,0.0,59.712,179.136,0,-1e-06
+M3 conservation_dues,A7 self-lending dues,lender share 50%,demo,1,3,1.865999,8.397,9.33,0.0,2.798999,2.798999,0.0,0.0,0.0,0.933,0.0,0,0.0
+M3 conservation_dues,A7 self-lending dues,lender share 50%,demo,2,4,3.731999,16.794,18.66,0.0,5.597999,5.597999,0.0,0.0,0.0,1.866,0.0,0,0.0
+M3 conservation_dues,A7 self-lending dues,lender share 50%,demo,4,6,7.463999,33.588,37.32,0.0,11.195999,11.195999,0.0,0.0,0.0,3.732,0.0,0,0.0
+M3 conservation_dues,A7 self-lending dues,lender share 50%,demo,8,10,14.927999,67.176,74.64,0.0,22.391999,22.391999,0.0,0.0,0.0,7.464,0.0,0,0.0
+M3 conservation_dues,A7 self-lending dues,lender share 50%,demo,16,18,29.855999,134.352,149.28,0.0,44.783999,44.783999,0.0,0.0,0.0,14.928,0.0,0,0.0
+M3 conservation_dues,A7 self-lending dues,lender share 50%,demo,32,34,59.711999,268.704,298.56,0.0,89.567999,89.567999,0.0,0.0,0.0,29.856,0.0,0,0.0
+M3 conservation_dues,A7 self-lending dues,lender share 50%,demo,64,66,119.423999,537.408,597.12,0.0,179.135999,179.135999,0.0,0.0,0.0,59.712,0.0,0,0.0
+M3r conservation_reserve_dues,A7 self-lending dues,lender share 50%,demo,1,3,-3.732001,2.799,9.33,0.0,2.798999,-2.799,0.0,0.0,0.0,0.933,0.0,0,-1e-06
+M3r conservation_reserve_dues,A7 self-lending dues,lender share 50%,demo,2,4,-7.464001,5.598,18.66,0.0,5.597999,-5.598,0.0,0.0,0.0,1.866,0.0,0,-1e-06
+M3r conservation_reserve_dues,A7 self-lending dues,lender share 50%,demo,4,6,-14.928001,11.196,37.32,0.0,11.195999,-11.196,0.0,0.0,0.0,3.732,0.0,0,-1e-06
+M3r conservation_reserve_dues,A7 self-lending dues,lender share 50%,demo,8,10,-29.856001,22.392,74.64,0.0,22.391999,-22.392,0.0,0.0,0.0,7.464,0.0,0,-1e-06
+M3r conservation_reserve_dues,A7 self-lending dues,lender share 50%,demo,16,18,-59.712001,44.784,149.28,0.0,44.783999,-44.784,0.0,0.0,0.0,14.928,0.0,0,-1e-06
+M3r conservation_reserve_dues,A7 self-lending dues,lender share 50%,demo,32,34,-119.424001,89.568,298.56,0.0,89.567999,-89.568,0.0,0.0,0.0,29.856,0.0,0,-1e-06
+M3r conservation_reserve_dues,A7 self-lending dues,lender share 50%,demo,64,66,-238.848001,179.136,597.12,0.0,179.135999,-179.136,0.0,0.0,0.0,59.712,0.0,0,-1e-06
+M4 credit_network_multihop,A7 self-lending dues,lender share 50%,demo,1,3,-6.531001,0.0,9.33,0.0,2.798999,-2.799,0.0,0.0,0.0,0.933,2.799,0,-1e-06
+M4 credit_network_multihop,A7 self-lending dues,lender share 50%,demo,2,4,-13.062001,0.0,18.66,0.0,5.597999,-5.598,0.0,0.0,0.0,1.866,5.598,0,-1e-06
+M4 credit_network_multihop,A7 self-lending dues,lender share 50%,demo,4,6,-26.124001,0.0,37.32,0.0,11.195999,-11.196,0.0,0.0,0.0,3.732,11.196,0,-1e-06
+M4 credit_network_multihop,A7 self-lending dues,lender share 50%,demo,8,10,-52.248001,0.0,74.64,0.0,22.391999,-22.392,0.0,0.0,0.0,7.464,22.392,0,-1e-06
+M4 credit_network_multihop,A7 self-lending dues,lender share 50%,demo,16,18,-104.496001,0.0,149.28,0.0,44.783999,-44.784,0.0,0.0,0.0,14.928,44.784,0,-1e-06
+M4 credit_network_multihop,A7 self-lending dues,lender share 50%,demo,32,34,-208.992001,0.0,298.56,0.0,89.567999,-89.568,0.0,0.0,0.0,29.856,89.568,0,-1e-06
+M4 credit_network_multihop,A7 self-lending dues,lender share 50%,demo,64,66,-417.984001,0.0,597.12,0.0,179.135999,-179.136,0.0,0.0,0.0,59.712,179.136,0,-1e-06
