@@ -44,6 +44,12 @@ const BorrowPage: NextPage = () => {
     functionName: "getBorrowLimit",
     args: [connectedAddress],
   });
+  // Interest you have paid (net of the protocol fee): the part of your own credit you earned.
+  const { data: duesPaid } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "duesPaid",
+    args: [connectedAddress],
+  });
 
   // Helper function to round down to the nearest penny (0.01 USDC = 10000 wei)
   const roundDownToNearestPenny = (amount: bigint): bigint => {
@@ -314,13 +320,13 @@ const BorrowPage: NextPage = () => {
   const defaultableAt = dueAt !== undefined && latePeriod !== undefined ? dueAt + Number(latePeriod) : undefined;
   const formatDate = (secs: number) => new Date(secs * 1000).toLocaleDateString();
 
-  // Outstanding rounded — disable when inactive; keep result object
+  // Outstanding rounded to the cent; the contract returns 0 once the loan is closed.
   const outRoundedRes = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "getOutstandingRoundedToCent" as any,
     args: activeLoanId !== undefined ? ([activeLoanId as bigint] as any) : undefined,
     query: {
-      enabled: activeLoanId !== undefined && loanIsActive,
+      enabled: activeLoanId !== undefined,
       refetchOnMount: "always",
       refetchOnWindowFocus: "always",
       staleTime: 0,
@@ -516,6 +522,9 @@ const BorrowPage: NextPage = () => {
           <div className="text-xs text-gray-500 mb-1">Credit Limit</div>
           <div className="text-2xl font-bold">{borrowLimit !== undefined ? formatUSDC(borrowLimit[0]) : "—"}</div>
           <div className="text-xs text-gray-400">your credit + backing</div>
+          {duesPaid !== undefined && duesPaid > 0n && borrowLimit !== undefined && borrowLimit[0] > 0n && (
+            <div className="text-xs text-gray-500 mt-1">includes {formatUSDC(duesPaid)} earned from interest you paid into the reserve</div>
+          )}
         </div>
         <div className="bg-base-100 rounded-lg p-4 shadow text-center">
           <div className="text-xs text-gray-500 mb-1">Max Loan</div>

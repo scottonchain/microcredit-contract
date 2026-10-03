@@ -13,10 +13,10 @@ Read the [README](README.md) to get an overview of the project.
 ### Vision
 
 The goal of this project is to democratize access to credit through:
-- **Social attestations and PageRank-based credit scoring** (all on-chain)
+- **Credit that cannot be manufactured**: borrowers draw on credit they hold (a line issued by the owner or the credit oracle, interest they have paid, or stake) or credit that others back them with from their own. See [docs/CREDIT_MODEL.md](docs/CREDIT_MODEL.md)
 - **Fixed-rate loans** based on real economic indicators (EFFR + risk premium)
 - **Unified lending pool** with proportional yield distribution
-- **Attester incentives** for maintaining network quality
+- **Backers who stand behind borrowers**: on a default their stake is slashed and their committed credit is burned, and a first-loss reserve pays before lenders do
 
 ### Project Status
 
@@ -86,7 +86,6 @@ microcredit-contract/
 │   │   ├── contracts/     # Solidity contracts
 │   │   ├── script/        # Forge deployment scripts
 │   │   ├── scripts-js/    # Node.js deploy/keystore utilities
-│   │   ├── scripts-py/    # NetworkX PageRank baseline
 │   │   └── test/          # Forge tests
 │   └── nextjs/            # Frontend application
 │       ├── app/           # Next.js 15 app router pages and relayer API routes

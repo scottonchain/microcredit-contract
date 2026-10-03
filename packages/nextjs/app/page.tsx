@@ -87,7 +87,7 @@ const Home: NextPage = () => {
                           </span>
                         </div>
                         <p className="text-green-700 text-sm">
-                          Great! You&apos;re registered with the system and can borrow or attest to others.
+                          You have a credit line of your own: you can borrow against it or back others.
                         </p>
                       </div>
                     </div>
@@ -239,7 +239,7 @@ const Home: NextPage = () => {
                     </div>
                   </div>
                   
-                  {/* Attestation Section */}
+                  {/* Backing Section */}
                   <div className="mt-6 bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-2xl p-6">
                     <div className="text-center">
                       <UserGroupIcon className="h-12 w-12 text-purple-600 mx-auto mb-3" />

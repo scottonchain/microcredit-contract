@@ -2,21 +2,395 @@
 
 import { useState, useMemo, useEffect } from "react";
 import type { NextPage } from "next";
-import { useAccount } from "wagmi";
+import { useAccount, useBlockNumber, useReadContracts, useWriteContract } from "wagmi";
 import { CogIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
-import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldReadContract, useScaffoldWriteContract, useTransactor } from "~~/hooks/scaffold-eth";
 import { formatPercent, formatUSDC } from "~~/utils/format";
-import { createPublicClient, http } from "viem";
+import { createPublicClient, formatUnits, http, parseUnits, zeroAddress } from "viem";
 import { localhost } from "viem/chains";
 import Link from "next/link";
 import { useIsAdmin } from "~~/hooks/useIsAdmin";
-import { ANVIL_RPC_URL, CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, USDC_ADDRESS } from "~~/utils/microcredit";
+import {
+  ANVIL_RPC_URL,
+  CHAIN_ID,
+  MICROCREDIT_ABI,
+  MICROCREDIT_ADDRESS,
+  SCORE_PROVIDER_ABI,
+  USDC_ADDRESS,
+} from "~~/utils/microcredit";
 
 const publicClient = createPublicClient({
   chain: { ...localhost, id: CHAIN_ID },
   transport: http(ANVIL_RPC_URL),
 });
+
+/** Parses a decimal string into fixed-point units with `decimals` places; null when invalid. */
+const parseFixed = (value: string, decimals: number): bigint | null => {
+  const trimmed = value.trim();
+  if (!new RegExp(`^\\d+(\\.\\d{1,${decimals}})?$`).test(trimmed)) return null;
+  return parseUnits(trimmed, decimals);
+};
+
+/** Basis points as a percentage, e.g. 1000n -> "10.00%". */
+const bpsToPercent = (bps?: bigint) => (bps !== undefined ? formatPercent(Number(bps) / 100) : "-");
+
+/*
+ * Writes below go through scaffold's transactor, which shows the revert reason with getParsedError
+ * (plain-language text from utils/contractErrors.ts for DecentralizedMicrocredit errors), so the
+ * handlers only reset their own state.
+ */
+
+/**
+ * First-loss reserve: a share of repaid interest, plus capital anyone adds, that pays uncovered
+ * default losses before lenders.
+ */
+const FirstLossReservePanel = ({ isOwner }: { isOwner: boolean }) => {
+  const [shareInput, setShareInput] = useState("");
+  const [releaseInput, setReleaseInput] = useState("");
+  const [fundInput, setFundInput] = useState("");
+  const [busy, setBusy] = useState<"share" | "release" | "fund" | null>(null);
+
+  const { data: reserveBps } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "reserveBps",
+  });
+  const { data: maxReserveBps } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "MAX_RESERVE_BPS",
+  });
+  const { data: reserve } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "firstLossReserve",
+  });
+  const { writeContractAsync } = useScaffoldWriteContract({ contractName: "DecentralizedMicrocredit" });
+  const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({ contractName: "MockUSDC" });
+
+  const newBps = parseFixed(shareInput, 2); // a percentage with two decimals is a number of basis points
+  const shareTooHigh = newBps !== null && maxReserveBps !== undefined && newBps > maxReserveBps;
+  const releaseAmount = parseFixed(releaseInput, 6);
+  const releaseTooHigh = releaseAmount !== null && reserve !== undefined && releaseAmount > reserve;
+  const fundAmount = parseFixed(fundInput, 6);
+
+  const setShare = async () => {
+    if (newBps === null) return;
+    setBusy("share");
+    try {
+      await writeContractAsync({ functionName: "setReserveBps", args: [newBps] });
+      setShareInput("");
+    } catch (error) {
+      console.error("setReserveBps failed:", error);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const release = async () => {
+    if (!releaseAmount) return;
+    setBusy("release");
+    try {
+      await writeContractAsync({ functionName: "releaseReserve", args: [releaseAmount] });
+      setReleaseInput("");
+    } catch (error) {
+      console.error("releaseReserve failed:", error);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Anyone can add first-loss capital: approve the USDC, then move it into the reserve.
+  const fund = async () => {
+    if (!fundAmount) return;
+    setBusy("fund");
+    try {
+      await writeUsdcAsync({ functionName: "approve", args: [MICROCREDIT_ADDRESS, fundAmount] });
+      await writeContractAsync({ functionName: "fundReserve", args: [fundAmount] });
+      setFundInput("");
+    } catch (error) {
+      console.error("fundReserve failed:", error);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+      <h2 className="text-xl font-semibold mb-4">First-Loss Reserve</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <h3 className="font-medium text-blue-800 mb-2">Reserve Share</h3>
+          <div className="text-2xl font-bold text-blue-600">{bpsToPercent(reserveBps)}</div>
+          <p className="text-sm text-blue-600 mt-1">Of every interest payment (max {bpsToPercent(maxReserveBps)})</p>
+        </div>
+        <div className="bg-green-50 p-4 rounded-lg">
+          <h3 className="font-medium text-green-800 mb-2">Reserve Balance</h3>
+          <div className="text-2xl font-bold text-green-600">{reserve !== undefined ? formatUSDC(reserve) : "-"}</div>
+          <p className="text-sm text-green-600 mt-1">
+            Pays default losses that slashed stake does not cover, before they reach lenders
+          </p>
+        </div>
+      </div>
+      <div className="mt-6">
+        <label htmlFor="fundReserve" className="block text-sm font-medium mb-2">
+          Add first-loss capital (USDC)
+        </label>
+        <div className="flex gap-2 max-w-md">
+          <input
+            id="fundReserve"
+            type="text"
+            inputMode="decimal"
+            placeholder="0.00"
+            value={fundInput}
+            onChange={e => setFundInput(e.target.value)}
+            className="input input-bordered flex-1 min-w-0"
+          />
+          <button className="btn btn-primary" disabled={!fundAmount || busy !== null} onClick={fund}>
+            {busy === "fund" ? "Adding..." : "Add to reserve"}
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Anyone can add. It is not a deposit: it earns nothing and cannot be withdrawn. Two transactions: approve
+          USDC, then add.
+        </p>
+      </div>
+      {isOwner ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <div>
+            <label htmlFor="reserveShare" className="block text-sm font-medium mb-2">
+              New reserve share (%)
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="reserveShare"
+                type="text"
+                inputMode="decimal"
+                placeholder={reserveBps !== undefined ? (Number(reserveBps) / 100).toString() : "0"}
+                value={shareInput}
+                onChange={e => setShareInput(e.target.value)}
+                className="input input-bordered flex-1 min-w-0"
+              />
+              <button
+                className="btn btn-primary"
+                disabled={newBps === null || shareTooHigh || busy !== null}
+                onClick={setShare}
+              >
+                {busy === "share" ? "Saving..." : "Set share"}
+              </button>
+            </div>
+            {shareTooHigh && <p className="text-xs text-red-500 mt-1">The maximum is {bpsToPercent(maxReserveBps)}.</p>}
+          </div>
+          <div>
+            <label htmlFor="releaseAmount" className="block text-sm font-medium mb-2">
+              Release to lenders (USDC)
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="releaseAmount"
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={releaseInput}
+                onChange={e => setReleaseInput(e.target.value)}
+                className="input input-bordered flex-1 min-w-0"
+              />
+              <button
+                type="button"
+                className="btn btn-outline"
+                disabled={!reserve}
+                onClick={() => reserve !== undefined && setReleaseInput(formatUnits(reserve, 6))}
+              >
+                Max
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={!releaseAmount || releaseTooHigh || busy !== null}
+                onClick={release}
+              >
+                {busy === "release" ? "Releasing..." : "Release"}
+              </button>
+            </div>
+            {releaseTooHigh ? (
+              <p className="text-xs text-red-500 mt-1">That is more than the reserve holds.</p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">Moves USDC from the reserve into the pool, raising the share price.</p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-500 mt-4">
+          Only the contract owner can change the reserve share or release the reserve.
+        </p>
+      )}
+    </div>
+  );
+};
+
+/**
+ * The credit oracle's issuance budget. OracleScoreProvider counts scores in units of 1e6 = one full
+ * line of maxLoanAmount; this panel shows them in USDC at the current max loan. The provider is
+ * whatever DecentralizedMicrocredit.scoreProvider() points at.
+ */
+const IssuanceBudgetPanel = () => {
+  const { address: connectedAddress } = useAccount();
+  const [budgetInput, setBudgetInput] = useState("");
+  const [perReportInput, setPerReportInput] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const { data: provider } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "scoreProvider",
+  });
+  const { data: maxLoanAmount } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "maxLoanAmount",
+  });
+  const hasProvider = !!provider && provider !== zeroAddress;
+  const providerContract = { address: provider as `0x${string}`, abi: SCORE_PROVIDER_ABI } as const;
+  const { data: limits, refetch } = useReadContracts({
+    contracts: [
+      { ...providerContract, functionName: "totalScore" },
+      { ...providerContract, functionName: "maxTotalScore" },
+      { ...providerContract, functionName: "maxIncreasePerReport" },
+      { ...providerContract, functionName: "owner" },
+    ],
+    query: { enabled: hasProvider },
+  });
+  // Oracle reports move totalScore, so refresh on every block as the scaffold read hooks do.
+  const { data: blockNumber } = useBlockNumber({ watch: true });
+  useEffect(() => {
+    if (hasProvider) refetch();
+  }, [blockNumber, hasProvider, refetch]);
+
+  const totalScore = limits?.[0]?.result;
+  const maxTotalScore = limits?.[1]?.result;
+  const maxIncreasePerReport = limits?.[2]?.result;
+  const providerOwner = limits?.[3]?.result;
+  const reportsBudget = totalScore !== undefined && maxTotalScore !== undefined && maxIncreasePerReport !== undefined;
+  const isProviderOwner =
+    !!connectedAddress && !!providerOwner && connectedAddress.toLowerCase() === providerOwner.toLowerCase();
+
+  const toUsdc = (score: bigint) => (maxLoanAmount !== undefined ? (score * maxLoanAmount) / 1_000_000n : undefined);
+  const lines = (score: bigint) => (Number(score) / 1e6).toFixed(2);
+  const usedPct =
+    reportsBudget && maxTotalScore > 0n ? Math.min(100, (Number(totalScore) / Number(maxTotalScore)) * 100) : 0;
+
+  const budgetUsdc = parseFixed(budgetInput, 6);
+  const perReportUsdc = parseFixed(perReportInput, 6);
+  const canSave = budgetUsdc !== null && perReportUsdc !== null && !!maxLoanAmount && hasProvider && !saving;
+
+  const { writeContractAsync } = useWriteContract();
+  const writeTx = useTransactor();
+  const saveLimits = async () => {
+    if (budgetUsdc === null || perReportUsdc === null || !maxLoanAmount || !hasProvider) return;
+    // USDC at the current max loan, back to score units.
+    const toScore = (usdc: bigint) => (usdc * 1_000_000n) / maxLoanAmount;
+    setSaving(true);
+    try {
+      await writeTx(() =>
+        writeContractAsync({
+          address: provider,
+          abi: SCORE_PROVIDER_ABI,
+          functionName: "setIssuanceLimits",
+          args: [toScore(budgetUsdc), toScore(perReportUsdc)],
+        }),
+      );
+      setBudgetInput("");
+      setPerReportInput("");
+      await refetch();
+    } catch (error) {
+      console.error("setIssuanceLimits failed:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
+      <h2 className="text-xl font-semibold mb-1">Oracle Issuance Budget</h2>
+      <p className="text-sm text-gray-600 mb-4">
+        The most credit the oracle can issue in total, and in one report. Overrides set by the owner are not counted.
+      </p>
+      {!hasProvider ? (
+        <p className="text-sm text-gray-500">No score provider is set.</p>
+      ) : !reportsBudget ? (
+        <p className="text-sm text-gray-500">The score provider does not report an issuance budget.</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-purple-50 p-4 rounded-lg">
+              <h3 className="font-medium text-purple-800 mb-2">Issued</h3>
+              <div className="text-2xl font-bold text-purple-600">
+                {formatUSDC(toUsdc(totalScore))} <span className="text-base font-normal">of {formatUSDC(toUsdc(maxTotalScore))}</span>
+              </div>
+              <progress className="progress progress-primary w-full mt-2" value={usedPct} max={100} />
+              <p className="text-sm text-purple-600 mt-1">
+                {lines(totalScore)} of {lines(maxTotalScore)} full lines of {formatUSDC(maxLoanAmount)}
+              </p>
+            </div>
+            <div className="bg-orange-50 p-4 rounded-lg">
+              <h3 className="font-medium text-orange-800 mb-2">Per Report</h3>
+              <div className="text-2xl font-bold text-orange-600">{formatUSDC(toUsdc(maxIncreasePerReport))}</div>
+              <p className="text-sm text-orange-600 mt-1">
+                Most one report may add ({lines(maxIncreasePerReport)} full lines)
+              </p>
+            </div>
+          </div>
+          {isProviderOwner ? (
+            <div className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="issuanceBudget" className="block text-sm font-medium mb-2">
+                    Budget (USDC)
+                  </label>
+                  <input
+                    id="issuanceBudget"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder={toUsdc(maxTotalScore) !== undefined ? formatUnits(toUsdc(maxTotalScore)!, 6) : ""}
+                    value={budgetInput}
+                    onChange={e => setBudgetInput(e.target.value)}
+                    className="input input-bordered w-full"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="issuancePerReport" className="block text-sm font-medium mb-2">
+                    Most one report may add (USDC)
+                  </label>
+                  <input
+                    id="issuancePerReport"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder={
+                      toUsdc(maxIncreasePerReport) !== undefined ? formatUnits(toUsdc(maxIncreasePerReport)!, 6) : ""
+                    }
+                    value={perReportInput}
+                    onChange={e => setPerReportInput(e.target.value)}
+                    className="input input-bordered w-full"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-4 mt-4">
+                <button className="btn btn-primary" disabled={!canSave} onClick={saveLimits}>
+                  {saving ? "Saving..." : "Set issuance limits"}
+                </button>
+                <p className="text-xs text-gray-500">
+                  Stored in score units, so the USDC amounts follow the max loan. A budget below what is already issued
+                  blocks any report that raises a score until the total is back under it.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 mt-4 flex flex-wrap items-center gap-1">
+              <span>Only the score provider&apos;s owner</span>
+              {providerOwner && <Address address={providerOwner} />}
+              <span>can change these.</span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
 
 const AdminPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -113,6 +487,12 @@ const AdminPage: NextPage = () => {
   
   // Centralized permissions
   const hasAccess = !!admin;
+  const isOwner = !!connectedAddress && !!owner && connectedAddress.toLowerCase() === owner.toLowerCase();
+
+  const { data: scoreProvider } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "scoreProvider",
+  });
 
   // Pool info for overview stats
   const { data: poolInfo, refetch: refetchPoolInfo } = useScaffoldReadContract({
@@ -921,7 +1301,7 @@ const AdminPage: NextPage = () => {
                 <div className="text-2xl font-bold text-purple-600">
                   {fundingPoolAPY !== undefined ? (Number(fundingPoolAPY) / 100).toFixed(2) : "-"}%
                 </div>
-                <p className="text-sm text-purple-600 mt-1">Projected lender yield</p>
+                <p className="text-sm text-purple-600 mt-1">Projected lender yield, net of fee and reserve</p>
               </div>
             </div>
             <div className="mt-4 p-3 bg-gray-100 rounded-md">
@@ -931,6 +1311,10 @@ const AdminPage: NextPage = () => {
               </p>
             </div>
           </div>
+
+          <FirstLossReservePanel isOwner={isOwner} />
+
+          <IssuanceBudgetPanel />
 
           {/* Detailed Data */}
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
@@ -962,7 +1346,7 @@ const AdminPage: NextPage = () => {
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span>Reputation Engine: Active</span>
+                    <span>Score Provider: {scoreProvider && scoreProvider !== zeroAddress ? "Set" : "Not Set"}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div

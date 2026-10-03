@@ -8,23 +8,64 @@ import { Address, AddressInput } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { formatUSDC } from "~~/utils/format";
 
-/** An account's own (granted) credit and total limit including backing received. */
+/**
+ * An account's own (granted) credit and total limit including backing received. Own credit is the
+ * issued line (score x max loan) plus dues (the share of interest paid into the first-loss reserve), less defaults
+ * charged to it as a backer; 0 after a default of its own.
+ */
 const CreditFigures = ({ account }: { account?: string }) => {
+  const who = account as `0x${string}` | undefined;
   const { data: granted } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "grantedCredit",
-    args: [account as `0x${string}` | undefined],
+    args: [who],
   });
   const { data: borrowLimit } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "getBorrowLimit",
-    args: [account as `0x${string}` | undefined],
+    args: [who],
   });
+  const { data: score } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getCreditScore",
+    args: [who],
+  });
+  const { data: maxLoanAmount } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "maxLoanAmount",
+  });
+  const { data: duesPaid } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "duesPaid",
+    args: [who],
+  });
+  const { data: creditLoss } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "creditLoss",
+    args: [who],
+  });
+  const { data: defaults } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "defaultedLoans",
+    args: [who],
+  });
+  const issuedLine =
+    score !== undefined && maxLoanAmount !== undefined ? (maxLoanAmount * score) / 1_000_000n : undefined;
   return (
     <>
       <div className="text-center">
         <div className="text-2xl font-bold text-blue-500">{granted !== undefined ? formatUSDC(granted) : "-"}</div>
         <div className="text-sm text-gray-600">Own Credit</div>
+        <div className="text-xs text-gray-500 mt-2 space-y-0.5">
+          <div>Issued line: {issuedLine !== undefined ? formatUSDC(issuedLine) : "-"}</div>
+          <div>Earned from interest paid into the reserve: {duesPaid !== undefined ? formatUSDC(duesPaid) : "-"}</div>
+          {creditLoss !== undefined && creditLoss > 0n && (
+            <div>Charged for defaults of people backed: {formatUSDC(creditLoss)}</div>
+          )}
+          {defaults !== undefined && defaults > 0n && (
+            <div className="text-red-500">Defaulted on a loan: own credit is 0</div>
+          )}
+        </div>
       </div>
       <div className="text-center">
         <div className="text-2xl font-bold text-green-500">
@@ -207,35 +248,35 @@ const ScoresPage: NextPage = () => {
                   <div className="flex items-center justify-between p-3 bg-green-50 rounded">
                     <div>
                       <div className="font-medium text-green-800">Excellent (90-100%)</div>
-                      <div className="text-sm text-green-600">Lowest interest rates, highest loan amounts</div>
+                      <div className="text-sm text-green-600">A line of 90 to 100% of the maximum loan</div>
                     </div>
                     <div className="text-2xl font-bold text-green-500">90-100%</div>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-blue-50 rounded">
                     <div>
                       <div className="font-medium text-blue-800">Very Good (70-89%)</div>
-                      <div className="text-sm text-blue-600">Good interest rates, high loan amounts</div>
+                      <div className="text-sm text-blue-600">A line of 70 to 89% of the maximum loan</div>
                     </div>
                     <div className="text-2xl font-bold text-blue-500">70-89%</div>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-yellow-50 rounded">
                     <div>
                       <div className="font-medium text-yellow-800">Good (50-69%)</div>
-                      <div className="text-sm text-yellow-600">Moderate interest rates, standard loan amounts</div>
+                      <div className="text-sm text-yellow-600">A line of 50 to 69% of the maximum loan</div>
                     </div>
                     <div className="text-2xl font-bold text-yellow-500">50-69%</div>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-orange-50 rounded">
                     <div>
                       <div className="font-medium text-orange-800">Fair (30-49%)</div>
-                      <div className="text-sm text-orange-600">Higher interest rates, limited loan amounts</div>
+                      <div className="text-sm text-orange-600">A line of 30 to 49% of the maximum loan</div>
                     </div>
                     <div className="text-2xl font-bold text-orange-500">30-49%</div>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-red-50 rounded">
                     <div>
                       <div className="font-medium text-red-800">Poor (0-29%)</div>
-                      <div className="text-sm text-red-600">Highest interest rates, minimal loan amounts</div>
+                      <div className="text-sm text-red-600">A line of up to 29% of the maximum loan</div>
                     </div>
                     <div className="text-2xl font-bold text-red-500">0-29%</div>
                   </div>
@@ -251,7 +292,7 @@ const ScoresPage: NextPage = () => {
                     </div>
                     <div>
                       <h4 className="font-medium">Your Own Credit</h4>
-                      <p className="text-gray-600">Your score, set by an institution or by the credit oracle (for example from your repayment history), times the maximum loan</p>
+                      <p className="text-gray-600">Your issued line (your score, set by an institution or the credit oracle, times the maximum loan) plus the share of your interest that went into the first-loss reserve</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -306,7 +347,7 @@ const ScoresPage: NextPage = () => {
                   </div>
                   <div>
                     <h3 className="font-medium">Repay Loans on Time</h3>
-                    <p className="text-gray-600">Lenders and institutions look at your repayment history when setting your credit</p>
+                    <p className="text-gray-600">The reserve share of the interest you pay adds to your own credit, and institutions look at your repayment history when setting your line</p>
                   </div>
                 </div>
               </div>
