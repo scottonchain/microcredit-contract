@@ -20,9 +20,8 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         credit.depositFunds(500_000e6);
         vm.stopPrank();
 
-        // Give the borrower a PageRank-derived score.
-        vm.prank(lender);
-        credit.recordAttestation(borrower, 800_000);
+        // The oracle grants the borrower a 90% score: 9,000 USDC of credit at a 10,000 maxLoanAmount.
+        _publishScore(borrower, 900_000);
     }
 
     function _ownerDeposit(uint256 amount) internal {
@@ -56,16 +55,6 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         assertFalse(isActive);
     }
 
-    function testAttesterRewardSharesPrincipal() public {
-        vm.prank(borrower);
-        uint256 loanId = credit.requestLoan(1_000e6);
-        credit.disburseLoan(loanId);
-
-        // Sole attester receives the whole 5%-of-principal pot.
-        assertEq(credit.computeAttesterReward(loanId, lender), 50e6);
-        assertEq(credit.computeAttesterReward(loanId, makeAddr("nobody")), 0);
-    }
-
     function testInterestRateIsPlatformRate() public {
         vm.prank(borrower);
         uint256 loanId = credit.requestLoan(1_000e6);
@@ -80,7 +69,7 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         credit.requestLoan(allowed);
 
         vm.prank(borrower);
-        vm.expectRevert("Outstanding loans exceed max");
+        vm.expectRevert(DecentralizedMicrocredit.BorrowLimitExceeded.selector);
         credit.requestLoan(1e6);
     }
 
@@ -88,7 +77,7 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(address(credit)), 500_000e6);
         _ownerDeposit(100_000e6);
         assertEq(usdc.balanceOf(address(credit)), 600_000e6);
-        assertEq(credit.totalDeposits(), 600_000e6);
+        assertEq(credit.totalAssets(), 600_000e6);
     }
 
     function testReservedLiquidityEnforced() public {
@@ -132,17 +121,19 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         vm.stopPrank();
 
         assertEq(usdc.balanceOf(lender), before - 150_000e6);
-        assertEq(credit.lenderDeposits(lender), 150_000e6);
+        assertEq(credit.lenderBalance(lender), 150_000e6);
     }
 
     function testLenderCannotWithdrawMoreThanAvailablePoolFunds() public {
         // Fresh pool funded by a single lender.
         vm.prank(owner);
         DecentralizedMicrocredit pool = new DecentralizedMicrocredit(750, 250, type(uint256).max, address(usdc), oracle);
+        vm.startPrank(owner);
+        pool.setScoreOverride(borrower, SCALE);
+        vm.stopPrank();
         vm.startPrank(lender);
         usdc.approve(address(pool), 100_000e6);
         pool.depositFunds(100_000e6);
-        pool.recordAttestation(borrower, 800_000);
         vm.stopPrank();
 
         uint256 utilisationCap = (100_000e6 * pool.lendingUtilizationCap()) / pool.BASIS_POINTS();
@@ -165,7 +156,7 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         credit.withdrawFunds(40_000e6);
         credit.withdrawFunds(30_000e6);
 
-        vm.expectRevert("Insufficient balance");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientBalance.selector);
         credit.withdrawFunds(40_000e6); // only 30k left
         vm.stopPrank();
     }
@@ -179,14 +170,14 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         credit.requestLoan(850_000e6);
         credit.requestLoan(50_000e6); // exactly at the cap
 
-        vm.expectRevert("Pool utilisation cap exceeded");
+        vm.expectRevert(DecentralizedMicrocredit.UtilisationCapExceeded.selector);
         credit.requestLoan(1e6);
         vm.stopPrank();
 
         assertEq(credit.reservedLiquidity(), 900_000e6);
     }
 
-    function testUtilizationCapLeavesWithdrawalBuffer() public {
+    function testUtilizationCapLeavesUnreservedFundsWithdrawable() public {
         _ownerDeposit(500_000e6);
         vm.prank(owner);
         credit.setMaxLoanAmount(type(uint256).max);
@@ -194,9 +185,12 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
         vm.prank(borrower);
         credit.requestLoan(900_000e6);
 
-        // 100k stays unreserved; 50k of it is withdrawable above the 5% buffer.
-        vm.prank(owner);
-        credit.withdrawFunds(50_000e6);
+        // 100k stays unreserved, and all of it can leave: the 5% buffer only limits new loans.
+        vm.startPrank(owner);
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
+        credit.withdrawFunds(100_000e6 + 1);
+        credit.withdrawFunds(100_000e6);
+        vm.stopPrank();
     }
 
     function testRepayReducesTotalLentOut() public {

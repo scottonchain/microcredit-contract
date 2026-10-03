@@ -13,8 +13,9 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
     address internal borrower = vm.addr(borrowerPk);
     uint256 internal lenderPk = 0x1E4D;
     address internal lender = vm.addr(lenderPk);
-    uint256 internal attesterPk = 0xA77E;
-    address internal attester = vm.addr(attesterPk);
+    uint256 internal backerPk = 0xA77E;
+    address internal backer = vm.addr(backerPk);
+    uint256 internal constant BACKER_CREDIT = 50e6; // 50% score x 100 USDC maxLoanAmount
     address internal poolLender = makeAddr("poolLender");
 
     event MetaLoanCreated(
@@ -25,18 +26,19 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
     event MetaDeposit(address indexed lender, uint256 amount, address indexed receiver, uint256 sharesMinted);
     event MetaWithdrawalRequested(address indexed lender, uint256 indexed queueId, uint256 amount, address indexed to);
     event MetaWithdrawalFilled(uint256 indexed queueId, uint256 amountFilled);
-    event MetaAttested(address indexed attester, address indexed borrower, uint256 weight);
-    event Deposited(address indexed lender, uint256 amount);
-    event Withdrawn(address indexed lender, address indexed to, uint256 amount);
+    event Deposited(address indexed lender, uint256 assets, uint256 shares);
+    event Withdrawn(address indexed lender, address indexed to, uint256 assets, uint256 shares);
     event LoanRequested(address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 interestRate);
     event LoanDisbursed(address indexed borrower, uint256 indexed loanId, address to, uint256 amount);
-    event Attested(address indexed attester, address indexed borrower, uint256 weight);
+    event Backed(address indexed backer, address indexed borrower, uint256 secured, uint256 unsecured);
 
     function setUp() public {
         _deploy(433, 500, 100e6);
         _deposit(poolLender, POOL);
         vm.prank(owner);
         credit.setScoreOverride(borrower, 500_000); // 50% -> may borrow up to 50 USDC
+        vm.prank(owner);
+        credit.setScoreOverride(backer, 500_000); // 50 USDC of granted credit to back others with
     }
 
     // ───────────────────────────── helpers ─────────────────────────────
@@ -76,13 +78,13 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         });
     }
 
-    function _attest(address to, uint256 weight) internal {
-        DecentralizedMicrocredit.AttestRequest memory req = DecentralizedMicrocredit.AttestRequest({
-            attester: attester, borrower: to, weight: weight, nonce: credit.nonces(attester), deadline: _deadline()
+    function _back(address to, uint256 amount) internal {
+        DecentralizedMicrocredit.BackRequest memory req = DecentralizedMicrocredit.BackRequest({
+            backer: backer, borrower: to, amount: amount, nonce: credit.nonces(backer), deadline: _deadline()
         });
-        bytes memory sig = _signAttestRequest(attesterPk, req);
+        bytes memory sig = _signBackRequest(backerPk, req);
         vm.prank(relayer);
-        credit.attestMeta(req, sig);
+        credit.backMeta(req, sig);
     }
 
     function _depositPermitOnly(address depositor, uint256 depositorPk, uint256 amount) internal {
@@ -129,7 +131,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _borrowRequest(40e6, LOAN_APR - 1);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
         vm.prank(relayer);
-        vm.expectRevert("APR changed");
+        vm.expectRevert(DecentralizedMicrocredit.AprChanged.selector);
         credit.borrowAndDisburseMeta(req, sig);
     }
 
@@ -146,7 +148,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _borrowRequest(30e6, LOAN_APR);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
         vm.prank(relayer);
-        vm.expectRevert("Outstanding loans exceed max");
+        vm.expectRevert(DecentralizedMicrocredit.BorrowLimitExceeded.selector);
         credit.borrowAndDisburseMeta(req, sig);
     }
 
@@ -160,53 +162,57 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _borrowRequest(9_600e6, LOAN_APR);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
         vm.prank(relayer);
-        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
         credit.borrowAndDisburseMeta(req, sig);
     }
 
-    // ───────────────────────────── attestMeta ─────────────────────────────
+    // ───────────────────────────── backMeta ─────────────────────────────
 
-    function testAttestMetaRecordsAttestationAndScore() public {
+    function testBackMetaMovesCreditFromTheBacker() public {
         address newcomer = makeAddr("newcomer");
         vm.expectEmit(address(credit));
-        emit MetaAttested(attester, newcomer, 800_000);
-        _attest(newcomer, 800_000);
+        emit Backed(backer, newcomer, 0, 30e6);
+        _back(newcomer, 30e6);
 
-        DecentralizedMicrocredit.Attestation[] memory atts = credit.getBorrowerAttestations(newcomer);
-        assertEq(atts.length, 1);
-        assertEq(atts[0].attester, attester);
-        assertEq(atts[0].weight, 800_000);
-        assertEq(credit.nonces(attester), 1);
-        assertEq(credit.getAttesters()[0], attester);
-        assertGt(credit.getCreditScore(newcomer), 0, "PageRank recomputed on attestation");
+        (uint256 secured, uint256 unsecured) = credit.getBacking(backer, newcomer);
+        assertEq(secured, 0);
+        assertEq(unsecured, 30e6);
+        assertEq(credit.nonces(backer), 1);
+        assertEq(credit.getBackers()[0], backer);
+        assertEq(credit.getBackedBorrowers()[0], newcomer);
+
+        (uint256 newcomerLimit,) = credit.getBorrowLimit(newcomer);
+        (uint256 backerLimit,) = credit.getBorrowLimit(backer);
+        assertEq(newcomerLimit, 30e6);
+        assertEq(backerLimit, BACKER_CREDIT - 30e6, "the backer gives up what the borrower gains");
     }
 
-    function testAttestMetaUpdatesExistingWeight() public {
+    function testBackMetaUpdatesTheAmount() public {
         address newcomer = makeAddr("newcomer");
-        _attest(newcomer, 800_000);
-        _attest(newcomer, 300_000);
+        _back(newcomer, 30e6);
+        _back(newcomer, 10e6);
 
-        DecentralizedMicrocredit.Attestation[] memory atts = credit.getBorrowerAttestations(newcomer);
-        assertEq(atts.length, 1);
-        assertEq(atts[0].weight, 300_000);
-        assertEq(credit.getAttesters().length, 1);
+        DecentralizedMicrocredit.Backing[] memory backings = credit.getBackings(newcomer);
+        assertEq(backings.length, 1);
+        assertEq(backings[0].unsecured, 10e6);
+        assertEq(credit.creditCommitted(backer), 10e6);
     }
 
-    function testAttestMetaRejectsSelfAttestationAndOverweight() public {
-        DecentralizedMicrocredit.AttestRequest memory req = DecentralizedMicrocredit.AttestRequest({
-            attester: attester, borrower: attester, weight: 1, nonce: 0, deadline: _deadline()
+    function testBackMetaRejectsSelfBackingAndMoreThanTheBackerHas() public {
+        DecentralizedMicrocredit.BackRequest memory req = DecentralizedMicrocredit.BackRequest({
+            backer: backer, borrower: backer, amount: 1, nonce: 0, deadline: _deadline()
         });
-        bytes memory sig = _signAttestRequest(attesterPk, req);
+        bytes memory sig = _signBackRequest(backerPk, req);
         vm.prank(relayer);
-        vm.expectRevert("Self-attestation");
-        credit.attestMeta(req, sig);
+        vm.expectRevert(DecentralizedMicrocredit.SelfBacking.selector);
+        credit.backMeta(req, sig);
 
         req.borrower = borrower;
-        req.weight = SCALE + 1;
-        sig = _signAttestRequest(attesterPk, req);
+        req.amount = BACKER_CREDIT + 1;
+        sig = _signBackRequest(backerPk, req);
         vm.prank(relayer);
-        vm.expectRevert("Weight too high");
-        credit.attestMeta(req, sig);
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientCredit.selector);
+        credit.backMeta(req, sig);
     }
 
     // ───────────────────────────── deposits ─────────────────────────────
@@ -220,12 +226,12 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.PermitData memory permit = _signPermit(lenderPk, 1_000e6, _deadline());
 
         vm.expectEmit(address(credit));
-        emit MetaDeposit(lender, 1_000e6, lender, 1_000e6);
+        emit MetaDeposit(lender, 1_000e6, lender, credit.convertToShares(1_000e6));
         vm.prank(relayer);
         credit.depositWithPermitMeta(req, sig, permit);
 
-        assertEq(credit.totalDeposits(), POOL + 1_000e6);
-        assertEq(credit.lenderDeposits(lender), 1_000e6);
+        assertEq(credit.totalAssets(), POOL + 1_000e6);
+        assertEq(credit.lenderBalance(lender), 1_000e6);
         assertEq(credit.lenderCount(), 2);
         assertEq(credit.getLenders()[1], lender);
         assertEq(credit.nonces(lender), 1);
@@ -241,12 +247,12 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.PermitData memory permit = _signPermit(lenderPk, 1_000e6, _deadline());
 
         vm.expectEmit(address(credit));
-        emit Deposited(receiver, 1_000e6);
+        emit Deposited(receiver, 1_000e6, credit.convertToShares(1_000e6));
         vm.prank(relayer);
         credit.depositWithPermitMeta(req, sig, permit);
 
-        assertEq(credit.lenderDeposits(receiver), 1_000e6);
-        assertEq(credit.lenderDeposits(lender), 0);
+        assertEq(credit.lenderBalance(receiver), 1_000e6);
+        assertEq(credit.lenderBalance(lender), 0);
         assertEq(usdc.balanceOf(lender), 0, "funds come from the signer");
     }
 
@@ -258,7 +264,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         bytes memory sig = _signDepositRequest(lenderPk, req);
         DecentralizedMicrocredit.PermitData memory permit = _signPermit(lenderPk, 999e6, _deadline());
         vm.prank(relayer);
-        vm.expectRevert("Permit value too low");
+        vm.expectRevert(DecentralizedMicrocredit.PermitValueTooLow.selector);
         credit.depositWithPermitMeta(req, sig, permit);
     }
 
@@ -266,8 +272,8 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         _depositPermitOnly(lender, lenderPk, 500e6);
         _depositPermitOnly(lender, lenderPk, 250e6);
 
-        assertEq(credit.lenderDeposits(lender), 750e6);
-        assertEq(credit.totalDeposits(), POOL + 750e6);
+        assertEq(credit.lenderBalance(lender), 750e6);
+        assertEq(credit.totalAssets(), POOL + 750e6);
         assertEq(credit.lenderCount(), 2);
         assertEq(credit.getLenders().length, 2);
     }
@@ -283,16 +289,17 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         credit.requestWithdrawalMeta(req, sig);
     }
 
-    /// @dev Lends the entire pool (POOL + 1,000 from `lender`) to `borrower`, leaving nothing liquid.
+    /// @dev Lends every deposited USDC to `borrower`, leaving nothing liquid.
     function _lendOutWholePool() internal returns (uint256 loanId) {
+        uint256 pool = credit.totalAssets();
         vm.startPrank(owner);
-        credit.setMaxLoanAmount(POOL + 1_000e6);
+        credit.setMaxLoanAmount(pool);
         credit.setScoreOverride(borrower, SCALE);
         credit.setLendingUtilizationCap(10_000);
         credit.setLiquidityLimits(0, 0);
         vm.stopPrank();
         vm.prank(borrower);
-        loanId = credit.requestLoan(POOL + 1_000e6);
+        loanId = credit.requestLoan(pool);
         credit.disburseLoan(loanId);
         assertEq(usdc.balanceOf(address(credit)), 0);
     }
@@ -308,8 +315,8 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         _requestWithdrawal(400e6, payout);
 
         assertEq(usdc.balanceOf(payout), 400e6);
-        assertEq(credit.lenderDeposits(lender), 600e6);
-        assertEq(credit.totalDeposits(), POOL + 600e6);
+        assertEq(credit.lenderBalance(lender), 600e6);
+        assertEq(credit.totalAssets(), POOL + 600e6);
     }
 
     function testWithdrawalQueuesUntilDepositsRestoreLiquidity() public {
@@ -319,18 +326,18 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         address payout = makeAddr("payout");
         _requestWithdrawal(1_000e6, payout);
         assertEq(usdc.balanceOf(payout), 0, "queued, not paid");
-        assertEq(credit.lenderDeposits(lender), 1_000e6);
+        assertEq(credit.lenderBalance(lender), 1_000e6);
 
         // A new deposit partially fills the head of the queue...
         address other = vm.addr(0x07E4);
         _depositPermitOnly(other, 0x07E4, 400e6);
         assertEq(usdc.balanceOf(payout), 400e6);
-        assertEq(credit.lenderDeposits(lender), 600e6);
+        assertEq(credit.lenderBalance(lender), 600e6);
 
         // ...and the next one completes it.
         _depositPermitOnly(other, 0x07E4, 1_000e6);
         assertEq(usdc.balanceOf(payout), 1_000e6);
-        assertEq(credit.lenderDeposits(lender), 0);
+        assertEq(credit.lenderBalance(lender), 0);
     }
 
     function testQueuedFundsCannotBeQueuedOrWithdrawnTwice() public {
@@ -344,11 +351,11 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         });
         bytes memory sig = _signRequestWithdrawal(lenderPk, again);
         vm.prank(relayer);
-        vm.expectRevert("Insufficient balance");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientBalance.selector);
         credit.requestWithdrawalMeta(again, sig);
 
         vm.prank(lender);
-        vm.expectRevert("Insufficient balance");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientBalance.selector);
         credit.withdrawFunds(1);
     }
 
@@ -364,7 +371,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         vm.stopPrank();
 
         assertEq(usdc.balanceOf(payout), 1_000e6);
-        assertEq(credit.lenderDeposits(lender), 0);
+        assertEq(credit.lenderBalance(lender), 0);
         assertEq(credit.queuedWithdrawals(lender), 0);
     }
 
@@ -378,23 +385,106 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(payout), 1_000e6);
     }
 
+    function testStrayTransferIsNotPoolLiquidity() public {
+        _depositPermitOnly(lender, lenderPk, 1_000e6);
+        _lendOutWholePool();
+        address payout = makeAddr("payout");
+        _requestWithdrawal(1_000e6, payout);
+
+        // USDC sent straight to the contract is not lenders' cash: it neither fills the queue
+        // nor funds a direct withdrawal.
+        usdc.mint(address(credit), 1_500e6);
+        vm.prank(poolLender);
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
+        credit.withdrawFunds(1);
+        assertEq(usdc.balanceOf(payout), 0);
+    }
+
     function testDirectWithdrawalCannotJumpTheQueue() public {
         _depositPermitOnly(lender, lenderPk, 1_000e6);
         _lendOutWholePool();
         address payout = makeAddr("payout");
         _requestWithdrawal(1_000e6, payout);
 
-        // Liquidity that arrives outside a deposit or repayment still goes to the queue first:
-        // a direct withdrawal only gets what is left after the queued request is paid.
-        usdc.mint(address(credit), 1_500e6);
+        // A direct withdrawal only gets what is left after the queued request is paid.
+        _deposit(makeAddr("newLender"), 1_500e6);
         vm.prank(poolLender);
         credit.withdrawFunds(500e6);
         assertEq(usdc.balanceOf(payout), 1_000e6);
         assertEq(usdc.balanceOf(poolLender), 500e6);
 
         vm.prank(poolLender);
-        vm.expectRevert("LIQUIDITY_BELOW_THRESHOLD");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
         credit.withdrawFunds(1);
+    }
+
+    /// @dev Queues `count` requests of 10 USDC against a drained pool, then deposits 500 USDC,
+    ///      enough for all of them.
+    function _queuedRequestsThenRefill(uint256 count) internal returns (address payout) {
+        _depositPermitOnly(lender, lenderPk, count * 10e6);
+        _lendOutWholePool();
+        payout = makeAddr("payout");
+        for (uint256 i = 0; i < count; i++) {
+            _requestWithdrawal(10e6, payout);
+        }
+        _deposit(makeAddr("newLender"), 500e6);
+    }
+
+    function testQueueFillIsBoundedPerCall() public {
+        address payout = _queuedRequestsThenRefill(11);
+        assertEq(usdc.balanceOf(payout), 100e6, "one call fills at most 10 requests");
+        assertEq(credit.totalQueuedWithdrawals(), 10e6);
+
+        credit.processWithdrawalQueue(10);
+        assertEq(usdc.balanceOf(payout), 110e6);
+        assertEq(credit.totalQueuedWithdrawals(), 0);
+        assertEq(credit.queuedWithdrawals(lender), 0);
+    }
+
+    function testLiquidityOwedToQueueIsNotLent() public {
+        _queuedRequestsThenRefill(11); // 400 USDC liquid, 10 USDC of it still owed to the queue
+
+        vm.prank(owner);
+        credit.setMaxLoanAmount(type(uint256).max);
+        vm.prank(borrower);
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
+        credit.requestLoan(391e6);
+        vm.prank(borrower);
+        credit.requestLoan(390e6);
+
+        (, uint256 available,,) = credit.getPoolInfo();
+        assertEq(available, 0);
+    }
+
+    function testLiquidityOwedToQueueIsNotWithdrawn() public {
+        // The deposit pays 10 requests and the withdrawal's own fill pays 10 more, so 10 USDC
+        // is still queued out of the 300 USDC left.
+        address payout = _queuedRequestsThenRefill(21);
+
+        vm.prank(poolLender);
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
+        credit.withdrawFunds(291e6);
+        vm.prank(poolLender);
+        credit.withdrawFunds(290e6);
+
+        assertEq(usdc.balanceOf(payout), 200e6);
+        assertEq(credit.totalQueuedWithdrawals(), 10e6);
+        assertEq(usdc.balanceOf(address(credit)), 10e6);
+    }
+
+    function testPartialFillThenDirectWithdrawalKeepsQueueOrder() public {
+        _depositPermitOnly(lender, lenderPk, 1_000e6);
+        _lendOutWholePool();
+        address payout = makeAddr("payout");
+        _requestWithdrawal(1_000e6, payout);
+
+        _deposit(makeAddr("newLender"), 400e6); // partial fill
+        assertEq(usdc.balanceOf(payout), 400e6);
+
+        vm.prank(makeAddr("newLender"));
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
+        credit.withdrawFunds(1e6);
+        assertEq(credit.queuedWithdrawals(lender), 600e6);
     }
 
     function testWithdrawalRequestRejectsMoreThanDeposited() public {
@@ -404,7 +494,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         });
         bytes memory sig = _signRequestWithdrawal(lenderPk, req);
         vm.prank(relayer);
-        vm.expectRevert("Insufficient balance");
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientBalance.selector);
         credit.requestWithdrawalMeta(req, sig);
     }
 
@@ -425,7 +515,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
 
         vm.prank(relayer);
         credit.depositPermitOnlyMeta(lender, permit);
-        assertEq(credit.lenderDeposits(lender), 500e6);
+        assertEq(credit.lenderBalance(lender), 500e6);
     }
 
     function testRepayLoanMetaSurvivesFrontRunPermit() public {
@@ -458,7 +548,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         permit.s = bytes32(uint256(permit.s) ^ 1);
 
         vm.prank(relayer);
-        vm.expectRevert("Permit failed");
+        vm.expectRevert(DecentralizedMicrocredit.PermitFailed.selector);
         credit.depositPermitOnlyMeta(lender, permit);
     }
 
@@ -466,8 +556,8 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
 
     function testLifecycleEvents() public {
         vm.expectEmit(address(credit));
-        emit Attested(attester, borrower, 700_000);
-        _attest(borrower, 700_000);
+        emit Backed(backer, borrower, 0, 20e6);
+        _back(borrower, 20e6);
 
         vm.expectEmit(address(credit));
         emit LoanRequested(borrower, 1, 40e6, LOAN_APR);
@@ -476,7 +566,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         _borrow(40e6);
 
         vm.expectEmit(address(credit));
-        emit Withdrawn(poolLender, poolLender, 100e6);
+        emit Withdrawn(poolLender, poolLender, 100e6, credit.convertToShares(100e6));
         vm.prank(poolLender);
         credit.withdrawFunds(100e6);
     }
@@ -534,7 +624,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         DecentralizedMicrocredit.RepayRequest memory stale = _repayRequest(loanId, owed - 20_000);
         bytes memory sig = _signRepayRequest(borrowerPk, stale);
         vm.prank(relayer);
-        vm.expectRevert("OUTSTANDING_CHANGED");
+        vm.expectRevert(DecentralizedMicrocredit.OutstandingChanged.selector);
         credit.repayLoanMeta(stale, sig, _noPermit());
 
         DecentralizedMicrocredit.RepayRequest memory close = _repayRequest(loanId, owed - 5_000);

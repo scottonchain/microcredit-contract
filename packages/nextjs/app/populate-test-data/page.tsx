@@ -76,7 +76,7 @@ export default function PopulatePage() {
       }),
     });
 
-    // ─── Create & fund dummy admin account to submit admin txs (computePageRank, etc.) ───
+    // ─── Create & fund a dummy account for helper transactions ───
     const ADMIN_PK = toHex(0x5000, { size: 32 }) as `0x${string}`; // deterministic but unused key
     const adminAccount = privateKeyToAccount(ADMIN_PK);
     await fetch(ANVIL_RPC_URL, {
@@ -165,11 +165,15 @@ export default function PopulatePage() {
     
     const lenderDeposits = generateRandomDeposits();
     
-    // Random attestation weight: 80% or 100% (800000 or 1000000 in the contract's scale)
-    const getRandomAttestWeight = (lenderIndex: number, borrowerIndex: number) => {
-      const seed = lenderIndex * 10000 + borrowerIndex; // Use unique seed for each lender-borrower pair
-      const use100Percent = seededRandom(seed) > 0.5; // 50% chance for each
-      return use100Percent ? 1000000n : 800000n; // 100% or 80%
+    // Each lender gets a 100 USDC credit line (admin override, 100% score) and backs borrowers from it:
+    // 80% of the line is split across the borrowers, at 80% or 100% of a share, so the total always
+    // fits and 20% is left for lender-to-lender backing.
+    const LENDER_CREDIT = 100_000_000n;
+    const getRandomBacking = (lenderIndex: number, borrowerCount: number) => {
+      const share = (LENDER_CREDIT * 8n) / 10n / BigInt(Math.max(borrowerCount, 1));
+      const seed = lenderIndex * 10000 + borrowerCount;
+      const amount = seededRandom(seed) > 0.5 ? share : (share * 8n) / 10n;
+      return (amount / 10_000n) * 10_000n; // whole cents
     };
 
     // 1) Deposits
@@ -250,8 +254,35 @@ export default function PopulatePage() {
     const lenderToLenderAttestations = includeLenderAttestations ? 1 : 0;
     
     // Lender to Borrower attestations
-    let attestationsSinceLastPageRank = 0;
-    const pageRankBatchSize = 5; // Compute PageRank every 5 attestations
+    // Grant each lender its credit line as the contract owner (Anvil impersonation; local only).
+    setStatus("⏳ Granting lenders credit lines...");
+    const contractOwner = (await publicClient.readContract({
+      address: MICROCREDIT_ADDRESS as `0x${string}`,
+      abi: MICROCREDIT_ABI,
+      functionName: "owner",
+    })) as `0x${string}`;
+    const anvilCall = (method: string, params: unknown[]) =>
+      fetch(ANVIL_RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      });
+    await anvilCall("anvil_impersonateAccount", [contractOwner]);
+    const ownerClient = createWalletClient({
+      chain: { ...localhost, id: CHAIN_ID },
+      transport: http(ANVIL_RPC_URL),
+      account: contractOwner,
+    });
+    for (const L of lenders) {
+      const hash = await ownerClient.writeContract({
+        address: MICROCREDIT_ADDRESS as `0x${string}`,
+        abi: MICROCREDIT_ABI,
+        functionName: "setScoreOverride",
+        args: [L.address, 1_000_000n],
+      });
+      await publicClient.waitForTransactionReceipt({ hash });
+    }
+    await anvilCall("anvil_stopImpersonatingAccount", [contractOwner]);
     
     for (let lenderIndex = 0; lenderIndex < lenders.length; lenderIndex++) {
       const L = lenders[lenderIndex];
@@ -269,44 +300,18 @@ export default function PopulatePage() {
         if (randomValue <= attestationProbability) {
           actualLenderToBorrowerAttestations++;
           attestCount++;
-          attestationsSinceLastPageRank++;
-          setStatus(`⏳ Lender ${L.address.slice(0, 6)}... attesting to borrower ${B.address.slice(0, 6)}... (${attestCount}/${actualLenderToBorrowerAttestations + lenderToLenderAttestations})`);
+          setStatus(`⏳ Lender ${L.address.slice(0, 6)}... backing borrower ${B.address.slice(0, 6)}... (${attestCount}/${actualLenderToBorrowerAttestations + lenderToLenderAttestations})`);
           setProgress(0.25 + (attestCount / (actualLenderToBorrowerAttestations + lenderToLenderAttestations)) * 0.25); // 25-50% for attestations
           
           try {
             const txHash = await walletClient.writeContract({ 
               address: MICROCREDIT_ADDRESS as `0x${string}`, 
               abi: MICROCREDIT_ABI, 
-              functionName: "recordAttestation", 
-              args: [B.address, getRandomAttestWeight(lenderIndex, borrowerIndex)],
+              functionName: "back",
+              args: [B.address, getRandomBacking(lenderIndex, borrowers.length)],
               gas: 5000000n // 5 million gas
             });
             await publicClient.waitForTransactionReceipt({ hash: txHash });
-            
-            // Compute PageRank every batchSize attestations
-            if (attestationsSinceLastPageRank >= pageRankBatchSize) {
-              setStatus(`⏳ Computing PageRank after ${attestationsSinceLastPageRank} attestations...`);
-              try {
-                const pageRankWalletClient = createWalletClient({ 
-                  chain: { ...localhost, id: CHAIN_ID }, 
-                  transport: http(ANVIL_RPC_URL), 
-                  account: adminAccount // use dummy admin
-                });
-                
-                const pageRankTxHash = await pageRankWalletClient.writeContract({ 
-                  address: MICROCREDIT_ADDRESS as `0x${string}`, 
-                  abi: MICROCREDIT_ABI, 
-                  functionName: "computePageRank",
-                  gas: 30000000n // 30 million gas for PageRank
-                });
-                await publicClient.waitForTransactionReceipt({ hash: pageRankTxHash });
-                console.log(`✅ PageRank computed after ${attestationsSinceLastPageRank} attestations`);
-              } catch (pageRankError) {
-                console.error("Failed to compute PageRank:", pageRankError);
-                // Continue with attestations even if PageRank fails
-              }
-              attestationsSinceLastPageRank = 0; // Reset counter
-            }
             
             // Add a small delay between transactions to prevent overwhelming the chain
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -352,33 +357,11 @@ export default function PopulatePage() {
                                 const txHash = await walletClient.writeContract({ 
             address: MICROCREDIT_ADDRESS as `0x${string}`, 
             abi: MICROCREDIT_ABI, 
-            functionName: "recordAttestation", 
-            args: [L2.address, getRandomAttestWeight(lender1Index, lender2Index)],
+            functionName: "back",
+            args: [L2.address, 10_000_000n], // 10 USDC from the 20% kept free
             gas: 5000000n // 5 million gas
           });
           await publicClient.waitForTransactionReceipt({ hash: txHash });
-          
-          // Compute PageRank after lender-to-lender attestation
-          setStatus(`⏳ Computing PageRank after lender-to-lender attestation...`);
-          try {
-            const pageRankWalletClient = createWalletClient({ 
-              chain: { ...localhost, id: CHAIN_ID }, 
-              transport: http(ANVIL_RPC_URL), 
-              account: adminAccount
-            });
-            
-            const pageRankTxHash = await pageRankWalletClient.writeContract({ 
-              address: MICROCREDIT_ADDRESS as `0x${string}`, 
-              abi: MICROCREDIT_ABI, 
-              functionName: "computePageRank",
-              gas: 30000000n // 30 million gas for PageRank
-            });
-            await publicClient.waitForTransactionReceipt({ hash: pageRankTxHash });
-            console.log(`✅ PageRank computed after lender-to-lender attestation`);
-          } catch (pageRankError) {
-            console.error("Failed to compute PageRank after lender-to-lender attestation:", pageRankError);
-            // Continue even if PageRank fails
-          }
           
           // Add a small delay between transactions to prevent overwhelming the chain
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -392,33 +375,10 @@ export default function PopulatePage() {
     setProgress(0.5); // 50% complete after attestations
     setStatus("✅ Attestations recorded");
 
-    // 3) Final PageRank computation to ensure all scores are up to date
+    // 3) No ranking step: credit comes only from granted lines and backing.
     setCurrentStep(3);
-    setStatus("⏳ Final PageRank computation...");
-    setProgress(0.75); // 75% complete after PageRank
-    
-    try {
-      // Final PageRank computation to ensure all scores are current
-      const prHash = await createWalletClient({ 
-        chain: { ...localhost, id: CHAIN_ID }, 
-        transport: http(ANVIL_RPC_URL), 
-        account: adminAccount 
-      }).writeContract({ 
-        address: MICROCREDIT_ADDRESS as `0x${string}`, 
-        abi: MICROCREDIT_ABI, 
-        functionName: "computePageRank",
-        gas: 30000000n // Use 30 million gas (block limit)
-      });
-      await publicClient.waitForTransactionReceipt({ hash: prHash });
-      setProgress(0.75); // 75% complete after PageRank
-      setStatus("✅ Final PageRank computed");
-  } catch (error) {
-    console.error("Failed to compute final PageRank:", error);
-    setStatus("❌ Failed to compute final PageRank - scores may not be fully updated");
-    
-    // Continue anyway since PageRank was computed incrementally
-    console.log("Proceeding with existing PageRank scores");
-  }
+    setProgress(0.75);
+    setStatus("✅ Credit lines granted and backing recorded");
 
   // 4) Register Borrowers (so they show up in admin page)
   setCurrentStep(4);

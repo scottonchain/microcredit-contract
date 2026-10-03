@@ -23,10 +23,10 @@ export const DEMO_PERSONAS: Record<string, DemoPersona> = {
     hex: "#a855f7",
     initial: "A",
   },
-  // Anvil account 2 — attester
+  // Anvil account 2 — backer
   "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": {
     name: "Avery",
-    role: "Attester",
+    role: "Backer",
     color: "bg-blue-500",
     hex: "#3b82f6",
     initial: "A",
