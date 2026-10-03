@@ -4855,7 +4855,7 @@ const deployedContracts = {
   },
   84532: {
     MockUSDC: {
-      address: "0xff9503e3aec502765c6cfc75ff3d75db7e863640",
+      address: "0x7c46870111257d8a3aaf846bc6d2f7da7fbb76f1",
       abi: [
         {
           type: "constructor",
@@ -5402,7 +5402,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     DecentralizedMicrocredit: {
-      address: "0xe3264d64cef7c7675a548524d883b597e7894169",
+      address: "0xa49b9352b2e8c2b79b58cb4c60db43342e08afa8",
       abi: [
         {
           type: "constructor",
@@ -8796,7 +8796,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     MicrocreditLens: {
-      address: "0x01c0586b3cef50b427411c1278be25605e8329dc",
+      address: "0x090543b6c41a6029660d464c584c0310a74a525d",
       abi: [
         {
           type: "constructor",
@@ -8965,7 +8965,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     OracleScoreProvider: {
-      address: "0x5bde901da88fc351d93b7cf7aaeb72af55d38b02",
+      address: "0x392503b73e9d628a6bb33edc9e22de6ac2c1a017",
       abi: [
         {
           type: "constructor",
