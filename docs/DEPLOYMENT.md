@@ -115,6 +115,14 @@ could change any parameter, set score overrides, or redirect the pending owner. 
   `LendingUpdated`). Each must come from a transaction in `run-latest.json`. If one does not, do
   not open the pool.
 
+## Emergency pause
+
+The ADMIN multisig is also the guardian of the lending contract. It can call `pause()` at once,
+without the timelock, if the oracle, an issuer or the relayer is compromised. Pausing stops new
+loans and disbursements only: borrowers can still repay, overdue loans can still be impaired and
+defaulted, and lenders can still exit. Unpausing is an owner action, so it goes through the
+timelock like any other change.
+
 ## Parameters
 
 Every parameter is an environment variable. An empty value counts as unset. A malformed number
