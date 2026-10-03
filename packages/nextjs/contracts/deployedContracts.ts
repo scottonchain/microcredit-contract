@@ -628,6 +628,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "MAX_BACKERS_PER_BORROWER",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "MAX_LOAN_TERM",
           inputs: [],
           outputs: [
@@ -642,19 +655,6 @@ const deployedContracts = {
         {
           type: "function",
           name: "MAX_PROTOCOL_FEE_BPS",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "MAX_VOUCHERS_PER_BORROWER",
           inputs: [],
           outputs: [
             {
@@ -751,34 +751,33 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "activeVouches",
+          name: "back",
           inputs: [
             {
-              name: "",
+              name: "borrower",
               type: "address",
               internalType: "address",
             },
-          ],
-          outputs: [
             {
-              name: "",
+              name: "amount",
               type: "uint256",
               internalType: "uint256",
             },
           ],
-          stateMutability: "view",
+          outputs: [],
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
-          name: "attestMeta",
+          name: "backMeta",
           inputs: [
             {
               name: "req",
               type: "tuple",
-              internalType: "struct DecentralizedMicrocredit.AttestRequest",
+              internalType: "struct DecentralizedMicrocredit.BackRequest",
               components: [
                 {
-                  name: "attester",
+                  name: "backer",
                   type: "address",
                   internalType: "address",
                 },
@@ -788,7 +787,7 @@ const deployedContracts = {
                   internalType: "address",
                 },
                 {
-                  name: "weight",
+                  name: "amount",
                   type: "uint256",
                   internalType: "uint256",
                 },
@@ -812,38 +811,6 @@ const deployedContracts = {
           ],
           outputs: [],
           stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "attesterStake",
-          inputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "basePersonalization",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
         },
         {
           type: "function",
@@ -933,13 +900,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "clearPageRankState",
-          inputs: [],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
           name: "completedLoans",
           inputs: [
             {
@@ -956,43 +916,6 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "computeAttesterReward",
-          inputs: [
-            {
-              name: "loanId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "attester",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "reward",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "computePageRank",
-          inputs: [],
-          outputs: [
-            {
-              name: "iterations",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -1021,6 +944,44 @@ const deployedContracts = {
               name: "assets",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "creditCommitted",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "creditLoss",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
             },
           ],
           outputs: [
@@ -1321,19 +1282,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "firstLoanCap",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "getAllLoanIds",
           inputs: [],
           outputs: [
@@ -1347,31 +1295,91 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getAllPageRankScores",
-          inputs: [],
-          outputs: [
-            {
-              name: "nodes",
-              type: "address[]",
-              internalType: "address[]",
-            },
-            {
-              name: "scores",
-              type: "uint256[]",
-              internalType: "uint256[]",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "getAttesters",
+          name: "getBackedBorrowers",
           inputs: [],
           outputs: [
             {
               name: "",
               type: "address[]",
               internalType: "address[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getBackers",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address[]",
+              internalType: "address[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getBacking",
+          inputs: [
+            {
+              name: "backer",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "borrower",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "secured",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "unsecured",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getBackings",
+          inputs: [
+            {
+              name: "borrower",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "tuple[]",
+              internalType: "struct DecentralizedMicrocredit.Backing[]",
+              components: [
+                {
+                  name: "backer",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "secured",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "unsecured",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+              ],
             },
           ],
           stateMutability: "view",
@@ -1396,37 +1404,6 @@ const deployedContracts = {
               name: "available",
               type: "uint256",
               internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "getBorrowerAttestations",
-          inputs: [
-            {
-              name: "borrower",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "tuple[]",
-              internalType: "struct DecentralizedMicrocredit.Attestation[]",
-              components: [
-                {
-                  name: "attester",
-                  type: "address",
-                  internalType: "address",
-                },
-                {
-                  name: "weight",
-                  type: "uint256",
-                  internalType: "uint256",
-                },
-              ],
             },
           ],
           stateMutability: "view",
@@ -1465,19 +1442,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getBorrowersWithAttestations",
-          inputs: [],
-          outputs: [
-            {
-              name: "result",
-              type: "address[]",
-              internalType: "address[]",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "getCreditScore",
           inputs: [
             {
@@ -1508,6 +1472,30 @@ const deployedContracts = {
           outputs: [
             {
               name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getFreeCredit",
+          inputs: [
+            {
+              name: "backer",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "credit",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "staked",
               type: "uint256",
               internalType: "uint256",
             },
@@ -1633,44 +1621,12 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getMaxPageRankScore",
-          inputs: [],
-          outputs: [
-            {
-              name: "maxScore",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "getOutstandingRoundedToCent",
           inputs: [
             {
               name: "loanId",
               type: "uint256",
               internalType: "uint256",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "getPageRankScore",
-          inputs: [
-            {
-              name: "node",
-              type: "address",
-              internalType: "address",
             },
           ],
           outputs: [
@@ -1712,15 +1668,10 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getVouchWeight",
+          name: "grantedCredit",
           inputs: [
             {
-              name: "attester",
-              type: "address",
-              internalType: "address",
-            },
-            {
-              name: "borrower",
+              name: "account",
               type: "address",
               internalType: "address",
             },
@@ -1749,19 +1700,6 @@ const deployedContracts = {
               name: "",
               type: "bool",
               internalType: "bool",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "kycBonus",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
             },
           ],
           stateMutability: "view",
@@ -1910,19 +1848,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "minVouchStake",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "nonces",
           inputs: [
             {
@@ -1962,38 +1887,6 @@ const deployedContracts = {
               name: "",
               type: "address",
               internalType: "address",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "pagerankScores",
-          inputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "personalizationCap",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
             },
           ],
           stateMutability: "view",
@@ -2108,24 +2001,6 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "recordAttestation",
-          inputs: [
-            {
-              name: "borrower",
-              type: "address",
-              internalType: "address",
-            },
-            {
-              name: "weight",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -2459,16 +2334,16 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "setBasePersonalization",
-          inputs: [
+          name: "scoreProvider",
+          inputs: [],
+          outputs: [
             {
-              name: "_base",
-              type: "uint256",
-              internalType: "uint256",
+              name: "",
+              type: "address",
+              internalType: "contract IScoreProvider",
             },
           ],
-          outputs: [],
-          stateMutability: "nonpayable",
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -2489,32 +2364,6 @@ const deployedContracts = {
           inputs: [
             {
               name: "_effrRate",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "setFirstLoanCap",
-          inputs: [
-            {
-              name: "amount",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "setKycBonus",
-          inputs: [
-            {
-              name: "_kycBonus",
               type: "uint256",
               internalType: "uint256",
             },
@@ -2568,38 +2417,12 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "setMinVouchStake",
-          inputs: [
-            {
-              name: "amount",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
           name: "setOracle",
           inputs: [
             {
               name: "_oracle",
               type: "address",
               internalType: "address",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "setPersonalizationCap",
-          inputs: [
-            {
-              name: "_cap",
-              type: "uint256",
-              internalType: "uint256",
             },
           ],
           outputs: [],
@@ -2682,6 +2505,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "setScoreProvider",
+          inputs: [
+            {
+              name: "provider",
+              type: "address",
+              internalType: "contract IScoreProvider",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "sharesOf",
           inputs: [
             {
@@ -2714,8 +2550,14 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "totalAssets",
-          inputs: [],
+          name: "stakeCommitted",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
           outputs: [
             {
               name: "",
@@ -2727,7 +2569,26 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "totalAttesterStake",
+          name: "stakeOf",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "totalAssets",
           inputs: [],
           outputs: [
             {
@@ -2792,6 +2653,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "totalStaked",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "unstake",
           inputs: [
             {
@@ -2831,10 +2705,10 @@ const deployedContracts = {
         },
         {
           type: "event",
-          name: "Attested",
+          name: "Backed",
           inputs: [
             {
-              name: "attester",
+              name: "backer",
               type: "address",
               indexed: true,
               internalType: "address",
@@ -2846,7 +2720,44 @@ const deployedContracts = {
               internalType: "address",
             },
             {
-              name: "weight",
+              name: "secured",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "unsecured",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "BackerCharged",
+          inputs: [
+            {
+              name: "backer",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "loanId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "slashed",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "charged",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -3066,31 +2977,6 @@ const deployedContracts = {
             },
             {
               name: "interestRate",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "MetaAttested",
-          inputs: [
-            {
-              name: "attester",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "borrower",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "weight",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -3413,10 +3299,23 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "ScoreProviderUpdated",
+          inputs: [
+            {
+              name: "provider",
+              type: "address",
+              indexed: false,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "Staked",
           inputs: [
             {
-              name: "attester",
+              name: "account",
               type: "address",
               indexed: true,
               internalType: "address",
@@ -3435,35 +3334,10 @@ const deployedContracts = {
           name: "Unstaked",
           inputs: [
             {
-              name: "attester",
+              name: "account",
               type: "address",
               indexed: true,
               internalType: "address",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "VoucherSlashed",
-          inputs: [
-            {
-              name: "attester",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "loanId",
-              type: "uint256",
-              indexed: true,
-              internalType: "uint256",
             },
             {
               name: "amount",
@@ -3522,6 +3396,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "BackingInUse",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "BorrowLimitExceeded",
           inputs: [],
         },
@@ -3542,12 +3421,12 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "FirstLoanCapExceeded",
+          name: "InsufficientBalance",
           inputs: [],
         },
         {
           type: "error",
-          name: "InsufficientBalance",
+          name: "InsufficientCredit",
           inputs: [],
         },
         {
@@ -3607,7 +3486,7 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "NoCreditScore",
+          name: "NoCredit",
           inputs: [],
         },
         {
@@ -3628,11 +3507,6 @@ const deployedContracts = {
         {
           type: "error",
           name: "NotOwner",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "NotOwnerOrOracle",
           inputs: [],
         },
         {
@@ -3678,7 +3552,7 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "SelfAttestation",
+          name: "SelfBacking",
           inputs: [],
         },
         {
@@ -3688,12 +3562,7 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "StakeLockedByVouches",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "StakeRequired",
+          name: "StakeCommitted",
           inputs: [],
         },
         {
@@ -3709,7 +3578,7 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "TooManyVouchers",
+          name: "TooManyBackers",
           inputs: [],
         },
         {
@@ -3720,16 +3589,6 @@ const deployedContracts = {
         {
           type: "error",
           name: "UtilisationCapExceeded",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "VouchLockedByActiveLoan",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "WeightTooHigh",
           inputs: [],
         },
         {
@@ -3750,6 +3609,548 @@ const deployedContracts = {
         {
           type: "error",
           name: "ZeroShares",
+          inputs: [],
+        },
+      ],
+      inheritedFunctions: {},
+    },
+    OracleScoreProvider: {
+      address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
+      abi: [
+        {
+          type: "constructor",
+          inputs: [
+            {
+              name: "initialOwner",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "initialReporter",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "initialMaxScoreAge",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "MAX_BATCH",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "MAX_SCORE_AGE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "MIN_SCORE_AGE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "SCALE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "acceptOwnership",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "creditScore",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "epoch",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint64",
+              internalType: "uint64",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "expectedWorkflowId",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "expectedWorkflowOwner",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "forwarder",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getScores",
+          inputs: [],
+          outputs: [
+            {
+              name: "users",
+              type: "address[]",
+              internalType: "address[]",
+            },
+            {
+              name: "scores",
+              type: "uint256[]",
+              internalType: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "isFresh",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "lastReportAt",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "maxScoreAge",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "onReport",
+          inputs: [
+            {
+              name: "metadata",
+              type: "bytes",
+              internalType: "bytes",
+            },
+            {
+              name: "report",
+              type: "bytes",
+              internalType: "bytes",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "owner",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "pendingOwner",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "publishScores",
+          inputs: [
+            {
+              name: "report",
+              type: "bytes",
+              internalType: "bytes",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "renounceOwnership",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "reporter",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "setForwarder",
+          inputs: [
+            {
+              name: "newForwarder",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "workflowOwner",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "workflowId",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setMaxScoreAge",
+          inputs: [
+            {
+              name: "newMaxScoreAge",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setReporter",
+          inputs: [
+            {
+              name: "newReporter",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "supportsInterface",
+          inputs: [
+            {
+              name: "interfaceId",
+              type: "bytes4",
+              internalType: "bytes4",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "transferOwnership",
+          inputs: [
+            {
+              name: "newOwner",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "ForwarderUpdated",
+          inputs: [
+            {
+              name: "forwarder",
+              type: "address",
+              indexed: false,
+              internalType: "address",
+            },
+            {
+              name: "workflowOwner",
+              type: "address",
+              indexed: false,
+              internalType: "address",
+            },
+            {
+              name: "workflowId",
+              type: "bytes32",
+              indexed: false,
+              internalType: "bytes32",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "MaxScoreAgeUpdated",
+          inputs: [
+            {
+              name: "maxScoreAge",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "OwnershipTransferStarted",
+          inputs: [
+            {
+              name: "previousOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "newOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "OwnershipTransferred",
+          inputs: [
+            {
+              name: "previousOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "newOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "ReporterUpdated",
+          inputs: [
+            {
+              name: "reporter",
+              type: "address",
+              indexed: false,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "ScoresPublished",
+          inputs: [
+            {
+              name: "epoch",
+              type: "uint64",
+              indexed: true,
+              internalType: "uint64",
+            },
+            {
+              name: "count",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "error",
+          name: "BatchTooLarge",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidMaxScoreAge",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "LengthMismatch",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotForwarder",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotReporter",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "OwnableInvalidOwner",
+          inputs: [
+            {
+              name: "owner",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+        },
+        {
+          type: "error",
+          name: "OwnableUnauthorizedAccount",
+          inputs: [
+            {
+              name: "account",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+        },
+        {
+          type: "error",
+          name: "ScoreTooHigh",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "StaleEpoch",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "UnexpectedWorkflow",
           inputs: [],
         },
       ],

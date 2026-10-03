@@ -5,14 +5,14 @@ Contracts, Forge tests and deploy tooling. Run commands from the repo root (`yar
 
 | Path | Contents |
 | ---- | -------- |
-| `contracts/DecentralizedMicrocredit.sol` | Lending pool, loans, attestations, meta-transactions |
-| `contracts/PageRank.sol` | On-chain PageRank, inherited by the main contract |
+| `contracts/DecentralizedMicrocredit.sol` | Lending pool, loans, credit and backing, meta-transactions |
+| `contracts/OracleScoreProvider.sol` | Credit scores published by an oracle (Chainlink CRE `onReport` or a reporter) |
+| `contracts/interfaces/` | `IScoreProvider`, and Chainlink's `IReceiver` (vendored) |
 | `contracts/MockUSDC.sol` | 6-decimal ERC20 + ERC20Permit with open minting (local/test only) |
 | `script/Deploy.s.sol` | Local deploy and demo seed (pool, background loans, personas) |
 | `script/VerifyAll.s.sol` | Submits the latest deploy's contracts for explorer verification |
 | `script/UpdateOracle.s.sol` | Points the contract's oracle at the caller |
 | `scripts-js/` | `yarn deploy` (`parseArgs.js`), keystore helpers, ABI generator |
-| `scripts-py/` | NetworkX baseline for `test/PageRankVerification.t.sol` |
 | `test/` | Forge tests; shared fixture in `test/utils/MicrocreditTestBase.sol` |
 
 ## Deploying

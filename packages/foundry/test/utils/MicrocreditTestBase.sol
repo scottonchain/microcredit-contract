@@ -4,22 +4,27 @@ pragma solidity ^0.8.30;
 import { Test } from "forge-std/Test.sol";
 import { DecentralizedMicrocredit } from "../../contracts/DecentralizedMicrocredit.sol";
 import { MockUSDC } from "../../contracts/MockUSDC.sol";
+import { OracleScoreProvider } from "../../contracts/OracleScoreProvider.sol";
 
 /**
  * @dev Shared fixture for DecentralizedMicrocredit tests: deploys the contract against the real
- *      MockUSDC (ERC20 + ERC20Permit) and provides EIP-712 / EIP-2612 signing helpers.
+ *      MockUSDC (ERC20 + ERC20Permit) with an OracleScoreProvider whose reporter is `oracle`,
+ *      and provides score-publishing and EIP-712 / EIP-2612 signing helpers.
  *      Typed-data hashes are rebuilt here from the type strings rather than read from the
  *      contract, so the tests also pin the wire format the frontend signs.
  */
 abstract contract MicrocreditTestBase is Test {
     DecentralizedMicrocredit internal credit;
     MockUSDC internal usdc;
+    OracleScoreProvider internal scores;
+    uint64 internal scoreEpoch;
     address internal owner = makeAddr("owner");
     address internal oracle = makeAddr("oracle");
     address internal relayer = makeAddr("relayer");
 
     uint256 internal constant SCALE = 1e6;
     uint256 internal constant DEADLINE_OFFSET = 1 hours;
+    uint256 internal constant MAX_SCORE_AGE = 7 days;
 
     bytes32 internal constant EIP712_DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
@@ -36,8 +41,8 @@ abstract contract MicrocreditTestBase is Test {
         keccak256("DepositRequest(address lender,uint256 amount,address receiver,uint256 nonce,uint256 deadline)");
     bytes32 internal constant REQUEST_WITHDRAWAL_TYPEHASH =
         keccak256("RequestWithdrawal(address lender,uint256 amount,address to,uint256 nonce,uint256 deadline)");
-    bytes32 internal constant ATTEST_REQUEST_TYPEHASH =
-        keccak256("AttestRequest(address attester,address borrower,uint256 weight,uint256 nonce,uint256 deadline)");
+    bytes32 internal constant BACK_REQUEST_TYPEHASH =
+        keccak256("BackRequest(address backer,address borrower,uint256 amount,uint256 nonce,uint256 deadline)");
     bytes32 internal constant PERMIT_TYPEHASH =
         keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
@@ -45,14 +50,27 @@ abstract contract MicrocreditTestBase is Test {
         usdc = new MockUSDC();
         vm.prank(owner);
         credit = new DecentralizedMicrocredit(effrRate, riskPremium, maxLoanAmount, address(usdc), oracle);
+        scores = new OracleScoreProvider(owner, oracle, MAX_SCORE_AGE);
+        vm.prank(owner);
+        credit.setScoreProvider(scores);
     }
 
-    /// @dev For suites testing other behaviour: vouching needs no stake and first loans are
-    ///      uncapped. SybilResistance.t.sol runs against the defaults.
-    function _relaxSybilGuards() internal {
-        vm.startPrank(owner);
-        credit.setMinVouchStake(0);
-        credit.setFirstLoanCap(type(uint256).max);
+    /// @dev Publishes `score` for `user` as the off-chain scorer would, in a new epoch.
+    function _publishScore(address user, uint256 score) internal {
+        address[] memory users = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        users[0] = user;
+        values[0] = score;
+        vm.prank(oracle);
+        scores.publishScores(abi.encode(++scoreEpoch, users, values));
+    }
+
+    /// @dev Mints `amount` to `who` and stakes it as secured credit.
+    function _stake(address who, uint256 amount) internal {
+        usdc.mint(who, amount);
+        vm.startPrank(who);
+        usdc.approve(address(credit), amount);
+        credit.stake(amount);
         vm.stopPrank();
     }
 
@@ -165,16 +183,14 @@ abstract contract MicrocreditTestBase is Test {
         );
     }
 
-    function _signAttestRequest(uint256 pk, DecentralizedMicrocredit.AttestRequest memory req)
+    function _signBackRequest(uint256 pk, DecentralizedMicrocredit.BackRequest memory req)
         internal
         view
         returns (bytes memory)
     {
         return _sign(
             pk,
-            keccak256(
-                abi.encode(ATTEST_REQUEST_TYPEHASH, req.attester, req.borrower, req.weight, req.nonce, req.deadline)
-            )
+            keccak256(abi.encode(BACK_REQUEST_TYPEHASH, req.backer, req.borrower, req.amount, req.nonce, req.deadline))
         );
     }
 

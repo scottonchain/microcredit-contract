@@ -11,7 +11,6 @@ export const CONTRACT_ERROR_MESSAGES: Record<MicrocreditErrorName, string> = {
   // access & config
   NotOwner: "Only the protocol owner can do this.",
   NotOracle: "Only the oracle can do this.",
-  NotOwnerOrOracle: "Only the protocol owner or the oracle can do this.",
   UnauthorizedRelayer: "This relayer is not on the allowed list.",
   ZeroAddress: "An address is missing.",
   ZeroAmount: "Enter an amount greater than zero.",
@@ -33,10 +32,8 @@ export const CONTRACT_ERROR_MESSAGES: Record<MicrocreditErrorName, string> = {
   InsufficientLiquidity:
     "The pool does not have enough free USDC right now. Withdrawal requests are queued and paid as loans are repaid.",
   // loans
-  NoCreditScore:
-    "You do not have a credit score yet. Ask someone trusted in the network to vouch for you on the Attest page.",
-  BorrowLimitExceeded: "That is more than your credit score allows.",
-  FirstLoanCapExceeded: "First loans are capped. Repay one loan in full to unlock your full limit.",
+  NoCredit: "You have no credit yet. Ask someone who has credit to back you on the Back page.",
+  BorrowLimitExceeded: "That is more than your credit allows. Your limit is your own credit plus what others back you with.",
   BorrowerInDefault: "This account has a defaulted loan and cannot borrow.",
   UtilisationCapExceeded: "The pool has lent out as much as it allows right now. Try a smaller amount or try later.",
   InvalidTerm: "Choose a repayment period between 1 and 365 days.",
@@ -51,14 +48,13 @@ export const CONTRACT_ERROR_MESSAGES: Record<MicrocreditErrorName, string> = {
   MustSendToBorrower: "Loan funds can only go to the borrower.",
   NothingToRepay: "There is nothing left to repay.",
   OutstandingChanged: "Your balance changed after you signed. Please review and try again.",
-  // attestations & stake
-  WeightTooHigh: "Confidence cannot be more than 100%.",
-  SelfAttestation: "You cannot vouch for yourself.",
-  TooManyVouchers: "This borrower already has the maximum number of vouchers.",
-  StakeRequired: "Stake more USDC to vouch for another person.",
-  StakeLockedByVouches: "That stake backs your active vouches. Withdraw a vouch first.",
+  // backing & stake
+  SelfBacking: "You cannot back yourself.",
+  TooManyBackers: "This borrower already has the maximum number of backers.",
+  InsufficientCredit: "You do not have that much free credit or stake to back with.",
+  BackingInUse: "That backing is covering money the borrower still owes. You can lower it once they repay.",
+  StakeCommitted: "That stake is committed to backing someone. Withdraw the backing first.",
   InsufficientStake: "That is more than you have staked.",
-  VouchLockedByActiveLoan: "You cannot lower or withdraw this vouch while the borrower has a loan out.",
   // inherited from OpenZeppelin
   SafeERC20FailedOperation: "The USDC transfer failed. Check your balance and approval.",
   InvalidShortString: "Unexpected contract error.",

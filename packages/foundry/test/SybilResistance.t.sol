@@ -5,204 +5,223 @@ import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.
 import { MicrocreditTestBase } from "./utils/MicrocreditTestBase.sol";
 
 /**
- * @dev Regression tests for the HermesCRBot persona findings on PR #3, run against the default
- *      configuration: vouching needs stake, trust must be anchored, first loans are capped.
- *      Persona 1: a ring of fake accounts vouching for each other and for Sam gave Sam a 90.9%
- *      score and pushed an honest borrower below him. Persona 6: an attester with no history
- *      and nothing at stake lifted a borrower from 0 to 90.9%.
+ * @dev Credit cannot be manufactured (docs/CREDIT_INTEGRITY_ISSUES.md, CI-1 to CI-3). An account
+ *      can borrow only against credit it holds (granted credit or stake) or credit that someone
+ *      who holds credit backs it with from their own. HermesCRBot's attack on #3: four fresh
+ *      accounts vouch for each other in a ring and all for Sam, then borrow with nothing behind
+ *      them.
  */
 contract SybilResistanceTest is MicrocreditTestBase {
-    uint256 internal constant STAKE = 50e6; // default minVouchStake
-    uint256 internal constant FIRST_LOAN_CAP = 50e6; // default firstLoanCap
-    uint256 internal constant RING_SIZE = 5;
+    uint256 internal constant RING_SIZE = 4;
+    uint256 internal constant AVERY_CREDIT = 92e6; // 92% score x 100 USDC maxLoanAmount
+    uint256 internal constant BRIGHTON_CREDIT = 25e6; // Brighton has a small line of his own
 
-    address internal avery = makeAddr("avery"); // trusted attester (KYC-verified)
-    address internal brighton = makeAddr("brighton"); // honest borrower
+    address internal avery = makeAddr("avery");
+    address internal brighton = makeAddr("brighton");
+    address internal carlos = makeAddr("carlos");
     address internal sam = makeAddr("sam"); // the ring's beneficiary
+    address internal poolLender = makeAddr("poolLender");
 
     function setUp() public {
         _deploy(433, 500, 100e6);
-        _deposit(makeAddr("poolLender"), 10_000e6);
-        vm.prank(oracle);
-        credit.markKYCVerified(avery);
-    }
-
-    function _stake(address who, uint256 amount) internal {
-        usdc.mint(who, amount);
-        vm.startPrank(who);
-        usdc.approve(address(credit), amount);
-        credit.stake(amount);
+        _deposit(poolLender, 10_000e6);
+        vm.startPrank(owner);
+        credit.setScoreOverride(avery, 920_000);
+        credit.setScoreOverride(brighton, 250_000);
         vm.stopPrank();
     }
 
-    function _vouch(address from, address to, uint256 weight) internal {
-        vm.prank(from);
-        credit.recordAttestation(to, weight);
-    }
-
-    /// @dev Staked fake accounts that vouch for each other in a ring and all vouch for Sam.
-    function _stakedRing() internal returns (address[] memory members) {
+    function _ring() internal returns (address[] memory members) {
         members = new address[](RING_SIZE);
         for (uint256 i = 0; i < RING_SIZE; i++) {
             members[i] = makeAddr(string.concat("sybil", vm.toString(i)));
-            _stake(members[i], 2 * STAKE);
         }
+    }
+
+    function _limit(address account) internal view returns (uint256 limit) {
+        (limit,) = credit.getBorrowLimit(account);
+    }
+
+    function _borrow(address borrower, uint256 amount) internal returns (uint256 loanId) {
+        vm.prank(borrower);
+        loanId = credit.requestLoan(amount);
+        credit.disburseLoan(loanId);
+    }
+
+    function _default(uint256 loanId) internal {
+        (,,,, uint256 dueAt) = credit.getLoanTerms(loanId);
+        vm.warp(dueAt + credit.LATE_PERIOD() + 1);
+        credit.markDefaulted(loanId);
+    }
+
+    // ───────────────────────────── the ring ─────────────────────────────
+
+    /// @dev Hermes's exact scenario: no credit anywhere, so there is nothing to back with.
+    function testRingOfFreshAccountsCannotBackOrBorrow() public {
+        address[] memory ring = _ring();
         for (uint256 i = 0; i < RING_SIZE; i++) {
-            _vouch(members[i], members[(i + 1) % RING_SIZE], SCALE);
-            _vouch(members[i], sam, SCALE);
+            vm.startPrank(ring[i]);
+            vm.expectRevert(DecentralizedMicrocredit.InsufficientCredit.selector);
+            credit.back(ring[(i + 1) % RING_SIZE], 10e6);
+            vm.expectRevert(DecentralizedMicrocredit.InsufficientCredit.selector);
+            credit.back(sam, 10e6);
+            vm.stopPrank();
         }
-    }
-
-    function _repayInFull(address borrower, uint256 loanId) internal {
-        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
-        usdc.mint(borrower, owed);
-        vm.startPrank(borrower);
-        usdc.approve(address(credit), owed);
-        credit.repayLoan(loanId, owed);
-        vm.stopPrank();
-    }
-
-    function testDefaults() public view {
-        assertEq(credit.minVouchStake(), STAKE);
-        assertEq(credit.firstLoanCap(), FIRST_LOAN_CAP);
-    }
-
-    // ───────────────────────────── persona 1: the ring ─────────────────────────────
-
-    function testUnstakedAccountsCannotVouch() public {
-        vm.prank(makeAddr("sybil0"));
-        vm.expectRevert(DecentralizedMicrocredit.StakeRequired.selector);
-        credit.recordAttestation(sam, SCALE);
-        assertEq(credit.getCreditScore(sam), 0);
-    }
-
-    function testStakedRingWithoutTrustAnchorEarnsNoScore() public {
-        _stakedRing();
-        assertEq(credit.getCreditScore(sam), 0);
-
+        assertEq(_limit(sam), 0);
         vm.prank(sam);
-        vm.expectRevert(DecentralizedMicrocredit.NoCreditScore.selector);
+        vm.expectRevert(DecentralizedMicrocredit.NoCredit.selector);
         credit.requestLoan(1e6);
     }
 
-    function testRingCannotDisplaceHonestBorrower() public {
-        _stake(avery, STAKE);
-        _vouch(avery, brighton, 800_000);
-        uint256 honestScore = credit.getCreditScore(brighton);
-        assertGt(honestScore, 0);
+    /// @dev With money at stake the ring can borrow only what it staked, and lenders get it back.
+    function testStakedRingBorrowsNoMoreThanItsStakeAndLendersLoseNothing() public {
+        address[] memory ring = _ring();
+        for (uint256 i = 0; i < RING_SIZE; i++) {
+            _stake(ring[i], 10e6);
+            vm.startPrank(ring[i]);
+            credit.back(ring[(i + 1) % RING_SIZE], 5e6);
+            credit.back(sam, 5e6);
+            vm.stopPrank();
+        }
 
-        _stakedRing();
-        assertEq(credit.getCreditScore(sam), 0, "no trust reaches the ring");
-        assertApproxEqAbs(credit.getCreditScore(brighton), honestScore, SCALE / 100);
+        uint256 totalCapacity = _limit(sam);
+        for (uint256 i = 0; i < RING_SIZE; i++) {
+            totalCapacity += _limit(ring[i]);
+        }
+        assertEq(totalCapacity, RING_SIZE * 10e6, "backing in circles creates no capacity");
+
+        uint256 assetsBefore = credit.totalAssets();
+        uint256 loanId = _borrow(sam, _limit(sam));
+        _default(loanId);
+        assertEq(credit.totalAssets(), assetsBefore, "slashed stake repays the lenders in full");
     }
 
-    // ───────────────────────────── persona 6: unanchored attester ─────────────────────────────
+    /// @dev One real line of credit in the ring is all the ring can ever borrow, once.
+    function testRingCannotMultiplyOneMembersCredit() public {
+        address[] memory ring = _ring();
+        vm.prank(owner);
+        credit.setScoreOverride(ring[0], 500_000); // 50 USDC of granted credit
 
-    function testUnanchoredAttesterCarriesNoWeight() public {
-        // Trust exists in the graph (Avery), but none of it reaches the newcomer attester.
-        _stake(avery, STAKE);
-        _vouch(avery, makeAddr("friend"), SCALE);
+        vm.prank(ring[0]);
+        credit.back(ring[1], 50e6);
+        // ring[1] received credit but holds none of its own, so it has nothing to pass on.
+        vm.prank(ring[1]);
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientCredit.selector);
+        credit.back(sam, 1e6);
 
-        address newcomer = makeAddr("newcomer");
-        _stake(newcomer, STAKE);
-        _vouch(newcomer, brighton, SCALE);
-        assertEq(credit.getCreditScore(newcomer), 0);
-        assertEq(credit.getCreditScore(brighton), 0);
+        assertEq(_limit(ring[0]) + _limit(ring[1]) + _limit(sam), 50e6);
+
+        uint256 loanId = _borrow(ring[1], 50e6);
+        _default(loanId);
+        assertEq(credit.grantedCredit(ring[0]), 0, "the guarantor's credit is burned");
+        vm.prank(ring[0]);
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientCredit.selector);
+        credit.back(ring[2], 1e6);
     }
 
-    // ───────────────────────────── first-loan cap ─────────────────────────────
+    // ───────────────────────────── conservation ─────────────────────────────
 
-    function testFirstLoanIsCappedUntilOneIsRepaid() public {
-        _stake(avery, STAKE);
-        _vouch(avery, brighton, SCALE);
-        (uint256 scoreLimit,) = _scoreLimit(brighton);
-        assertGt(scoreLimit, FIRST_LOAN_CAP, "score alone would allow more");
-
-        (uint256 limit, uint256 available) = credit.getBorrowLimit(brighton);
-        assertEq(limit, FIRST_LOAN_CAP);
-        assertEq(available, FIRST_LOAN_CAP);
-
-        vm.prank(brighton);
-        vm.expectRevert(DecentralizedMicrocredit.FirstLoanCapExceeded.selector);
-        credit.requestLoan(FIRST_LOAN_CAP + 1);
-
-        vm.startPrank(brighton);
-        uint256 first = credit.requestLoan(30e6);
-        vm.expectRevert(DecentralizedMicrocredit.FirstLoanCapExceeded.selector); // the cap covers active loans together
-        credit.requestLoan(21e6);
-        vm.stopPrank();
-        credit.disburseLoan(first);
-
-        _repayInFull(brighton, first);
-        assertEq(credit.completedLoans(brighton), 1);
-        (limit, available) = credit.getBorrowLimit(brighton);
-        assertEq(limit, scoreLimit);
-        assertEq(available, scoreLimit);
-
-        vm.prank(brighton);
-        credit.requestLoan(scoreLimit);
-    }
-
-    function _scoreLimit(address borrower) internal view returns (uint256 limit, uint256 score) {
-        score = credit.getCreditScore(borrower);
-        limit = (credit.maxLoanAmount() * score) / SCALE;
-    }
-
-    // ───────────────────────────── stake locking ─────────────────────────────
-
-    function testEachVouchNeedsItsOwnStake() public {
-        _stake(avery, STAKE);
-        _vouch(avery, brighton, 500_000);
-        _vouch(avery, brighton, 900_000); // raising an existing vouch needs no more stake
+    function testBackingMovesCreditItDoesNotCopyIt() public {
+        assertEq(_limit(brighton), BRIGHTON_CREDIT, "Brighton already has credit of his own");
 
         vm.prank(avery);
-        vm.expectRevert(DecentralizedMicrocredit.StakeRequired.selector);
-        credit.recordAttestation(sam, SCALE);
-
-        _stake(avery, STAKE);
-        _vouch(avery, sam, SCALE);
-        assertEq(credit.activeVouches(avery), 2);
-    }
-
-    function testVouchIsLockedWhileBorrowerHasActiveLoan() public {
-        _stake(avery, STAKE);
-        _vouch(avery, brighton, SCALE);
-        vm.prank(brighton);
-        uint256 loanId = credit.requestLoan(10e6);
-        credit.disburseLoan(loanId);
+        credit.back(brighton, 50e6);
+        assertEq(_limit(brighton), BRIGHTON_CREDIT + 50e6);
+        assertEq(_limit(avery), AVERY_CREDIT - 50e6);
 
         vm.startPrank(avery);
-        vm.expectRevert(DecentralizedMicrocredit.VouchLockedByActiveLoan.selector);
-        credit.recordAttestation(brighton, 500_000);
-        vm.expectRevert(DecentralizedMicrocredit.VouchLockedByActiveLoan.selector);
-        credit.recordAttestation(brighton, 0);
-        vm.expectRevert(DecentralizedMicrocredit.StakeLockedByVouches.selector);
-        credit.unstake(1);
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientCredit.selector);
+        credit.back(carlos, AVERY_CREDIT - 50e6 + 1);
+        credit.back(carlos, AVERY_CREDIT - 50e6);
         vm.stopPrank();
-
-        _repayInFull(brighton, loanId);
-        _vouch(avery, brighton, 0);
-        assertEq(credit.activeVouches(avery), 0);
-        assertEq(credit.getVouchWeight(avery, brighton), 0);
-
-        vm.prank(avery);
-        credit.unstake(STAKE);
-        assertEq(usdc.balanceOf(avery), STAKE);
-        assertEq(credit.attesterStake(avery), 0);
+        assertEq(_limit(avery), 0);
     }
+
+    function testOwnLoansReduceWhatYouCanBack() public {
+        _borrow(avery, 60e6);
+        (uint256 free,) = credit.getFreeCredit(avery);
+        assertEq(free, AVERY_CREDIT - 60e6);
+        vm.prank(avery);
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientCredit.selector);
+        credit.back(brighton, free + 1);
+    }
+
+    function testReceivedBackingCannotBePassedOn() public {
+        vm.prank(avery);
+        credit.back(carlos, 40e6);
+        vm.prank(carlos);
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientCredit.selector);
+        credit.back(sam, 1e6);
+    }
+
+    function testBackingCannotBeCutBelowWhatTheBorrowerOwes() public {
+        vm.prank(avery);
+        credit.back(brighton, 50e6);
+        _borrow(brighton, 70e6); // 25 of his own + 45 of Avery's
+
+        vm.startPrank(avery);
+        vm.expectRevert(DecentralizedMicrocredit.BackingInUse.selector);
+        credit.back(brighton, 44e6);
+        credit.back(brighton, 45e6);
+        vm.stopPrank();
+        assertEq(_limit(brighton), 70e6);
+    }
+
+    function testCommittedStakeCannotBeWithdrawn() public {
+        _stake(carlos, 30e6);
+        vm.prank(carlos);
+        credit.back(sam, 30e6);
+        (uint256 secured, uint256 unsecured) = credit.getBacking(carlos, sam);
+        assertEq(secured, 30e6);
+        assertEq(unsecured, 0);
+
+        vm.startPrank(carlos);
+        vm.expectRevert(DecentralizedMicrocredit.StakeCommitted.selector);
+        credit.unstake(1);
+        credit.back(sam, 0); // Sam owes nothing, so the backing can be withdrawn
+        credit.unstake(30e6);
+        vm.stopPrank();
+        assertEq(usdc.balanceOf(carlos), 30e6);
+    }
+
+    /// @dev If a backer's own credit shrinks, its unsecured backing shrinks with it.
+    function testLostCreditStopsBackingOthers() public {
+        vm.startPrank(avery);
+        credit.back(brighton, 46e6);
+        credit.back(carlos, 46e6);
+        vm.stopPrank();
+        assertEq(_limit(carlos), 46e6);
+
+        vm.prank(owner);
+        credit.setScoreOverride(avery, 460_000); // Avery's granted credit falls to 46
+        assertEq(_limit(carlos), 23e6, "half of Avery's commitments are still covered");
+        assertEq(_limit(brighton), BRIGHTON_CREDIT + 23e6);
+    }
+
+    function testDefaulterLosesTheCreditItGaveOthers() public {
+        vm.prank(avery);
+        credit.back(carlos, 40e6);
+        uint256 loanId = _borrow(avery, AVERY_CREDIT - 40e6);
+        _default(loanId);
+
+        assertEq(credit.grantedCredit(avery), 0);
+        assertEq(_limit(carlos), 0, "credit from a defaulted backer backs nothing");
+    }
+
+    // ───────────────────────────── stake ─────────────────────────────
 
     function testStakeIsNotPoolLiquidity() public {
         uint256 assetsBefore = credit.totalAssets();
-        _stake(avery, STAKE);
+        _stake(carlos, 50e6);
         assertEq(credit.totalAssets(), assetsBefore);
-        assertEq(credit.totalAttesterStake(), STAKE);
-        assertEq(usdc.balanceOf(address(credit)), assetsBefore + STAKE);
+        assertEq(credit.totalStaked(), 50e6);
+        assertEq(usdc.balanceOf(address(credit)), assetsBefore + 50e6);
     }
 
     function testUnstakeRejectsMoreThanStaked() public {
-        _stake(avery, STAKE);
-        vm.prank(avery);
+        _stake(carlos, 50e6);
+        vm.prank(carlos);
         vm.expectRevert(DecentralizedMicrocredit.InsufficientStake.selector);
-        credit.unstake(STAKE + 1);
+        credit.unstake(50e6 + 1);
     }
 }

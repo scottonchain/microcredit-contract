@@ -21,7 +21,6 @@ contract ShareAccountingTest is MicrocreditTestBase {
 
     function setUp() public {
         _deploy(750, 250, 10_000e6); // 7.5% EFFR + 2.5% premium = 10% APR
-        _relaxSybilGuards();
         vm.prank(owner);
         credit.setScoreOverride(borrower, SCALE);
     }

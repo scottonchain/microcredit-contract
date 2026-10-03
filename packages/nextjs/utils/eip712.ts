@@ -32,10 +32,10 @@ export const TYPES = {
     { name: "nonce", type: "uint256" },
     { name: "deadline", type: "uint256" },
   ],
-  AttestRequest: [
-    { name: "attester", type: "address" },
+  BackRequest: [
+    { name: "backer", type: "address" },
     { name: "borrower", type: "address" },
-    { name: "weight", type: "uint256" },
+    { name: "amount", type: "uint256" },
     { name: "nonce", type: "uint256" },
     { name: "deadline", type: "uint256" },
   ],
@@ -48,10 +48,10 @@ export const TYPES = {
   ],
 } as const;
 
-export type AttestRequest = {
-  attester: `0x${string}`;
+export type BackRequest = {
+  backer: `0x${string}`;
   borrower: `0x${string}`;
-  weight: bigint; // scaled by 1e6 (SCALE)
+  amount: bigint; // USDC (6 decimals) of the backer's own credit
   nonce: bigint;
   deadline: bigint;
 };

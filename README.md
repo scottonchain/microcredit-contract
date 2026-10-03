@@ -5,11 +5,11 @@
 ## Introduction
 
 This project prototypes a full-stack **peer-to-peer micro-lending application** on an EVM network.  
-Lenders earn yield on USDC deposits while borrowers obtain collateral-free loans backed by their **social reputation**, not a traditional credit history.
+Lenders earn yield on USDC deposits while borrowers obtain collateral-free loans backed by **credit**: their own, or credit that people who trust them commit from theirs.
 
 Key ideas for crypto-aware readers:
 
-1. **Reputation via PageRank**: users create weighted social attestations; an on-chain PageRank algorithm turns the network graph into a 0–100 credit score that caps how much each borrower can draw.
+1. **Credit is conserved, never manufactured**: an account borrows only against credit it holds (a line granted from its history or by an institution, through an admin override or the credit oracle) or credit someone else backs it with from their own. Backing moves credit; it never copies it, so Sybil accounts vouching for each other gain nothing. See `docs/CREDIT_INTEGRITY_ISSUES.md`.
 2. **Fixed-rate loans**: the APR is the Effective Federal Funds Rate (EFFR) plus a configurable risk premium, fixed when the loan is created.
 3. **Single liquidity pool**: deposits are pooled; liquidity is reserved when a loan is approved and released when repaid, balancing lender withdrawals with borrower demand.
 4. **Gasless by default**: every user action can be signed as an EIP-712 message (or an EIP-2612 permit) and submitted by a relayer, so borrowers never need ETH.
@@ -18,9 +18,10 @@ Key ideas for crypto-aware readers:
 
 ## Feature Highlights
 
-• Social attestations and PageRank-based credit scoring (all on-chain)  
+• Social backing: people with credit back borrowers from their own credit or staked USDC, and pay first if the borrower defaults  
+• Credit scores published by an oracle through a swappable `IScoreProvider` (Chainlink CRE ready)  
 • Unified lending pool with utilisation cap, liquidity buffer and a FIFO withdrawal queue  
-• Meta-transactions for borrowing, repaying, depositing, withdrawing and attesting  
+• Meta-transactions for borrowing, repaying, depositing, withdrawing and backing  
 • Admin panel to update EFFR, risk premium and other parameters  
 • Next.js 15 front-end with live pool statistics and user dashboards
 
@@ -37,10 +38,9 @@ Key ideas for crypto-aware readers:
 
 ```
 packages/foundry/
-  contracts/   DecentralizedMicrocredit.sol, PageRank.sol, MockUSDC.sol
+  contracts/   DecentralizedMicrocredit.sol, OracleScoreProvider.sol, MockUSDC.sol, interfaces/
   script/      Deploy.s.sol (local deploy + demo seed), VerifyAll.s.sol, UpdateOracle.s.sol
   scripts-js/  `yarn deploy` and keystore helpers, ABI generator
-  scripts-py/  NetworkX PageRank baseline used by the Solidity tests
   test/        Forge tests (shared fixture in test/utils/)
 packages/nextjs/
   app/         pages; app/api/meta/* are the gasless relayer routes
@@ -105,7 +105,7 @@ NEXT_PUBLIC_DEMO_WALLET=false
 ```
 
 ### Demo wallet mode
-A fake `window.ethereum` provider is injected that proxies all signing to the local Anvil node (which auto-signs with its unlocked accounts). A **DEMO** badge and a persona dropdown appear in the header so you can instantly switch between the seeded personas: **Alexis** (admin), **Avery** (attester) and **Brighton** (borrower), without touching MetaMask or triggering any wallet pop-ups. `yarn demo` turns this on automatically.
+A fake `window.ethereum` provider is injected that proxies all signing to the local Anvil node (which auto-signs with its unlocked accounts). A **DEMO** badge and a persona dropdown appear in the header so you can instantly switch between the seeded personas: **Alexis** (admin), **Avery** (backer) and **Brighton** (borrower), without touching MetaMask or triggering any wallet pop-ups. `yarn demo` turns this on automatically.
 
 **Enable:**
 ```
@@ -131,30 +131,30 @@ The contract stores two basis-point values:
 - `effrRate`: Effective Federal Funds Rate, intended to come from the Pyth Network oracle in production (set manually during local testing).
 - `riskPremium`: additional spread to cover platform risk.
 
-The borrower's APR is `effrRate + riskPremium`, fixed when the loan is created. Simple interest accrues on the principal from origination, with none during the first 24 hours. Partial repayments reduce the outstanding balance, a repayment never pulls more than is owed, and balances under one cent are forgiven when the loan closes.
+The borrower's APR is `effrRate + riskPremium`, fixed when the loan is created. Simple interest accrues on the principal from disbursement, with none during the first 24 hours. Partial repayments reduce the outstanding balance, a repayment never pulls more than is owed, and balances under one cent are forgiven when the loan closes.
 
 ## User Guides
 
 ### Borrowers
-1. Ask contacts for attestations to raise your credit score.  
-2. Check the *Scores* page for your current score and max loan amount.  
-3. Submit a loan request on the *Borrower* page; the UI previews repayments. Your first loans are capped at 50 USDC in total until you repay one in full.  
-4. Repay in full or in part from the *Borrower* page before the due date shown there. Repayments are gasless: you sign one USDC permit.
-5. A loan unpaid 30 days after its due date can be marked defaulted by anyone: your vouchers lose stake and you cannot borrow again.
+1. Start from the credit you have: a line from your history or one an institution extends to you.  
+2. Share your backing link (*Borrower* page) with people who have credit. What they back you with is added to your limit.  
+3. Check the *Scores* page for your own credit, your backers and your limit.  
+4. Submit a loan request on the *Borrower* page; the UI previews repayments.  
+5. Repay in full or in part from the *Borrower* page before the due date shown there. Repayments are gasless: you sign one USDC permit.
+6. A loan unpaid 30 days after its due date can be marked defaulted by anyone: your backers pay for it and you cannot borrow again.
 
 ### Lenders
 1. Deposit USDC through the *Lend* page.  
 2. Your deposit buys pool shares. Interest borrowers repay (less the protocol fee) raises the share price, so every lender earns pro rata; the *Lend* page shows deposits, interest earned and current balance.  
 3. Withdraw whenever liquidity is available (*Max* takes everything); requests that cannot be paid immediately are queued, keep earning, and are filled as liquidity returns.
 
-### Attesters
-1. Stake USDC on the *Attest* page: each active vouch locks 50 USDC of it (the `minVouchStake` default).  
-2. Create an attestation for a borrower, choosing a confidence weight. Re-attesting updates the weight. A vouch cannot be lowered or withdrawn while the borrower has a loan out, and it only carries weight if trust reaches you (an admin-assigned score, a lender balance, KYC, or vouches from trusted people).  
-3. If a borrower you vouch for defaults, your stake covers your share of the unpaid principal (split by vouch weight).  
-4. The contract computes each attester's weight-proportional share of a reward pot (`computeAttesterReward`); automatic payouts are not implemented yet.
+### Backers
+1. On the *Back* page (`/attest`), back a borrower with an amount of your own credit. Your free credit line is used first; if you have none (or not enough), stake USDC to back with money instead.  
+2. Your own limit falls by exactly what the borrower gains. You can lower or withdraw the backing, but not below what the borrower currently owes.  
+3. If the borrower defaults, your backing pays first: staked USDC is slashed back to the lenders and committed credit is burned from your line.
 
 ### Oracle / Admin
-1. PageRank is recomputed on-chain after every attestation (demo only); the admin page can also trigger it.  
+1. Grant credit lines with score overrides, or publish scores through `OracleScoreProvider` (a Chainlink CRE workflow via `onReport`, or a reporter account). Scores go stale after `maxScoreAge` without a report.  
 2. Update `effrRate`, `riskPremium`, `maxLoanAmount`, the utilisation cap and liquidity limits as needed.  
 3. Monitor pool metrics and reserved liquidity.
 

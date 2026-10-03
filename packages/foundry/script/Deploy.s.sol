@@ -4,14 +4,16 @@ pragma solidity ^0.8.30;
 import { Script, console } from "forge-std/Script.sol";
 import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
 import { MockUSDC } from "../contracts/MockUSDC.sol";
+import { OracleScoreProvider } from "../contracts/OracleScoreProvider.sol";
 
 /**
  * @notice Deploys MockUSDC (unless deployment-config.json points at a live one) and
  *         DecentralizedMicrocredit, then seeds the local demo state.
  * @dev Run with `yarn deploy`. Uses Anvil's deterministic accounts:
- *        9 Alexis: deployer, owner and oracle
- *        2 Avery: attester (staked, so her vouch counts)
- *        3 Brighton: borrower
+ *        9 Alexis: deployer, owner, oracle and score reporter (the local stand-in for the
+ *          Chainlink CRE forwarder; the Next.js /api/oracle/refresh route publishes as Alexis)
+ *        2 Avery: backer, with 92 USDC of granted credit to back others with
+ *        3 Brighton: borrower, with a 25 USDC line of his own (from history or an institution)
  *        4 Diana, 5 Eve: background borrowers that bring pool utilisation to 89%
  */
 contract DeployScript is Script {
@@ -25,6 +27,7 @@ contract DeployScript is Script {
     uint256 internal constant RISK_PREMIUM_BPS = 500; // 5.00%
     uint256 internal constant MAX_LOAN = 100e6; // 100 USDC at a 100% credit score
     uint256 internal constant POOL_SEED = 10_000e6;
+    uint256 internal constant MAX_SCORE_AGE = 7 days;
 
     DecentralizedMicrocredit internal credit;
 
@@ -36,6 +39,10 @@ contract DeployScript is Script {
         credit = new DecentralizedMicrocredit(EFFR_BPS, RISK_PREMIUM_BPS, MAX_LOAN, usdc, alexis);
         console.log("DecentralizedMicrocredit deployed at:", address(credit));
 
+        OracleScoreProvider scores = new OracleScoreProvider(alexis, alexis, MAX_SCORE_AGE);
+        credit.setScoreProvider(scores);
+        console.log("OracleScoreProvider deployed at:", address(scores));
+
         // Seed the lending pool.
         MockUSDC(usdc).mint(alexis, POOL_SEED);
         MockUSDC(usdc).approve(address(credit), POOL_SEED);
@@ -45,21 +52,17 @@ contract DeployScript is Script {
         // Diana + Eve bring utilisation to 89%: the most we can lend while leaving room for
         // a max-size (100 USDC) loan for Brighton under the 90% cap ($8,899 + $100 <= $9,000).
         // Lender APY ~ 8.3% (= 9.33% loan rate x 89% utilisation).
-        // Their loans are far above the first-loan cap, so lift it while seeding them.
-        uint256 firstLoanCap = credit.firstLoanCap();
         credit.setMaxLoanAmount(POOL_SEED);
-        credit.setFirstLoanCap(POOL_SEED);
         _seedBorrower(DIANA_PK, 6_500e6);
         _seedBorrower(EVE_PK, 2_399e6);
         credit.setMaxLoanAmount(MAX_LOAN);
-        credit.setFirstLoanCap(firstLoanCap);
         console.log("Background borrowers: Diana $6,500 + Eve $2,399 = $8,899 lent (89%)");
 
-        // Established scores for the operator and the attester, so Avery's attestation
-        // carries weight in PageRank.
-        credit.setScoreOverride(alexis, 950_000); // 95%
-        credit.setScoreOverride(vm.addr(AVERY_PK), 920_000); // 92%
-        _stakeAsAttester(usdc, AVERY_PK, credit.minVouchStake());
+        // Granted credit (score x 100 USDC). Only these accounts hold credit; everyone else can
+        // borrow only what one of them backs them with.
+        credit.setScoreOverride(alexis, 950_000); // 95 USDC
+        credit.setScoreOverride(vm.addr(AVERY_PK), 920_000); // 92 USDC
+        credit.setScoreOverride(vm.addr(BRIGHTON_PK), 250_000); // 25 USDC
 
         _setDisplayName(AVERY_PK, "Avery");
         _setDisplayName(BRIGHTON_PK, "Brighton");
@@ -92,17 +95,6 @@ contract DeployScript is Script {
         vm.startBroadcast(ALEXIS_PK);
 
         credit.disburseLoan(loanId);
-    }
-
-    /// @dev Mints `amount` to `pk` and stakes it, enough for one vouch.
-    function _stakeAsAttester(address usdc, uint256 pk, uint256 amount) internal {
-        MockUSDC(usdc).mint(vm.addr(pk), amount);
-        vm.stopBroadcast();
-        vm.startBroadcast(pk);
-        MockUSDC(usdc).approve(address(credit), amount);
-        credit.stake(amount);
-        vm.stopBroadcast();
-        vm.startBroadcast(ALEXIS_PK);
     }
 
     function _setDisplayName(uint256 pk, string memory name) internal {

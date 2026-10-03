@@ -13,8 +13,9 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
     address internal borrower = vm.addr(borrowerPk);
     uint256 internal lenderPk = 0x1E4D;
     address internal lender = vm.addr(lenderPk);
-    uint256 internal attesterPk = 0xA77E;
-    address internal attester = vm.addr(attesterPk);
+    uint256 internal backerPk = 0xA77E;
+    address internal backer = vm.addr(backerPk);
+    uint256 internal constant BACKER_CREDIT = 50e6; // 50% score x 100 USDC maxLoanAmount
     address internal poolLender = makeAddr("poolLender");
 
     event MetaLoanCreated(
@@ -25,21 +26,19 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
     event MetaDeposit(address indexed lender, uint256 amount, address indexed receiver, uint256 sharesMinted);
     event MetaWithdrawalRequested(address indexed lender, uint256 indexed queueId, uint256 amount, address indexed to);
     event MetaWithdrawalFilled(uint256 indexed queueId, uint256 amountFilled);
-    event MetaAttested(address indexed attester, address indexed borrower, uint256 weight);
     event Deposited(address indexed lender, uint256 assets, uint256 shares);
     event Withdrawn(address indexed lender, address indexed to, uint256 assets, uint256 shares);
     event LoanRequested(address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 interestRate);
     event LoanDisbursed(address indexed borrower, uint256 indexed loanId, address to, uint256 amount);
-    event Attested(address indexed attester, address indexed borrower, uint256 weight);
+    event Backed(address indexed backer, address indexed borrower, uint256 secured, uint256 unsecured);
 
     function setUp() public {
         _deploy(433, 500, 100e6);
-        _relaxSybilGuards();
         _deposit(poolLender, POOL);
         vm.prank(owner);
         credit.setScoreOverride(borrower, 500_000); // 50% -> may borrow up to 50 USDC
-        vm.prank(oracle);
-        credit.markKYCVerified(attester); // trust anchor for attestations
+        vm.prank(owner);
+        credit.setScoreOverride(backer, 500_000); // 50 USDC of granted credit to back others with
     }
 
     // ───────────────────────────── helpers ─────────────────────────────
@@ -79,13 +78,13 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         });
     }
 
-    function _attest(address to, uint256 weight) internal {
-        DecentralizedMicrocredit.AttestRequest memory req = DecentralizedMicrocredit.AttestRequest({
-            attester: attester, borrower: to, weight: weight, nonce: credit.nonces(attester), deadline: _deadline()
+    function _back(address to, uint256 amount) internal {
+        DecentralizedMicrocredit.BackRequest memory req = DecentralizedMicrocredit.BackRequest({
+            backer: backer, borrower: to, amount: amount, nonce: credit.nonces(backer), deadline: _deadline()
         });
-        bytes memory sig = _signAttestRequest(attesterPk, req);
+        bytes memory sig = _signBackRequest(backerPk, req);
         vm.prank(relayer);
-        credit.attestMeta(req, sig);
+        credit.backMeta(req, sig);
     }
 
     function _depositPermitOnly(address depositor, uint256 depositorPk, uint256 amount) internal {
@@ -167,49 +166,53 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         credit.borrowAndDisburseMeta(req, sig);
     }
 
-    // ───────────────────────────── attestMeta ─────────────────────────────
+    // ───────────────────────────── backMeta ─────────────────────────────
 
-    function testAttestMetaRecordsAttestationAndScore() public {
+    function testBackMetaMovesCreditFromTheBacker() public {
         address newcomer = makeAddr("newcomer");
         vm.expectEmit(address(credit));
-        emit MetaAttested(attester, newcomer, 800_000);
-        _attest(newcomer, 800_000);
+        emit Backed(backer, newcomer, 0, 30e6);
+        _back(newcomer, 30e6);
 
-        DecentralizedMicrocredit.Attestation[] memory atts = credit.getBorrowerAttestations(newcomer);
-        assertEq(atts.length, 1);
-        assertEq(atts[0].attester, attester);
-        assertEq(atts[0].weight, 800_000);
-        assertEq(credit.nonces(attester), 1);
-        assertEq(credit.getAttesters()[0], attester);
-        assertGt(credit.getCreditScore(newcomer), 0, "PageRank recomputed on attestation");
+        (uint256 secured, uint256 unsecured) = credit.getBacking(backer, newcomer);
+        assertEq(secured, 0);
+        assertEq(unsecured, 30e6);
+        assertEq(credit.nonces(backer), 1);
+        assertEq(credit.getBackers()[0], backer);
+        assertEq(credit.getBackedBorrowers()[0], newcomer);
+
+        (uint256 newcomerLimit,) = credit.getBorrowLimit(newcomer);
+        (uint256 backerLimit,) = credit.getBorrowLimit(backer);
+        assertEq(newcomerLimit, 30e6);
+        assertEq(backerLimit, BACKER_CREDIT - 30e6, "the backer gives up what the borrower gains");
     }
 
-    function testAttestMetaUpdatesExistingWeight() public {
+    function testBackMetaUpdatesTheAmount() public {
         address newcomer = makeAddr("newcomer");
-        _attest(newcomer, 800_000);
-        _attest(newcomer, 300_000);
+        _back(newcomer, 30e6);
+        _back(newcomer, 10e6);
 
-        DecentralizedMicrocredit.Attestation[] memory atts = credit.getBorrowerAttestations(newcomer);
-        assertEq(atts.length, 1);
-        assertEq(atts[0].weight, 300_000);
-        assertEq(credit.getAttesters().length, 1);
+        DecentralizedMicrocredit.Backing[] memory backings = credit.getBackings(newcomer);
+        assertEq(backings.length, 1);
+        assertEq(backings[0].unsecured, 10e6);
+        assertEq(credit.creditCommitted(backer), 10e6);
     }
 
-    function testAttestMetaRejectsSelfAttestationAndOverweight() public {
-        DecentralizedMicrocredit.AttestRequest memory req = DecentralizedMicrocredit.AttestRequest({
-            attester: attester, borrower: attester, weight: 1, nonce: 0, deadline: _deadline()
+    function testBackMetaRejectsSelfBackingAndMoreThanTheBackerHas() public {
+        DecentralizedMicrocredit.BackRequest memory req = DecentralizedMicrocredit.BackRequest({
+            backer: backer, borrower: backer, amount: 1, nonce: 0, deadline: _deadline()
         });
-        bytes memory sig = _signAttestRequest(attesterPk, req);
+        bytes memory sig = _signBackRequest(backerPk, req);
         vm.prank(relayer);
-        vm.expectRevert(DecentralizedMicrocredit.SelfAttestation.selector);
-        credit.attestMeta(req, sig);
+        vm.expectRevert(DecentralizedMicrocredit.SelfBacking.selector);
+        credit.backMeta(req, sig);
 
         req.borrower = borrower;
-        req.weight = SCALE + 1;
-        sig = _signAttestRequest(attesterPk, req);
+        req.amount = BACKER_CREDIT + 1;
+        sig = _signBackRequest(backerPk, req);
         vm.prank(relayer);
-        vm.expectRevert(DecentralizedMicrocredit.WeightTooHigh.selector);
-        credit.attestMeta(req, sig);
+        vm.expectRevert(DecentralizedMicrocredit.InsufficientCredit.selector);
+        credit.backMeta(req, sig);
     }
 
     // ───────────────────────────── deposits ─────────────────────────────
@@ -553,8 +556,8 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
 
     function testLifecycleEvents() public {
         vm.expectEmit(address(credit));
-        emit Attested(attester, borrower, 700_000);
-        _attest(borrower, 700_000);
+        emit Backed(backer, borrower, 0, 20e6);
+        _back(borrower, 20e6);
 
         vm.expectEmit(address(credit));
         emit LoanRequested(borrower, 1, 40e6, LOAN_APR);

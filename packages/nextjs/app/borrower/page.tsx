@@ -7,7 +7,7 @@ import { useAccount, usePublicClient, useSignTypedData } from "wagmi";
 import { CreditCardIcon, CalculatorIcon, DocumentDuplicateIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
+import { formatUSDC } from "~~/utils/format";
 import { relayerErrorMessage } from "~~/utils/contractErrors";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
@@ -21,13 +21,6 @@ const BorrowPage: NextPage = () => {
   const [repaymentPeriod, setRepaymentPeriod] = useState(7); // Default 1 week
   const [isLoading, setIsLoading] = useState(false);
   const [permitError, setPermitError] = useState<string | null>(null);
-
-  // Fetch on-chain credit score (0 – 1e6)
-  const { data: creditScore } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "getCreditScore",
-    args: [connectedAddress],
-  });
 
   // Fetch pool info for total participants
   const { data: poolInfo } = useScaffoldReadContract({
@@ -44,33 +37,13 @@ const BorrowPage: NextPage = () => {
   const borrowerAprPercent = loanRateBp !== undefined ? (Number(loanRateBp) / 100).toFixed(2) : undefined;
   // Removed lenderCount usage
 
-  // Fetch maxLoanAmount to tell whether the first-loan cap is what limits this borrower
-  const { data: maxLoanAmount } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "maxLoanAmount",
-  });
-  // [limit, available]: score x maxLoanAmount, capped at firstLoanCap until a loan is repaid in
-  // full, and how much of it the borrower's active loans leave unused.
+  // [limit, available]: your own credit not committed to others plus backing received, and how
+  // much of it your open loans leave unused.
   const { data: borrowLimit } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "getBorrowLimit",
     args: [connectedAddress],
   });
-  const { data: completedLoans } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "completedLoans",
-    args: [connectedAddress],
-  });
-  const { data: firstLoanCap } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "firstLoanCap",
-  });
-  const firstLoanCapped =
-    completedLoans === 0n &&
-    firstLoanCap !== undefined &&
-    creditScore !== undefined &&
-    maxLoanAmount !== undefined &&
-    (maxLoanAmount * creditScore) / 1_000_000n > firstLoanCap;
 
   // Helper function to round down to the nearest penny (0.01 USDC = 10000 wei)
   const roundDownToNearestPenny = (amount: bigint): bigint => {
@@ -504,7 +477,7 @@ const BorrowPage: NextPage = () => {
     return `${weeks} Weeks`;
   };
 
-  const hasCredit = creditScore !== undefined && Number(creditScore) > 0;
+  const hasCredit = borrowLimit !== undefined && borrowLimit[0] > 0n;
 
   // Prefill amount when eligible known
   useEffect(() => {
@@ -520,11 +493,11 @@ const BorrowPage: NextPage = () => {
     return parsed !== null && parsed > maxEligibleAmount;
   };
 
-  const attestationUrl = connectedAddress ? `${window.location.origin}/attest?borrower=${connectedAddress}` : "";
+  const backingUrl = connectedAddress ? `${window.location.origin}/attest?borrower=${connectedAddress}` : "";
 
   const [copied, setCopied] = useState(false);
-  const copyAttestationUrl = () => {
-    navigator.clipboard.writeText(attestationUrl);
+  const copyBackingUrl = () => {
+    navigator.clipboard.writeText(backingUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -540,20 +513,16 @@ const BorrowPage: NextPage = () => {
       {/* ── Credit Stats (always visible) ─────────────────────────── */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-base-100 rounded-lg p-4 shadow text-center">
-          <div className="text-xs text-gray-500 mb-1">Score</div>
-          <div className={`text-2xl font-bold ${getCreditScoreColor(Number(creditScore ?? 0))}`}>
-            {creditScore !== undefined ? (Number(creditScore) / 1e4).toFixed(0) : "—"}
-          </div>
-          <div className="text-xs text-gray-400">out of 100</div>
+          <div className="text-xs text-gray-500 mb-1">Credit Limit</div>
+          <div className="text-2xl font-bold">{borrowLimit !== undefined ? formatUSDC(borrowLimit[0]) : "—"}</div>
+          <div className="text-xs text-gray-400">your credit + backing</div>
         </div>
         <div className="bg-base-100 rounded-lg p-4 shadow text-center">
           <div className="text-xs text-gray-500 mb-1">Max Loan</div>
           <div className="text-2xl font-bold">
             {maxEligibleAmount !== undefined ? formatUSDC(maxEligibleAmount) : "—"}
           </div>
-          <div className="text-xs text-gray-400">
-            {firstLoanCapped ? "First loan cap: repay one loan to unlock your full limit" : "USDC"}
-          </div>
+          <div className="text-xs text-gray-400">available now</div>
         </div>
         <div className="bg-base-100 rounded-lg p-4 shadow text-center">
           <div className="text-xs text-gray-500 mb-1">APR</div>
@@ -564,35 +533,37 @@ const BorrowPage: NextPage = () => {
         </div>
       </div>
 
-      {/* ── Attestation CTA (shown when score is zero, no active loan) ── */}
+      {/* ── Backing CTA (shown when there is no credit yet, no active loan) ── */}
       {!loanIsActive && !hasCredit && (
         <div className="bg-base-100 rounded-lg p-5 shadow-lg mb-6 border border-base-300">
           <div className="flex items-start gap-4">
             <div className="flex-shrink-0 pt-0.5">
               <div
-                onClick={copyAttestationUrl}
+                onClick={copyBackingUrl}
                 className="cursor-pointer flex flex-col items-center"
                 title="Click to copy link"
               >
-                <QRCodeDisplay value={attestationUrl} size={72} />
+                <QRCodeDisplay value={backingUrl} size={72} />
                 <span className="text-xs text-gray-400 mt-1">scan or copy</span>
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold mb-1">Share your attestation link to build credit</p>
+              <p className="font-semibold mb-1">Share your backing link to get credit</p>
               <p className="text-sm text-gray-500 mb-3">
-                Your credit score is built from trust attestations by people who know you. Send this link to friends or community members — each attestation raises your score and unlocks borrowing.
+                You can borrow against credit you already have, or credit that someone who has credit backs you
+                with from their own. Send this link to people who know you: what they back you with becomes your
+                limit, and they stand behind it if you do not repay.
               </p>
               <div className="flex items-center gap-2">
                 <span
                   className="text-xs text-blue-600 underline truncate cursor-pointer"
-                  title={attestationUrl}
-                  onClick={copyAttestationUrl}
+                  title={backingUrl}
+                  onClick={copyBackingUrl}
                 >
-                  {attestationUrl}
+                  {backingUrl}
                 </span>
                 <button
-                  onClick={copyAttestationUrl}
+                  onClick={copyBackingUrl}
                   className="btn btn-xs btn-outline flex-shrink-0 gap-1"
                 >
                   <DocumentDuplicateIcon className="h-3 w-3" />
@@ -604,7 +575,7 @@ const BorrowPage: NextPage = () => {
         </div>
       )}
 
-      {/* Loan Request Form (shown after attestation when credit exists, and no active loan) */}
+      {/* Loan Request Form (shown when credit exists and there is no active loan) */}
       {!loanIsActive && hasCredit && (
         <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
           <h2 className="text-xl font-semibold mb-4 flex items-center">
@@ -725,7 +696,7 @@ const BorrowPage: NextPage = () => {
                 {daysOverdue > 0 && defaultableAt !== undefined && (
                   <p className="text-xs text-error">
                     Repay before {formatDate(defaultableAt)}. After that the loan can be marked defaulted, your
-                    vouchers lose stake, and you cannot borrow again.
+                    backers pay for it, and you cannot borrow again.
                   </p>
                 )}
               </div>
