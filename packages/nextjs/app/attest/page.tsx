@@ -7,6 +7,8 @@ import { toast } from "react-hot-toast";
 import { AddressInput } from "~~/components/scaffold-eth";
 import { DocumentDuplicateIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { useAddressDisplayName } from "~~/hooks/useAddressDisplayName";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { formatUSDC } from "~~/utils/format";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 import { AttestRequest, MICRO_DOMAIN, TYPES } from "~~/utils/eip712";
 import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS } from "~~/utils/microcredit";
@@ -65,6 +67,55 @@ function AttestForm() {
       .then((score) => setMyScore(Number(score as bigint)))
       .catch(() => setMyScore(null));
   }, [connectedAddress, publicClient]);
+
+  // ── Stake: every active vouch locks minVouchStake of the attester's staked USDC ──
+  const [stakeLoading, setStakeLoading] = useState(false);
+  const { writeContractAsync: writeCreditAsync } = useScaffoldWriteContract({ contractName: "DecentralizedMicrocredit" });
+  const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({ contractName: "MockUSDC" });
+  const { data: myStake, refetch: refetchStake } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "attesterStake",
+    args: [connectedAddress],
+  });
+  const { data: myActiveVouches } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "activeVouches",
+    args: [connectedAddress],
+  });
+  const { data: minVouchStake } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "minVouchStake",
+  });
+  const { data: currentWeight } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getVouchWeight",
+    args: [connectedAddress, (attestBorrower || undefined) as `0x${string}` | undefined],
+  });
+  // A new vouch (no current weight) needs stake for one more active vouch.
+  const isNewVouch = currentWeight === undefined || currentWeight === 0n;
+  const stakeShortfall =
+    myStake !== undefined && myActiveVouches !== undefined && minVouchStake !== undefined && isNewVouch
+      ? (() => {
+          const needed = minVouchStake * (myActiveVouches + 1n);
+          return needed > myStake ? needed - myStake : 0n;
+        })()
+      : 0n;
+
+  const handleStake = async () => {
+    if (!connectedAddress || stakeShortfall === 0n) return;
+    setStakeLoading(true);
+    try {
+      await writeUsdcAsync({ functionName: "approve", args: [MICROCREDIT_ADDRESS, stakeShortfall] });
+      await writeCreditAsync({ functionName: "stake", args: [stakeShortfall] });
+      await refetchStake();
+      toast.success(`Staked ${formatUSDC(stakeShortfall)}`, { position: "top-center" });
+    } catch (err: any) {
+      console.error("Stake error", err);
+      toast.error(`Failed to stake: ${err?.shortMessage || err?.message || "Unknown error"}`);
+    } finally {
+      setStakeLoading(false);
+    }
+  };
 
   // Prefill from query params (?borrower=0x...&weight=80)
   useEffect(() => {
@@ -213,6 +264,27 @@ function AttestForm() {
           </div>
         )}
 
+        {connectedAddress && myStake !== undefined && minVouchStake !== undefined && (
+          <div className="bg-base-200 border border-base-300 rounded-lg p-4 mb-6 text-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-gray-500">Your stake</div>
+                <div className="text-xl font-bold">{formatUSDC(myStake)}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-gray-500">Backing</div>
+                <div className="text-xl font-bold">
+                  {String(myActiveVouches ?? 0n)} vouch{myActiveVouches === 1n ? "" : "es"}
+                </div>
+              </div>
+            </div>
+            <p className="text-gray-500 mt-2">
+              Each vouch locks {formatUSDC(minVouchStake)} of your stake. A vouch cannot be lowered or withdrawn while
+              the borrower has a loan out, and your vouch only carries weight if others trust you.
+            </p>
+          </div>
+        )}
+
         {!submittedInfo ? (
           <>
             <div className="bg-base-100 rounded-lg p-6 shadow w-full">
@@ -225,14 +297,21 @@ function AttestForm() {
                   <label className="block text-sm font-medium mb-2">Confidence Level: {attestWeight}%</label>
                   <input type="range" min="1" max="100" value={attestWeight} onChange={e=>setAttestWeight(Number(e.target.value))} className="w-full" />
                 </div>
-                <button onClick={handleAttestation} disabled={!attestBorrower || attestLoading || !connectedAddress} className="btn btn-primary w-full">
-                  {attestLoading ? "Submitting..." : "Submit Attestation"}
-                </button>
+                {stakeShortfall > 0n ? (
+                  <button onClick={handleStake} disabled={stakeLoading || !connectedAddress} className="btn btn-secondary w-full">
+                    {stakeLoading ? "Staking..." : `Stake ${formatUSDC(stakeShortfall)} to vouch`}
+                  </button>
+                ) : (
+                  <button onClick={handleAttestation} disabled={!attestBorrower || attestLoading || !connectedAddress} className="btn btn-primary w-full">
+                    {attestLoading ? "Submitting..." : "Submit Attestation"}
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="text-xs text-gray-500 mt-4 text-center">
-              Attestations are gasless: you sign a message and our relayer submits it on-chain.
+              Attestations are gasless: you sign a message and our relayer submits it on-chain. Staking is a normal
+              wallet transaction.
             </div>
           </>
         ) : (

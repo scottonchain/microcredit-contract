@@ -9,7 +9,7 @@
  *             lender APY, so the viewer can read them here without a separate step.
  *   Step 2  — Avery attests to Brighton with 80 % confidence (/attest).
  *             PageRank is computed automatically by the contract.
- *   Step 3  — Brighton requests a 50 USDC loan, 28-day term (/borrower).
+ *   Step 3  — Brighton requests a 40 USDC first loan (first loans are capped at 50), 28-day term (/borrower).
  *             Gasless meta-transaction — Brighton needs no ETH.
  *   Step 4  — Brighton repays the loan in full (/borrower).
  *
@@ -336,10 +336,10 @@ async function main() {
     await waitForStatus(page, 'success|submitted|attested|0x[0-9a-f]{10}', 35000);
     await sleep(STEP_PAUSE);
 
-    // ── STEP 3: Brighton requests a 50 USDC loan ─────────────────────────
+    // ── STEP 3: Brighton requests a 40 USDC first loan ─────────────────────────
     // All transactions are gasless meta-transactions paid by the relayer —
     // Brighton does not need ETH.
-    banner(3, `${ACCOUNTS.borrower.name} requests a 50 USDC loan — 28-day term`);
+    banner(3, `${ACCOUNTS.borrower.name} takes a 40 USDC first loan, 28-day term`);
     await gotoAs(page, '/borrower', ACCOUNTS.borrower);
     await connectWallet(page);
 
@@ -359,8 +359,8 @@ async function main() {
     await sleep(400);
 
     // Fill the loan amount (number input)
-    console.log('  → entering loan amount: 50');
-    await page.locator('input[type="number"]').first().fill('50');
+    console.log('  → entering loan amount: 40');
+    await page.locator('input[type="number"]').first().fill('40');
     await sleep(400);
 
     console.log('  → clicking One-Click Borrow');

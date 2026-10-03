@@ -43,11 +43,33 @@ const BorrowPage: NextPage = () => {
   const borrowerAprPercent = loanRateBp !== undefined ? (Number(loanRateBp) / 100).toFixed(2) : undefined;
   // Removed lenderCount usage
 
-  // Fetch maxLoanAmount to compute eligible amount
+  // Fetch maxLoanAmount to tell whether the first-loan cap is what limits this borrower
   const { data: maxLoanAmount } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "maxLoanAmount",
   });
+  // [limit, available]: score x maxLoanAmount, capped at firstLoanCap until a loan is repaid in
+  // full, and how much of it the borrower's active loans leave unused.
+  const { data: borrowLimit } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "getBorrowLimit",
+    args: [connectedAddress],
+  });
+  const { data: completedLoans } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "completedLoans",
+    args: [connectedAddress],
+  });
+  const { data: firstLoanCap } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "firstLoanCap",
+  });
+  const firstLoanCapped =
+    completedLoans === 0n &&
+    firstLoanCap !== undefined &&
+    creditScore !== undefined &&
+    maxLoanAmount !== undefined &&
+    (maxLoanAmount * creditScore) / 1_000_000n > firstLoanCap;
 
   // Helper function to round down to the nearest penny (0.01 USDC = 10000 wei)
   const roundDownToNearestPenny = (amount: bigint): bigint => {
@@ -73,8 +95,8 @@ const BorrowPage: NextPage = () => {
   // TODO: This should be made consistent with best practices for loan amount calculation
   // Current implementation reduces borrowable amount by 1% for each additional week beyond 1 week
   const maxEligibleAmount = useMemo(() => {
-    if (!creditScore || !maxLoanAmount) return 0n;
-    const baseAmount = (BigInt(maxLoanAmount) * creditScore) / BigInt(1e6);
+    if (!borrowLimit) return 0n;
+    const baseAmount = borrowLimit[1];
     
     // Calculate weeks from repayment period (repaymentPeriod is in days)
     const weeks = Math.ceil(repaymentPeriod / 7);
@@ -88,7 +110,7 @@ const BorrowPage: NextPage = () => {
     const reductionFactor = Math.pow(0.99, weeks - 1);
     const reducedAmount = BigInt(Math.floor(Number(baseAmount) * reductionFactor));
     return roundDownToNearestPenny(reducedAmount);
-  }, [creditScore, maxLoanAmount, repaymentPeriod]);
+  }, [borrowLimit, repaymentPeriod]);
 
   // Auto-update loan amount when repayment period changes
   useEffect(() => {
@@ -511,7 +533,9 @@ const BorrowPage: NextPage = () => {
           <div className="text-2xl font-bold">
             {maxEligibleAmount !== undefined ? formatUSDC(maxEligibleAmount) : "—"}
           </div>
-          <div className="text-xs text-gray-400">USDC</div>
+          <div className="text-xs text-gray-400">
+            {firstLoanCapped ? "First loan cap: repay one loan to unlock your full limit" : "USDC"}
+          </div>
         </div>
         <div className="bg-base-100 rounded-lg p-4 shadow text-center">
           <div className="text-xs text-gray-500 mb-1">APR</div>
