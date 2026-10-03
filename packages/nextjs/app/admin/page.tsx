@@ -282,7 +282,7 @@ const AdminPage: NextPage = () => {
   const LenderRow = ({ address, index }: { address: `0x${string}`; index: number }) => {
     const { data: deposit } = useScaffoldReadContract({
       contractName: "DecentralizedMicrocredit",
-      functionName: "lenderDeposits",
+      functionName: "lenderBalance",
       args: [address],
     });
 

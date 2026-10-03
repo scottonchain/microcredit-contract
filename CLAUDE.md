@@ -49,15 +49,18 @@ Node >= 20.18.3 and Foundry are required.
 
 Inherits `PageRank` (graph + computation) and OpenZeppelin `EIP712`. The file is grouped into constants, types, state, events, admin, lending pool, loans, credit, meta-transactions, views and internals.
 
-**Single pool lending model**: All lenders deposit USDC to one shared pool; all borrowers draw from the same pool.
+**Single pool lending model**: All lenders deposit USDC to one shared pool; all borrowers draw from the same pool. Lenders hold non-transferable shares (`sharesOf`, `totalShares`); `convertToShares` / `convertToAssets` follow OpenZeppelin ERC4626 with a 6-decimal virtual offset. Interest is recognised on repayment (cash basis): `_repay` settles accrued interest before principal, and the interest, less `protocolFeeBps` (max `MAX_PROTOCOL_FEE_BPS`, 20%), raises the share price. The owner withdraws fees with `claimProtocolFees`.
 
 **Key state variables for liquidity:**
-- `totalDeposits`: principal deposited by lenders, net of withdrawals
-- `totalLentOut`: principal currently held by active borrowers
-- `reservedLiquidity`: USDC committed to approved but undisbursed loans
-- `lendingUtilizationCap`: max fraction of pool that can be lent or reserved (default 90%)
-- `liquidityBuffer` / `liquidityThreshold`: share of deposits / absolute USDC kept liquid (default 5% / 0)
-- `totalQueuedWithdrawals`: USDC owed to the FIFO withdrawal queue (`requestWithdrawalMeta`); held back from loans and direct withdrawals. Each deposit, repayment or withdrawal pays at most `QUEUE_FILLS_PER_CALL` (10) queued requests; anyone can call `processWithdrawalQueue(maxItems)` to drain the rest
+- `totalAssets()` = `lenderCash` + `totalLentOut`. `lenderCash` is tracked internally (deposits, disbursements, repayments, payouts), so USDC sent straight to the contract does not move the share price
+- `totalLentOut`: principal still owed on disbursed, active loans
+- `reservedLiquidity`: USDC committed to approved but undisbursed loans (part of `lenderCash`)
+- `lendingUtilizationCap`: max fraction of `totalAssets` that can be lent or reserved (default 90%)
+- `liquidityBuffer` / `liquidityThreshold`: share of `totalAssets` / absolute USDC that new loans must leave liquid (default 5% / 0). Withdrawals and the queue may use it
+- `protocolFees`: accrued, unclaimed fees; outside `lenderCash`, never lent or withdrawn by lenders
+- `lenderBalance(lender)` / `lenderPrincipal(lender)`: current value of a lender's shares / what they deposited net of the cost basis of shares withdrawn (earnings = the difference)
+- `totalQueuedShares` / `totalQueuedWithdrawals()`: shares locked in the FIFO withdrawal queue (`requestWithdrawalMeta`) and their USDC value, held back from loans and direct withdrawals. Queued shares keep earning until paid. Each deposit, repayment or withdrawal pays at most `QUEUE_FILLS_PER_CALL` (10) queued requests; anyone can call `processWithdrawalQueue(maxItems)` to drain the rest
+- `withdrawFunds` and `requestWithdrawalMeta` take a USDC amount; `type(uint256).max` means the whole unqueued balance
 
 **Loan lifecycle:**
 1. `requestLoan()` / `requestLoanMeta()`: validate and reserve liquidity, create the loan record; interest accrues from here
@@ -75,7 +78,7 @@ Every origination path goes through `_originateLoan` (score limit across active 
 
 Attesters create weighted directed edges (0–100% confidence) to borrowers; re-attesting replaces the edge weight. The on-chain PageRank (alpha=0.85, max 100 iterations, per-node convergence threshold 1e-3) runs after every attestation (demo only). The personalization vector comes from the `_personalizationWeight` hook:
 - Admin score override, if set; otherwise
-- `basePersonalization` + deposits (capped at `personalizationCap`) + `kycBonus` for KYC-verified users
+- `basePersonalization` + `lenderBalance` (capped at `personalizationCap`) + `kycBonus` for KYC-verified users
 
 Scores are scaled to `PR_SCALE = 100000`; credit score = `SCALE * x / (x + 100)` with `x = 1000 * PR / max(PR)`. `computePageRank()` is callable by anyone and is gas-intensive; `clearPageRankState()` is owner/oracle only.
 
@@ -126,6 +129,7 @@ Network configuration is in `packages/nextjs/scaffold.config.ts` (default: Found
 
 All suites extend `test/utils/MicrocreditTestBase.sol` (real MockUSDC, EIP-712/EIP-2612 signing helpers that rebuild typehashes from their type strings):
 - `DecentralizedMicrocredit.t.sol`: core lending, limits, liquidity, withdrawals
+- `ShareAccounting.t.sol`: share price, interest-first repayment, protocol fee, buffer vs exits, stray transfers
 - `LoanAccounting.t.sol`: interest, partial/full repayment, admin permissions, views
 - `MetaTransactions.t.sol`: signature, nonce, deadline and relayer-whitelist rules
 - `MetaTransactionFlows.t.sol`: effects of each meta-transaction entry point
