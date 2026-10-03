@@ -1,0 +1,313 @@
+# Credit model
+
+Why Sybil accounts cannot manufacture credit in this protocol, where credit can legitimately come
+from, and what the protocol may and may not do with repayment history. Every claim here is either
+proved below, enforced by a test, or reproduced by a script in `analysis/`. Issues found against
+this model are tracked in [`CREDIT_INTEGRITY_ISSUES.md`](CREDIT_INTEGRITY_ISSUES.md).
+
+## The spine
+
+1. **Sybil-proofness is a loss bound, not a detection problem.** Identities are free (Douceur 2002),
+   and no symmetric reputation function of a graph of accounts is sybilproof (Cheng and Friedman
+   2005), so no rule that reads the graph's structure can tell a ring of fakes from a community. The protocol instead bounds what any set of accounts can
+   take: lenders' realised plus potential loss never exceeds the credit that was issued plus the
+   dues that were paid (Theorem 2). Accounts with nothing issued and nothing paid add exactly
+   nothing, however many there are.
+2. **Credit is a liability of someone.** Every unit of borrowing capacity is underwritten by a
+   named account's issued credit, its dues, or its stake. Backing moves underwriting from one
+   account to another; it never creates it. This is "trust is risk" (Litos and Zindros 2017) and
+   the one-hop case of a credit network (Karlan, Möbius, Rosenblat and Szeidl 2009; Dandekar et al.
+   2011), and the bound is the min-cut between the attacker's accounts and everyone else.
+3. **History alone can earn only what it has paid.** Any on-chain rule that grants a pseudonymous
+   account more credit for a repayment history than the value that history transferred to
+   lenders can be farmed: one seed, recycled across fresh accounts, yields profit linear in the
+   number of accounts (Theorem 3). The reviewer's proposal "repayment raises capacity by 25% of
+   principal" fails this way at zero cost. The largest safe rule is the one implemented: earned
+   credit equals interest paid net of the protocol fee.
+4. **Larger credit from history needs an accountable issuer.** History is information about the
+   probability of default; turning it into a larger line requires someone who bears the loss if
+   the information is wrong: an institution (delegated monitoring, Diamond 1984) or a costly
+   identity. Issuance is therefore budgeted on-chain, so a compromised or gamed oracle can
+   misallocate its budget but cannot exceed it.
+5. **Unsecured backing lowers the probability of default, not the loss given default.** Burning a
+   backer's credit recovers no cash. It works through selection and monitoring (Stiglitz 1990;
+   Ghatak and Guinnane 1999). Lenders' cash recovery comes only from stake and from the first-loss
+   reserve, and both are priced in `analysis/credit_risk`.
+
+## 1. Why the previous designs failed
+
+| Design | What decided credit | Why Sybils won |
+| --- | --- | --- |
+| Vouching + on-chain PageRank (up to `21b838d`) | A symmetric function of the attestation graph, personalised by deposits | No symmetric reputation function is sybilproof (Cheng and Friedman 2005), and PageRank in particular is manipulable by Sybil strategies (Cheng and Friedman 2006). Concretely: a uniform fallback made every node a root when no deposits existed, $100 deposits were withdrawable roots, and scores were relative, so a ring of fakes scored about 0.9 and out-borrowed honest users (Hermes, PR #3, rounds 1 to 3). |
+| Stake per vouch + first-loan cap | The same graph, made more expensive | Topology still turned vouches into credit; costs only scaled the attack. |
+| Reviewer proposal: capacity rises 25% of each repaid principal | On-chain repayment history | Theorem 3: a repayment inside the 24-hour interest-free window costs nothing and earns 25, so one recycled seed farms unbounded capacity. |
+
+## 2. Model
+
+Accounts $a \in \mathcal{A}$ are free to create. For each account the contract stores:
+
+| Symbol | Meaning | Contract |
+| --- | --- | --- |
+| $\ell(a)$ | issued line: score × `maxLoanAmount`, from the owner (override) or the oracle | `getCreditScore`, `maxLoanAmount` |
+| $d(a)$ | dues: interest paid on the account's loans, net of the protocol fee | `duesPaid` |
+| $\lambda(a)$ | credit charged to the account as a backer when borrowers it backed defaulted | `creditLoss` |
+| $\delta(a)$ | 1 once the account has defaulted on a loan of its own | `defaultedLoans` |
+| $G(a) = (1-\delta(a))\max(0,\ \ell(a)+d(a)-\lambda(a))$ | granted credit | `grantedCredit` |
+| $s(a),\ s^c(a)$ | stake, and the part committed to backing | `stakeOf`, `stakeCommitted` |
+| $c(a)$ | granted credit committed to backing | `creditCommitted` |
+| $\sigma_e,\ \upsilon_e$ | secured and unsecured amount of backing edge $e=(u\to v)$ | `getBacking` |
+| $o(a)$ | open principal (requested or disbursed, not repaid) | `_outstandingPrincipal` |
+
+Commitments are edge sums: $s^c(u)=\sum_{e\ \text{out of}\ u}\sigma_e$ and $c(u)=\sum_{e\ \text{out of}\ u}\upsilon_e$.
+The coverage of a backer is $\kappa(u)=\min\left(1,\ \max(0,G(u)-o(u))/c(u)\right)$ (1 when $c(u)=0$), and
+
+$$\mathrm{Lim}(v) = (1-\delta(v))\Big[\max\big(0,\ G(v)-c(v)\big) + \sum_{e=(u\to v)} \big(\sigma_e + \upsilon_e\,\kappa(u)\big)\Big].$$
+
+The operations and the checks the contract makes:
+
+- **borrow** $x$: $o(v)+x \le \mathrm{Lim}(v)$.
+- **back** (raise an edge by $x$): $x \le \varphi(u) + (s(u)-s^c(u))$, where the free credit
+  $\varphi(u)=\min\big(G(u)-c(u),\ \mathrm{Lim}(u)-o(u)\big)$ is committed first and stake covers the rest.
+  Received backing is not in $\varphi$, so it cannot be passed on.
+- **cut** an edge: unsecured first, then secured, and afterwards $o(v)\le \mathrm{Lim}(v)$
+  (`BackingInUse`). Committed stake cannot be unstaked (`StakeCommitted`).
+- **default** of a loan with unpaid principal $w$ (anyone, after `LATE_PERIOD`): with
+  $\Sigma\sigma$ and $\Sigma\upsilon$ the borrower's incoming totals, stake
+  $f_s=\min(w,\Sigma\sigma)$ is slashed pro rata and returned to lenders, then
+  $f_c=\min(w-f_s,\Sigma\upsilon)$ is charged pro rata to the unsecured backers' $\lambda$, and the
+  residual $w-f_s-f_c$ falls on lenders. Charged backing is consumed; the rest is released once
+  the borrower has no open loans. The borrower's own $G$ becomes 0.
+
+## 3. Conservation
+
+**Theorem 1 (capacity).** In every state, $\sum_v \mathrm{Lim}(v) \le \sum_a \big(G(a) + s^c(a)\big)$.
+
+*Proof.* Regroup the edge terms of $\sum_v \mathrm{Lim}(v)$ by their source $u$; each $u$
+contributes $\max(0,G(u)-c(u)) + s^c(u) + c(u)\kappa(u)$. If $c(u)\le G(u)$ this is at most
+$G(u)-c(u)+c(u)+s^c(u)$. If $c(u)>G(u)$ it is $c(u)\kappa(u)+s^c(u)\le G(u)+s^c(u)$, because
+$\kappa(u)\le G(u)/c(u)$. $\square$
+
+Theorem 1 is about capacity at an instant. Losses happen over time, while credit is charged,
+burned and released, so the statement that matters needs its own proof.
+
+Let $\Lambda$ be lenders' cumulative realised loss (written-off principal not recovered from
+stake) and $U=\sum_v \max\big(0,\ o^{\mathrm{act}}(v) - \Sigma\sigma_{\mathrm{in}}(v)\big)$ their
+potential loss: disbursed principal not covered by secured backing.
+
+**Theorem 2 (loss bound).** With issued lines fixed, in every reachable state
+$$\Lambda + U \;\le\; \sum_{a}\big(\ell(a) + d(a)\big).$$
+
+*Proof.* For each account define its own residual exposure, the part of its open principal that
+neither secured nor unsecured backing received covers,
+$r(a)=\max\big(0,\ o(a)-\Sigma\sigma_{\mathrm{in}}(a)-\Sigma\upsilon_{\mathrm{in}}(a)\big)$, and its
+realised loss $\Lambda_a$: the credit charged to it as a backer plus the residuals lenders absorbed
+at its own defaults. We show that every operation preserves the per-account invariant
+
+$$Q(a):\qquad r(a) + c(a) + \Lambda_a \;\le\; \ell(a) + d(a).$$
+
+It holds initially (all terms 0 on the left). For an account that has not defaulted,
+$\ell+d-\Lambda_a = \ell+d-\lambda = G$ while $G>0$, so $Q(a)$ reads $r(a)+c(a)\le G(a)$.
+
+- *Borrow.* The check gives $o \le \max(0,G-c) + \Sigma\sigma_{\mathrm{in}} + \Sigma\upsilon_{\mathrm{in}}\kappa$; since $\kappa\le1$, $r\le\max(0,G-c)$, so $r+c\le G$ (and $r=0$ when $G<c$).
+- *Back by $x$ from credit.* $x\le G-c$ and $x \le \mathrm{Lim}-o$. The second gives $o-\Sigma\sigma_{\mathrm{in}}-\Sigma\upsilon_{\mathrm{in}} \le G-c-x$, so after the commitment $r+c+x\le G$.
+- *Cut an incoming edge.* The `BackingInUse` check is the borrow check again. Cutting an outgoing edge lowers $c$.
+- *Charge* (a borrower $u$ backed defaults): $c(u)$ falls by at least the charge and $\lambda(u)=\Lambda_u$ rises by it. The left side does not rise.
+- *Default* of $v$'s loan $w$. Using $f_s,f_c$ above and $X=o-\Sigma\sigma_{\mathrm{in}}$, a case check over $X\le\Sigma\upsilon_{\mathrm{in}}$, $w-f_s\le \Sigma\upsilon_{\mathrm{in}}<X$ and $w-f_s>\Sigma\upsilon_{\mathrm{in}}$ shows $r'(v) + (w-f_s-f_c) = r(v)$: the residual lenders absorb is exactly the residual that leaves $r(v)$, and it enters $\Lambda_v$. After the default $Q(v)$ is in terms of $\ell+d$, not $G$, so burning $G(v)$ to 0 does not break it, and a defaulted account can neither borrow nor commit.
+- *Repay, dues.* $r$ falls; $d$ rises.
+
+Summing, $\Lambda=\sum_a\Lambda_a$ (slashed stake is recovered, every other unit of a default is
+either charged to a backer or a residual of the defaulter), and
+$U\le\sum_v\big(r(v)+\Sigma\upsilon_{\mathrm{in}}(v)\big)=\sum_a\big(r(a)+c(a)\big)$. Hence
+$\Lambda+U\le\sum_a(\ell(a)+d(a))$. $\square$
+
+Pro-rata rounding can leave a few wei per default uncharged; they fall on lenders.
+
+**Corollary (Sybil-proofness as a min-cut).** Let an attacker control any set $S$ of accounts.
+Lenders' losses on loans to $S$ are at most
+$$\sum_{a\in S}\big(\ell(a)+d(a)\big) \;+\; \sum_{e:\ \mathcal{A}\setminus S\ \to\ S} \upsilon_e,$$
+and honest backers lose at most what they committed to $S$ ($\sigma_e+\upsilon_e$ on those
+edges). Fresh accounts have $\ell=d=0$, so the bound is independent of $|S|$: it is the capacity
+of the cut between the attacker's accounts and everyone else, the same quantity that bounds
+Sybil influence in credit networks and in SybilLimit-style defences, where it is the attack edges.
+
+*The role of coverage $\kappa$.* The proof uses only $\kappa\le1$, so with fixed lines the bound
+would hold even with $\kappa=1$. Coverage matters when the issuer revises a line downward, or a
+backer defaults: it stops new borrowing against credit that is no longer there, so the bound holds
+with the line in force at the time each exposure is created (CI-15).
+
+**Machine checks.** `test/invariant/CreditConservation.invariant.t.sol` checks Theorems 1 and 2,
+Sybil independence and solvency under random interleavings of every operation, including
+defaults; `SybilResistance.t.sol` pins the named attacks.
+
+### What is left to attack
+
+Theorem 2 does not say nothing can go wrong. It says where an attacker has to go:
+
+| Target | What the attacker gets | Bound |
+| --- | --- | --- |
+| Fresh accounts, rings, wash trades | nothing | $\ell=d=s=0$ |
+| An honest backer (persuade, bribe, impersonate a friend) | what that backer commits to the attacker's accounts | the backer's own choice; charged to the backer |
+| The issuer (fool its policy, buy identities it trusts, compromise the oracle) | the lines it issues to the attacker | the issuance budget (and, with CI-17, the issuer's capital first) |
+| Governance (the owner key) | anything: overrides, `maxLoanAmount`, the provider | none on-chain today (CI-6) |
+
+So the protocol's security reduces to issuance and governance, which is where it should be: those
+are the only places credit is created. The rest of this document is about making issuance safe.
+
+**A trilemma.** Free identities, unsecured credit from history beyond dues, and a bounded loss:
+any protocol can have at most two (Theorem 3 for the third pair). This protocol keeps free
+identities and the bound, and gets history-based credit beyond dues only through an issuer who
+adds an identity cost or capital.
+
+## 4. Where credit can come from
+
+Theorem 2 moves the whole question to the right-hand side: $\ell$ and $d$. Whoever can raise them
+can create losses. There are three candidates, and the protocol treats each according to what
+backs it.
+
+### 4.1 History: the dues bound
+
+A history rule $f$ maps an account's on-chain record $h$ (loans taken and repaid) to extra
+credit. Write $\pi(h)$ for the value the history transferred to lenders: interest paid net of the
+protocol fee.
+
+**Theorem 3 (farming).** Suppose identities are free, and some history $h$ that a fresh account
+can complete using recyclable capital (capital returned at the end of $h$) has $f(h) > \pi(h)$.
+Then for every $n$ an attacker with that capital can complete $h$ on $n$ fresh accounts in turn and
+default on all of them, for profit at least $n\,\big(f(h)-\pi(h)\big)$.
+
+*Proof.* Secured backing makes $h$ reachable with recyclable capital: stake $K$, back fresh
+account $i$ with it, let $i$ borrow and repay, withdraw the backing (allowed once $i$ owes
+nothing) and repeat with $i+1$. The stake is never slashed. Each account ends with $f(h)$ of credit
+of its own and has paid $\pi(h)$; borrowing $f(h)$ and defaulting nets $f(h)-\pi(h)$ per account. $\square$
+
+**Corollary.** Absent identity costs, the largest history rule for which Theorem 2 still holds is
+$f(h)=\pi(h)$: it is safe (it is $d$ in Theorem 2, so earned credit adds no net lender loss),
+and any rule exceeding it on a reproducible history is farmable. This is the on-chain form of
+Friedman and Resnick's (2001) "pay your dues" result for cheap pseudonyms and of Bulow and
+Rogoff's (1989) result that lending cannot rest on reputation alone, only on sanctions: here
+walking away is creating a new address, and there is nothing to sanction. Friedman and Resnick
+also show the dues cost disappears only with identities that cannot be replaced (issued once per
+person by a trusted party), which is exactly the identity-cost route of 4.2. Resnick and Sami
+(2009) show the same tension for transitive trust in general: a protocol that is sybilproof in
+their sense must sometimes refuse transactions that are profitable in expectation. The dues bound
+is that cost, made explicit and minimal.
+
+*The reviewer's rule, concretely.* Under "capacity rises by 25% of repaid principal, up to 100",
+seed $K=100$ of stake and four borrow-and-repay cycles inside the 24-hour interest-free window give
+a fresh account 100 of its own capacity at a cost of gas. With $n$ accounts the attacker extracts
+$100n$ and the seed is never at risk. Thirty-day cycles cost about 0.77 each and change nothing.
+The same holds if an oracle reads `completedLoans` and grants credit for it: the policy, not the
+venue, is what is farmable. `analysis/sybil_sim` reproduces this for every mechanism.
+
+**What the protocol does.** `duesPaid[borrower]` accumulates the interest part of every
+repayment net of the protocol fee and is added to granted credit. A borrower who has paid 30 USDC
+of interest has 30 USDC more credit of their own; to extract it by defaulting they must first have
+given it to lenders. It is lost on default, like everything else the account holds. This is
+deliberately small: it is a floor anyone can reach without permission, not the main source of
+credit.
+
+### 4.2 Identity cost and institutions
+
+If obtaining an identity costs $k$ (a proof of personhood, a KYC check, the expected penalty for
+fraud), a profit-seeking attacker gains nothing from history credit up to $\pi(h)+k$ per
+identity. That is an incentive bound, not a loss bound: a griefing attacker can still cost lenders
+$k$ per identity. So credit beyond dues is a decision someone must be accountable for. That
+someone is the issuer: the owner through overrides or, in production, the oracle that the CRE
+workflow feeds. History, repayment timeliness and identity are the information the issuer uses;
+the issuer converts information into lines and answers for the result.
+
+Diamond (1984) is the standard account of why this works only if the issuer bears the loss of its
+own judgement: a delegated monitor needs a contract that makes misreporting costly. The protocol
+implements the first half and specifies the second:
+
+- **Issuance budget (implemented).** `OracleScoreProvider` keeps the sum of the scores it has
+  published and rejects a report that would take the total above `maxTotalScore`. Total
+  oracle-issued credit is therefore at most `maxTotalScore` × `maxLoanAmount` / `SCALE`, and by
+  Theorem 2 so is lenders' exposure to the oracle. A compromised workflow can misallocate its
+  budget; it cannot mint beyond it. This is the bound the reviewer asked for ("a compromised
+  workflow can misallocate but cannot mint credit"), stated in terms Theorem 2 makes exact.
+- **Pooled first-loss capital (implemented).** Anyone, typically an institution or the operator
+  standing behind the lines it issues, can add to the first-loss reserve with `fundReserve`. It
+  pays default losses before lenders and is never returned to the payer.
+- **Issuer first-loss capital (specified, CI-17).** Losses that Theorem 2 attributes to credit an
+  issuer created ($\Lambda_a$ for accounts whose $\ell$ it set) are charged to capital the issuer
+  posts before they reach lenders, with the budget a governance-set multiple of that capital.
+  Lenders' exposure to an issuer is then budget minus capital, priced explicitly.
+
+### 4.3 Stake
+
+Stake is cash. It is the only source that recovers money for lenders on default, and it carries
+no identity assumption at all.
+
+## 5. What backing is worth to lenders
+
+Burning a backer's credit recovers nothing. For lenders, loss given default on an
+unsecured-backed loan is the same as on an unbacked one; what backing changes is the probability
+of default, because a backer who loses credit when the borrower defaults screens and monitors
+(Stiglitz 1990; Besley and Coate 1995; Ghatak and Guinnane 1999). Two consequences:
+
+- Lenders' protection is stake (secured backing) and the **first-loss reserve**: `reserveBps` of
+  every interest payment accumulates in `firstLossReserve`, which pays the uncovered part of each
+  default before it reaches the share price. Sizing is in `analysis/credit_risk` (Vasicek one-factor
+  model, Monte Carlo for small pools).
+- A single APR for secured and unsecured exposure overprices the first and may underprice the
+  second; risk-based pricing by the secured share is a natural next step (CI-18).
+
+## 6. Generalisation: multi-hop credit
+
+The protocol forbids passing on received backing. That is the one-hop restriction of a credit
+network, where Avery's line to Brighton and Brighton's line to Carlos together let Carlos borrow
+along the path: borrowing capacity between two agents is the max-flow between them, and a default
+is paid along the path, each intermediary compensating the next and losing the link to the
+defaulter (Karlan et al. 2009). The bound of Theorem 2 survives (every edge is still a commitment
+of its source's own credit), and Dandekar et al. (2011) show such networks keep liquidity within a
+constant factor of a central currency on well-connected graphs; Ramseyer, Goel and Mazières (2020)
+add aggregate borrowing limits per agent that bound what a defaulting coalition can cost the rest.
+Multi-hop routing would raise honest liquidity, at the cost of path selection on-chain or a
+routing proof from the caller. It is the right extension once one-hop backing is in use.
+
+## 7. Lender fairness
+
+Without provisioning, a loan past due is carried at full value until `markDefaulted`, 30 days
+later. A lender who exits in that window escapes a loss that is already visible: with overdue
+unsecured exposure $X$ in a pool of $A$, a lender holding share $w$ who exits leaves their part of
+$X$, $wX$, to those who stay, and every lender who can see the overdue loan has the same incentive
+to go first (the run logic of Diamond and Dybvig 1983). `impairLoan`, callable by anyone once a
+loan is past due, removes the unpaid principal not covered by secured backing from `totalAssets`
+(expected-loss provisioning in the IFRS 9 / CECL sense, with unsecured exposure treated as fully
+lost). Exits after that pay the loss pro rata; repayment reverses the provision and the default
+only confirms it. With several open loans per borrower each loan counts the borrower's whole
+secured backing, so the provision can be low; the default settles the exact loss.
+
+## 8. Requirements mapped to results
+
+| Requirement (Scott, Hermes) | Status |
+| --- | --- |
+| Borrow only with credit of your own or credit someone who has it backs you with | Theorem 1, enforced on every borrow |
+| A ring's credit is bounded by what enters it from outside | Corollary to Theorem 2 (min-cut) |
+| Vouching locks the voucher's capacity; default costs the voucher | `back` commits; Theorem 2's charge step |
+| No credit from nothing; no uniform fallback | $\ell=d=s=0 \Rightarrow$ zero capacity; no fallback exists |
+| Repayment grows capacity | Only as dues (Theorem 3 shows larger on-chain rules are farmable); larger lines via issuers |
+| Oracle cannot mint beyond an on-chain bound | Issuance budget in `OracleScoreProvider` |
+| First-loss reserve | `firstLossReserve` |
+| Default plus run never favours the first exiter | `impairLoan` once past due (CI-8) |
+
+## References
+
+- Besley, T. and Coate, S. (1995). Group lending, repayment incentives and social collateral. *Journal of Development Economics* 46(1).
+- Bulow, J. and Rogoff, K. (1989). Sovereign debt: is to forgive to forget? *American Economic Review* 79(1).
+- Cheng, A. and Friedman, E. (2005). Sybilproof reputation mechanisms. *ACM SIGCOMM Workshop on Economics of Peer-to-Peer Systems (P2PECON)*.
+- Cheng, A. and Friedman, E. (2006). Manipulability of PageRank under Sybil strategies. *Workshop on the Economics of Networked Systems (NetEcon)*.
+- Dandekar, P., Goel, A., Govindan, R. and Post, I. (2011). Liquidity in credit networks: a little trust goes a long way. *ACM EC*.
+- Diamond, D. (1984). Financial intermediation and delegated monitoring. *Review of Economic Studies* 51(3).
+- Diamond, D. and Dybvig, P. (1983). Bank runs, deposit insurance, and liquidity. *Journal of Political Economy* 91(3).
+- Douceur, J. (2002). The Sybil attack. *IPTPS*.
+- Friedman, E. and Resnick, P. (2001). The social cost of cheap pseudonyms. *Journal of Economics and Management Strategy* 10(2).
+- Ghatak, M. and Guinnane, T. (1999). The economics of lending with joint liability: theory and practice. *Journal of Development Economics* 60(1).
+- Karlan, D., Möbius, M., Rosenblat, T. and Szeidl, A. (2009). Trust and social collateral. *Quarterly Journal of Economics* 124(3).
+- Litos, O. S. T. and Zindros, D. (2017). Trust is risk: a decentralized financial trust platform. *Financial Cryptography and Data Security*.
+- Ramseyer, G., Goel, A. and Mazières, D. (2020). Liquidity in credit networks with constrained agents. *The Web Conference (WWW)*.
+- Resnick, P. and Sami, R. (2009). Sybilproof transitive trust protocols. *ACM EC*.
+- Stiglitz, J. (1990). Peer monitoring and credit markets. *World Bank Economic Review* 4(3).
+- Vasicek, O. (2002). The distribution of loan portfolio value. *Risk* 15(12).
+- Yu, H., Gibbons, P., Kaminsky, M. and Xiao, F. (2008). SybilLimit: a near-optimal social network defense against Sybil attacks. *IEEE Symposium on Security and Privacy*.
