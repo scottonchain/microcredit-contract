@@ -452,7 +452,7 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         vm.prank(borrower);
         credit.requestLoan(390e6);
 
-        (, uint256 available,,) = credit.getPoolInfo();
+        (, uint256 available,,) = lens.getPoolInfo();
         assertEq(available, 0);
     }
 

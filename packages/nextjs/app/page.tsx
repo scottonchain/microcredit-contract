@@ -54,7 +54,7 @@ const Home: NextPage = () => {
   const totalRatePct = totalRateBp !== undefined ? (totalRateBp / 100).toFixed(2) : undefined;
 
   const { data: poolApyBp } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
+    contractName: "MicrocreditLens",
     functionName: "getFundingPoolAPY",
   });
   const apyDisplay = poolApyBp !== undefined ? `${(Number(poolApyBp) / 100).toFixed(2)}%` : "—";

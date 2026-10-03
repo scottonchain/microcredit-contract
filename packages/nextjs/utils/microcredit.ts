@@ -8,6 +8,9 @@ const deployment = deployedContracts[CHAIN_ID];
 
 export const MICROCREDIT_ADDRESS = deployment.DecentralizedMicrocredit.address as `0x${string}`;
 export const MICROCREDIT_ABI = deployment.DecentralizedMicrocredit.abi;
+/** MicrocreditLens: read-only views derived from the pool's state (kept out of the pool for size). */
+export const LENS_ADDRESS = deployment.MicrocreditLens.address as `0x${string}`;
+export const LENS_ABI = deployment.MicrocreditLens.abi;
 export const USDC_ADDRESS = deployment.MockUSDC?.address as `0x${string}` | undefined;
 export const USDC_ABI = deployment.MockUSDC?.abi;
 /** OracleScoreProvider ABI. Read its live address from DecentralizedMicrocredit.scoreProvider(). */

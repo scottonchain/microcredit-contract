@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import { Test } from "forge-std/Test.sol";
 import { DecentralizedMicrocredit } from "../../contracts/DecentralizedMicrocredit.sol";
+import { MicrocreditLens } from "../../contracts/MicrocreditLens.sol";
 import { MockUSDC } from "../../contracts/MockUSDC.sol";
 import { ICreditUsage, OracleScoreProvider } from "../../contracts/OracleScoreProvider.sol";
 
@@ -15,6 +16,7 @@ import { ICreditUsage, OracleScoreProvider } from "../../contracts/OracleScorePr
  */
 abstract contract MicrocreditTestBase is Test {
     DecentralizedMicrocredit internal credit;
+    MicrocreditLens internal lens;
     MockUSDC internal usdc;
     OracleScoreProvider internal scores;
     uint64 internal scoreEpoch;
@@ -51,6 +53,7 @@ abstract contract MicrocreditTestBase is Test {
         usdc = new MockUSDC();
         vm.prank(owner);
         credit = new DecentralizedMicrocredit(effrRate, riskPremium, maxLoanAmount, address(usdc), oracle);
+        lens = new MicrocreditLens(credit);
         scores = new OracleScoreProvider(owner, oracle, MAX_SCORE_AGE, ISSUANCE_BUDGET);
         vm.startPrank(owner);
         credit.setScoreProvider(scores);

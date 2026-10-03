@@ -96,6 +96,10 @@ Borrowers/lenders/attesters sign typed messages; relayers submit on-chain. Entry
 
 The Next.js API routes at `packages/nextjs/app/api/meta/*` (`back`, `borrow`, `deposit`, `repay-one`, `request-withdrawal`) act as relayers on top of `app/api/meta/relayer.ts`, which resolves the relayer account (`RELAYER_PRIVATE_KEY`, or Anvil's first unlocked account locally), simulates, submits, waits for the receipt and decodes events.
 
+### MicrocreditLens
+
+Stateless read-only views derived from the pool's public state, kept out of `DecentralizedMicrocredit` because the pool is near the EIP-170 size limit (23,913 of 24,576 bytes; CI-26): `getFundingPoolAPY`, `getPoolInfo`, `previewLoanTerms`, `getOutstandingRoundedToCent`, `maxWithdrawable`. Every deploy script deploys one next to the pool. Put new derived views here, not in the pool.
+
 ### MockUSDC
 
 ERC20 + ERC20Permit with 6 decimals, free-mint (no access control). Used for local/test deployments only.
@@ -120,7 +124,7 @@ Demo wallet mode (`NEXT_PUBLIC_DEMO_WALLET=true`, set automatically by `yarn dem
 
 ## Deployment
 
-`packages/foundry/script/Deploy.s.sol` (local only; broadcasts with Anvil's published keys) deploys MockUSDC (unless `deployment-config.json` points at a live token) and `DecentralizedMicrocredit` with EFFR=433 bps, risk premium=500 bps, maxLoan=100 USDC. It seeds a 10,000 USDC pool, deploys `OracleScoreProvider` (reporter Alexis, 7-day `maxScoreAge`, issuance budget of 50 full lines) and sets it as the score provider, sets the reserve share to 30% of interest, opens background loans for Diana and Eve (89% utilisation), grants credit with score overrides to Alexis (admin, account 9, 95 USDC), Avery (backer, account 2, 92 USDC) and Brighton (borrower, account 3, 25 USDC), sets display names for Avery and Brighton (borrower, account 3), and sends ETH to three demo wallets. `yarn deploy` (`scripts-js/parseArgs.js`) then runs `generateTsAbis.js` to regenerate `packages/nextjs/contracts/deployedContracts.ts`; commit that file when the ABI changes.
+`packages/foundry/script/Deploy.s.sol` (local only; broadcasts with Anvil's published keys) deploys MockUSDC (unless `deployment-config.json` points at a live token), `DecentralizedMicrocredit` and its `MicrocreditLens`, with EFFR=433 bps, risk premium=500 bps, maxLoan=100 USDC. It seeds a 10,000 USDC pool, deploys `OracleScoreProvider` (reporter Alexis, 7-day `maxScoreAge`, issuance budget of 50 full lines) and sets it as the score provider, sets the reserve share to 30% of interest, opens background loans for Diana and Eve (89% utilisation), grants credit with score overrides to Alexis (admin, account 9, 95 USDC), Avery (backer, account 2, 92 USDC) and Brighton (borrower, account 3, 25 USDC), sets display names for Avery and Brighton (borrower, account 3), and sends ETH to three demo wallets. `yarn deploy` (`scripts-js/parseArgs.js`) then runs `generateTsAbis.js` to regenerate `packages/nextjs/contracts/deployedContracts.ts`; commit that file when the ABI changes.
 
 `packages/foundry/script/DeployProduction.s.sol` is the production path: env-configured (calibrated defaults), deploys a self-administered `TimelockController` for an ADMIN multisig and starts the ownership handover of both contracts to it; it only simulates unless run with `--broadcast`, which happens only after the approvals in `docs/DEPLOYMENT.md`. `test/DeployProduction.t.sol` runs it in-process.
 

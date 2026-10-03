@@ -1582,19 +1582,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getFundingPoolAPY",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "getLenders",
           inputs: [],
           outputs: [
@@ -1691,53 +1678,6 @@ const deployedContracts = {
             },
             {
               name: "dueAt",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "getOutstandingRoundedToCent",
-          inputs: [
-            {
-              name: "loanId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "getPoolInfo",
-          inputs: [],
-          outputs: [
-            {
-              name: "_totalAssets",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "_availableFunds",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "_reservedFunds",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "_lenderCount",
               type: "uint256",
               internalType: "uint256",
             },
@@ -1952,25 +1892,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "maxWithdrawable",
-          inputs: [
-            {
-              name: "lender",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "nonces",
           inputs: [
             {
@@ -2043,40 +1964,6 @@ const deployedContracts = {
               name: "",
               type: "address",
               internalType: "address",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "previewLoanTerms",
-          inputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-            {
-              name: "principal",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "repaymentPeriod",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [
-            {
-              name: "interestRate",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "payment",
-              type: "uint256",
-              internalType: "uint256",
             },
           ],
           stateMutability: "view",
@@ -3977,8 +3864,151 @@ const deployedContracts = {
       ],
       inheritedFunctions: {},
     },
-    OracleScoreProvider: {
+    MicrocreditLens: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
+      abi: [
+        {
+          type: "constructor",
+          inputs: [
+            {
+              name: "credit_",
+              type: "address",
+              internalType: "contract DecentralizedMicrocredit",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "credit",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract DecentralizedMicrocredit",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getFundingPoolAPY",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getOutstandingRoundedToCent",
+          inputs: [
+            {
+              name: "loanId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getPoolInfo",
+          inputs: [],
+          outputs: [
+            {
+              name: "totalAssets",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "availableFunds",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "reservedFunds",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "lenderCount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "maxWithdrawable",
+          inputs: [
+            {
+              name: "lender",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "previewLoanTerms",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "principal",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "repaymentPeriod",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "interestRate",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "payment",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+      ],
+      inheritedFunctions: {},
+    },
+    OracleScoreProvider: {
+      address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
       abi: [
         {
           type: "constructor",

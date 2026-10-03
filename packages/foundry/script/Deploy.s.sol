@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import { Script, console } from "forge-std/Script.sol";
 import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
+import { MicrocreditLens } from "../contracts/MicrocreditLens.sol";
 import { MockUSDC } from "../contracts/MockUSDC.sol";
 import { ICreditUsage, OracleScoreProvider } from "../contracts/OracleScoreProvider.sol";
 
@@ -44,6 +45,7 @@ contract DeployScript is Script {
         address usdc = _resolveUsdc();
         credit = new DecentralizedMicrocredit(EFFR_BPS, RISK_PREMIUM_BPS, MAX_LOAN, usdc, alexis);
         console.log("DecentralizedMicrocredit deployed at:", address(credit));
+        console.log("MicrocreditLens deployed at:", address(new MicrocreditLens(credit)));
 
         OracleScoreProvider scores = new OracleScoreProvider(alexis, alexis, MAX_SCORE_AGE, ISSUANCE_BUDGET);
         credit.setScoreProvider(scores);

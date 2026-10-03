@@ -171,7 +171,7 @@ contract ShareAccountingTest is MicrocreditTestBase {
 
         assertEq(credit.protocolFees(), 1e6);
         assertApproxEqAbs(credit.lenderBalance(alice), 1_009e6, DUST);
-        assertEq(credit.getFundingPoolAPY(), 0, "nothing lent");
+        assertEq(lens.getFundingPoolAPY(), 0, "nothing lent");
 
         vm.prank(owner);
         credit.claimProtocolFees(treasury, 1e6);
@@ -190,7 +190,7 @@ contract ShareAccountingTest is MicrocreditTestBase {
         assertApproxEqAbs(usdc.balanceOf(alice), 1_009e6, DUST);
         assertGe(usdc.balanceOf(address(credit)), credit.protocolFees());
 
-        (, uint256 available,,) = credit.getPoolInfo();
+        (, uint256 available,,) = lens.getPoolInfo();
         assertLe(available, DUST);
     }
 
@@ -222,7 +222,7 @@ contract ShareAccountingTest is MicrocreditTestBase {
         credit.setProtocolFeeBps(1_000);
         _deposit(alice, 1_000e6);
         _openLoan(500e6); // 50% utilisation of a 10% APR pool = 5% gross
-        assertEq(credit.getFundingPoolAPY(), 450);
+        assertEq(lens.getFundingPoolAPY(), 450);
     }
 
     // ───────────────────────────── impairment (run fairness) ─────────────────────────────
@@ -301,15 +301,15 @@ contract ShareAccountingTest is MicrocreditTestBase {
     function testMaxWithdrawableIsWhatWithdrawFundsPays() public {
         _deposit(alice, 500e6);
         _deposit(bob, 500e6);
-        assertApproxEqAbs(credit.maxWithdrawable(alice), 500e6, DUST);
+        assertApproxEqAbs(lens.maxWithdrawable(alice), 500e6, DUST);
 
         _openLoan(900e6); // 100 USDC left in cash
-        assertEq(credit.maxWithdrawable(alice), 100e6, "capped by the cash on hand");
+        assertEq(lens.maxWithdrawable(alice), 100e6, "capped by the cash on hand");
 
-        uint256 max = credit.maxWithdrawable(alice);
+        uint256 max = lens.maxWithdrawable(alice);
         vm.prank(alice);
         credit.withdrawFunds(max);
-        assertEq(credit.maxWithdrawable(bob), 0);
+        assertEq(lens.maxWithdrawable(bob), 0);
         vm.prank(bob);
         vm.expectRevert(DecentralizedMicrocredit.InsufficientLiquidity.selector);
         credit.withdrawFunds(1);
@@ -321,7 +321,7 @@ contract ShareAccountingTest is MicrocreditTestBase {
         vm.warp(vm.getBlockTimestamp() + 30 days);
         _repay(loanId, credit.getCurrentOutstandingAmount(loanId));
         assertEq(credit.getCurrentOutstandingAmount(loanId), 0);
-        assertEq(credit.getOutstandingRoundedToCent(loanId), 0);
+        assertEq(lens.getOutstandingRoundedToCent(loanId), 0);
     }
 
     // ───────────────────────────── share price integrity ─────────────────────────────

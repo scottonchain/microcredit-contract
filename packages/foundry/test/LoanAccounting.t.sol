@@ -50,7 +50,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
         uint256 loanId = _openLoan(PRINCIPAL);
         vm.warp(vm.getBlockTimestamp() + 10 days);
         uint256 exact = credit.getCurrentOutstandingAmount(loanId);
-        uint256 rounded = credit.getOutstandingRoundedToCent(loanId);
+        uint256 rounded = lens.getOutstandingRoundedToCent(loanId);
         assertEq(rounded % 10_000, 0);
         assertLe(rounded > exact ? rounded - exact : exact - rounded, 5_000);
     }
@@ -153,7 +153,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
             owed = credit.getCurrentOutstandingAmount(loanId);
             if (owed % 10_000 != 0 && owed % 10_000 < 5_000) break;
         }
-        uint256 rounded = credit.getOutstandingRoundedToCent(loanId);
+        uint256 rounded = lens.getOutstandingRoundedToCent(loanId);
         assertLt(rounded, owed, "fixture should round down");
         usdc.mint(borrower, rounded - PRINCIPAL);
 
@@ -216,17 +216,17 @@ contract LoanAccountingTest is MicrocreditTestBase {
     // ───────────────────────────── pool views ─────────────────────────────
 
     function testFundingPoolApyScalesWithUtilisation() public {
-        assertEq(credit.getFundingPoolAPY(), 0, "nothing lent yet");
+        assertEq(lens.getFundingPoolAPY(), 0, "nothing lent yet");
         vm.prank(owner);
         credit.setMaxLoanAmount(50_000e6);
         _openLoan(50_000e6); // 50% of the pool
-        assertEq(credit.getFundingPoolAPY(), RATE / 2);
+        assertEq(lens.getFundingPoolAPY(), RATE / 2);
     }
 
     function testPoolInfoExcludesReservedFunds() public {
         vm.prank(borrower);
         credit.requestLoan(PRINCIPAL); // reserved, not yet disbursed
-        (uint256 deposits, uint256 available, uint256 reserved, uint256 lenders) = credit.getPoolInfo();
+        (uint256 deposits, uint256 available, uint256 reserved, uint256 lenders) = lens.getPoolInfo();
         assertEq(deposits, 100_000e6);
         assertEq(reserved, PRINCIPAL);
         assertEq(available, 100_000e6 - PRINCIPAL);
@@ -234,13 +234,13 @@ contract LoanAccountingTest is MicrocreditTestBase {
     }
 
     function testPreviewLoanTermsUnderOneWeekIsOnePayment() public view {
-        (, uint256 payment) = credit.previewLoanTerms(borrower, 1_000e6, 3 days);
+        (, uint256 payment) = lens.previewLoanTerms(borrower, 1_000e6, 3 days);
         uint256 interest = (1_000e6 * RATE * 3 days) / (10_000 * 365 days);
         assertEq(payment, 1_000e6 + interest);
     }
 
     function testPreviewLoanTermsUsesPlatformRate() public view {
-        (uint256 rate, uint256 weekly) = credit.previewLoanTerms(borrower, 1_000e6, 28 days);
+        (uint256 rate, uint256 weekly) = lens.previewLoanTerms(borrower, 1_000e6, 28 days);
         assertEq(rate, RATE);
         uint256 interest = (1_000e6 * RATE * 28 days) / (10_000 * 365 days);
         assertEq(weekly, (1_000e6 + interest) / 4);
