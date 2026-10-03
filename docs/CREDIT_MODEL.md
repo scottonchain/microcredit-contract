@@ -373,7 +373,29 @@ only confirms it. With a first-loss reserve, provisions up to its size are absor
 and the share price does not move at all. With several open loans per borrower each loan counts the borrower's whole
 secured backing, so the provision can be low; the default settles the exact loss.
 
-## 8. Requirements mapped to results
+## 8. Assumptions and limits
+
+What the theorems do not say:
+
+- **Principal, not interest.** The bounds are on principal. Accrued interest a defaulter never pays
+  is lost income, priced by the premium (section 5), not a loss the theorems bound.
+- **Issuers are trusted up to their budget.** Theorem 2 bounds losses by issued lines; whether
+  the issuer's lines are wise is the issuer's problem, bounded on-chain by the budget and, once
+  CI-17 lands, by its capital. Owner overrides are not budgeted (CI-6).
+- **Lines fixed, or Theorem 2'.** With lines that change, the bound is on each account's highest
+  line in its current cycle; the oracle budget is charged that way, owner overrides are not.
+- **Rounding.** Pro-rata charging leaves at most a few wei per edge per default on lenders, and
+  sub-cent balances are forgiven at closing (absorbed by the reserve first). The invariant suite
+  carries both explicitly.
+- **The token.** USDC is assumed to transfer as specified. A blocklisted lender or borrower cannot
+  move funds; a depeg moves every figure together. Neither creates credit.
+- **Ordering.** A backer cutting a backing and a borrower drawing on it can race in one block;
+  each transaction is checked against the state it sees, so either order keeps every invariant.
+- **Information, not just incentives.** Unsecured backing lowers PD only if backers screen and
+  monitor. The protocol makes them bear the loss; it cannot make them diligent (section 5).
+- **The pooled reserve** leaves the stress-time loss transfer of CI-21.
+
+## 9. Requirements mapped to results
 
 | Requirement (Scott, Hermes) | Status |
 | --- | --- |
