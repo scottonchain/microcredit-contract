@@ -10,9 +10,11 @@ the fixing commit and the regression test that proves it.
 credit that someone who holds credit commits to it from their own. Credit comes from exactly two
 sources:
 
-- **Granted credit:** the account's credit score (admin override, or published by the oracle
-  through `IScoreProvider`) × `maxLoanAmount`, less `creditLoss`. This is the only unsecured
-  credit, and only the owner or the oracle can create it.
+- **Granted credit:** the account's issued line (credit score from an admin override, or published
+  by the oracle through `IScoreProvider`, × `maxLoanAmount`) plus the dues it has paid (interest
+  net of the protocol fee, `duesPaid`), less `creditLoss`. Only the owner or the oracle can issue
+  lines, and the oracle only within its issuance budget; dues are credit the account has already
+  paid lenders for.
 - **Stake:** USDC the account locks in the contract (`stake`). Secured.
 
 Backing (`back` / `backMeta`) moves credit from a backer to a borrower. The backer's free granted
@@ -24,22 +26,30 @@ If a backed borrower defaults, the backers pay first: committed stake is slashed
 and committed credit is burned from the backer's granted credit (`creditLoss`), so a guarantor
 cannot back the same loss twice.
 
+The formal statement and proofs (lenders' realised plus potential loss never exceeds issued lines
+plus dues paid; history can earn no more than dues without an accountable issuer) are in
+[`CREDIT_MODEL.md`](CREDIT_MODEL.md).
+
 ## Open issues
 
 | ID | Issue | Source | Status |
 | --- | --- | --- | --- |
-| CI-4 | In the demo video Brighton already has credit, from previous activity or because an institution gave it to him; it is not money he staked, and Avery's attestation should not be what creates it. Until now every deploy script gave Brighton no credit of his own, so his whole limit came from Avery's attestation at no cost to her (the CI-1 path). | User, 2026-10-03 (LinkedIn video) | **Fixed in the model and the demo:** Brighton now starts with a 25 USDC granted line (score override standing in for history or an institution) and Avery backs him with 50 USDC of her own credit, which leaves her limit. Still to do: step through the video itself, which is blocked until `dms.licdn.com` is allowed in the environment's network settings. |
-| CI-5 | Repayment history does not raise a limit. Credit earned from history is granted credit: it must come from the oracle's or an institution's grant (which can read `completedLoans`), never be created automatically on-chain. | Hermes on #3: round 1 item 5; user, 2026-10-03 | Open (oracle policy and the CRE workflow) |
-| CI-6 | Unsecured credit exists only where the owner or oracle grants it, so their keys and the provider are the trust root. | Design consequence of the invariant | Open: Ownable2Step, timelock and bounds on overrides and provider changes |
-| CI-7 | No first-loss reserve: unsecured backing defaults fall on lenders immediately. | Hermes on #3: round 2 item 3 | Open |
-| CI-8 | No invariant tests for conservation: total capacity ≤ Σ granted + Σ stake; lender claims ≤ `totalAssets`; a default plus a run never lets the first exiter take more than pro rata. | Hermes on #3: round 2 item 5 | Open |
+| CI-6 | Unsecured credit exists only where the owner or oracle issues it, so their keys are the trust root. By Theorem 2 lenders' worst case is the sum of issued lines. | Design consequence of the invariant | Partly fixed in c52610a: the oracle's issuance is budgeted (`maxTotalScore`, `maxIncreasePerReport`). Open: owner overrides are unbudgeted, raising `maxLoanAmount` scales every line, and the lending contract still has a single-step owner (Ownable2Step, timelock). |
 | CI-9 | Lenders cannot see what they can withdraw (`maxWithdrawable`) or the pool's utilisation and realised yield. | Hermes on #3: round 1 items 2 and 6, round 2 item 4 | Open |
 | CI-10 | `getCurrentOutstandingAmount` reverts for closed loans; views should return 0. | Hermes on #3: round 1 item 4 | Open |
+| CI-17 | Issued credit has no first-loss capital behind it: an issuer that misjudges (or is fooled by bought identities) loses nothing. Delegated monitoring needs the monitor to bear the loss (Diamond 1984). | CREDIT_MODEL.md section 4.2 | Open, specified: lines in USDC per issuer, issuer capital charged first for losses Theorem 2 attributes to its lines, budget a multiple of capital. |
+| CI-18 | One APR for secured and unsecured principal: stake-secured exposure has no loss given default but pays the full risk premium. | CREDIT_MODEL.md section 5 | Open: price the premium on the unsecured share. |
+| CI-19 | The oracle's scoring policy must obey Theorem 3: no credit derived from the backing graph or from repayment counts, which fresh accounts produce at no cost. The CRE workflow is not written yet. | CREDIT_MODEL.md section 4 | Open (policy requirement for the workflow) |
+| CI-20 | Backing is one hop; honest liquidity would rise with multi-hop credit-network routing (bound preserved). | CREDIT_MODEL.md section 6 | Open (enhancement) |
 
 ## Closed issues
 
 | ID | Issue | Source | Fix | Regression test |
 | --- | --- | --- | --- | --- |
+| CI-4 | The demo video: whoever vouches must already hold credit (from previous activity or because an institution gave it), not necessarily money, and vouching must not create credit. In the old UI shown in the video, Avery (92% score) attested for Brighton at 80% confidence and Brighton's limit rose from $0 to $89.48 while Avery kept all of hers: the attestation copied credit (CI-1, CI-3). | User, 2026-10-03 (LinkedIn video, frames reviewed) | cf4ade6: backing commits the backer's own granted credit (issued line or dues) or stake, and the backer's capacity falls by what the borrower gains. Deploy gives Avery 92 USDC and Brighton 25 USDC of issued credit; Avery backs Brighton with 50 from hers. | `testBackingMovesCreditItDoesNotCopyIt`, `testReceivedBackingCannotBePassedOn` |
+| CI-5 | Repayment history did not raise a limit, and the obvious fix (capacity rises by a share of repaid principal, as proposed in review) is farmable: a borrow-and-repay inside the interest-free day costs nothing, so one recycled seed gives unbounded fresh accounts credit. | Hermes on #3: round 1 item 5 and the design comment; user, 2026-10-03 | c52610a: history earns exactly the dues it paid (`duesPaid`, interest net of fee), the largest rule that keeps the loss bound (CREDIT_MODEL.md, Theorem 3). Larger lines from history come from an accountable issuer. | `testRecycledSeedBuildsHistoryThatEarnsNoCredit`, `testHistoryEarnsOnlyTheDuesItPaid`, `testDuesCanBackOthers` |
+| CI-7 | No first-loss reserve: unsecured backing defaults fell on lenders immediately. | Hermes on #3: round 2 item 3 | c52610a: `reserveBps` of interest funds `firstLossReserve`, which pays uncovered losses before the share price moves | `testReserveTakesItsShareOfInterest`, `testReservePaysUncoveredLossBeforeLenders` |
+| CI-8 | A default plus a run let the first exiter take more than pro rata: an overdue loan counted at full value for 30 days. No invariant tests for conservation. | Hermes on #3: round 2 item 5 | c51a9f5: `impairLoan` provisions overdue unsecured principal; invariant suite added (see CREDIT_MODEL.md, Machine checks) | `testImpairmentStopsAnExitAheadOfAKnownLoss`; `test/invariant/` |
 | CI-1 | Sybil ring manufactured credit: fresh accounts vouching for each other (plus all for one beneficiary) reached high scores and borrowed with nothing behind them, out-borrowing honest users. Earlier mitigations (stake per vouch, anchored PageRank, first-loan cap) only made this harder, because graph topology still turned vouches into credit. | Hermes on #3: persona walkthrough item 1, Base Sepolia item 1, multi-persona round 1 item 1; user directive 2026-10-03 | cf4ade6: credit-conservation redesign; backing (`back` / `backMeta`) moves the backer's own granted credit or stake; vouches carry no credit; on-chain PageRank removed | `SybilResistance.t.sol`: `testRingOfFreshAccountsCannotBackOrBorrow`, `testStakedRingBorrowsNoMoreThanItsStakeAndLendersLoseNothing`, `testRingCannotMultiplyOneMembersCredit` |
 | CI-2 | An attester with no history and nothing at stake passed weight to a borrower. | Hermes on #3: persona 6, Base Sepolia item 2 | cf4ade6: backing needs the backer's own free credit or stake (`InsufficientCredit`); received backing cannot be passed on | `testRingOfFreshAccountsCannotBackOrBorrow`, `testReceivedBackingCannotBePassedOn` |
 | CI-3 | Vouching cost the voucher nothing. | Hermes on #3: round 1 item 7 | cf4ade6: backing lowers the backer's limit by the same amount, and the backer pays on default (stake slashed, credit burned via `creditLoss`) | `testBackingMovesCreditItDoesNotCopyIt`, `LoanLifecycle.t.sol` default tests |
