@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
+import { OracleScoreProvider } from "../contracts/OracleScoreProvider.sol";
 import { MicrocreditTestBase } from "./utils/MicrocreditTestBase.sol";
 
 /**
@@ -328,6 +329,41 @@ contract SybilResistanceTest is MicrocreditTestBase {
         credit.back(sam, dues);
         assertEq(_limit(sam), dues);
         assertEq(_limit(carlos), AVERY_CREDIT, "Carlos keeps Avery's backing and has committed his dues");
+    }
+
+    // ───────────────────────────── issuance (CI-6) ─────────────────────────────
+
+    /// @dev A compromised oracle with a budget of one line tries to rotate it: Sam's fakes each get
+    ///      the line, borrow, and pass it on. The budget stays held while a line is in use, so only
+    ///      one of them ever borrows against it at a time.
+    function testCompromisedOracleCannotRotateItsBudget() public {
+        vm.prank(owner);
+        scores.setIssuanceLimits(SCALE, SCALE); // one full line: 100 USDC
+        address[] memory ring = _ring();
+
+        _publishScore(ring[0], SCALE);
+        uint256 loanId = _borrow(ring[0], 100e6);
+        _publishScore(ring[0], 0);
+        vm.expectRevert(OracleScoreProvider.IssuanceBudgetExceeded.selector);
+        this.publishAsOracle(ring[1], SCALE);
+
+        address[] memory first = new address[](1);
+        first[0] = ring[0];
+        scores.releaseBudget(first);
+        assertEq(scores.totalHeld(), SCALE, "still in use: the loan is open");
+
+        // Once the line is unused again (here, the loan defaulted and was written off), the
+        // budget can move on: losses from a compromised oracle accrue at most one budget per
+        // loan lifetime, which is what issuer capital and governance response are for.
+        _default(loanId);
+        scores.releaseBudget(first);
+        assertEq(scores.totalHeld(), 0);
+        _publishScore(ring[1], SCALE);
+        assertEq(_limit(ring[1]), 100e6);
+    }
+
+    function publishAsOracle(address user, uint256 score) external {
+        _publishScore(user, score);
     }
 
     // ───────────────────────────── stake ─────────────────────────────
