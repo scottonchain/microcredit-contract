@@ -667,6 +667,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "MAX_RESERVE_BPS",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "MIN_LOAN_TERM",
           inputs: [],
           outputs: [
@@ -1226,6 +1239,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "duesPaid",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "effrRate",
           inputs: [],
           outputs: [
@@ -1276,6 +1308,19 @@ const deployedContracts = {
               name: "extensions",
               type: "uint256[]",
               internalType: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "firstLossReserve",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
             },
           ],
           stateMutability: "view",
@@ -2036,6 +2081,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "releaseReserve",
+          inputs: [
+            {
+              name: "amount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "repayLoan",
           inputs: [
             {
@@ -2289,6 +2347,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "reserveBps",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "reservedLiquidity",
           inputs: [],
           outputs: [
@@ -2467,6 +2538,19 @@ const deployedContracts = {
               name: "allowed",
               type: "bool",
               internalType: "bool",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setReserveBps",
+          inputs: [
+            {
+              name: "bps",
+              type: "uint256",
+              internalType: "uint256",
             },
           ],
           outputs: [],
@@ -3280,6 +3364,19 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "ReserveReleased",
+          inputs: [
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "ScoreOverrideSet",
           inputs: [
             {
@@ -3416,6 +3513,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "ExceedsReserve",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "FeeTooHigh",
           inputs: [],
         },
@@ -3536,6 +3638,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "ReserveTooHigh",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "SafeERC20FailedOperation",
           inputs: [
             {
@@ -3632,6 +3739,11 @@ const deployedContracts = {
             },
             {
               name: "initialMaxScoreAge",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "initialMaxTotalScore",
               type: "uint256",
               internalType: "uint256",
             },
@@ -3814,7 +3926,33 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "maxIncreasePerReport",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "maxScoreAge",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "maxTotalScore",
           inputs: [],
           outputs: [
             {
@@ -3927,6 +4065,24 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "setIssuanceLimits",
+          inputs: [
+            {
+              name: "newMaxTotalScore",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "newMaxIncreasePerReport",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "setMaxScoreAge",
           inputs: [
             {
@@ -3972,6 +4128,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "totalScore",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "transferOwnership",
           inputs: [
             {
@@ -4004,6 +4173,25 @@ const deployedContracts = {
               type: "bytes32",
               indexed: false,
               internalType: "bytes32",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "IssuanceLimitsUpdated",
+          inputs: [
+            {
+              name: "maxTotalScore",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "maxIncreasePerReport",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
             },
           ],
           anonymous: false,
@@ -4099,6 +4287,11 @@ const deployedContracts = {
         {
           type: "error",
           name: "InvalidMaxScoreAge",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "IssuanceBudgetExceeded",
           inputs: [],
         },
         {

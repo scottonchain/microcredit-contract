@@ -11,7 +11,7 @@ import { OracleScoreProvider } from "../contracts/OracleScoreProvider.sol";
  *         DecentralizedMicrocredit, then seeds the local demo state.
  * @dev Run with `yarn deploy`. Uses Anvil's deterministic accounts:
  *        9 Alexis: deployer, owner, oracle and score reporter (the local stand-in for the
- *          Chainlink CRE forwarder; the Next.js /api/oracle/refresh route publishes as Alexis)
+ *          Chainlink CRE forwarder)
  *        2 Avery: backer, with 92 USDC of granted credit to back others with
  *        3 Brighton: borrower, with a 25 USDC line of his own (from history or an institution)
  *        4 Diana, 5 Eve: background borrowers that bring pool utilisation to 89%
@@ -28,6 +28,8 @@ contract DeployScript is Script {
     uint256 internal constant MAX_LOAN = 100e6; // 100 USDC at a 100% credit score
     uint256 internal constant POOL_SEED = 10_000e6;
     uint256 internal constant MAX_SCORE_AGE = 7 days;
+    // Oracle issuance budget: at most 50 full lines (5,000 USDC at maxLoan 100), half the seeded pool.
+    uint256 internal constant ISSUANCE_BUDGET = 50e6;
 
     DecentralizedMicrocredit internal credit;
 
@@ -39,7 +41,7 @@ contract DeployScript is Script {
         credit = new DecentralizedMicrocredit(EFFR_BPS, RISK_PREMIUM_BPS, MAX_LOAN, usdc, alexis);
         console.log("DecentralizedMicrocredit deployed at:", address(credit));
 
-        OracleScoreProvider scores = new OracleScoreProvider(alexis, alexis, MAX_SCORE_AGE);
+        OracleScoreProvider scores = new OracleScoreProvider(alexis, alexis, MAX_SCORE_AGE, ISSUANCE_BUDGET);
         credit.setScoreProvider(scores);
         console.log("OracleScoreProvider deployed at:", address(scores));
 
