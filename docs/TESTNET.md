@@ -2,11 +2,13 @@
 
 A deployment for persona testing by agents and people. It is a testnet with a free-mint token: nothing here has value, and this is not the production deployment (`DEPLOYMENT.md`).
 
-Three deployments of the same contract code exist. The **live deployment** is the one agents use: it is run by Hermes, which holds every role. The **reference run** came first and is kept for its record, and a **duplicate run** by Hermes is recorded below. The contracts are identical in all three: `73cb3f6` and `main` `489f01a` differ only outside `packages/foundry/contracts`.
+Three deployments of the same contract code exist. The **live deployment** is the one agents use: it is run by Hermes, which holds every role. The **reference run** came first and is kept for its record, and a **duplicate run** by Hermes is recorded below. The contracts are identical in all three: `9ab3729` and `main` `19b166e` differ only outside `packages/foundry/contracts`.
+
+Commit ids: the repository's history was rewritten on 2026-10-04 to remove private identifiers from commit messages (file contents unchanged), so the broadcast logs record the pre-rewrite ids `73cb3f6` (now `9ab3729`) and `489f01a` (now `19b166e`).
 
 ## Live deployment (operated by Hermes)
 
-Chain: Base Sepolia (84532), RPC `https://sepolia.base.org`. Deployed 2026-10-03 from `main` `489f01a` with `script/DeployTestnet.s.sol` (`MAX_LOAN=100000000`). Broadcast logs: `packages/foundry/broadcast/DeployTestnet.s.sol/84532/run-1791065984302.json` and `TestnetScenarios.s.sol/84532/run-1791066260981.json`.
+Chain: Base Sepolia (84532), RPC `https://sepolia.base.org`. Deployed 2026-10-03 from `main` `19b166e` with `script/DeployTestnet.s.sol` (`MAX_LOAN=100000000`). Broadcast logs: `packages/foundry/broadcast/DeployTestnet.s.sol/84532/run-1791065984302.json` and `TestnetScenarios.s.sol/84532/run-1791066260981.json`.
 
 | Contract | Address |
 | --- | --- |
@@ -74,7 +76,7 @@ LIVE_REX=0x563D424087ed949456c425281D8F21042d8C13aB forge test --match-path test
 
 ## Duplicate run (Hermes, 2026-10-04 00:21 UTC)
 
-Hermes deployed `main` (489f01a) a second time, from a check that started without memory of the first. It is a complete, correctly wired deployment with the full scenario run, verified from chain state (24,400-byte pool; token, score provider, `lending` and lens wired; every role held by `0x5e4d…48F9`; 14 loans; Sam's 25 stake; Brighton's limit 75). It is **not** the live pool: the live addresses above are the ones every document, config and issue points at, and switching them again would split agents across pools. Its broadcast logs were not captured (the files published for it are copies of the reference run's).
+Hermes deployed `main` (19b166e) a second time, from a check that started without memory of the first. It is a complete, correctly wired deployment with the full scenario run, verified from chain state (24,400-byte pool; token, score provider, `lending` and lens wired; every role held by `0x5e4d…48F9`; 14 loans; Sam's 25 stake; Brighton's limit 75). It is **not** the live pool: the live addresses above are the ones every document, config and issue points at, and switching them again would split agents across pools. Its broadcast logs were not captured (the files published for it are copies of the reference run's).
 
 | Contract | Address |
 | --- | --- |
@@ -87,7 +89,7 @@ Deploy transactions: pool `0x2593902e…c635`, lens `0x7a6a043d…4832`, score p
 
 ## Reference run (first deployment)
 
-Deployed from `73cb3f6` by the Claude Code agent. Its admin key lived only in that agent's container, so this deployment is not administered any more. It is kept as a second, independent run of the same scenarios.
+Deployed from `9ab3729` by the Claude Code agent. Its admin key lived only in that agent's container, so this deployment is not administered any more. It is kept as a second, independent run of the same scenarios.
 
 | Contract | Address |
 | --- | --- |

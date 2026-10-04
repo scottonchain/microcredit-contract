@@ -18,7 +18,8 @@ KEY_LINE='(private[_ -]?key|PRIVATE_KEY|secret)[^\n]{0,40}0x[0-9a-fA-F]{64}'
 fail=0
 scan() {
   local label=$1 hits
-  hits=$(grep -nE "$PATTERNS" || true)
+  # Line numbers with the match masked: a finding must not copy the content into a public CI log.
+  hits=$(grep -nE "$PATTERNS" | sed -E "s#$PATTERNS#[redacted]#g" || true)
   if [ -n "$hits" ]; then
     echo "$label: forbidden content"
     echo "$hits" | head -20
