@@ -105,4 +105,23 @@ contract RelayerRetryTest is MicrocreditTestBase {
         }
         assertTrue(found);
     }
+
+    /// Check 4 (maintainers' recovery rule): after an unknown outcome, the nonce tells the relayer whether
+    /// the request landed. It moved => do not resubmit or re-sign; the loan is repaid exactly once.
+    function testUnknownOutcomeRecoveryReadsNonce() public {
+        uint256 loanId = _borrow(40e6);
+        usdc.mint(borrower, 100e6);
+        DecentralizedMicrocredit.RepayRequest memory req = _req(loanId);
+        uint256 nonceBefore = credit.nonces(borrower);
+        assertEq(req.nonce, nonceBefore, "request signed against current nonce");
+
+        vm.prank(relayer);
+        credit.repayLoanMeta(req, _signRepayRequest(borrowerPk, req), _signPermit(borrowerPk, 100e6, _deadline()));
+        // The relayer lost the ack. It reads state instead of resending:
+        assertEq(credit.nonces(borrower), nonceBefore + 1, "nonce moved => request landed");
+        // Observation only: the contract exposes the signal; "do not resubmit" is a relayer-side rule.
+        (, uint256 outstanding,,, bool isActive) = credit.getLoan(loanId);
+        assertEq(outstanding, 0, "loan fully repaid by the one landed request");
+        assertFalse(isActive, "loan no longer open");
+    }
 }
