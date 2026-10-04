@@ -124,4 +124,71 @@ contract RelayerRetryTest is MicrocreditTestBase {
         assertEq(outstanding, 0, "loan fully repaid by the one landed request");
         assertFalse(isActive, "loan no longer open");
     }
+
+    /// Check 5 (chain-3, calldata half): the call that consumed the nonce carries the whole signed request in its
+    /// calldata, so a reconciler holding the receipt's tx can recover (borrower, loanId, nonce) from tx.input.
+    /// Forge has no tx object, so the recorded call into the contract stands in for tx.input of a direct relayer tx.
+    function testCalldataCarriesSignedRequest() public {
+        uint256 loanId = _borrow(40e6);
+        usdc.mint(borrower, 100e6);
+        DecentralizedMicrocredit.RepayRequest memory req = _req(loanId);
+        bytes memory sig = _signRepayRequest(borrowerPk, req);
+        DecentralizedMicrocredit.PermitData memory permit = _signPermit(borrowerPk, 100e6, _deadline());
+
+        vm.startStateDiffRecording();
+        vm.prank(relayer);
+        credit.repayLoanMeta(req, sig, permit);
+        Vm.AccountAccess[] memory acc = vm.stopAndReturnStateDiff();
+
+        bytes memory input;
+        for (uint256 i = 0; i < acc.length; i++) {
+            if (acc[i].account == address(credit) && acc[i].depth == 1 && acc[i].data.length > 4) {
+                if (bytes4(acc[i].data) == DecentralizedMicrocredit.repayLoanMeta.selector) {
+                    input = acc[i].data;
+                    break;
+                }
+            }
+        }
+        assertGt(input.length, 4, "found the repayLoanMeta call input");
+        bytes memory args = new bytes(input.length - 4);
+        for (uint256 i = 0; i < args.length; i++) {
+            args[i] = input[i + 4];
+        }
+        (DecentralizedMicrocredit.RepayRequest memory got,,) =
+            abi.decode(args, (DecentralizedMicrocredit.RepayRequest, bytes, DecentralizedMicrocredit.PermitData));
+        assertEq(got.borrower, borrower, "borrower recoverable from calldata");
+        assertEq(got.loanId, loanId, "loanId recoverable from calldata");
+        assertEq(got.nonce, req.nonce, "nonce recoverable from calldata");
+        assertEq(credit.nonces(borrower), got.nonce + 1, "that nonce is the one that moved");
+    }
+
+    /// Check 6 (counter-case for chain-3): the relayer submits through a wrapper contract. The tx.input is now the
+    /// wrapper's calldata, and the repayLoanMeta call sits one level down. A reconciler that only matches the
+    /// repayLoanMeta selector at the top level finds nothing. Nonce check still works.
+    function testWrappedBatchHidesRequestFromTopLevelSelector() public {
+        uint256 loanId = _borrow(40e6);
+        usdc.mint(borrower, 100e6);
+        DecentralizedMicrocredit.RepayRequest memory req = _req(loanId);
+        bytes memory sig = _signRepayRequest(borrowerPk, req);
+        DecentralizedMicrocredit.PermitData memory permit = _signPermit(borrowerPk, 100e6, _deadline());
+        Wrapper w = new Wrapper();
+        vm.prank(owner);
+        credit.setRelayerWhitelisted(address(w), true);
+        bytes memory inner = abi.encodeCall(DecentralizedMicrocredit.repayLoanMeta, (req, sig, permit));
+        bytes memory outer = abi.encodeCall(Wrapper.forward, (address(credit), inner));
+
+        assertTrue(
+            bytes4(outer) != DecentralizedMicrocredit.repayLoanMeta.selector, "top-level selector is the wrapper's"
+        );
+        vm.prank(relayer);
+        w.forward(address(credit), inner);
+        assertEq(credit.nonces(borrower), req.nonce + 1, "nonce check still shows it landed");
+    }
+}
+
+contract Wrapper {
+    function forward(address target, bytes calldata data) external {
+        (bool ok,) = target.call(data);
+        require(ok, "inner call failed");
+    }
 }
