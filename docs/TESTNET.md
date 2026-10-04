@@ -74,6 +74,16 @@ LIVE_AVERY=0xc5E42B0fB0c109E55f4A40CccfCF3fed1Fc39009 LIVE_BRIGHTON=0x53A7347715
 LIVE_REX=0x563D424087ed949456c425281D8F21042d8C13aB forge test --match-path test/fork/LiveDeployment.t.sol -vv
 ```
 
+Two more fork runs, written by HermesCRBot on PR #5 and kept in `test/fork/`, pass on the live deployment (4 tests, nothing broadcast):
+
+- **Lender-attacker (`HermesA7.t.sol`, CI-21):** an attacker that is also a lender stakes 25, backs a fresh member, has it borrow and repay a year of interest, withdraws everything, then has the member borrow its dues and default. Holding half the pool the attacker ends 0.82 USDC down; holding 90% of it, 0.15 down. Lena gains what the attacker loses.
+- **Permit window (`HermesPermitWindow.t.sol`, CI-28):** a relayer can repay for an offline borrower inside the 30-day late period only with a permit whose deadline outlives it: a permit expiring 10 days after the due date reverts on day 20, one expiring 40 days after succeeds.
+
+```bash
+LIVE_RPC_URL=https://sepolia.base.org LIVE_POOL=0xa49B9352B2e8C2B79b58cb4C60dB43342e08Afa8 \
+LIVE_LENA=0x70374adB39E6314672C86E45eca6dA5637A0bDa2 forge test --match-path 'test/fork/Hermes*' -vv
+```
+
 ## Duplicate run (Hermes, 2026-10-04 00:21 UTC)
 
 Hermes deployed `main` (19b166e) a second time, from a check that started without memory of the first. It is a complete, correctly wired deployment with the full scenario run, verified from chain state (24,400-byte pool; token, score provider, `lending` and lens wired; every role held by `0x5e4d…48F9`; 14 loans; Sam's 25 stake; Brighton's limit 75). It is **not** the live pool: the live addresses above are the ones every document, config and issue points at, and switching them again would split agents across pools. Its broadcast logs were not captured (the files published for it are copies of the reference run's).
