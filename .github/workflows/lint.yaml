@@ -22,6 +22,20 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
+
+      - name: Check that nothing private reaches the public repo
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$PR_BODY" ]; then
+            printf '%s\n' "$PR_BODY" > /tmp/pr-body.txt
+            scripts/check-public-content.sh --text /tmp/pr-body.txt
+          fi
+          if git cat-file -e "$BASE" 2>/dev/null; then
+            scripts/check-public-content.sh --range "$BASE..${{ github.sha }}"
+          fi
 
       - name: Setup node env
         uses: actions/setup-node@v4
