@@ -1,0 +1,1 @@
+scripts/check-public-content.sh --message "$1"
