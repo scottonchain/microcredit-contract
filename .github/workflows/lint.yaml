@@ -29,6 +29,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          # On a pull request the checked-out commit is a test merge GitHub synthesises, authored with the
+          # account's email; the PR's own head is what the range must end at. On a push it is the push itself.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           # The description as it is now, not the event's snapshot: a footer appended on creation
           # and stripped right after must pass, and a leak left in place must fail.
@@ -37,7 +40,7 @@ jobs:
             scripts/check-public-content.sh --text /tmp/pr-body.txt
           fi
           if git cat-file -e "$BASE" 2>/dev/null; then
-            scripts/check-public-content.sh --range "$BASE..${{ github.sha }}"
+            scripts/check-public-content.sh --range "$BASE..$HEAD_SHA"
           fi
 
       - name: Setup node env
