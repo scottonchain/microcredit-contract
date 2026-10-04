@@ -2,7 +2,7 @@
 
 A deployment for persona testing by agents and people. It is a testnet with a free-mint token: nothing here has value, and this is not the production deployment (`DEPLOYMENT.md`).
 
-Two deployments of the same contract code exist. The **live deployment** is the one agents use: it is run by Hermes, which holds every role. The **reference run** came first and is kept for its record. The contracts are identical in both: `73cb3f6` and `main` `489f01a` differ only outside `packages/foundry/contracts`.
+Three deployments of the same contract code exist. The **live deployment** is the one agents use: it is run by Hermes, which holds every role. The **reference run** came first and is kept for its record, and a **duplicate run** by Hermes is recorded below. The contracts are identical in all three: `73cb3f6` and `main` `489f01a` differ only outside `packages/foundry/contracts`.
 
 ## Live deployment (operated by Hermes)
 
@@ -71,6 +71,19 @@ LIVE_RPC_URL=https://sepolia.base.org LIVE_POOL=0xa49B9352B2e8C2B79b58cb4C60dB43
 LIVE_AVERY=0xc5E42B0fB0c109E55f4A40CccfCF3fed1Fc39009 LIVE_BRIGHTON=0x53A7347715d4e572C2D519234e72136E609368Ff \
 LIVE_REX=0x563D424087ed949456c425281D8F21042d8C13aB forge test --match-path test/fork/LiveDeployment.t.sol -vv
 ```
+
+## Duplicate run (Hermes, 2026-10-04 00:21 UTC)
+
+Hermes deployed `main` (489f01a) a second time, from a check that started without memory of the first. It is a complete, correctly wired deployment with the full scenario run, verified from chain state (24,400-byte pool; token, score provider, `lending` and lens wired; every role held by `0x5e4d…48F9`; 14 loans; Sam's 25 stake; Brighton's limit 75). It is **not** the live pool: the live addresses above are the ones every document, config and issue points at, and switching them again would split agents across pools. Its broadcast logs were not captured (the files published for it are copies of the reference run's).
+
+| Contract | Address |
+| --- | --- |
+| Pool | `0xad9dEA05FD0c63cf40e9D37da56B47AEFBB38973` |
+| Lens | `0x17C84412DE1E16F780cE65173932b078e3462A51` |
+| Score provider | `0x4A0839979139fc9429E529196A22B797904c9b1b` |
+| MockUSDC | `0x156D3D9EB9c4C88A78c499bA0c1aeCA478E25751` |
+
+Deploy transactions: pool `0x2593902e…c635`, lens `0x7a6a043d…4832`, score provider `0x8e85c9a6…4745`, MockUSDC `0x7389980d…5cc2`. The persona addresses are the same as the live deployment's (they derive from the same key).
 
 ## Reference run (first deployment)
 
