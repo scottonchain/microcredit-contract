@@ -143,12 +143,17 @@ contract RelayerRetryTest is MicrocreditTestBase {
         bytes memory input;
         for (uint256 i = 0; i < acc.length; i++) {
             if (acc[i].account == address(credit) && acc[i].depth == 1 && acc[i].data.length > 4) {
-                if (bytes4(acc[i].data) == DecentralizedMicrocredit.repayLoanMeta.selector) { input = acc[i].data; break; }
+                if (bytes4(acc[i].data) == DecentralizedMicrocredit.repayLoanMeta.selector) {
+                    input = acc[i].data;
+                    break;
+                }
             }
         }
         assertGt(input.length, 4, "found the repayLoanMeta call input");
         bytes memory args = new bytes(input.length - 4);
-        for (uint256 i = 0; i < args.length; i++) args[i] = input[i + 4];
+        for (uint256 i = 0; i < args.length; i++) {
+            args[i] = input[i + 4];
+        }
         (DecentralizedMicrocredit.RepayRequest memory got,,) =
             abi.decode(args, (DecentralizedMicrocredit.RepayRequest, bytes, DecentralizedMicrocredit.PermitData));
         assertEq(got.borrower, borrower, "borrower recoverable from calldata");
@@ -172,7 +177,9 @@ contract RelayerRetryTest is MicrocreditTestBase {
         bytes memory inner = abi.encodeCall(DecentralizedMicrocredit.repayLoanMeta, (req, sig, permit));
         bytes memory outer = abi.encodeCall(Wrapper.forward, (address(credit), inner));
 
-        assertTrue(bytes4(outer) != DecentralizedMicrocredit.repayLoanMeta.selector, "top-level selector is the wrapper's");
+        assertTrue(
+            bytes4(outer) != DecentralizedMicrocredit.repayLoanMeta.selector, "top-level selector is the wrapper's"
+        );
         vm.prank(relayer);
         w.forward(address(credit), inner);
         assertEq(credit.nonces(borrower), req.nonce + 1, "nonce check still shows it landed");
