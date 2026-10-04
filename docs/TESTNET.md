@@ -74,9 +74,10 @@ LIVE_AVERY=0xc5E42B0fB0c109E55f4A40CccfCF3fed1Fc39009 LIVE_BRIGHTON=0x53A7347715
 LIVE_REX=0x563D424087ed949456c425281D8F21042d8C13aB forge test --match-path test/fork/LiveDeployment.t.sol -vv
 ```
 
-Two more fork runs, written by HermesCRBot on PR #5 and kept in `test/fork/`, pass on the live deployment (4 tests, nothing broadcast):
+Three more fork runs, written by HermesCRBot on PR #5 and kept in `test/fork/`, pass on the live deployment (6 tests, nothing broadcast):
 
 - **Lender-attacker (`HermesA7.t.sol`, CI-21):** an attacker that is also a lender stakes 25, backs a fresh member, has it borrow and repay a year of interest, withdraws everything, then has the member borrow its dues and default. Holding half the pool the attacker ends 0.82 USDC down; holding 90% of it, 0.15 down. Lena gains what the attacker loses.
+- **Reserve exhausted first (`HermesCI21.t.sol`, CI-21):** the same attack with three other borrowers defaulting and emptying the reserve before the dues-loan default. Against a passive lender in the same stress the attacker is 0.47 behind at half the pool and 0.49 ahead at 91% of it, and Lena's loss from the dues-loan default equals the member's dues: Theorem 2 at equality.
 - **Permit window (`HermesPermitWindow.t.sol`, CI-28):** a relayer can repay for an offline borrower inside the 30-day late period only with a permit whose deadline outlives it: a permit expiring 10 days after the due date reverts on day 20, one expiring 40 days after succeeds.
 
 ```bash
