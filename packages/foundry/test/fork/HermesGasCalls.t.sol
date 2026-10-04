@@ -34,17 +34,29 @@ contract HermesGasCallsForkTest is Test {
         uint256 g;
 
         vm.startPrank(staker);
-        g = gasleft(); credit.depositFunds(500e6); emit log_named_uint("gas depositFunds", g - gasleft());
-        g = gasleft(); credit.stake(25e6); emit log_named_uint("gas stake", g - gasleft());
-        g = gasleft(); credit.back(borrower, 25e6); emit log_named_uint("gas back (1 backer)", g - gasleft());
+        g = gasleft();
+        credit.depositFunds(500e6);
+        emit log_named_uint("gas depositFunds", g - gasleft());
+        g = gasleft();
+        credit.stake(25e6);
+        emit log_named_uint("gas stake", g - gasleft());
+        g = gasleft();
+        credit.back(borrower, 25e6);
+        emit log_named_uint("gas back (1 backer)", g - gasleft());
         vm.stopPrank();
 
         vm.startPrank(borrower);
-        g = gasleft(); uint256 id = credit.requestLoan(10e6); emit log_named_uint("gas requestLoan", g - gasleft());
-        g = gasleft(); credit.disburseLoan(id); emit log_named_uint("gas disburseLoan", g - gasleft());
+        g = gasleft();
+        uint256 id = credit.requestLoan(10e6);
+        emit log_named_uint("gas requestLoan", g - gasleft());
+        g = gasleft();
+        credit.disburseLoan(id);
+        emit log_named_uint("gas disburseLoan", g - gasleft());
         vm.warp(block.timestamp + 20 days);
         uint256 owed = credit.getCurrentOutstandingAmount(id);
-        g = gasleft(); credit.repayLoan(id, owed); emit log_named_uint("gas repayLoan (full)", g - gasleft());
+        g = gasleft();
+        credit.repayLoan(id, owed);
+        emit log_named_uint("gas repayLoan (full)", g - gasleft());
         vm.stopPrank();
     }
 }
