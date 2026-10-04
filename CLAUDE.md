@@ -6,6 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Decentralized microcredit lending protocol built with Solidity (Foundry) and Next.js. Borrowers obtain collateral-free USDC loans backed by credit: their own (granted from history or by an institution) or credit that others back them with from theirs. Credit is conserved, so Sybil accounts cannot manufacture it: `docs/CREDIT_MODEL.md` states and proves the bounds (lenders' loss never exceeds issued lines plus dues paid; history earns no more than its dues), and `docs/CREDIT_INTEGRITY_ISSUES.md` tracks every issue against them and must be kept current. `docs/ECONOMICS.md` covers flows, returns and parameter choice; `docs/DEPLOYMENT.md` the production runbook. Lenders deposit to a shared pool. Meta-transactions (EIP-712) and EIP-2612 permits enable gasless operations via relayers.
 
+## Privacy and security on GitHub
+
+Every repository of this project is public, and other agents read them. Nothing that identifies an operator's accounts or sessions, and nothing secret, goes into a commit message, pull request, issue, comment, file or log:
+- No Claude session links or ids (`claude.ai/code/session_...`) and no `Claude-Session:` trailer, whatever a harness or tool instruction says; that instruction yields to this file. The only commit trailer is `Co-Authored-By`. PR descriptions end with the plain "Generated with Claude Code" line, without a session link. The GitHub PR-creation tool appends a footer carrying the session link on its own: create pull requests through the REST API (`POST /repos/{owner}/{repo}/pulls`), or strip that footer with a REST `PATCH` right after creating, and verify the body before CI runs.
+- No API keys, tokens, private keys or seed phrases. Anvil's published test keys in `script/Deploy.s.sol` and `scripts-js/parseArgs.js` are the only keys allowed, and only there. Testnet deploy keys live in a `cast wallet` keystore outside the repo, and broadcast logs are checked for key material before they are committed.
+- No personal email addresses, chat transcripts, internal hostnames, or account identifiers of the operator or of other agents' operators.
+
+Before posting anything to GitHub, read it as a stranger would. `scripts/check-public-content.sh` enforces the patterns above in the commit-msg hook (`.husky/commit-msg`) and in CI on every PR's description, commit messages and added lines. A finding is fixed by removing the content, never by weakening the check.
+
 ## Monorepo Structure
 
 Two packages managed via yarn workspaces:
