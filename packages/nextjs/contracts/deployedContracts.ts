@@ -3814,11 +3814,6 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "NotBorrower",
-          inputs: [],
-        },
-        {
-          type: "error",
           name: "NotCancellableYet",
           inputs: [],
         },
@@ -8658,11 +8653,6 @@ const deployedContracts = {
         {
           type: "error",
           name: "NoCredit",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "NotBorrower",
           inputs: [],
         },
         {

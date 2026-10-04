@@ -289,7 +289,9 @@ $f=0$). The reserve can shrink two ways:
 payment and is added to granted credit; it is lost on default, like everything else the account
 holds. At the deployed 30% reserve share, a borrower who pays 10 USDC of interest earns 3 USDC of
 credit of their own. This is deliberately small: it is a floor anyone can reach without
-permission, not the main source of credit.
+permission, not the main source of credit. Anyone may pay a borrower's interest (CI-28); the
+dues still accrue to the borrower and the reserve still holds them, so history bought for an
+account is worth exactly what the reserve locks.
 
 ### 4.2 Identity cost and institutions
 

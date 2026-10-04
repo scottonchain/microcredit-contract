@@ -15,6 +15,7 @@ contract LoanAccountingTest is MicrocreditTestBase {
     address internal stranger = makeAddr("stranger");
 
     event DisplayNameSet(address indexed user, string name);
+    event LoanRepaid(address indexed borrower, uint256 indexed loanId, uint256 amount);
 
     function setUp() public {
         _deploy(750, 250, 10_000e6);
@@ -206,11 +207,29 @@ contract LoanAccountingTest is MicrocreditTestBase {
         vm.stopPrank();
     }
 
-    function testOnlyBorrowerCanRepayDirectly() public {
+    /// @dev CI-28: anyone may repay a loan with their own USDC; the loan and its dues stay the borrower's.
+    function testAnyoneCanRepayForTheBorrower() public {
+        vm.prank(owner);
+        credit.setReserveBps(3_000);
         uint256 loanId = _openLoan(PRINCIPAL);
-        vm.prank(stranger);
-        vm.expectRevert(DecentralizedMicrocredit.NotBorrower.selector);
-        credit.repayLoan(loanId, 1);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        usdc.mint(stranger, owed);
+        uint256 borrowerBefore = usdc.balanceOf(borrower);
+
+        vm.startPrank(stranger);
+        usdc.approve(address(credit), owed);
+        vm.expectEmit(address(credit));
+        emit LoanRepaid(borrower, loanId, owed);
+        credit.repayLoan(loanId, owed);
+        vm.stopPrank();
+
+        assertEq(usdc.balanceOf(stranger), 0, "the payer's USDC was pulled");
+        assertEq(usdc.balanceOf(borrower), borrowerBefore, "the borrower paid nothing");
+        assertEq(credit.getCurrentOutstandingAmount(loanId), 0);
+        assertEq(credit.completedLoans(borrower), 1, "the repayment is the borrower's history");
+        assertGt(credit.duesPaid(borrower), 0, "and so are the dues");
+        assertEq(credit.duesPaid(stranger), 0);
     }
 
     // ───────────────────────────── pool views ─────────────────────────────

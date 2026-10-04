@@ -165,6 +165,34 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         assertEq(uint256(_status(loanId)), uint256(DecentralizedMicrocredit.LoanStatus.Defaulted));
     }
 
+    /// @dev CI-28: a backer whose stake is on the line can cure the loan with their own USDC inside
+    ///      the late period. Nothing is slashed, and the backing is released as after any repayment.
+    function testBackerCanCureAnOverdueLoanBeforeItDefaults() public {
+        uint256 loanId = _borrow(LOAN);
+        vm.warp(_defaultableAt(loanId) - 1 days); // past due, inside LATE_PERIOD
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        usdc.mint(avery, owed);
+        vm.startPrank(avery);
+        usdc.approve(address(credit), owed);
+        credit.repayLoan(loanId, owed);
+        vm.stopPrank();
+        assertEq(uint256(_status(loanId)), uint256(DecentralizedMicrocredit.LoanStatus.Repaid));
+
+        vm.warp(_defaultableAt(loanId));
+        vm.expectRevert(DecentralizedMicrocredit.LoanNotActive.selector);
+        credit.markDefaulted(loanId);
+
+        assertEq(credit.stakeOf(avery), STAKE, "nothing slashed");
+        assertEq(credit.defaultedLoans(brighton), 0);
+        assertEq(credit.completedLoans(brighton), 1, "the cure is Brighton's history");
+        assertEq(credit.stakeCommitted(avery), STAKE, "the backing stays until Avery lowers it");
+        vm.prank(avery);
+        credit.back(brighton, 0);
+        vm.prank(avery);
+        credit.unstake(STAKE);
+        assertEq(usdc.balanceOf(avery), STAKE);
+    }
+
     /// @dev Hermes persona 4. Avery's staked backing covers the whole loss: lenders lose nothing.
     function testDefaultSlashesSecuredBackingIntoThePool() public {
         uint256 loanId = _borrow(LOAN);

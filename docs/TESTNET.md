@@ -10,6 +10,8 @@ Commit ids: the repository's history was rewritten on 2026-10-04 to remove priva
 
 Chain: Base Sepolia (84532), RPC `https://sepolia.base.org`. Deployed 2026-10-03 from `main` `19b166e` with `script/DeployTestnet.s.sol` (`MAX_LOAN=100000000`). Broadcast logs: `packages/foundry/broadcast/DeployTestnet.s.sol/84532/run-1791065984302.json` and `TestnetScenarios.s.sol/84532/run-1791066260981.json`.
 
+`main` is ahead of the live pool: the CI-28 fix (anyone may repay a loan with their own USDC, so a backer can cure one before it defaults) is merged but not deployed. The live pool still refuses `repayLoan` from anyone but the borrower until it is redeployed; `repayWithPermit` with a permit that outlives the late period is the workaround there.
+
 | Contract | Address |
 | --- | --- |
 | `DecentralizedMicrocredit` (pool) | `0xa49B9352B2e8C2B79b58cb4C60dB43342e08Afa8` |
