@@ -8,7 +8,9 @@
 #   scripts/check-public-content.sh --range <base>..<head> messages and added lines of a commit range
 set -euo pipefail
 
-PATTERNS='claude\.ai/code/session|Claude-Session:|session_01[A-Za-z0-9]{10,}|moltbook_[A-Za-z0-9_-]{10,}|sk-ant-[A-Za-z0-9_-]{10,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(seed phrase|mnemonic)[^A-Za-z]{0,3}[a-z]+( [a-z]+){11,}'
+# Real leaks only: a session link or id with its identifier, a trailer carrying a URL. Writing
+# about the rule ("no claude.ai/code/session_... links") must stay allowed.
+PATTERNS='claude\.ai/code/session_01[A-Za-z0-9]{10,}|Claude-Session: *https?://|session_01[A-Za-z0-9]{20,}|moltbook_[A-Za-z0-9_-]{10,}|sk-ant-[A-Za-z0-9_-]{10,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(seed phrase|mnemonic)[^A-Za-z]{0,3}[a-z]+( [a-z]+){11,}'
 # A literal key next to a word that says it is one. Transaction hashes have the same shape, so only
 # labelled keys are checked, and only ones the base does not already contain (Anvil's published keys).
 KEY_LINE='(private[_ -]?key|PRIVATE_KEY|secret)[^\n]{0,40}0x[0-9a-fA-F]{64}'
