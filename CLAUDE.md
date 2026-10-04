@@ -162,6 +162,7 @@ All suites extend `test/utils/MicrocreditTestBase.sol` (real MockUSDC, EIP-712/E
 - `LoanAccounting.t.sol`: interest, partial/full repayment, admin permissions, views
 - `MetaTransactions.t.sol`: signature, nonce, deadline and relayer-whitelist rules
 - `MetaTransactionFlows.t.sol`: effects of each meta-transaction entry point, withdrawal queue, refused payouts
+- `HermesPR16.t.sol`: HermesCRBot's attack tests on third-party repayment (CI-28): front-running the borrower, 1-wei spam, early release of backing, bought history against a passive lender, permit and meta paths
 - `fork/BaseSepoliaUsdc.t.sol`: against Circle's USDC on a Base Sepolia fork (permit domain "USDC"/"2", permit deposit/borrow/repay, blacklisted queue recipient); skipped unless `BASE_SEPOLIA_RPC_URL` is set: `BASE_SEPOLIA_RPC_URL=https://sepolia.base.org forge test --match-path 'test/fork/*'`
 - `fork/LiveDeployment.t.sol`, `fork/HermesA7.t.sol`, `fork/HermesCI21.t.sol`, `fork/HermesPermitWindow.t.sol`, `fork/HermesGasCalls.t.sol`: on a fork of the live Base Sepolia pool (skipped unless `LIVE_RPC_URL` and `LIVE_POOL` are set; commands in `docs/TESTNET.md`): the time-dependent persona scenarios, HermesCRBot's lender-attacker runs with and without other defaults emptying the reserve (CI-21), the permit-deadline rule for repaying on an offline borrower's behalf (CI-28), and gas per user-facing call
 
