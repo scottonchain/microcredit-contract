@@ -279,6 +279,40 @@ contract SybilResistanceTest is MicrocreditTestBase {
         assertEq(credit.totalAssets(), assetsBefore + interest - fee - dues, "lenders keep their share of the interest");
     }
 
+    /// @dev CI-28: a third party may pay a borrower's interest. The dues still go to the borrower
+    ///      and the reserve still holds them, so bought history is worth exactly what the reserve locks.
+    function testDuesPaidByAThirdPartyAreLockedInTheReserve() public {
+        vm.prank(owner);
+        credit.setReserveBps(5_000);
+        uint256 assetsBefore = credit.totalAssets();
+        _stake(carlos, 100e6);
+        address member = _ring()[0];
+        vm.prank(carlos);
+        credit.back(member, 100e6);
+        uint256 loanId = _borrow(member, 100e6);
+        vm.warp(block.timestamp + 30 days);
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        uint256 interest = owed - 100e6;
+
+        address payer = makeAddr("payer"); // pays with its own USDC, not the member's
+        usdc.mint(payer, owed);
+        vm.startPrank(payer);
+        usdc.approve(address(credit), owed);
+        credit.repayLoan(loanId, owed);
+        vm.stopPrank();
+        vm.prank(carlos);
+        credit.back(member, 0);
+
+        uint256 dues = interest / 2;
+        assertEq(credit.duesPaid(member), dues, "the dues are the borrower's, whoever paid");
+        assertEq(credit.duesPaid(payer), 0);
+        assertEq(_limit(member), dues);
+
+        _default(_borrow(member, dues));
+        assertEq(credit.firstLossReserve(), 0, "the reserve the payer funded absorbed the default");
+        assertEq(credit.totalAssets(), assetsBefore + interest - dues, "lenders keep their share of the interest");
+    }
+
     /// @dev Found by analysis/sybil_sim (attack A7). If dues were all interest net of fee, an
     ///      attacker that is also a lender would get its pool share of that interest back, withdraw
     ///      while its loans are current, and leave the dues-funded default to the other lenders.

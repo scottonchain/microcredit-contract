@@ -362,7 +362,6 @@ contract DecentralizedMicrocredit is EIP712 {
     error NotCancellableYet();
     error NotYetDefaultable();
     error NotOverdue();
-    error NotBorrower();
     error WrongBorrower();
     error MustSendToBorrower();
     error NothingToRepay();
@@ -675,14 +674,18 @@ contract DecentralizedMicrocredit is EIP712 {
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
-    /// @notice Repay up to `amount`; any excess over the outstanding balance is not pulled.
+    /**
+     * @notice Repay up to `amount` of a loan with the caller's USDC; any excess over the outstanding
+     *         balance is not pulled. Anyone may pay: a backer can cure a loan before it defaults on
+     *         them, and a relayer can pay for an offline borrower. The loan, its dues and its history
+     *         stay the borrower's.
+     */
     function repayLoan(uint256 loanId, uint256 amount) external {
         Loan storage loan = _repayableLoan(loanId);
-        require(msg.sender == loan.borrower, NotBorrower());
         require(amount > 0, ZeroAmount());
 
         uint256 paid = _repay(loanId, loan, msg.sender, amount);
-        emit LoanRepaid(msg.sender, loanId, paid);
+        emit LoanRepaid(loan.borrower, loanId, paid);
     }
 
     /**
