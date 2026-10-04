@@ -279,7 +279,11 @@ $f=0$). The reserve can shrink two ways:
   $s=90\%$ the attacker still loses 0.65 per account (against 2.52 without the farm), and a
   lender who sees the defaults coming does better by exiting. Earmarking the reserve behind dues
   in use removes it in simulation, at the cost that the earmarked part stops cushioning other
-  defaults (CI-21).
+  defaults (CI-21). Measured on a fork of the live pool (HermesCRBot, `test/fork/HermesCI21.t.sol`,
+  $r=0.3$, $f=0$, one member paying $I=2.33$ of interest, three other defaults emptying the
+  reserve): the attacker ends $I(s-0.7)$ ahead of a passive lender, $-0.47$ USDC at $s=0.5$ and
+  $+0.49$ at $s=0.91$, and the remaining lender's loss from the dues-loan default equals the
+  member's dues, so Theorem 2 holds with equality.
 
 **What the protocol does.** `duesPaid[borrower]` accumulates the reserve share of every interest
 payment and is added to granted credit; it is lost on default, like everything else the account
