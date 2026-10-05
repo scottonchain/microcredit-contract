@@ -249,7 +249,7 @@ round-trip test skips.
 ### P7. Simulation (`ShortSimulation`, `run.py`)
 
 **World.** 24 monthly reports, maxLoanAmount 100 USDC, APR 12.33% (EFFR 433 + premium 800 bps,
-`DeployProduction` default), reserve share 65%. Honest verified borrowers: 40% basic, 40%
+`DeployProduction` default), reserve share 65% (the `DeployProduction` default when this experiment was run; the default is now 45%). Honest verified borrowers: 40% basic, 40%
 standard, 20% enhanced. Their true annual PDs are 1, 2, 5, 10 or 20%, drawn from the tier's
 population, the same population the issuer's prior is fitted to. Each cycle they borrow with
 probability 0.85. They default with the cycle PD after drawing their whole limit, repay late with
@@ -329,7 +329,7 @@ model's expected 568.
 | --- | --- | --- |
 | `maxLoanAmount` | 100 USDC | local deploy; scores scale to any value (a production pilot uses 25) |
 | EFFR, risk premium | 433, 800 bps | `DeployProduction` default premium, `analysis/credit_risk` at annual PD 5% |
-| reserve share | 65% | `DeployProduction` default; enters only through dues |
+| reserve share | 65% | the experiment's setting, the `DeployProduction` default when it was run (now 45%); enters only through dues |
 | identity cost $k_t$ | basic 15, standard 40, enhanced 120 USDC | illustrative; set from the market price of an identity in the tier plus the expected penalty |
 | cap $\text{cap}_t$ | $\min(k_t, \texttt{maxLoanAmount})$ | the tightest incentive-compatible cap |
 | PD population per tier | weights on 1, 2, 5, 10, 20% (`policy.TIER_PD_WEIGHTS`) | illustrative base rates; the prior is fitted to them |

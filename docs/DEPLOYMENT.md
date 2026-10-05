@@ -141,7 +141,7 @@ reverts; it never falls back to the default.
 | `TIMELOCK_DELAY` | 172800 (2 days) | Delay on every governance action, 1 to 30 days | Governance decision |
 | `RISK_PREMIUM_BPS` | 800 | Added to EFFR for each loan's fixed APR | Calibration, annual PD 5% ([analysis/credit_risk](../analysis/credit_risk/README.md), bottom line 2) |
 | `MAX_LOAN` | 25000000 (25 USDC) | A full line, at score 100% | Pilot size |
-| `RESERVE_BPS` | 6500 | Share of repaid interest that funds the first-loss reserve | Calibration, annual PD 5% (bottom line 3) |
+| `RESERVE_BPS` | 4500 | Share of repaid interest that funds the first-loss reserve | Owner's interim decision, pending the reserve-equilibrium analysis ([ECONOMICS.md](ECONOMICS.md), "The reserve share") |
 | `PROTOCOL_FEE_BPS` | 0 | Protocol's share of repaid interest | The calibration assumes no fee |
 | `ISSUANCE_BUDGET_LINES` | 20 | `maxTotalScore = lines x 1e6` | 20 x 25 USDC: at most 500 USDC of oracle-issued credit |
 | `MAX_INCREASE_PER_REPORT_LINES` | 5 | `maxIncreasePerReport`: how much one report may add | Limits how fast a bad report can issue |
@@ -150,10 +150,17 @@ reverts; it never falls back to the default.
 | `CRE_WORKFLOW_OWNER`, `CRE_WORKFLOW_ID` | unset | The one workflow the provider accepts. Required with a forwarder | The CRE workflow |
 | `RELAYER` | unset | If set, the whitelist is enabled and this is the only relayer | Operations |
 
-The 800 and 6500 defaults assume an annual PD of 5%. For PD 3% the calibration gives 600 and
-5500. For PD 10% it gives 1400 and 7500. Pick the row for the riskiest borrowers the pilot
-admits. The calibration also caps the reserve at 6.5% of deposits at PD 5%. Release any surplus
-above that through the timelock (`releaseReserve`).
+The 800 premium assumes an annual PD of 5%. For PD 3% the calibration gives 600, and for PD 10%
+it gives 1400. Pick the row for the riskiest borrowers the pilot admits.
+
+The reserve share is a separate decision. The calibration recommended 6500 at PD 5% (5500 at 3%,
+7500 at 10%) on the assumption that the reserve above a cap is released to lenders. The contract
+never releases interest-funded reserve (`releaseReserve` keeps all dues, ce99679), so under that
+rule 6500 leaves lenders about 3.7% a year in the long run, below the 4.33% funding rate
+(`ECONOMICS.md`). The owner set the default to 4500 on 2026-10-05, just above the share that
+covers expected loss (about 4200 at PD 5%), and it stays an interim value until the equilibrium
+analysis has been reviewed and finalized. Only capital added through `fundReserve` can be
+released, and only above all dues ever paid.
 
 The script leaves three contract defaults as they are: `lendingUtilizationCap` 90%,
 `liquidityBuffer` 5% and `liquidityThreshold` 0. It also rejects values that look like unit
@@ -186,8 +193,8 @@ mistakes: EFFR above 2000 bps, a premium above 5000 bps, or `MAX_LOAN` outside 1
   proposal if needed.
 - Do not set a reporter in production. `publishScores` skips the workflow pinning.
 - Do not grant timelock roles to an EOA. Do not open the executor role to `address(0)`.
-- Do not lower the premium or the reserve share below the calibration without a new calibration
-  run.
+- Do not lower the premium below the calibration without a new calibration run. Do not change the
+  reserve share from the interim 4500 without the owner's decision and the reviewed analysis.
 - Do not run `script/Deploy.s.sol` against a public network. It broadcasts with Anvil's published
   keys and seeds demo state.
 - Do not broadcast before the approval gates. Do not commit keys or `.env` files.
