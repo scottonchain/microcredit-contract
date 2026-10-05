@@ -123,6 +123,102 @@ contract RelayerRetryBatchTest is MicrocreditTestBase {
         assertTrue(ok[1], "a then lands");
         assertEq(credit.nonces(borrower), n + 1, "consumed range is still [n, n+1)");
     }
+
+    // ───────────── chain-7, two signers in one envelope (the case chain-7 left untested) ─────────────
+
+    uint256 internal otherPk = 0xA11CE;
+    address internal other = vm.addr(otherPk);
+
+    function _borrowAs(uint256 pk, uint256 amount) internal returns (uint256 loanId) {
+        address who = vm.addr(pk);
+        vm.prank(owner);
+        credit.setScoreOverride(who, 500_000);
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = DecentralizedMicrocredit.BorrowAndDisburse({
+            borrower: who,
+            amount: amount,
+            to: who,
+            repaymentPeriod: 28 days,
+            maxAprBps: 933,
+            nonce: credit.nonces(who),
+            deadline: _deadline()
+        });
+        vm.prank(relayer);
+        credit.borrowAndDisburseMeta(req, _signBorrowAndDisburse(pk, req));
+        uint256[] memory ids = credit.getBorrowerLoanIds(who);
+        loanId = ids[ids.length - 1];
+    }
+
+    function _repayCall(uint256 pk, uint256 loanId, uint256 nonce, uint256 deadline)
+        internal
+        view
+        returns (bytes memory)
+    {
+        DecentralizedMicrocredit.RepayRequest memory req = DecentralizedMicrocredit.RepayRequest({
+            borrower: vm.addr(pk), loanId: loanId, amount: 0, nonce: nonce, deadline: deadline
+        });
+        return abi.encodeCall(
+            DecentralizedMicrocredit.repayLoanMeta,
+            (req, _signRepayRequest(pk, req), _signPermit(pk, 100e6, _deadline()))
+        );
+    }
+
+    /// chain-7d: two signers, one intent each, in one envelope; the first signer's intent is expired. The envelope
+    /// tx succeeds. Per-signer counters keep the ranges apart: [nA, nA) is empty (nothing of A landed) and
+    /// [nB, nB+1) names B's intent. A journal keyed by (signer, nonce) settles both without the envelope receipt.
+    function testTwoSignersOnlyTheLandedSignersNonceMoves() public {
+        uint256 loanA = _borrow(40e6);
+        uint256 loanB = _borrowAs(otherPk, 40e6);
+        usdc.mint(borrower, 100e6);
+        usdc.mint(other, 100e6);
+        uint256 nA = credit.nonces(borrower);
+        uint256 nB = credit.nonces(other);
+        bytes[] memory calls = new bytes[](2);
+        calls[0] = _repayCall(borrowerPk, loanA, nA, block.timestamp - 1); // expired
+        calls[1] = _repayCall(otherPk, loanB, nB, _deadline());
+
+        vm.prank(relayer);
+        bool[] memory ok = envelope.batch(address(credit), calls);
+        assertFalse(ok[0], "A's intent reverted (SignatureExpired)");
+        assertTrue(ok[1], "B's intent landed");
+        assertEq(credit.nonces(borrower), nA, "A: range [nA, nA) empty, nothing landed");
+        assertEq(credit.nonces(other), nB + 1, "B: range [nB, nB+1) names B's intent");
+        (, uint256 outA,,, bool activeA) = credit.getLoan(loanA);
+        (, uint256 outB,,, bool activeB) = credit.getLoan(loanB);
+        assertGt(outA, 0, "A still owes");
+        assertTrue(activeA, "A's loan still open");
+        assertEq(outB, 0, "B repaid");
+        assertFalse(activeB, "B's loan closed");
+    }
+
+    /// chain-7e: two signers, three intents (A valid, A expired, B valid) in one envelope. Two nonces were consumed
+    /// in total, which alone cannot say whose. Read per signer: [nA, nA+1) names A's valid intent (its expired one
+    /// consumed nothing), [nB, nB+1) names B's. Each signer's range is independent of the other's calls.
+    function testTwoSignersEachRangeNamesItsOwnLandedIntent() public {
+        uint256 loanA = _borrow(40e6);
+        uint256 loanB = _borrowAs(otherPk, 40e6);
+        usdc.mint(borrower, 100e6);
+        usdc.mint(other, 100e6);
+        uint256 nA = credit.nonces(borrower);
+        uint256 nB = credit.nonces(other);
+        bytes[] memory calls = new bytes[](3);
+        calls[0] = _repayCall(borrowerPk, loanA, nA, _deadline());
+        calls[1] = _repayCall(borrowerPk, loanA, nA + 1, block.timestamp - 1); // expired
+        calls[2] = _repayCall(otherPk, loanB, nB, _deadline());
+
+        vm.prank(relayer);
+        bool[] memory ok = envelope.batch(address(credit), calls);
+        assertTrue(ok[0], "A's valid intent landed");
+        assertFalse(ok[1], "A's expired intent reverted");
+        assertTrue(ok[2], "B's intent landed");
+        assertEq(credit.nonces(borrower), nA + 1, "A: exactly one consumed, [nA, nA+1) = A's valid intent");
+        assertEq(credit.nonces(other), nB + 1, "B: exactly one consumed, [nB, nB+1) = B's intent");
+        (, uint256 outA,,, bool activeA) = credit.getLoan(loanA);
+        (, uint256 outB,,, bool activeB) = credit.getLoan(loanB);
+        assertEq(outA, 0, "A repaid by its valid intent");
+        assertFalse(activeA, "A's loan closed");
+        assertEq(outB, 0, "B repaid");
+        assertFalse(activeB, "B's loan closed");
+    }
 }
 
 /// @dev A batch envelope that swallows inner reverts and never reverts itself (the shape merktop described:
