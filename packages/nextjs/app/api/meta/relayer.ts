@@ -10,7 +10,9 @@ import {
   createWalletClient,
   decodeEventLog,
   defineChain,
+  encodeFunctionData,
   http,
+  keccak256,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import deployedContracts from "~~/contracts/deployedContracts";
@@ -19,6 +21,7 @@ import { rateLimited } from "~~/app/api/meta/rateLimit";
 import { contractErrorName, describeContractError } from "~~/utils/contractErrors";
 import { type ChainReads, type Entry, type IntentKey, Journal, decide, isTerminal, keyId, recover } from "~~/utils/relayerJournal";
 import { FileStore } from "~~/utils/relayerJournalStore";
+import { BroadcastRejected, BroadcastUnconfirmed, JournalWriteFailed, rebroadcast, sendHashFirst } from "~~/utils/relayerSend";
 
 /**
  * Shared server-side relayer for the /api/meta/* routes. Each route receives a payload signed by
@@ -193,6 +196,12 @@ export async function relay(params: {
   // Journal (off unless RELAYER_JOURNAL_PATH is set and the route names its signer): the intent is durable before the
   // first network call; a request already seen is answered from the journal; a lost outcome is settled from the chain.
   const state = params.intent ? journalFor() : undefined;
+  // Hash-first sending (relayerSend.ts) needs a local signer: the transaction hash must exist before the broadcast. An
+  // unlocked development node cannot give that, so the journal is refused there outside the local chain.
+  const localSigner = (walletClient.account as { type?: string } | undefined)?.type === "local";
+  if (state && !localSigner && chainId !== LOCAL_CHAIN_ID) {
+    throw new RelayerError("The relayer journal needs a local signing key (RELAYER_PRIVATE_KEY) outside the local chain", 500);
+  }
   let key: IntentKey | undefined;
   let entry: Entry | undefined;
   if (state && params.intent) {
@@ -218,6 +227,24 @@ export async function relay(params: {
         const receipt = await publicClient.getTransactionReceipt({ hash: d.entry.hash as Hex });
         return { hash: d.entry.hash as Hex, receipt, relayer: address, events: decodeEvents(abi, contractAddress, receipt), replayed: true };
       }
+      if (d.entry.state === "submitted" && d.entry.raw && d.entry.hash && localSigner) {
+        // The same signed request again, and its transaction has no receipt: send the identical bytes once more (one
+        // transaction, one hash, however often) and wait for the receipt, which alone decides.
+        const hash = d.entry.hash as Hex;
+        try {
+          await rebroadcast(d.entry, { broadcast: async raw => void (await publicClient.sendRawTransaction({ serializedTransaction: raw as Hex })) });
+          const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 20_000 });
+          state.store.append(state.journal.outcome(key, receipt.status === "success" ? "success" : "reverted", new Date().toISOString()));
+          if (receipt.status !== "success") throw new RelayerError(`Transaction ${hash} reverted`);
+          return { hash, receipt, relayer: address, events: decodeEvents(abi, contractAddress, receipt) };
+        } catch (e) {
+          if (e instanceof RelayerError) throw e;
+          throw new RelayerError(
+            `Submitted but not yet confirmed (transaction ${hash}). Send the same request again: the identical transaction is rebroadcast, never a second one.`,
+            202,
+          );
+        }
+      }
       const note = String(d.answer.body.note ?? d.answer.body.status);
       throw new RelayerError(d.entry.hash ? `${note} (transaction ${d.entry.hash})` : note, d.answer.status);
     }
@@ -242,13 +269,48 @@ export async function relay(params: {
         account: walletClient.account!,
       }));
     } catch (e) {
-      if (state && key) state.store.append(state.journal.settle(key, "abandoned", "simulation reverted before any send", new Date().toISOString()));
+      // Nothing was signed or sent, whether the simulation reverted or its read failed.
+      if (state && key) state.store.append(state.journal.settle(key, "abandoned", "simulation failed before any send", new Date().toISOString()));
       throw e;
     }
-    // From here on the outcome of a failed call is unknown: the entry stays open for recovery.
+    if (state && key && localSigner) {
+      const account = walletClient.account!;
+      const data = encodeFunctionData({ abi, functionName, args } as any);
+      try {
+        return (await sendHashFirst(
+          state.journal,
+          key,
+          {
+            // Signing reads the network (nonce, fees) but sends nothing; the hash is journaled before the broadcast.
+            sign: async () => {
+              const prepared = await walletClient.prepareTransactionRequest({ account, to: contractAddress, data, chain: walletClient.chain } as any);
+              const raw = await walletClient.signTransaction(prepared as any);
+              return { raw, hash: keccak256(raw) };
+            },
+            broadcast: async raw => void (await publicClient.sendRawTransaction({ serializedTransaction: raw as Hex })),
+            append: e => state.store.append(e),
+          },
+          () => new Date().toISOString(),
+        )) as Hex;
+      } catch (e) {
+        if (e instanceof JournalWriteFailed) throw new RelayerError("The relayer journal is unavailable; the request was not sent", 503);
+        if (e instanceof BroadcastRejected) throw new RelayerError("The relayer's account nonce moved before the transaction could be sent; nothing was sent. Try again.", 503);
+        if (e instanceof BroadcastUnconfirmed) {
+          throw new RelayerError(
+            `Submitted but not yet confirmed (transaction ${e.hash}). Send the same request again: the identical transaction is rebroadcast, never a second one.`,
+            202,
+          );
+        }
+        // Signing failed before any hash existed: nothing was broadcast.
+        state.store.append(state.journal.settle(key, "abandoned", "signing failed before any broadcast", new Date().toISOString()));
+        throw e;
+      }
+    }
+    // Unjournaled, or an unlocked development node: the outcome of a failed call is unknown to the journal, which stays open.
     return walletClient.writeContract(request);
   });
-  if (state && key) state.store.append(state.journal.submitted(key, hash, new Date().toISOString()));
+  // The hash-first path has already journaled the hash (and the bytes) before the broadcast; the unlocked-node path has not.
+  if (state && key && state.journal.get(key)?.hash !== hash) state.store.append(state.journal.submitted(key, hash, new Date().toISOString()));
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   if (state && key) state.store.append(state.journal.outcome(key, receipt.status === "success" ? "success" : "reverted", new Date().toISOString()));
   if (receipt.status !== "success") throw new RelayerError(`Transaction ${hash} reverted`);

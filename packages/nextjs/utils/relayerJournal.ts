@@ -5,6 +5,12 @@
  * Rules, each from the fixture or the contract tests (`test/RelayerRetry.t.sol`, `test/RelayerRetryBatch.t.sol`):
  *  1. The intent is written, and made durable, BEFORE the first network call. A present record means "permitted or
  *     intended", never "performed".
+ *  1b. For a local signer the signed transaction is built before it is sent, so its hash exists before the network does:
+ *     the hash and the raw bytes are journaled durably BEFORE the broadcast (relayerSend.ts). "No hash" therefore means
+ *     "never broadcast", and "a hash" means "may be in a mempool": absence of a mined receipt is then unknown, not failure
+ *     (fixture email-11 case B: the node accepted it and the worker died before persisting). The identical bytes may be
+ *     rebroadcast any number of times; they cannot land twice. A signer that cannot sign locally (an unlocked development
+ *     node) cannot give this guarantee and is refused outside the local chain.
  *  2. The key of an intent is (chain, pool, signer, nonce), the nonce the signer signed. The contract consumes that
  *     nonce exactly once (`InvalidNonce`), so a duplicate submission cannot land twice; the journal's job is to make the
  *     relayer's own answers truthful and idempotent, not to be the last line of defence.
@@ -57,6 +63,8 @@ export type Entry = {
   state: State;
   functionName?: string;
   hash?: string;
+  /** The signed transaction (public once broadcast), kept so the identical bytes can be rebroadcast. */
+  raw?: string;
   note?: string;
 };
 
@@ -134,8 +142,8 @@ export class Journal {
     return { kind: "existing", entry: prev };
   }
 
-  submitted(key: IntentKey, hash: string, now: string): Entry {
-    return this.advance(key, { state: "submitted", hash }, now);
+  submitted(key: IntentKey, hash: string, now: string, raw?: string): Entry {
+    return this.advance(key, { state: "submitted", hash, ...(raw ? { raw } : {}) }, now);
   }
 
   outcome(key: IntentKey, status: "success" | "reverted", now: string): Entry {
