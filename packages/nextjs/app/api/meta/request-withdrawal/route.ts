@@ -9,6 +9,7 @@ export const POST = relayerRoute(async body => {
     chainId,
     contractAddress,
     functionName: "requestWithdrawalMeta",
+    intent: { signer: req.lender, poolNonce: String(req.nonce) },
     args: [
       {
         lender: req.lender,

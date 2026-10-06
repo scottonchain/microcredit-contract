@@ -8,6 +8,7 @@ export const POST = relayerRoute(async body => {
   const result = await relay({
     chainId,
     contractAddress,
+    intent: { signer: lender },
     functionName: "depositPermitOnlyMeta",
     args: [lender, toPermitArg(permit as PermitPayload)],
   });

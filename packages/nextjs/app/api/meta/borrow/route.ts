@@ -9,6 +9,7 @@ export const POST = relayerRoute(async body => {
     chainId,
     contractAddress,
     functionName: "borrowAndDisburseMeta",
+    intent: { signer: req.borrower, poolNonce: String(req.nonce) },
     args: [
       {
         borrower: req.borrower,

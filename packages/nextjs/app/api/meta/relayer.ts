@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import {
   type Abi,
@@ -16,6 +17,8 @@ import deployedContracts from "~~/contracts/deployedContracts";
 import scaffoldConfig from "~~/scaffold.config";
 import { rateLimited } from "~~/app/api/meta/rateLimit";
 import { contractErrorName, describeContractError } from "~~/utils/contractErrors";
+import { type ChainReads, type Entry, type IntentKey, Journal, decide, isTerminal, keyId, recover } from "~~/utils/relayerJournal";
+import { FileStore } from "~~/utils/relayerJournalStore";
 
 /**
  * Shared server-side relayer for the /api/meta/* routes. Each route receives a payload signed by
@@ -43,7 +46,12 @@ export type RelayResult = {
   receipt: TransactionReceipt;
   relayer: Address;
   events: DecodedEvent[];
+  /** True when the answer came from the journal: the same signed request had already landed. */
+  replayed?: boolean;
 };
+
+/** Who signed the request and, for pool meta-transactions, the pool nonce they signed (see utils/relayerJournal.ts). */
+export type RelayIntent = { signer: string; poolNonce?: string };
 
 const deployments = deployedContracts as unknown as Record<
   number,
@@ -120,38 +128,137 @@ function decodeEvents(abi: Abi, contractAddress: Address, receipt: TransactionRe
     });
 }
 
+// ---- durable journal (utils/relayerJournal.ts; off unless RELAYER_JOURNAL_PATH is set) ----------------------------------
+let journalState: { path: string; store: FileStore; journal: Journal } | undefined;
+const recoveredChains = new Set<number>();
+
+function journalFor() {
+  const path = process.env.RELAYER_JOURNAL_PATH;
+  if (!path) return undefined;
+  if (!journalState || journalState.path !== path) {
+    const store = new FileStore(path);
+    journalState = { path, store, journal: Journal.replay(store.readLines()) };
+    recoveredChains.clear();
+  }
+  return journalState;
+}
+
+const digestOf = (functionName: string, args: readonly unknown[]) =>
+  createHash("sha256")
+    .update(functionName + JSON.stringify(args, (_k, v) => (typeof v === "bigint" ? v.toString() : v)))
+    .digest("hex");
+
+function chainReads(publicClient: any, pool: Address, abi: Abi): ChainReads {
+  return {
+    receipt: async hash => {
+      try {
+        const r = await publicClient.getTransactionReceipt({ hash: hash as Hex });
+        return { status: r.status as "success" | "reverted" };
+      } catch (e: any) {
+        if (e?.name === "TransactionReceiptNotFoundError") return undefined; // not mined yet: neither success nor absence
+        throw e;
+      }
+    },
+    poolNonce: async signer =>
+      (await publicClient.readContract({ address: pool, abi, functionName: "nonces", args: [signer as Address] })) as bigint,
+  };
+}
+
+/** Settles what the chain can settle for this chain's open entries, once per process and chain. Errors do not block relaying. */
+async function recoverOnce(state: NonNullable<ReturnType<typeof journalFor>>, chainId: number, reads: ChainReads) {
+  if (recoveredChains.has(chainId)) return;
+  try {
+    const done = await recover(state.journal, reads, new Date().toISOString(), e => e.key.chainId === chainId);
+    for (const r of done) state.store.append(r.next);
+    recoveredChains.add(chainId);
+    if (done.length) console.log(`[relayer] journal recovery settled ${done.length} open intent(s) on chain ${chainId}`);
+  } catch (e: any) {
+    console.error("[relayer] journal recovery failed, will retry on the next request:", e?.message ?? e);
+  }
+}
+
 /** Submits `functionName(args)` to the contract from the relayer and waits for it to be mined. */
 export async function relay(params: {
   chainId: number;
   contractAddress: Address;
   functionName: string;
   args: readonly unknown[];
+  intent?: RelayIntent;
 }): Promise<RelayResult> {
   const { chainId, functionName, args } = params;
   const { address: contractAddress, abi } = resolveDeployment(chainId, params.contractAddress);
   const { publicClient, walletClient, address } = await getRelayer(chainId);
   console.log(`[relayer] ${functionName}`, { chainId, contractAddress, relayer: address });
 
+  // Journal (off unless RELAYER_JOURNAL_PATH is set and the route names its signer): the intent is durable before the
+  // first network call; a request already seen is answered from the journal; a lost outcome is settled from the chain.
+  const state = params.intent ? journalFor() : undefined;
+  let key: IntentKey | undefined;
+  let entry: Entry | undefined;
+  if (state && params.intent) {
+    const reads = chainReads(publicClient, contractAddress, abi);
+    await recoverOnce(state, chainId, reads);
+    const digest = digestOf(functionName, args);
+    key = {
+      chainId,
+      pool: contractAddress,
+      signer: params.intent.signer,
+      kind: params.intent.poolNonce !== undefined ? "pool" : "permit",
+      nonce: params.intent.poolNonce ?? digest,
+    };
+    let d = decide(state.journal, key, digest, functionName, new Date().toISOString());
+    if (d.action === "answer" && !isTerminal(d.entry.state)) {
+      // An open entry from this process or an earlier one: let the chain settle what it can, then decide again.
+      const done = await recover(state.journal, reads, new Date().toISOString(), e => keyId(e.key) === keyId(key!));
+      for (const r of done) state.store.append(r.next);
+      if (done.length) d = decide(state.journal, key, digest, functionName, new Date().toISOString());
+    }
+    if (d.action === "answer") {
+      if (d.answer.status === 200 && d.entry.hash) {
+        const receipt = await publicClient.getTransactionReceipt({ hash: d.entry.hash as Hex });
+        return { hash: d.entry.hash as Hex, receipt, relayer: address, events: decodeEvents(abi, contractAddress, receipt), replayed: true };
+      }
+      const note = String(d.answer.body.note ?? d.answer.body.status);
+      throw new RelayerError(d.entry.hash ? `${note} (transaction ${d.entry.hash})` : note, d.answer.status);
+    }
+    entry = d.entry;
+    try {
+      state.store.append(entry); // durable before any network call
+    } catch (e: any) {
+      state.journal.settle(key, "abandoned", "journal write failed; nothing was sent", new Date().toISOString());
+      throw new RelayerError("The relayer journal is unavailable; the request was not sent", 503);
+    }
+  }
+
   const hash = await serialized(async () => {
     // Simulate first so reverts surface with their reason and never cost the relayer gas.
-    const { request } = await publicClient.simulateContract({
-      address: contractAddress,
-      abi,
-      functionName,
-      args,
-      account: walletClient.account!,
-    });
+    let request;
+    try {
+      ({ request } = await publicClient.simulateContract({
+        address: contractAddress,
+        abi,
+        functionName,
+        args,
+        account: walletClient.account!,
+      }));
+    } catch (e) {
+      if (state && key) state.store.append(state.journal.settle(key, "abandoned", "simulation reverted before any send", new Date().toISOString()));
+      throw e;
+    }
+    // From here on the outcome of a failed call is unknown: the entry stays open for recovery.
     return walletClient.writeContract(request);
   });
+  if (state && key) state.store.append(state.journal.submitted(key, hash, new Date().toISOString()));
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (state && key) state.store.append(state.journal.outcome(key, receipt.status === "success" ? "success" : "reverted", new Date().toISOString()));
   if (receipt.status !== "success") throw new RelayerError(`Transaction ${hash} reverted`);
 
   return { hash, receipt, relayer: address, events: decodeEvents(abi, contractAddress, receipt) };
 }
 
 /** Standard fields every relayer route returns for a mined transaction. */
-export function txResponse({ hash, receipt, relayer }: RelayResult) {
-  return { txHash: hash, hash, status: "mined", receiptStatus: receipt.status, relayer };
+export function txResponse({ hash, receipt, relayer, replayed }: RelayResult) {
+  return { txHash: hash, hash, status: "mined", receiptStatus: receipt.status, relayer, ...(replayed ? { replayed: true } : {}) };
 }
 
 export function findEvent(result: RelayResult, eventName: string) {
