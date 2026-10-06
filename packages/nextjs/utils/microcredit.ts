@@ -4,6 +4,26 @@ import scaffoldConfig from "~~/scaffold.config";
 /** Chain the app targets (local Anvil by default; see scaffold.config.ts). */
 export const CHAIN_ID = scaffoldConfig.targetNetworks[0].id;
 
+/**
+ * Whether the gasless relayer routes (app/api/meta/*) exist in this build. A static export has no server, so
+ * it is built with NEXT_PUBLIC_RELAYER_DISABLED=true and every page falls back to wallet-direct calls: the
+ * user pays gas and signs each transaction. Only the withdrawal queue has no wallet-direct form.
+ */
+export const RELAYER_ENABLED = process.env.NEXT_PUBLIC_RELAYER_DISABLED !== "true";
+
+/** The live Base Sepolia pool this app is built against when CHAIN_ID is 84532 (docs/TESTNET.md). */
+export const LIVE_DEPLOYMENT = {
+  chainId: 84532,
+  chainName: "Base Sepolia",
+  deployedCommit: "1812e7d",
+  explorer: "https://sepolia.basescan.org",
+} as const;
+export const IS_LIVE_TESTNET = (CHAIN_ID as number) === LIVE_DEPLOYMENT.chainId;
+/** The commit this front end was built from, stamped at build time (scripts/build-static.sh). */
+export const BUILD_COMMIT = process.env.NEXT_PUBLIC_BUILD_COMMIT ?? "";
+/** Path prefix when the static export is served under a sub-path (GitHub Pages project site); "" otherwise. */
+export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 const deployment = deployedContracts[CHAIN_ID];
 
 export const MICROCREDIT_ADDRESS = deployment.DecentralizedMicrocredit.address as `0x${string}`;

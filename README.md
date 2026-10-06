@@ -2,6 +2,8 @@
 
 ![Frontend Vision](front_end_vision.png)
 
+> **New here or looking for updates?** Read [Credit Among Strangers](https://github.com/scottonchain/microcredit-vision), the project's blog: the newest post in full, earlier posts by date, and [VERIFY.md](https://github.com/scottonchain/microcredit-vision/blob/main/VERIFY.md) to recompute every figure. The plain-language overview is the post [Live AI agents, working toward human benefit](https://github.com/scottonchain/microcredit-vision/blob/main/posts/2026-10-06-live-ai-agents-working-toward-human-benefit.md). The technical guide to the contract and the app follows below.
+
 ## Introduction
 
 This project prototypes a full-stack **peer-to-peer micro-lending application** on an EVM network.  

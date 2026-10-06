@@ -14,7 +14,9 @@ import { relayerErrorMessage } from "~~/utils/contractErrors";
 import { getParsedError } from "~~/utils/scaffold-eth";
 import { formatUSDC } from "~~/utils/format";
 import { BackRequest, MICRO_DOMAIN, TYPES } from "~~/utils/eip712";
-import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS } from "~~/utils/microcredit";
+import { BASE_PATH, CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, RELAYER_ENABLED } from "~~/utils/microcredit";
+import { assertSameSigner, captureSigner, requireHash } from "~~/utils/walletWrite";
+import { usePoolToken } from "~~/hooks/usePoolToken";
 
 // useSearchParams() needs a Suspense boundary for the page to be prerendered at build time.
 export default function BackPage() {
@@ -86,7 +88,7 @@ function BackForm() {
   const copyLink = async () => {
     if (!connectedAddress) return;
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/attest?borrower=${connectedAddress}`);
+      await navigator.clipboard.writeText(`${window.location.origin}${BASE_PATH}/attest?borrower=${connectedAddress}`);
       setLinkCopied(true);
       toast.success("Backing link copied!", { position: "top-center", duration: 2000 });
       setTimeout(() => setLinkCopied(false), 2500);
@@ -109,12 +111,22 @@ function BackForm() {
 
   const refreshCredit = () => Promise.all([refetchStake(), refetchFree(), refetchBacking()]);
 
+  // The build's token must be the pool's token; otherwise no write is offered (see TestnetBanner).
+  const { mismatch: tokenMismatch } = usePoolToken();
+
   const handleStake = async () => {
+    if (tokenMismatch) {
+      toast.error("This build's token does not match the pool's token; staking is disabled.");
+      return;
+    }
     if (!connectedAddress || stakeShortfall === 0n) return;
     setStakeLoading(true);
     try {
+      // Two transactions, each required to have been sent and mined, by the same account on the same chain.
+      const signer = captureSigner("Staking");
       await writeUsdc("approve", [MICROCREDIT_ADDRESS, stakeShortfall]);
-      await writeCreditAsync({ functionName: "stake", args: [stakeShortfall] });
+      assertSameSigner(signer);
+      requireHash(await writeCreditAsync({ functionName: "stake", args: [stakeShortfall] }), "Staking");
       await refreshCredit();
       toast.success(`Staked ${formatUSDC(stakeShortfall)}`, { position: "top-center" });
     } catch (err: any) {
@@ -131,6 +143,17 @@ function BackForm() {
     setLoading(true);
     try {
       if (!publicClient) throw new Error("Contract not available");
+      if (!RELAYER_ENABLED) {
+        // Wallet-direct: the backer sends the transaction and pays the gas. Success is the mined hash, nothing less.
+        const txHash = requireHash(
+          await writeCreditAsync({ functionName: "back", args: [borrower as `0x${string}`, amount] }),
+          "The backing",
+        );
+        await refreshCredit();
+        setSubmitted({ borrower, amount, txHash });
+        toast.success("Backing recorded", { position: "top-center" });
+        return;
+      }
       const backer = connectedAddress as `0x${string}`;
       const nonce = (await publicClient.readContract({
         address: MICROCREDIT_ADDRESS,
@@ -272,15 +295,16 @@ function BackForm() {
             ) : (
               <button
                 onClick={handleBack}
-                disabled={!borrower || amount === null || loading || !connectedAddress || isOwnLink}
+                disabled={tokenMismatch || !borrower || amount === null || loading || !connectedAddress || isOwnLink}
                 className="btn btn-primary w-full"
               >
                 {loading ? "Submitting..." : amount !== null ? `Back with ${formatUSDC(amount)}` : "Back"}
               </button>
             )}
             <div className="text-xs text-gray-500 text-center">
-              Backing is gasless: you sign a message and our relayer submits it. Staking is a normal wallet
-              transaction.
+              {RELAYER_ENABLED
+                ? "Backing is gasless: you sign a message and our relayer submits it. Staking is a normal wallet transaction."
+                : "Your wallet signs and pays for the backing transaction, and for staking: each is a normal wallet transaction on this network."}
             </div>
           </div>
         ) : (

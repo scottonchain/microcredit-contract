@@ -52,7 +52,15 @@ contract DeployTestnetScript is Script {
         vm.startBroadcast();
         (, d.deployer,) = vm.readCallers();
         d.usdc = _envAddress("USDC_ADDRESS");
-        if (d.usdc == address(0)) d.usdc = address(new MockUSDC());
+        if (d.usdc == address(0)) {
+            // The public Base Sepolia demo runs on Circle's USDC (0x036CbD53842c5426634e7929541eC2318f3dCF7e); a
+            // free-mint token there is a mistake unless asked for explicitly.
+            require(
+                block.chainid != BASE_SEPOLIA || _isSet("ALLOW_MOCK_USDC"),
+                "DeployTestnet: set USDC_ADDRESS on Base Sepolia (or ALLOW_MOCK_USDC=1 for a private mock deployment)"
+            );
+            d.usdc = address(new MockUSDC());
+        }
         d.credit = new DecentralizedMicrocredit(
             _envUint("EFFR_BPS", 433), _envUint("RISK_PREMIUM_BPS", 500), _envUint("MAX_LOAN", 25e6), d.usdc, d.deployer
         );

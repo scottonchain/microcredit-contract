@@ -11,7 +11,7 @@ import scaffoldConfig from "~~/scaffold.config";
 const { onlyLocalBurnerWallet, targetNetworks } = scaffoldConfig;
 
 const isLocalNetwork = targetNetworks.some(
-  n => n.id === chains.hardhat.id || n.id === chains.foundry.id,
+  n => (n.id as number) === chains.hardhat.id || (n.id as number) === chains.foundry.id,
 );
 
 // In demo wallet mode the fake window.ethereum provider identifies as MetaMask,

@@ -6,7 +6,30 @@ Three deployments of the same contract code exist. The **live deployment** is th
 
 Commit ids: the repository's history was rewritten on 2026-10-04 to remove private identifiers from commit messages (file contents unchanged), so the broadcast logs record the pre-rewrite ids `73cb3f6` (now `9ab3729`) and `489f01a` (now `19b166e`).
 
-## Live deployment (operated by Hermes)
+## Canonical-USDC deployment (BASE-SEPOLIA-USDC-001, 2026-10-06, operated by Hermes)
+
+The public demo at https://scottonchain.github.io/pool/ runs on this deployment. Its token is Circle's Base Sepolia test USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` (no value; obtained from Circle's faucet, never minted here). Deployed 2026-10-06 by Hermes from `main` `1812e7d` with `script/DeployTestnet.s.sol`, from the pinned plan in contract issue #7 (comment 6025612128); broadcast log `packages/foundry/broadcast/DeployTestnet.s.sol/84532/run-1791321859078.json` (also published by Hermes at testbed commit `d2ffe7a`).
+
+| Contract | Address |
+| --- | --- |
+| `DecentralizedMicrocredit` (pool) | `0x73872B8fB7F1771C67911f03edc75aBdc9514973` |
+| `MicrocreditLens` | `0xe47BAea70DC68D6bDeFE08FD8021F84F69FdF8F4` |
+| `OracleScoreProvider` | `0x554c6bB61eDF0CAfB90ff31813540369Cb0105e4` |
+| USDC (Circle, Base Sepolia) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+
+Parameters: EFFR 433 bps plus a 500 bps risk premium (933 bps APR); a full line is 100 USDC; the reserve share is 45% of interest (the contract default the operator decided on 2026-10-05; the mock-token pool below runs 30%); the issuance budget is 50 full lines; scores go stale after 7 days. Roles: owner, oracle, score reporter and guardian are Hermes's testnet account `0x5e4dC7639D2b94006c51aD5373173f5e01c248F9`.
+
+Deploy and configuration transactions (blocks 47776780 to 47776786, all successful): pool `0x7f0feb90dc37d08917fa8d9d76e17d247e6a76d2486582c7fe8c8347d7013b24`, lens `0xf0ee5bf22c74010661ad26fcceae434fabc1cd266ec84dcf4d822522a401553c`, score provider `0x7de028fc659ef68f2b61623a7d103012ddffec2a9c4cd27cf7f0447a67139908`, `setLending` `0x86bc41c532dd4e4b6ff32bc0d996f1424e249e6ca82c6c1cad839dd0d3d8cf97`, `setScoreProvider` `0x8aa04c046cc34d9229ee357eca8955a8a12b9658d2a90e2e7f2a3e6cf42776d1`, `setReserveBps` `0x3c5558e6a2bf4eb04607cf690ab7ff89299178b433bee42af01683b9c2604813`, `setGuardian` `0xb109eaf6e0d3a7842497ee6fa9d9480eb0ea5e258e2d6fd1e65b5441e072c751`. Verified from chain by Hermes after deployment: `usdc()`, `scoreProvider()`, `reserveBps()` 4500, `maxLoanAmount()` 100000000, `owner()` and `guardian()` as stated.
+
+Funding: 20 USDC deposited from Hermes's account by `approve` (`0xa07b55523e7977c5a0b9d6a24418e4fe26deae2ff9cf8796eb1fe4f364ab5d8e`, block 47776801) then `depositFunds` (`0xdb51bbe136a8db32009b51f3ee3d64676521e99aff3ea90b5c1da8fc965a3d96`, block 47776811): the pool's token balance and `lenderCash` are 20,000,000 (20 USDC) and the depositor holds 2e13 shares. A raw token transfer to the pool is not a deposit: `lenderCash` is tracked internally.
+
+Credit: one line of 92 USDC to the Avery persona `0xc5E42B0fB0c109E55f4A40CccfCF3fed1Fc39009` (`publishScores` `0xf3e2abfc88b08545128431b86bcf98bd22b916b035ba6ef1ac32447cc7f14948`, block 47776850), so that a fresh wallet can be backed in the acceptance run; one of the 50 lines is held, no other line exists.
+
+Test USDC for visitors comes from Circle's faucet (https://faucet.circle.com, Base Sepolia); its amounts and quotas are not verified by this project, and Hermes's API access to it returned 403 on 2026-10-06. `docs/TESTNET_WALKTHROUGH.md` is the visitor's guide.
+
+## Mock-token deployment (history: 2026-10-03 to 2026-10-06, operated by Hermes)
+
+Until the canonical-USDC deployment above went live, this was the deployment behind the public demo. It runs on a free-mint MockUSDC, stays on chain and keeps its scenario record below, but the app no longer points at it. A position there (the Lena persona's deposit, the test wallets of the acceptance runs) exits by calling `withdrawFunds(uint256)` on the pool from the depositing account; nothing of value is held.
 
 Chain: Base Sepolia (84532), RPC `https://sepolia.base.org`. Deployed 2026-10-03 from `main` `19b166e` with `script/DeployTestnet.s.sol` (`MAX_LOAN=100000000`). Broadcast logs: `packages/foundry/broadcast/DeployTestnet.s.sol/84532/run-1791065984302.json` and `TestnetScenarios.s.sol/84532/run-1791066260981.json`.
 
@@ -137,7 +160,7 @@ Broadcast logs: `run-1791061743878.json` and `run-1791062101644.json` in the sam
 
 ## Front end
 
-`packages/nextjs/contracts/deployedContracts.ts` points at the live deployment. To use it, set `targetNetworks: [chains.baseSepolia]` in `packages/nextjs/scaffold.config.ts`. The relayer routes then need `RELAYER_PRIVATE_KEY` for a funded Base Sepolia account.
+`packages/nextjs/contracts/deployedContracts.ts` carries the canonical-USDC deployment for chain 84532 (regenerated from the broadcast log by `generateTsAbis.js`, which keeps only the contracts of the run that deployed the pool, so no mock token can pair with it). `yarn build:static` builds the public wallet-direct app against it (`CLAUDE.md`, "Target chain and the static release"); the relayed version needs `RELAYER_PRIVATE_KEY` for a funded Base Sepolia account and is release two.
 
 ## Agent testbed
 

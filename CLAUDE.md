@@ -15,6 +15,10 @@ Every repository of this project is public, and other agents read them. Nothing 
 
 Before posting anything to GitHub, read it as a stranger would. `scripts/check-public-content.sh` enforces the patterns above in the commit-msg hook (`.husky/commit-msg`) and in CI on every PR's description, commit messages and added lines. A finding is fixed by removing the content, never by weakening the check.
 
+## Team blog and shared planning
+
+The project's public blog is the `scottonchain/microcredit-vision` repository ("Credit Among Strangers"): `README.md` there is a generated feed, posts live in `posts/`, and its `CLAUDE.md` holds the build steps, the posting cadence, the voice and the ownership (Claude Code writes the posts; Hermes keeps `VERIFY.md` rows). Every figure a post states must have a row in that `VERIFY.md`. Before planning work across the project's repositories, read the team's world model, `world-model/model.json` in `scottonchain/microcredit-agent-testbed`, at the current `main` commit, and follow its update protocol in `world-model/README.md`.
+
 ## Monorepo Structure
 
 Two packages managed via yarn workspaces:
@@ -131,6 +135,8 @@ Next.js 15 App Router with wagmi v2 + viem + RainbowKit for Web3. Zustand for cl
 Contract addresses, ABIs and the chain id come from `utils/microcredit.ts` (built on the generated `contracts/deployedContracts.ts`); EIP-712 domains and types from `utils/eip712.ts`. Scaffold-ETH hooks in `packages/nextjs/hooks/scaffold-eth/` provide contract reading/writing utilities. Custom hooks in `packages/nextjs/hooks/` include `useIsAdmin`, `useUserRole`, `useAddressDisplayName`.
 
 Demo wallet mode (`NEXT_PUBLIC_DEMO_WALLET=true`, set automatically by `yarn demo`) injects a provider that signs with Anvil accounts; personas are in `constants/demoPersonas.ts`.
+
+**Target chain and the static release.** The chain the app is built for is a literal in `scaffold.target.ts` (the local Anvil chain as checked in), so every ABI and address follows it through `deployedContracts.ts`. `yarn build:static` (`scripts/build-static.sh`) swaps that file for Base Sepolia for the duration of the build, sets `NEXT_PUBLIC_RELAYER_DISABLED=true` and `NEXT_PUBLIC_IPFS_BUILD=true`, and writes a static export to `out/` against the live pool: with `RELAYER_ENABLED` false, the lend, attest and borrower pages use wallet-direct calls (approve and `depositFunds`, `withdrawFunds`, `back`, `requestLoan` then `disburseLoan`, approve and `repayLoan`), the user pays gas, a requested loan that was not disbursed is offered for disbursement or cancellation after a reload, the withdrawal queue and chosen loan terms are named as relayer-only, `TestnetBanner` states the network, the deployed commit and the build commit, and `TestnetMint` mints test USDC. `NEXT_PUBLIC_BASE_PATH=/pool` serves the export under a sub-path. No secret is needed for that build. Wallet-direct origination is an intent (`utils/originationIntent.ts`, pure functions, unit-tested with `yarn workspace @se-2/nextjs test`): persisted to `localStorage` before the wallet is asked, bound to the request's transaction hash before the receipt is awaited, resolved to a loan id from that receipt's `LoanRequested` event (never from the length of the borrower's id array), and reconciled on reload or in a second tab; while it is unresolved the page offers no new request, and only a wallet rejection drops it. Every wallet-direct step requires a mined hash (`utils/walletWrite.ts`: scaffold's write hook resolves `undefined` on a missing deployment, no wallet or the wrong chain, which must never read as success) and the same signer on the same chain as the step before. `docs/TESTNET_WALKTHROUGH.md` is the human walkthrough the banner links to, by build commit.
 
 ## Deployment
 

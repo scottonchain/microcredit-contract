@@ -169,6 +169,31 @@ function processAllDeployments(broadcastPath) {
     });
   });
 
+  // One deployment set per chain: the run that deployed the pool (DecentralizedMicrocredit) last defines the
+  // chain's contracts. Contracts that only older runs deployed (the MockUSDC of a retired deployment, say) are
+  // dropped, so the app can never pair a new pool with a stale token entry.
+  const poolRunByChain = new Map();
+  allDeployments.forEach((d) => {
+    if (d.contractName === "DecentralizedMicrocredit") {
+      poolRunByChain.set(d.chainId, {
+        script: d.deploymentScript,
+        file: d.deploymentFile,
+      });
+    }
+  });
+  allDeployments.forEach((d, key) => {
+    const run = poolRunByChain.get(d.chainId);
+    if (
+      run &&
+      (d.deploymentScript !== run.script || d.deploymentFile !== run.file)
+    ) {
+      console.log(
+        `Dropping ${d.contractName} at ${d.address} on chain ${d.chainId}: deployed by an older run than the pool (${d.deploymentFile})`
+      );
+      allDeployments.delete(key);
+    }
+  });
+
   const allContracts = {};
 
   allDeployments.forEach((deployment) => {
