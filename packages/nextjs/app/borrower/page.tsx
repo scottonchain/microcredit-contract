@@ -25,7 +25,7 @@ import {
   reconcileIntent,
   saveIntent,
 } from "~~/utils/originationIntent";
-import { type Signer, assertSameSigner, captureSigner, requireHash } from "~~/utils/walletWrite";
+import { type Signer, assertSameSigner, captureSigner, requireHash, waitForAllowance } from "~~/utils/walletWrite";
 import { usePoolToken } from "~~/hooks/usePoolToken";
 import { relayerErrorMessage } from "~~/utils/contractErrors";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
@@ -1137,6 +1137,8 @@ const BorrowPage: NextPage = () => {
                         // to have been sent and mined before the next step, by the same account on the same chain.
                         const signer = captureSigner("The repayment");
                         await writeUsdc("approve", [MICROCREDIT_ADDRESS, amountToRepay]);
+                        if (!publicClient) throw new Error("Contract not available");
+                        await waitForAllowance(publicClient, signer.address, MICROCREDIT_ADDRESS, amountToRepay);
                         assertSameSigner(signer);
                         requireHash(
                           await writeCreditAsync({ functionName: "repayLoan", args: [activeLoanId as bigint, amountToRepay] }),
@@ -1276,6 +1278,8 @@ const BorrowPage: NextPage = () => {
                           // to have been sent and mined before the next step, by the same account on the same chain.
                           const signer = captureSigner("The repayment");
                           await writeUsdc("approve", [MICROCREDIT_ADDRESS, repayAmountBigInt]);
+                          if (!publicClient) throw new Error("Contract not available");
+                          await waitForAllowance(publicClient, signer.address, MICROCREDIT_ADDRESS, repayAmountBigInt);
                           assertSameSigner(signer);
                           requireHash(
                             await writeCreditAsync({ functionName: "repayLoan", args: [activeLoanId as bigint, repayAmountBigInt] }),

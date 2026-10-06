@@ -61,6 +61,7 @@ On **Borrow**, the active loan shows what is owed. Repay in full or in part: two
 | You opened the page in two tabs | Both tabs see the same pending request and neither offers a new one | Finish it in one tab |
 | Your wallet is on another network | The app asks you to switch; nothing is sent, no success is shown | Switch to Base Sepolia |
 | You switched accounts between the two prompts of a step | The second transaction is not sent; the page says the wallet changed | Switch back and repeat the step |
+| After the approval the page says it is "mined but not yet visible to the network" | A public RPC endpoint can lag behind the block; the page waited about 30 seconds for the approval to show and stopped without sending anything further | Wait a moment and press the same button again: the approval is already in place and only the second transaction is sent |
 | The banner shows "Token mismatch" | The build's token is not the pool's token; every write is disabled | Report it on contract issue 7; nothing you do can go wrong meanwhile |
 | A transaction reverted | The page shows the error text from the contract | Read it; the usual causes are a limit, a paused pool or an already settled loan |
 

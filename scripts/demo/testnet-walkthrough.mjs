@@ -21,7 +21,11 @@
  *                           reload during recovery)
  *        --wrong-network    the wallet reports Ethereum Sepolia (11155111) and refuses to switch; the script asserts
  *                           the app sends nothing and shows its wrong-network state
- *        --headful          show the browser;  --skip-lend --skip-borrow --skip-withdraw  skip steps
+ *        --headful          show the browser;  --skip-lend --skip-borrow --skip-withdraw --skip-back  skip steps
+ *        --resume-pending   continue a borrow whose requestLoan was already mined (the loan is Requested)
+ *        --repay-only / --withdraw-only  run only that part
+ * Environment (browser): CHROMIUM_PATH, CHROMIUM_NO_SANDBOX=1.
+ * Credit: the selectors and flags after the first live run are Hermes's (testbed a35802e, browser-run-f116695).
  * The JSON holds addresses, hashes and balances only; the key is never written.
  */
 import fs from "node:fs";
@@ -193,7 +197,7 @@ async function connectWallet(page) {
   if (!(await btn.isVisible({ timeout: 4000 }).catch(() => false))) return;
   await btn.click();
   await sleep(800);
-  const mm = page.getByText("MetaMask").first();
+  const mm = page.getByRole("button", { name: /MetaMask/ }).first();
   if (await mm.isVisible({ timeout: 3000 }).catch(() => false)) await mm.click();
   else await page.getByText(/browser wallet|injected/i).first().click({ timeout: 4000 });
   await page.waitForFunction(() => /0x[0-9a-fA-F]{4}/.test(document.body.innerText), { timeout: 20000 }).catch(() => {});
@@ -285,7 +289,13 @@ async function step(name, fn) {
 
 // ── The walkthrough ───────────────────────────────────────────────────────────
 async function main() {
-  const browser = await chromium.launch({ headless: !flags.has("--headful") });
+  // CHROMIUM_PATH points at a browser binary when playwright's own download is not installed; CHROMIUM_NO_SANDBOX=1 for
+  // containers that cannot run the sandbox.
+  const browser = await chromium.launch({
+    headless: !flags.has("--headful"),
+    ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+    ...(process.env.CHROMIUM_NO_SANDBOX === "1" ? { args: ["--no-sandbox"] } : {}),
+  });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await ctx.exposeFunction("__walletRequest", walletRequest);
   await ctx.addInitScript(PROVIDER_INIT_SCRIPT);
@@ -343,20 +353,20 @@ async function main() {
       });
     }
 
-    if (!flags.has("--skip-lend")) {
+    if (!flags.has("--skip-lend") && !flags.has("--withdraw-only")) {
       await step(`lend ${LEND_AMOUNT} USDC (approve, depositFunds)`, async () => {
         await goto(page, "/lend/");
         const before = Number((await state(accounts.borrower.address)).lenderBalance);
         await page.getByPlaceholder("Enter amount in USDC").fill(LEND_AMOUNT);
         await page.getByRole("button", { name: /^Deposit$/ }).click({ timeout: 15000 });
-        const confirmed = await waitForText(page, "Deposit confirmed", 240000);
+        const confirmed = await waitForText(page, "Deposit confirmed", 90000);
         const ok = await waitFor(async () => Number((await state(accounts.borrower.address)).lenderBalance) >= before + Number(LEND_AMOUNT) - 0.01, 60000);
-        if (!ok) throw new Error("lender balance did not rise");
+        if (!ok) { console.log("PAGE TEXT AT FAILURE:", (await page.evaluate(() => document.body.innerText)).slice(0, 1500)); throw new Error("lender balance did not rise"); }
         return `page said confirmed: ${confirmed}; lender balance rose`;
       });
     }
 
-    if (accounts.backer) {
+    if (accounts.backer && !flags.has("--skip-back") && !flags.has("--withdraw-only")) {
       await step(`backer backs the borrower with ${BACK_AMOUNT} USDC of credit`, async () => {
         bridge.active = "backer";
         await page.goto(APP_URL + `/attest/?borrower=${accounts.borrower.address}`, { waitUntil: "domcontentloaded" });
@@ -375,30 +385,52 @@ async function main() {
     }
 
     if (!flags.has("--skip-borrow")) {
-      await step(`borrow ${BORROW_AMOUNT} USDC (requestLoan, disburseLoan)${flags.has("--reject-disburse") ? " with the second prompt rejected once, then a reload" : ""}`, async () => {
+      if (!flags.has("--repay-only")) await step(`borrow ${BORROW_AMOUNT} USDC (requestLoan, disburseLoan)${flags.has("--reject-disburse") ? " with the second prompt rejected once, then a reload" : ""}`, async () => {
         const s0 = await state(accounts.borrower.address);
-        if (Number(s0.available) < Number(BORROW_AMOUNT)) {
+        if (!flags.has("--resume-pending") && Number(s0.available) < Number(BORROW_AMOUNT)) {
           throw new Error(`available credit ${s0.available} is below ${BORROW_AMOUNT}: the wallet needs backing or an issued line first`);
         }
         await goto(page, "/borrower/");
         const borrowBtn = page.getByRole("button", { name: /Borrow \(two wallet transactions\)/i });
-        await borrowBtn.waitFor({ state: "visible", timeout: 60000 });
-        await page.locator('input[type="number"]').first().fill(BORROW_AMOUNT);
+        try { if (!flags.has("--resume-pending")) await borrowBtn.waitFor({ state: "visible", timeout: 60000 }); }
+        catch (e) { console.log("BORROWER PAGE TEXT:", (await page.evaluate(() => document.body.innerText)).slice(0, 1800)); console.log("BUTTONS", JSON.stringify(await page.evaluate(() => [...document.querySelectorAll("button")].map(x => x.innerText.trim()).filter(Boolean)))); throw e; }
+        if (!flags.has("--resume-pending")) await page.locator('input[type="number"]').first().fill(BORROW_AMOUNT);
         bridge.rejectNextDisburse = flags.has("--reject-disburse");
-        const idsBefore = new Set(s0.loans.map(l => l.id));
+        const idsBefore = new Set(s0.loans.filter(l => !(flags.has("--resume-pending") && l.status === "Requested")).map(l => l.id));
+        const txBase = bridge.txs.length;
+        let reqHash, loanId;
+        if (flags.has("--resume-pending")) {
+          const pend = s0.loans.find(l => l.status === "Requested");
+          if (!pend) throw new Error("no pending requested loan to resume");
+          loanId = BigInt(pend.id);
+          reqHash = "(request made by the previous run of this script)";
+        } else {
         await borrowBtn.click();
-        const requestTx = await waitFor(async () => bridge.txs.some(t => t.to.toLowerCase() === POOL.toLowerCase() && t.selector !== DISBURSE_SELECTOR), 120000);
+        const requestTx = await waitFor(async () => bridge.txs.slice(txBase).some(t => t.who === "borrower" && t.to.toLowerCase() === POOL.toLowerCase() && t.selector !== DISBURSE_SELECTOR), 120000);
         if (!requestTx) throw new Error("no requestLoan transaction was sent");
-        const reqHash = bridge.txs.filter(t => t.to.toLowerCase() === POOL.toLowerCase()).slice(-1)[0].hash;
+        reqHash = bridge.txs.slice(txBase).filter(t => t.who === "borrower" && t.to.toLowerCase() === POOL.toLowerCase() && t.selector !== DISBURSE_SELECTOR)[0].hash;
         const receipt = await publicClient.waitForTransactionReceipt({ hash: reqHash, timeout: 180000 });
         const events = parseEventLogs({ abi: ABI, eventName: "LoanRequested", logs: receipt.logs });
         const mine = events.filter(e => e.args.borrower.toLowerCase() === accounts.borrower.address.toLowerCase());
         if (mine.length !== 1) throw new Error(`expected one LoanRequested event of ours, found ${mine.length}`);
-        const loanId = mine[0].args.loanId;
+        loanId = mine[0].args.loanId;
+        }
+        let note0 = "";
         let note = `request ${reqHash} created loan #${loanId}`;
+        if (flags.has("--reject-disburse") && flags.has("--resume-pending")) {
+          await page.goto(APP_URL + "/borrower/", { waitUntil: "domcontentloaded" });
+          await sleep(2500);
+          await connectWallet(page);
+          await waitForText(page, "Loan requested, not yet disbursed", 60000);
+          const sendsBefore = bridge.txs.length;
+          await page.getByRole("button", { name: /^Disburse$/ }).click({ timeout: 15000 });
+          await sleep(5000);
+          bridge.rejectNextDisburse = false;
+          note0 = `Disburse clicked with the wallet rejecting it; new transactions sent: ${bridge.txs.length - sendsBefore}; `;
+        }
         if (flags.has("--reject-disburse")) {
           const card = await waitForText(page, "Loan requested, not yet disbursed", 60000);
-          note += `; second prompt rejected; recovery card shown: ${card}`;
+          note += `; ${note0}second prompt rejected; recovery card shown: ${card}`;
           await page.reload({ waitUntil: "domcontentloaded" });
           await sleep(2500);
           await connectWallet(page);
@@ -423,13 +455,13 @@ async function main() {
         const s0 = await state(accounts.borrower.address);
         const open = s0.loans.find(l => l.status === "Active");
         if (!open) throw new Error("no active loan to repay");
-        const buttons = page.getByRole("button", { name: /repay/i });
+        const buttons = page.getByRole("button", { name: /^Pay\b/ });
         const n = await buttons.count();
         let clicked = false;
         for (let i = 0; i < n; i++) {
           const b = buttons.nth(i);
           const label = (await b.innerText()).trim();
-          if (/full|all|entire|pay off/i.test(label) && (await b.isEnabled())) {
+          if (/^Pay\b/.test(label) && (await b.isEnabled())) {
             await b.click();
             clicked = true;
             break;
@@ -439,9 +471,9 @@ async function main() {
           await buttons.first().click();
           clicked = true;
         }
-        if (!clicked) throw new Error("no repay button found");
-        const repaid = await waitFor(async () => (await state(accounts.borrower.address)).loans.some(l => l.id === open.id && l.status === "Repaid"), 240000);
-        if (!repaid) throw new Error(`loan #${open.id} did not become Repaid`);
+        if (!clicked) { console.log("REPAY PAGE TEXT:", (await page.evaluate(() => document.body.innerText)).slice(0, 1800)); console.log("BUTTONS", JSON.stringify(await page.evaluate(() => [...document.querySelectorAll("button")].map(x => x.innerText.trim()).filter(Boolean)))); throw new Error("no repay button found"); }
+        const repaid = await waitFor(async () => (await state(accounts.borrower.address)).loans.some(l => l.id === open.id && l.status === "Repaid"), 90000);
+        if (!repaid) { console.log("REPAY PAGE TEXT AT FAILURE:", (await page.evaluate(() => document.body.innerText)).slice(0, 2500)); console.log("WALLET CALLS (last 12):", JSON.stringify(bridge.calls.slice(-12))); throw new Error(`loan #${open.id} did not become Repaid`); }
         return `loan #${open.id} repaid`;
       });
     }

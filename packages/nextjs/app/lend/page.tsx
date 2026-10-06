@@ -16,7 +16,7 @@ import { useUsdcBalance, useUsdcWrite } from "~~/hooks/useUsdc";
 import { TestnetMint } from "~~/components/TestnetMint";
 import { MICRO_DOMAIN, TYPES, readPermitDomain, roundDownToCent, splitSignature } from "~~/utils/eip712";
 import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, RELAYER_ENABLED, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
-import { assertSameSigner, captureSigner, requireHash } from "~~/utils/walletWrite";
+import { assertSameSigner, captureSigner, requireHash, waitForAllowance } from "~~/utils/walletWrite";
 import { usePoolToken } from "~~/hooks/usePoolToken";
 
 const LendPage: NextPage = () => {
@@ -193,6 +193,7 @@ const LendPage: NextPage = () => {
         // each required to have been sent and mined before the next step, by the same account on the same chain.
         const signer = captureSigner("The deposit");
         await writeUsdc("approve", [MICROCREDIT_ADDRESS, amountInt]);
+        await waitForAllowance(publicClient, signer.address, MICROCREDIT_ADDRESS, amountInt);
         assertSameSigner(signer);
         requireHash(await writeContractAsync({ functionName: "depositFunds", args: [amountInt] }), "The deposit");
         await Promise.all([refetchPoolInfo(), refetchLenderPosition(), refetchUsdcBalance()]);

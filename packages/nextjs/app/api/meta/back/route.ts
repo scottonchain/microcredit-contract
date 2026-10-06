@@ -9,6 +9,7 @@ export const POST = relayerRoute(async body => {
     chainId,
     contractAddress,
     functionName: "backMeta",
+    intent: { signer: req.backer, poolNonce: String(req.nonce) },
     args: [
       {
         backer: req.backer,

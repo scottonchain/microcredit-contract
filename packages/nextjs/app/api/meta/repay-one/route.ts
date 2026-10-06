@@ -23,6 +23,7 @@ export const POST = relayerRoute(async body => {
   const result = await relay({
     chainId,
     contractAddress,
+    intent: { signer: borrower },
     functionName: "repayWithPermit",
     args: [
       borrower,
