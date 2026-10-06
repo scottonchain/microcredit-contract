@@ -54,7 +54,7 @@ test("a different signed request under the same nonce is refused while the first
   assert.equal(j.begin(key(6), "dB", "backMeta", T).kind, "new");
 });
 
-test("email-11/13 shape: crash after the intent, before any send; the nonce is unconsumed: abandoned, a retry may submit", async () => {
+test("email-11/13 shape: crash after the intent, before any hash (so nothing was broadcast, rule 1b); the nonce is unconsumed: abandoned, a retry may submit", async () => {
   const j = new Journal();
   j.begin(key(3), "d", "requestWithdrawalMeta", T);
   const r = await recover(j, reads({ nonces: { [ALICE]: 3n } }), T);
