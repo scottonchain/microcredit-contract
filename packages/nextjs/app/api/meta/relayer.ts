@@ -250,7 +250,7 @@ export async function relay(params: {
       kind: params.intent.poolNonce !== undefined ? "pool" : "permit",
       nonce: params.intent.poolNonce ?? digest,
     };
-    let d = decide(state.journal, key, digest, functionName, new Date().toISOString());
+    let d = decide(state.journal, key, digest, functionName, new Date().toISOString(), localSigner);
     if (d.action === "answer" && !isTerminal(d.entry.state)) {
       // An open entry from this process or an earlier one: let the chain settle what it can, then decide again.
       const done = await recover(
@@ -261,7 +261,7 @@ export async function relay(params: {
         (_e, err) => console.error("[relayer] journal read failed; the entry stays as it is:", messageOf(err)),
       );
       for (const r of done) state.store.append(r.next);
-      if (done.length) d = decide(state.journal, key, digest, functionName, new Date().toISOString());
+      if (done.length) d = decide(state.journal, key, digest, functionName, new Date().toISOString(), localSigner);
     }
     if (d.action === "answer") {
       if (d.answer.status === 200 && d.entry.hash) {

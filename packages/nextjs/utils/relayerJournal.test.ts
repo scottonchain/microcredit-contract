@@ -115,13 +115,27 @@ test("two signers in one process: each journal key recovers against its own sign
   assert.equal(byId[keyId(key(0, BOB))], "abandoned");
 });
 
-test("a permit-only intent with no hash is unresolved for an operator, never resent", async () => {
+test("a permit-only intent with no hash, made without hash-first sending, is unresolved for an operator, never resent", async () => {
   const j = new Journal();
   const k: IntentKey = { chainId: 84532, pool: POOL, signer: ALICE, kind: "permit", nonce: "digest-of-permit" };
   j.begin(k, "d", "depositPermitOnlyMeta", T);
   const r = await recover(j, reads({}), T);
   assert.equal(r[0].next.state, "unresolved");
   assert.equal(answerFor(r[0].next).status, 409);
+});
+
+test("a permit-only intent with no hash, made under hash-first sending, was never broadcast: abandoned, a retry may submit", async () => {
+  const j = new Journal();
+  const k: IntentKey = { chainId: 84532, pool: POOL, signer: ALICE, kind: "permit", nonce: "digest-of-permit-2" };
+  const first = decide(j, k, "d", "depositPermitOnlyMeta", T, true);
+  assert.equal(first.action, "send");
+  assert.equal((first as any).entry.hashFirst, true);
+  const r = await recover(j, reads({}), T);
+  assert.equal(r[0].next.state, "abandoned");
+  assert.equal(decide(j, k, "d", "depositPermitOnlyMeta", T, true).action, "send", "the retry is a new intent");
+  // with a hash and no receipt it stays unknown, like every hashed entry
+  j.submitted(k, "0xpermit", T, "0xraw");
+  assert.equal((await recover(j, reads({}), T)).length, 0);
 });
 
 test("terminal states stay terminal: a late 'submitted' or a second recovery changes nothing", async () => {
