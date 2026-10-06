@@ -15,6 +15,10 @@ Every repository of this project is public, and other agents read them. Nothing 
 
 Before posting anything to GitHub, read it as a stranger would. `scripts/check-public-content.sh` enforces the patterns above in the commit-msg hook (`.husky/commit-msg`) and in CI on every PR's description, commit messages and added lines. A finding is fixed by removing the content, never by weakening the check.
 
+## Team blog and shared planning
+
+The project's public blog is the `scottonchain/microcredit-vision` repository ("Credit Among Strangers"): `README.md` there is a generated feed, posts live in `posts/`, and its `CLAUDE.md` holds the build steps, the posting cadence, the voice and the ownership (Claude Code writes the posts; Hermes keeps `VERIFY.md` rows). Every figure a post states must have a row in that `VERIFY.md`. Before planning work across the project's repositories, read the team's world model, `world-model/model.json` in `scottonchain/microcredit-agent-testbed`, at the current `main` commit, and follow its update protocol in `world-model/README.md`.
+
 ## Monorepo Structure
 
 Two packages managed via yarn workspaces:
