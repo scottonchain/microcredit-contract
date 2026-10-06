@@ -25,7 +25,8 @@
  *     the strength of elapsed time.
  *
  * Permit-only routes (`depositPermitOnlyMeta`, `repayWithPermit`) have no pool nonce; they are keyed by the digest of the
- * permit and recovered by their hash only. With no hash they stay `unresolved` for an operator, by rule 5.
+ * permit and recovered by their hash only. With no hash, an intent made under hash-first sending was never broadcast and is
+ * `abandoned`; one made without it (an unlocked development node) stays `unresolved` for an operator, by rule 5.
  *
  * Pure functions and an in-memory model; the file store (relayerJournalStore.ts) only appends lines and replays them.
  */
@@ -50,7 +51,7 @@ export type State =
   | "reverted" // receipt, status reverted (the contract refused it; nothing took effect)
   | "abandoned" // recovery found the nonce unconsumed and no hash: nothing landed, a retry may submit
   | "consumed_unattributed" // the nonce was consumed; no hash is known; whether by this request is not established
-  | "unresolved"; // permit-only intent with no hash after a restart: an operator decides
+  | "unresolved"; // permit-only intent with no hash after a restart, made without hash-first sending: an operator decides
 
 export const TERMINAL: readonly State[] = ["mined", "reverted", "abandoned", "consumed_unattributed", "unresolved"];
 
@@ -65,6 +66,8 @@ export type Entry = {
   hash?: string;
   /** The signed transaction (public once broadcast), kept so the identical bytes can be rebroadcast. */
   raw?: string;
+  /** Set when the intent was made under hash-first sending (rule 1b): no hash then proves nothing was broadcast. */
+  hashFirst?: true;
   note?: string;
 };
 
@@ -130,12 +133,20 @@ export class Journal {
   }
 
   /** Rule 1 and 3. The caller appends `entry` durably BEFORE any network call when the result is `new`. */
-  begin(key: IntentKey, digest: string, functionName: string, now: string): BeginResult {
+  begin(key: IntentKey, digest: string, functionName: string, now: string, hashFirst = false): BeginResult {
     const prev = this.get(key);
     // Nothing took effect under an abandoned or reverted intent: a fresh attempt (same or different signed request)
     // is journaled as a new intent for the same key. Every other state answers from the journal (rule 3).
     if (!prev || prev.state === "abandoned" || prev.state === "reverted") {
-      const entry: Entry = { v: JOURNAL_VERSION, at: now, key, digest, state: "intent", functionName };
+      const entry: Entry = {
+        v: JOURNAL_VERSION,
+        at: now,
+        key,
+        digest,
+        state: "intent",
+        functionName,
+        ...(hashFirst ? { hashFirst: true as const } : {}),
+      };
       this.reopen(entry);
       return { kind: "new", entry };
     }
@@ -211,6 +222,14 @@ export async function recover(
                 "nonce consumed and no hash known: decode the consuming transaction's calldata to attribute it; never resend",
                 now,
               );
+      } else if (entry.hashFirst) {
+        // Hash-first (rule 1b): the hash is journaled before the broadcast, so no hash means nothing was broadcast.
+        next = journal.settle(
+          entry.key,
+          "abandoned",
+          "no hash was journaled, so nothing was broadcast; a retry may submit",
+          now,
+        );
       } else {
         next = journal.settle(
           entry.key,
@@ -266,8 +285,15 @@ export type Decision =
  * The relayer's decision for one incoming signed request: submit (after journaling the returned entry), or answer from
  * the journal without touching the network. A conflicting request under the same key is answered with a 409.
  */
-export function decide(journal: Journal, key: IntentKey, digest: string, functionName: string, now: string): Decision {
-  const r = journal.begin(key, digest, functionName, now);
+export function decide(
+  journal: Journal,
+  key: IntentKey,
+  digest: string,
+  functionName: string,
+  now: string,
+  hashFirst = false,
+): Decision {
+  const r = journal.begin(key, digest, functionName, now, hashFirst);
   if (r.kind === "new") return { action: "send", entry: r.entry };
   if (r.kind === "conflict") {
     return {
