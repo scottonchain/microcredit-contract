@@ -39,8 +39,11 @@ const { baseSepolia } = requireFromNextjs("viem/chains");
 const flags = new Set(process.argv.slice(2));
 const APP_URL = (process.env.APP_URL || "https://scottonchain.github.io/pool").replace(/\/$/, "");
 const RPC_URL = process.env.RPC_URL || "https://sepolia.base.org";
-const POOL = "0xa49B9352B2e8C2B79b58cb4C60dB43342e08Afa8";
-const USDC = "0x7C46870111257d8A3aaF846BC6D2F7DA7FBb76f1";
+// The pool and its token: the live mock-token pool by default; set POOL and USDC for another deployment, and
+// USDC_IS_MOCK=0 when the token has no public mint (Circle's USDC: fund the wallet from faucet.circle.com first).
+const POOL = process.env.POOL || "0xa49B9352B2e8C2B79b58cb4C60dB43342e08Afa8";
+const USDC = process.env.USDC || "0x7C46870111257d8A3aaF846BC6D2F7DA7FBb76f1";
+const USDC_IS_MOCK = (process.env.USDC_IS_MOCK ?? "1") !== "0";
 const CHAIN_ID_HEX = "0x14a34"; // 84532
 const WRONG_CHAIN_HEX = "0xaa36a7"; // 11155111, Ethereum Sepolia: the network the banner says this is not
 const LEND_AMOUNT = process.env.LEND_AMOUNT || "20";
@@ -318,14 +321,25 @@ async function main() {
       await sleep(2000);
     }
 
-    await step("mint 100 test USDC", async () => {
-      await goto(page, "/lend/");
-      const before = (await state(accounts.borrower.address)).usdc;
-      await page.getByRole("button", { name: /Get 100 test USDC/i }).click({ timeout: 15000 });
-      const ok = await waitFor(async () => Number((await state(accounts.borrower.address)).usdc) >= Number(before) + 100, 120000);
-      if (!ok) throw new Error("USDC balance did not rise by 100");
-      return "balance rose by 100";
-    });
+    if (USDC_IS_MOCK) {
+      await step("mint 100 test USDC", async () => {
+        await goto(page, "/lend/");
+        const before = (await state(accounts.borrower.address)).usdc;
+        await page.getByRole("button", { name: /Get 100 test USDC/i }).click({ timeout: 15000 });
+        const ok = await waitFor(async () => Number((await state(accounts.borrower.address)).usdc) >= Number(before) + 100, 120000);
+        if (!ok) throw new Error("USDC balance did not rise by 100");
+        return "balance rose by 100";
+      });
+    } else {
+      await step("test USDC already held (no public mint on this token)", async () => {
+        const s = await state(accounts.borrower.address);
+        const need = Number(LEND_AMOUNT) + Number(BORROW_AMOUNT);
+        if (Number(s.usdc) < need) {
+          throw new Error(`the wallet holds ${s.usdc} USDC; it needs at least ${need} (lend plus repay): fund it from faucet.circle.com (Base Sepolia) first`);
+        }
+        return `wallet holds ${s.usdc} USDC`;
+      });
+    }
 
     if (!flags.has("--skip-lend")) {
       await step(`lend ${LEND_AMOUNT} USDC (approve, depositFunds)`, async () => {

@@ -16,6 +16,7 @@ import { formatUSDC } from "~~/utils/format";
 import { BackRequest, MICRO_DOMAIN, TYPES } from "~~/utils/eip712";
 import { BASE_PATH, CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, RELAYER_ENABLED } from "~~/utils/microcredit";
 import { assertSameSigner, captureSigner, requireHash } from "~~/utils/walletWrite";
+import { usePoolToken } from "~~/hooks/usePoolToken";
 
 // useSearchParams() needs a Suspense boundary for the page to be prerendered at build time.
 export default function BackPage() {
@@ -110,7 +111,14 @@ function BackForm() {
 
   const refreshCredit = () => Promise.all([refetchStake(), refetchFree(), refetchBacking()]);
 
+  // The build's token must be the pool's token; otherwise no write is offered (see TestnetBanner).
+  const { mismatch: tokenMismatch } = usePoolToken();
+
   const handleStake = async () => {
+    if (tokenMismatch) {
+      toast.error("This build's token does not match the pool's token; staking is disabled.");
+      return;
+    }
     if (!connectedAddress || stakeShortfall === 0n) return;
     setStakeLoading(true);
     try {
@@ -287,7 +295,7 @@ function BackForm() {
             ) : (
               <button
                 onClick={handleBack}
-                disabled={!borrower || amount === null || loading || !connectedAddress || isOwnLink}
+                disabled={tokenMismatch || !borrower || amount === null || loading || !connectedAddress || isOwnLink}
                 className="btn btn-primary w-full"
               >
                 {loading ? "Submitting..." : amount !== null ? `Back with ${formatUSDC(amount)}` : "Back"}

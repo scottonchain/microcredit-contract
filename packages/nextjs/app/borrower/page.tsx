@@ -26,6 +26,7 @@ import {
   saveIntent,
 } from "~~/utils/originationIntent";
 import { type Signer, assertSameSigner, captureSigner, requireHash } from "~~/utils/walletWrite";
+import { usePoolToken } from "~~/hooks/usePoolToken";
 import { relayerErrorMessage } from "~~/utils/contractErrors";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
@@ -589,8 +590,15 @@ const BorrowPage: NextPage = () => {
     await refreshAfterMutation();
   };
 
+  // The build's token must be the pool's token; otherwise no write is offered (see TestnetBanner).
+  const { mismatch: tokenMismatch } = usePoolToken();
+
   const handleOneClickBorrow = async () => {
     if (!loanAmount || !connectedAddress) return;
+    if (tokenMismatch) {
+      toast.error("This build's token does not match the pool's token; borrowing is disabled.");
+      return;
+    }
     
     setIsLoading(true);
     try {
@@ -1012,6 +1020,7 @@ const BorrowPage: NextPage = () => {
             <button
               className="btn btn-primary w-full md:w-auto"
               disabled={
+                tokenMismatch ||
                 lendingPaused ||
                 isLoading ||
                 signingRef.current ||

@@ -17,6 +17,7 @@ import { TestnetMint } from "~~/components/TestnetMint";
 import { MICRO_DOMAIN, TYPES, readPermitDomain, roundDownToCent, splitSignature } from "~~/utils/eip712";
 import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, RELAYER_ENABLED, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
 import { assertSameSigner, captureSigner, requireHash } from "~~/utils/walletWrite";
+import { usePoolToken } from "~~/hooks/usePoolToken";
 
 const LendPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -165,7 +166,14 @@ const LendPage: NextPage = () => {
 
   // Attestation prefill and handlers removed
 
+  // The build's token must be the pool's token; otherwise no write is offered (see TestnetBanner).
+  const { mismatch: tokenMismatch } = usePoolToken();
+
   const handleDeposit = async () => {
+    if (tokenMismatch) {
+      setErrorMessage("This build's token does not match the pool's token; deposits are disabled.");
+      return;
+    }
     if (!depositAmount || !connectedAddress || !usdcAddress) return;
     
     const amountInt = parseDepositAmount(depositAmount);
@@ -503,6 +511,7 @@ const LendPage: NextPage = () => {
               <button
                 onClick={handleDeposit}
                 disabled={
+                  tokenMismatch ||
                   !depositAmount || 
                   !connectedAddress || 
                   isLoading || 

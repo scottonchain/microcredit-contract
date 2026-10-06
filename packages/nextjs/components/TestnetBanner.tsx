@@ -1,5 +1,6 @@
 "use client";
 
+import { usePoolToken } from "~~/hooks/usePoolToken";
 import { BUILD_COMMIT, IS_LIVE_TESTNET, LIVE_DEPLOYMENT, MICROCREDIT_ADDRESS, RELAYER_ENABLED } from "~~/utils/microcredit";
 
 /**
@@ -7,12 +8,19 @@ import { BUILD_COMMIT, IS_LIVE_TESTNET, LIVE_DEPLOYMENT, MICROCREDIT_ADDRESS, RE
  * tokens have no value, which deployment the page talks to, and how transactions are paid for.
  */
 export const TestnetBanner = () => {
+  const { poolToken, configuredToken, mismatch } = usePoolToken();
   if (!IS_LIVE_TESTNET) return null;
   const poolUrl = `${LIVE_DEPLOYMENT.explorer}/address/${MICROCREDIT_ADDRESS}`;
   const walkthroughUrl = `https://github.com/scottonchain/microcredit-contract/blob/${BUILD_COMMIT || "main"}/docs/TESTNET_WALKTHROUGH.md`;
   return (
     <div className="bg-warning text-warning-content text-sm px-4 py-2">
       <div className="max-w-5xl mx-auto space-y-1">
+        {mismatch && (
+          <p className="bg-error text-error-content rounded px-2 py-1">
+            <strong>Token mismatch.</strong> This build is configured for token {configuredToken ?? "(none)"} but the pool
+            reports {poolToken}. Deposits, backing, borrowing and repayment are disabled until the build is corrected.
+          </p>
+        )}
         <p>
           <strong>Test network.</strong> This app talks to the project&apos;s pool on {LIVE_DEPLOYMENT.chainName} (chain
           id {LIVE_DEPLOYMENT.chainId}, a Base test network, not Ethereum Sepolia). Every token here is a test token with
