@@ -33,6 +33,7 @@ import {
   waitForAllowance,
   waitForLoanVisible,
 } from "~~/utils/walletWrite";
+import { stopMessage } from "~~/utils/stopMessage";
 import { usePoolToken } from "~~/hooks/usePoolToken";
 import { relayerErrorMessage } from "~~/utils/contractErrors";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
@@ -745,7 +746,7 @@ const BorrowPage: NextPage = () => {
     } catch (error) {
       console.error("Error in one-click borrow:", error);
       toast.error(`Borrowing failed: ${getParsedError(error)}`);
-      setStepError(`Borrowing stopped: ${getParsedError(error)}`);
+      setStepError(stopMessage("Borrowing stopped", getParsedError(error), String((error as any)?.message ?? error)));
       await refreshAfterMutation();
     } finally {
       setIsLoading(false);
@@ -776,7 +777,7 @@ const BorrowPage: NextPage = () => {
       await disburseIntent(current, signer);
     } catch (error) {
       toast.error(`Disbursement failed: ${getParsedError(error)}`);
-      setStepError(`The disbursement stopped: ${getParsedError(error)}`);
+      setStepError(stopMessage("The disbursement stopped", getParsedError(error), String((error as any)?.message ?? error)));
     } finally {
       setIsLoading(false);
     }
@@ -784,12 +785,14 @@ const BorrowPage: NextPage = () => {
 
   const handleCancelRequested = async (loanId: bigint) => {
     setIsLoading(true);
+    setStepError("");
     try {
       requireHash(await writeCreditAsync({ functionName: "cancelLoan", args: [loanId] }), "The cancellation");
       if (intent && intent.loanId === loanId.toString()) setIntent(null);
       await refreshAfterMutation();
     } catch (error) {
       toast.error(`Cancellation failed: ${getParsedError(error)}`);
+      setStepError(stopMessage("The cancellation stopped", getParsedError(error), String((error as any)?.message ?? error)));
     } finally {
       setIsLoading(false);
     }
@@ -1138,6 +1141,7 @@ const BorrowPage: NextPage = () => {
                     if (!activeLoanId || !connectedAddress) return;
                     signingRef.current = true;
                     setIsLoading(true);
+                    setStepError("");
                     try {
                       setPermitError(null);
                       console.log("Starting full repayment process (gasless meta)...");
@@ -1231,6 +1235,7 @@ const BorrowPage: NextPage = () => {
                       // Transaction is mined. Refetch state in parallel.
                       await refreshAfterMutation();
                     } catch (error) {
+                      setStepError(stopMessage("The repayment stopped", getParsedError(error), String((error as any)?.message ?? error)));
                       const errorType = handleTransferError(error);
                       switch (errorType) {
                         case "TRANSFER_FAILED":
@@ -1289,6 +1294,7 @@ const BorrowPage: NextPage = () => {
                       const repayAmountBigInt = parseLoanAmount(repayAmount);
                       if (!repayAmountBigInt) return;
                       setIsLoading(true);
+                      setStepError("");
                       try {
                         console.log("Starting partial repayment process (gasless meta)...");
 
@@ -1372,6 +1378,7 @@ const BorrowPage: NextPage = () => {
                         // Transaction is mined. Refetch state in parallel.
                         await refreshAfterMutation();
                       } catch (error) {
+                        setStepError(stopMessage("The repayment stopped", getParsedError(error), String((error as any)?.message ?? error)));
                         const errorType = handleTransferError(error);
                         switch (errorType) {
                           case "TRANSFER_FAILED":

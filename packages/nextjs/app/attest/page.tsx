@@ -17,6 +17,7 @@ import { BackRequest, MICRO_DOMAIN, TYPES } from "~~/utils/eip712";
 import { BASE_PATH, CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, RELAYER_ENABLED } from "~~/utils/microcredit";
 import { assertSameSigner, captureSigner, requireHash, waitForAllowance } from "~~/utils/walletWrite";
 import { usePoolToken } from "~~/hooks/usePoolToken";
+import { stopMessage } from "~~/utils/stopMessage";
 
 // useSearchParams() needs a Suspense boundary for the page to be prerendered at build time.
 export default function BackPage() {
@@ -47,6 +48,8 @@ function BackForm() {
   const [arrivedViaLink, setArrivedViaLink] = useState(false);
   const [submitted, setSubmitted] = useState<{ borrower: string; amount: bigint; txHash?: string } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  // The last step that stopped, kept on the page: a toast is gone before anyone can read it.
+  const [stepError, setStepError] = useState("");
 
   const borrowerDisplayName = useAddressDisplayName(borrower || undefined);
   const { displayName: backerDisplayName } = useDisplayName();
@@ -121,6 +124,7 @@ function BackForm() {
     }
     if (!connectedAddress || stakeShortfall === 0n) return;
     setStakeLoading(true);
+    setStepError("");
     try {
       // Two transactions, each required to have been sent and mined, by the same account on the same chain.
       const signer = captureSigner("Staking");
@@ -134,6 +138,7 @@ function BackForm() {
     } catch (err: any) {
       console.error("Stake error", err);
       toast.error(`Failed to stake: ${getParsedError(err)}`);
+      setStepError(stopMessage("Staking stopped", getParsedError(err), String(err?.message ?? err)));
     } finally {
       setStakeLoading(false);
     }
@@ -143,6 +148,7 @@ function BackForm() {
   const handleBack = async () => {
     if (!borrower || !connectedAddress || amount === null) return;
     setLoading(true);
+    setStepError("");
     try {
       if (!publicClient) throw new Error("Contract not available");
       if (!RELAYER_ENABLED) {
@@ -196,7 +202,8 @@ function BackForm() {
       toast.success("Backing recorded", { position: "top-center" });
     } catch (err: any) {
       console.error("Backing error", err);
-      toast.error(`Failed to back: ${err?.message || "Unknown error"}`);
+      toast.error(`Failed to back: ${getParsedError(err)}`);
+      setStepError(stopMessage("Backing stopped", getParsedError(err), String(err?.message ?? err)));
     } finally {
       setLoading(false);
     }
@@ -205,6 +212,11 @@ function BackForm() {
   return (
     <div className="flex items-center flex-col grow pt-10">
       <div className="px-5 w-full max-w-2xl">
+        {stepError && (
+          <div className="alert alert-warning mb-6" role="alert">
+            {stepError}
+          </div>
+        )}
         {arrivedViaLink && !submitted && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6 text-blue-800">
             {!connectedAddress ? (
