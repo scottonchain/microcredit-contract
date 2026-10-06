@@ -26,7 +26,7 @@ export const TestnetBanner = () => {
           {BUILD_COMMIT ? `; this page was built from commit ${BUILD_COMMIT}` : ""}.{" "}
           {RELAYER_ENABLED
             ? "Transactions are relayed for you."
-            : "Your wallet signs and pays for each transaction: you need a little Base Sepolia ETH from any public faucet, and test USDC is minted free on the lend and borrow pages."}
+            : "Your wallet signs and pays for each transaction: you need a little Base Sepolia ETH from any public faucet, and test USDC is minted free on the lend and borrow pages. A new wallet has no credit to borrow against until someone who holds credit backs it or an issuer grants it a line; the borrow page explains how."}
         </p>
       </div>
     </div>

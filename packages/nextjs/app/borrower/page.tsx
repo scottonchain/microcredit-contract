@@ -418,15 +418,25 @@ const BorrowPage: NextPage = () => {
       if (!RELAYER_ENABLED) {
         // Wallet-direct: request, then disburse, as two transactions with the pool's default term. If the
         // second is rejected, the loan stays requested and the page offers to disburse or cancel it.
+        const readIds = async () =>
+          (await publicClient.readContract({
+            address: MICROCREDIT_ADDRESS,
+            abi: MICROCREDIT_ABI,
+            functionName: "getBorrowerLoanIds",
+            args: [connectedAddress],
+          })) as readonly bigint[];
+        const before = (await readIds()).length;
         await writeCreditAsync({ functionName: "requestLoan", args: [principal] });
-        const ids = (await publicClient.readContract({
-          address: MICROCREDIT_ADDRESS,
-          abi: MICROCREDIT_ABI,
-          functionName: "getBorrowerLoanIds",
-          args: [connectedAddress],
-        })) as readonly bigint[];
+        // A public RPC can lag behind the mined block; wait until the new id is visible before sending the
+        // second transaction, so it never targets an older loan. If it never appears, the recovery card
+        // shows the requested loan after a reload.
+        let ids = await readIds();
+        for (let tries = 0; ids.length <= before && tries < 10; tries++) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          ids = await readIds();
+        }
+        if (ids.length <= before) throw new Error("The loan request is mined but not visible yet; reload the page to disburse it");
         const newest = ids[ids.length - 1];
-        if (newest === undefined) throw new Error("The loan request was not recorded");
         await writeCreditAsync({ functionName: "disburseLoan", args: [newest] });
         await refreshAfterMutation();
         setLoanAmount("");
