@@ -1,6 +1,6 @@
 import { getAccount } from "wagmi/actions";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
-import { CHAIN_ID, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
+import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
 import { waitForStable } from "~~/utils/stableRead";
 
 /**
@@ -72,5 +72,28 @@ export async function waitForAllowance(
       })) as bigint,
     allowance => allowance >= amount,
     { what: "The approval" },
+  );
+}
+
+/**
+ * After `requestLoan` was mined and before `disburseLoan` is simulated: wait until the loan exists for reads, on two
+ * consecutive reads. A public RPC can serve the pre-send simulation from a node that has not seen the request yet, which
+ * reverts before the wallet is ever asked and leaves the request undisbursed. Any status other than "none" counts as
+ * visible: a loan that is no longer requested then fails the simulation with its real reason, not with a timeout.
+ */
+export async function waitForLoanVisible(
+  publicClient: { readContract: (args: any) => Promise<unknown> },
+  loanId: bigint,
+): Promise<void> {
+  await waitForStable(
+    async () =>
+      (await publicClient.readContract({
+        address: MICROCREDIT_ADDRESS,
+        abi: MICROCREDIT_ABI,
+        functionName: "getLoanTerms",
+        args: [loanId],
+      })) as readonly unknown[],
+    terms => Number(terms[0]) !== 0,
+    { what: "The loan request" },
   );
 }

@@ -25,7 +25,14 @@ import {
   reconcileIntent,
   saveIntent,
 } from "~~/utils/originationIntent";
-import { type Signer, assertSameSigner, captureSigner, requireHash, waitForAllowance } from "~~/utils/walletWrite";
+import {
+  type Signer,
+  assertSameSigner,
+  captureSigner,
+  requireHash,
+  waitForAllowance,
+  waitForLoanVisible,
+} from "~~/utils/walletWrite";
 import { usePoolToken } from "~~/hooks/usePoolToken";
 import { relayerErrorMessage } from "~~/utils/contractErrors";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
@@ -57,6 +64,8 @@ const BorrowPage: NextPage = () => {
   // Wallet-direct origination: the persisted intent and what reconciliation currently says about it.
   const [intent, setIntentState] = useState<OriginationIntent | null>(null);
   const [reconcileNote, setReconcileNote] = useState("");
+  // The last wallet-direct step that stopped, kept on the page: a toast is gone before anyone can read it.
+  const [stepError, setStepError] = useState("");
   const [mayDismiss, setMayDismiss] = useState(false);
   const [offeredLoanId, setOfferedLoanId] = useState<bigint | undefined>(undefined);
   // The term requestLoan applies when the loan is not relayed (seconds, from the deployed pool).
@@ -559,6 +568,9 @@ const BorrowPage: NextPage = () => {
     if (!publicClient) throw new Error("Contract not available");
     const loanId = BigInt(current.loanId ?? "0");
     assertSameSigner(signer);
+    // The request is mined, but the node behind the next read may not have it yet: wait before simulating.
+    await waitForLoanVisible(publicClient, loanId);
+    assertSameSigner(signer);
     await publicClient.simulateContract({
       address: MICROCREDIT_ADDRESS,
       abi: MICROCREDIT_ABI,
@@ -601,6 +613,7 @@ const BorrowPage: NextPage = () => {
     }
     
     setIsLoading(true);
+    setStepError("");
     try {
       const principal = parseLoanAmount(loanAmount);
       if (!principal) return;
@@ -732,6 +745,7 @@ const BorrowPage: NextPage = () => {
     } catch (error) {
       console.error("Error in one-click borrow:", error);
       toast.error(`Borrowing failed: ${getParsedError(error)}`);
+      setStepError(`Borrowing stopped: ${getParsedError(error)}`);
       await refreshAfterMutation();
     } finally {
       setIsLoading(false);
@@ -741,6 +755,7 @@ const BorrowPage: NextPage = () => {
   // Second step for a requested loan, by its own id: the intent's loan, or one found on chain without an intent.
   const handleDisburseRequested = async (loanId: bigint) => {
     setIsLoading(true);
+    setStepError("");
     try {
       const signer = captureSigner("The disbursement");
       const current: OriginationIntent =
@@ -761,6 +776,7 @@ const BorrowPage: NextPage = () => {
       await disburseIntent(current, signer);
     } catch (error) {
       toast.error(`Disbursement failed: ${getParsedError(error)}`);
+      setStepError(`The disbursement stopped: ${getParsedError(error)}`);
     } finally {
       setIsLoading(false);
     }
@@ -896,6 +912,12 @@ const BorrowPage: NextPage = () => {
       )}
 
       {lendingPaused && <div className="alert alert-warning mb-6">New lending is paused. You can still repay.</div>}
+
+      {stepError && (
+        <div className="alert alert-warning mb-6" role="alert">
+          {stepError}
+        </div>
+      )}
 
       {/* An origination intent whose outcome is not settled: reconciliation, never a new request */}
       {decision.kind === "reconcile" && (
