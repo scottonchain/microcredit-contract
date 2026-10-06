@@ -102,7 +102,8 @@ export class Journal {
   private apply(e: Entry) {
     const id = keyId(e.key);
     const prev = this.latest.get(id);
-    const reopened = e.state === "intent" && prev !== undefined && (prev.state === "abandoned" || prev.state === "reverted");
+    const reopened =
+      e.state === "intent" && prev !== undefined && (prev.state === "abandoned" || prev.state === "reverted");
     if (prev && isTerminal(prev.state) && !reopened) return; // rule 5: a terminal state is replaced only by a new intent
     if (!prev) this.order.push(id);
     this.latest.set(id, e);
@@ -185,26 +186,43 @@ export async function recover(
   reads: ChainReads,
   now: string,
   only: (e: Entry) => boolean = () => true,
+  onReadError: (entry: Entry, error: unknown) => void = () => {},
 ): Promise<Recovery[]> {
   const out: Recovery[] = [];
   for (const entry of journal.open().filter(only)) {
     let next: Entry | undefined;
-    if (entry.hash) {
-      const r = await reads.receipt(entry.hash);
-      if (r) next = journal.outcome(entry.key, r.status, now);
-    } else if (entry.key.kind === "pool") {
-      const current = await reads.poolNonce(entry.key.signer);
-      next =
-        current <= BigInt(entry.key.nonce)
-          ? journal.settle(entry.key, "abandoned", "nonce unconsumed and no hash: nothing landed; a retry may submit", now)
-          : journal.settle(
-              entry.key,
-              "consumed_unattributed",
-              "nonce consumed and no hash known: decode the consuming transaction's calldata to attribute it; never resend",
-              now,
-            );
-    } else {
-      next = journal.settle(entry.key, "unresolved", "permit-only intent with no hash: operator decides; never resend", now);
+    try {
+      if (entry.hash) {
+        const r = await reads.receipt(entry.hash);
+        if (r) next = journal.outcome(entry.key, r.status, now);
+      } else if (entry.key.kind === "pool") {
+        const current = await reads.poolNonce(entry.key.signer);
+        next =
+          current <= BigInt(entry.key.nonce)
+            ? journal.settle(
+                entry.key,
+                "abandoned",
+                "nonce unconsumed and no hash: nothing landed; a retry may submit",
+                now,
+              )
+            : journal.settle(
+                entry.key,
+                "consumed_unattributed",
+                "nonce consumed and no hash known: decode the consuming transaction's calldata to attribute it; never resend",
+                now,
+              );
+      } else {
+        next = journal.settle(
+          entry.key,
+          "unresolved",
+          "permit-only intent with no hash: operator decides; never resend",
+          now,
+        );
+      }
+    } catch (e) {
+      // A read that fails is neither confirmation nor absence (fixture email-9): the entry stays open, the others go on.
+      onReadError(entry, e);
+      continue;
     }
     if (next && next !== entry) out.push({ entry, next });
   }
@@ -217,11 +235,20 @@ export function answerFor(entry: Entry): { status: number; body: Record<string, 
     case "mined":
       return { status: 200, body: { status: "mined", txHash: entry.hash, replayed: true } };
     case "submitted":
-      return { status: 202, body: { status: "submitted", txHash: entry.hash, note: "the receipt is not yet confirmed" } };
+      return {
+        status: 202,
+        body: { status: "submitted", txHash: entry.hash, note: "the receipt is not yet confirmed" },
+      };
     case "intent":
-      return { status: 202, body: { status: "in_flight", note: "an earlier submission of this request is being processed" } };
+      return {
+        status: 202,
+        body: { status: "in_flight", note: "an earlier submission of this request is being processed" },
+      };
     case "reverted":
-      return { status: 409, body: { status: "reverted", txHash: entry.hash, note: "the contract refused this request" } };
+      return {
+        status: 409,
+        body: { status: "reverted", txHash: entry.hash, note: "the contract refused this request" },
+      };
     case "abandoned":
       return { status: 409, body: { status: "abandoned", note: entry.note } };
     case "consumed_unattributed":
@@ -248,7 +275,10 @@ export function decide(journal: Journal, key: IntentKey, digest: string, functio
       entry: r.entry,
       answer: {
         status: 409,
-        body: { status: "nonce_in_use", note: "a different signed request with this nonce is already being processed or has landed" },
+        body: {
+          status: "nonce_in_use",
+          note: "a different signed request with this nonce is already being processed or has landed",
+        },
       },
     };
   }

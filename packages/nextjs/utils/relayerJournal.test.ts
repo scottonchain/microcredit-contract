@@ -1,9 +1,3 @@
-import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { test } from "node:test";
-import { FileStore } from "./relayerJournalStore.ts";
 import {
   type ChainReads,
   type IntentKey,
@@ -14,13 +8,27 @@ import {
   keyId,
   recover,
 } from "./relayerJournal.ts";
+import { FileStore } from "./relayerJournalStore.ts";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { test } from "node:test";
 
 const POOL = "0x73872B8fB7F1771C67911f03edc75aBdc9514973";
 const ALICE = "0x1111111111111111111111111111111111111111";
 const BOB = "0x2222222222222222222222222222222222222222";
 const T = "2026-10-06T22:00:00Z";
-const key = (nonce: number, signer = ALICE): IntentKey => ({ chainId: 84532, pool: POOL, signer, kind: "pool", nonce: String(nonce) });
-const reads = (o: Partial<{ receipts: Record<string, "success" | "reverted">; nonces: Record<string, bigint> }>): ChainReads => ({
+const key = (nonce: number, signer = ALICE): IntentKey => ({
+  chainId: 84532,
+  pool: POOL,
+  signer,
+  kind: "pool",
+  nonce: String(nonce),
+});
+const reads = (
+  o: Partial<{ receipts: Record<string, "success" | "reverted">; nonces: Record<string, bigint> }>,
+): ChainReads => ({
   receipt: async h => (o.receipts?.[h] ? { status: o.receipts[h] } : undefined),
   poolNonce: async s => o.nonces?.[s.toLowerCase()] ?? 0n,
 });
@@ -32,7 +40,10 @@ test("chain-1/2: the intent is journaled before submit; a replay of the same sig
   assert.equal(a.kind, "new");
   const b = j.begin(key(0), "d1", "borrowAndDisburseMeta", T);
   assert.equal(b.kind, "existing");
-  assert.deepEqual(answerFor(b.entry), { status: 202, body: { status: "in_flight", note: "an earlier submission of this request is being processed" } });
+  assert.deepEqual(answerFor(b.entry), {
+    status: 202,
+    body: { status: "in_flight", note: "an earlier submission of this request is being processed" },
+  });
   j.submitted(key(0), "0xabc", T);
   j.outcome(key(0), "success", T);
   const c = j.begin(key(0), "d1", "borrowAndDisburseMeta", T);
@@ -190,4 +201,46 @@ test("recovery can be limited to one chain's entries", async () => {
   const r = await recover(j, reads({ nonces: { [ALICE]: 0n } }), T, e => e.key.chainId === 84532);
   assert.equal(r.length, 1);
   assert.equal(j.get(other)!.state, "intent", "the other chain's entry is untouched");
+});
+
+test("email-9: a verification read that fails is neither confirmation nor absence; that entry stays open and the others are still settled", async () => {
+  const j = new Journal();
+  j.begin(key(10), "d", "backMeta", T);
+  j.submitted(key(10), "0xflaky", T, "0xraw");
+  j.begin(key(11), "d", "backMeta", T);
+  j.submitted(key(11), "0xfine", T, "0xraw");
+  const failures: string[] = [];
+  const r = await recover(
+    j,
+    {
+      receipt: async h => {
+        if (h === "0xflaky") throw new Error("HTTP request timed out");
+        return { status: "success" };
+      },
+      poolNonce: async () => 0n,
+    },
+    T,
+    () => true,
+    (e, err) => failures.push(e.hash + ": " + (err as Error).message),
+  );
+  assert.equal(r.length, 1);
+  assert.equal(j.get(key(10))!.state, "submitted", "the failed read concluded nothing");
+  assert.equal(j.get(key(11))!.state, "mined");
+  assert.deepEqual(failures, ["0xflaky: HTTP request timed out"]);
+});
+
+test("email-9: a failed nonce read for a hash-less entry does not abandon it", async () => {
+  const j = new Journal();
+  j.begin(key(12), "d", "backMeta", T);
+  await recover(
+    j,
+    {
+      receipt: async () => undefined,
+      poolNonce: async () => {
+        throw new Error("ECONNRESET");
+      },
+    },
+    T,
+  );
+  assert.equal(j.get(key(12))!.state, "intent");
 });

@@ -1,10 +1,5 @@
-import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { test } from "node:test";
-import { FileStore } from "./relayerJournalStore.ts";
 import { type ChainReads, type IntentKey, Journal, decide, recover } from "./relayerJournal.ts";
+import { FileStore } from "./relayerJournalStore.ts";
 import {
   BroadcastRejected,
   BroadcastUnconfirmed,
@@ -15,12 +10,23 @@ import {
   rebroadcast,
   sendHashFirst,
 } from "./relayerSend.ts";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { test } from "node:test";
 
 const POOL = "0x73872B8fB7F1771C67911f03edc75aBdc9514973";
 const ALICE = "0x1111111111111111111111111111111111111111";
 const T = "2026-10-06T23:00:00Z";
 const now = () => T;
-const key = (nonce: number): IntentKey => ({ chainId: 84532, pool: POOL, signer: ALICE, kind: "pool", nonce: String(nonce) });
+const key = (nonce: number): IntentKey => ({
+  chainId: 84532,
+  pool: POOL,
+  signer: ALICE,
+  kind: "pool",
+  nonce: String(nonce),
+});
 const SIGNED = { hash: "0xaaaa", raw: "0x02f8aaaa" };
 const reads = (o: Partial<{ receipts: Record<string, "success" | "reverted">; nonce: bigint }>): ChainReads => ({
   receipt: async h => (o.receipts?.[h] ? { status: o.receipts[h] } : undefined),
@@ -166,7 +172,9 @@ test("nonce too low on the first broadcast: nothing can land; abandoned, a fresh
     sign: async () => SIGNED,
     append: e => s.append(e),
     broadcast: async () => {
-      throw Object.assign(new Error("nonce too low: next nonce 12, tx nonce 11"), { shortMessage: "Nonce provided for the transaction is lower than the current nonce" });
+      throw Object.assign(new Error("nonce too low: next nonce 12, tx nonce 11"), {
+        shortMessage: "Nonce provided for the transaction is lower than the current nonce",
+      });
     },
   };
   await assert.rejects(sendHashFirst(j, key(6), deps, now), BroadcastRejected);
@@ -192,7 +200,10 @@ test("error classification reads the message, the short message and the details"
   assert.ok(isAlreadyKnown(new Error("ALREADY_EXISTS: transaction already imported")));
   assert.ok(isAlreadyKnown({ details: "known transaction: 0xabc" }));
   assert.ok(isNonceTooLow({ shortMessage: "nonce too low" }));
-  assert.ok(!isAlreadyKnown(new Error("replacement transaction underpriced")), "a different transaction at that nonce is not 'the same bytes'");
+  assert.ok(
+    !isAlreadyKnown(new Error("replacement transaction underpriced")),
+    "a different transaction at that nonce is not 'the same bytes'",
+  );
   assert.ok(!isNonceTooLow(new Error("insufficient funds for gas")));
 });
 
