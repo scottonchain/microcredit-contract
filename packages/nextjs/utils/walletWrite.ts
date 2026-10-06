@@ -1,6 +1,7 @@
 import { getAccount } from "wagmi/actions";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
-import { CHAIN_ID } from "~~/utils/microcredit";
+import { CHAIN_ID, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
+import { waitForStable } from "~~/utils/stableRead";
 
 /**
  * Wallet-direct writes: scaffold's `writeContractAsync` and `useTransactor` resolve `undefined` (after showing a
@@ -47,4 +48,29 @@ export function assertSameSigner(expected: Signer): void {
   if (account.chainId !== expected.chainId) {
     throw new SignerChanged(`chain ${account.chainId ?? "none"} is not ${expected.chainId}`);
   }
+}
+
+/**
+ * After an `approve` was mined and before the step that spends it: wait until the allowance is visible to reads on two
+ * consecutive reads (see stableRead.ts). A public RPC can serve the next pre-send simulation from a node that has not
+ * seen the approval yet, which would otherwise stop the flow after the first transaction.
+ */
+export async function waitForAllowance(
+  publicClient: { readContract: (args: any) => Promise<unknown> },
+  owner: `0x${string}`,
+  spender: `0x${string}`,
+  amount: bigint,
+): Promise<void> {
+  if (!USDC_ADDRESS) throw new Error("USDC address is not configured for this chain");
+  await waitForStable(
+    async () =>
+      (await publicClient.readContract({
+        address: USDC_ADDRESS,
+        abi: USDC_ABI,
+        functionName: "allowance",
+        args: [owner, spender],
+      })) as bigint,
+    allowance => allowance >= amount,
+    { what: "The approval" },
+  );
 }

@@ -15,7 +15,7 @@ import { getParsedError } from "~~/utils/scaffold-eth";
 import { formatUSDC } from "~~/utils/format";
 import { BackRequest, MICRO_DOMAIN, TYPES } from "~~/utils/eip712";
 import { BASE_PATH, CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, RELAYER_ENABLED } from "~~/utils/microcredit";
-import { assertSameSigner, captureSigner, requireHash } from "~~/utils/walletWrite";
+import { assertSameSigner, captureSigner, requireHash, waitForAllowance } from "~~/utils/walletWrite";
 import { usePoolToken } from "~~/hooks/usePoolToken";
 
 // useSearchParams() needs a Suspense boundary for the page to be prerendered at build time.
@@ -125,6 +125,8 @@ function BackForm() {
       // Two transactions, each required to have been sent and mined, by the same account on the same chain.
       const signer = captureSigner("Staking");
       await writeUsdc("approve", [MICROCREDIT_ADDRESS, stakeShortfall]);
+      if (!publicClient) throw new Error("Contract not available");
+      await waitForAllowance(publicClient, signer.address, MICROCREDIT_ADDRESS, stakeShortfall);
       assertSameSigner(signer);
       requireHash(await writeCreditAsync({ functionName: "stake", args: [stakeShortfall] }), "Staking");
       await refreshCredit();
