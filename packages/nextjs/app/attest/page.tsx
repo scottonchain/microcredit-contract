@@ -14,7 +14,7 @@ import { relayerErrorMessage } from "~~/utils/contractErrors";
 import { getParsedError } from "~~/utils/scaffold-eth";
 import { formatUSDC } from "~~/utils/format";
 import { BackRequest, MICRO_DOMAIN, TYPES } from "~~/utils/eip712";
-import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS } from "~~/utils/microcredit";
+import { BASE_PATH, CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, RELAYER_ENABLED } from "~~/utils/microcredit";
 
 // useSearchParams() needs a Suspense boundary for the page to be prerendered at build time.
 export default function BackPage() {
@@ -86,7 +86,7 @@ function BackForm() {
   const copyLink = async () => {
     if (!connectedAddress) return;
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/attest?borrower=${connectedAddress}`);
+      await navigator.clipboard.writeText(`${window.location.origin}${BASE_PATH}/attest?borrower=${connectedAddress}`);
       setLinkCopied(true);
       toast.success("Backing link copied!", { position: "top-center", duration: 2000 });
       setTimeout(() => setLinkCopied(false), 2500);
@@ -131,6 +131,14 @@ function BackForm() {
     setLoading(true);
     try {
       if (!publicClient) throw new Error("Contract not available");
+      if (!RELAYER_ENABLED) {
+        // Wallet-direct: the backer sends the transaction and pays the gas.
+        await writeCreditAsync({ functionName: "back", args: [borrower as `0x${string}`, amount] });
+        await refreshCredit();
+        setSubmitted({ borrower, amount, txHash: undefined });
+        toast.success("Backing recorded", { position: "top-center" });
+        return;
+      }
       const backer = connectedAddress as `0x${string}`;
       const nonce = (await publicClient.readContract({
         address: MICROCREDIT_ADDRESS,

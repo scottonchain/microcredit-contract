@@ -12,9 +12,10 @@ import { BanknotesIcon, PlusIcon, EyeIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import HowItWorks from "~~/components/HowItWorks";
-import { useUsdcBalance } from "~~/hooks/useUsdc";
+import { useUsdcBalance, useUsdcWrite } from "~~/hooks/useUsdc";
+import { TestnetMint } from "~~/components/TestnetMint";
 import { MICRO_DOMAIN, TYPES, readPermitDomain, roundDownToCent, splitSignature } from "~~/utils/eip712";
-import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
+import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, RELAYER_ENABLED, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
 
 const LendPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -56,6 +57,7 @@ const LendPage: NextPage = () => {
   const { writeContractAsync } = useScaffoldWriteContract({
     contractName: "DecentralizedMicrocredit",
   });
+  const writeUsdc = useUsdcWrite();
 
   // USDC contract hooks
   const { data: usdcAddress } = useScaffoldReadContract({
@@ -177,6 +179,17 @@ const LendPage: NextPage = () => {
       const lender = connectedAddress as `0x${string}`;
       const receiver = connectedAddress as `0x${string}`;
 
+      if (!RELAYER_ENABLED) {
+        // Wallet-direct: approve the pool for the amount, then deposit; two transactions, gas paid by the lender.
+        await writeUsdc("approve", [MICROCREDIT_ADDRESS, amountInt]);
+        await writeContractAsync({ functionName: "depositFunds", args: [amountInt] });
+        await Promise.all([refetchPoolInfo(), refetchLenderPosition(), refetchUsdcBalance()]);
+        setDepositAmount("");
+        setErrorMessage(null);
+        toast.success("Deposit confirmed", { position: "top-center" });
+        return;
+      }
+
       // 1) Build & sign ERC-2612 Permit for USDC (required)
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
       let permitPayload: { value: string; deadline: string; v: number; r: `0x${string}`; s: `0x${string}` } | undefined;
@@ -261,6 +274,14 @@ const LendPage: NextPage = () => {
       const lender = connectedAddress as `0x${string}`;
       const to = connectedAddress as `0x${string}`;
 
+      if (!RELAYER_ENABLED) {
+        // Wallet-direct: withdraw what the pool can pay now; the queue for the rest is relayer-only.
+        await writeContractAsync({ functionName: "withdrawFunds", args: [amountInt] });
+        await Promise.all([refetchPoolInfo(), refetchLenderPosition(), refetchUsdcBalance()]);
+        setWithdrawAmount("");
+        toast.success("Withdrawal confirmed", { position: "top-center" });
+        return;
+      }
       const metaNonce = (await publicClient.readContract({
         address: MICROCREDIT_ADDRESS,
         abi: MICROCREDIT_ABI,
@@ -433,6 +454,9 @@ const LendPage: NextPage = () => {
             )}
 
             {/* Deposit Funds */}
+            <div className="mb-3">
+              <TestnetMint onMinted={refetchUsdcBalance} />
+            </div>
             <div className="divider my-6"></div>
             <h3 className="text-lg font-semibold mb-3 flex items-center">
               <PlusIcon className="h-5 w-5 mr-2" />
@@ -508,6 +532,12 @@ const LendPage: NextPage = () => {
 
             
             {/* Withdraw Funds */}
+            {!RELAYER_ENABLED && (
+              <p className="text-xs text-gray-500 mb-2">
+                Your wallet withdraws what the pool can pay now. Queued withdrawals, for amounts the pool cannot pay yet,
+                need the relayed version of this app.
+              </p>
+            )}
             {lenderBalance !== undefined && lenderBalance > 0n && (
               <>
                 <div className="divider my-6"></div>

@@ -6,24 +6,33 @@ import type { NextPage } from "next";
 import { useAccount, usePublicClient, useSignTypedData } from "wagmi";
 import { CreditCardIcon, CalculatorIcon, DocumentDuplicateIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useUsdcWrite } from "~~/hooks/useUsdc";
+import { getParsedError } from "~~/utils/scaffold-eth";
+import { TestnetMint } from "~~/components/TestnetMint";
+import { toast } from "react-hot-toast";
 import { formatUSDC } from "~~/utils/format";
 import { relayerErrorMessage } from "~~/utils/contractErrors";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 import { MICRO_DOMAIN, type PermitDomain, TYPES, readPermitDomain, splitSignature } from "~~/utils/eip712";
 import {
+  BASE_PATH,
   CHAIN_ID,
   LENS_ABI,
   LENS_ADDRESS,
   MICROCREDIT_ABI,
   MICROCREDIT_ADDRESS,
+  RELAYER_ENABLED,
   USDC_ABI,
   USDC_ADDRESS,
 } from "~~/utils/microcredit";
 
 const BorrowPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
+  // Wallet-direct writes (used when this build has no relayer): the borrower signs and pays for each transaction.
+  const { writeContractAsync: writeCreditAsync } = useScaffoldWriteContract({ contractName: "DecentralizedMicrocredit" });
+  const writeUsdc = useUsdcWrite();
   const [loanAmount, setLoanAmount] = useState(""); // For loan requests
   const [repayAmount, setRepayAmount] = useState(""); // For partial repayments
   const [repaymentPeriod, setRepaymentPeriod] = useState(7); // Default 1 week
@@ -304,6 +313,9 @@ const BorrowPage: NextPage = () => {
     args: [activeLoanId],
     query: { enabled: activeLoanId !== undefined },
   });
+  // A loan that is requested and reserved but not yet disbursed (LoanStatus.Requested = 1): the wallet-direct
+  // path needs a second transaction for it, and a reload must offer that step rather than a new loan.
+  const loanIsRequested = loanIsActive && loanTerms !== undefined && Number(loanTerms[0]) === 1;
   const { data: latePeriod } = useScaffoldReadContract({
     contractName: "DecentralizedMicrocredit",
     functionName: "LATE_PERIOD",
@@ -403,6 +415,23 @@ const BorrowPage: NextPage = () => {
       const principal = parseLoanAmount(loanAmount);
       if (!principal) return;
       if (!publicClient) throw new Error("Contract not available");
+      if (!RELAYER_ENABLED) {
+        // Wallet-direct: request, then disburse, as two transactions with the pool's default term. If the
+        // second is rejected, the loan stays requested and the page offers to disburse or cancel it.
+        await writeCreditAsync({ functionName: "requestLoan", args: [principal] });
+        const ids = (await publicClient.readContract({
+          address: MICROCREDIT_ADDRESS,
+          abi: MICROCREDIT_ABI,
+          functionName: "getBorrowerLoanIds",
+          args: [connectedAddress],
+        })) as readonly bigint[];
+        const newest = ids[ids.length - 1];
+        if (newest === undefined) throw new Error("The loan request was not recorded");
+        await writeCreditAsync({ functionName: "disburseLoan", args: [newest] });
+        await refreshAfterMutation();
+        setLoanAmount("");
+        return;
+      }
       // === One-Click Borrow (BorrowAndDisburse) ===
       const nonce = (await publicClient.readContract({
         address: MICROCREDIT_ADDRESS,
@@ -460,6 +489,34 @@ const BorrowPage: NextPage = () => {
       setLoanAmount("");
     } catch (error) {
       console.error("Error in one-click borrow:", error);
+      toast.error(`Borrowing failed: ${getParsedError(error)}`);
+      await refreshAfterMutation();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDisburseRequested = async () => {
+    if (activeLoanId === undefined) return;
+    setIsLoading(true);
+    try {
+      await writeCreditAsync({ functionName: "disburseLoan", args: [activeLoanId as bigint] });
+      await refreshAfterMutation();
+    } catch (error) {
+      toast.error(`Disbursement failed: ${getParsedError(error)}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelRequested = async () => {
+    if (activeLoanId === undefined) return;
+    setIsLoading(true);
+    try {
+      await writeCreditAsync({ functionName: "cancelLoan", args: [activeLoanId as bigint] });
+      await refreshAfterMutation();
+    } catch (error) {
+      toast.error(`Cancellation failed: ${getParsedError(error)}`);
     } finally {
       setIsLoading(false);
     }
@@ -493,7 +550,7 @@ const BorrowPage: NextPage = () => {
     return parsed !== null && parsed > maxEligibleAmount;
   };
 
-  const backingUrl = connectedAddress ? `${window.location.origin}/attest?borrower=${connectedAddress}` : "";
+  const backingUrl = connectedAddress ? `${window.location.origin}${BASE_PATH}/attest?borrower=${connectedAddress}` : "";
 
   const [copied, setCopied] = useState(false);
   const copyBackingUrl = () => {
@@ -508,6 +565,9 @@ const BorrowPage: NextPage = () => {
       <div className="flex items-center justify-center mb-8">
         <CreditCardIcon className="h-8 w-8 mr-3" />
         <h1 className="text-3xl font-bold">{hasCredit ? "Request Loan" : "Build Credit"}</h1>
+      </div>
+      <div className="flex justify-center mb-4">
+        <TestnetMint onMinted={refreshAfterMutation} />
       </div>
 
       {/* ── Credit Stats (always visible) ─────────────────────────── */}
@@ -580,6 +640,26 @@ const BorrowPage: NextPage = () => {
 
       {lendingPaused && <div className="alert alert-warning mb-6">New lending is paused. You can still repay.</div>}
 
+      {/* A requested loan that still needs its second transaction */}
+      {loanIsRequested && (
+        <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8 border border-warning">
+          <h2 className="text-xl font-semibold mb-2">Loan requested, not yet disbursed</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            {activePrincipal !== undefined ? formatUSDC(activePrincipal) : "A loan"} is reserved for you but has not been
+            paid out. Disburse it to receive the funds, or cancel it to release the reservation. Nothing else can be
+            requested until one of the two is done.
+          </p>
+          <div className="flex gap-2">
+            <button className="btn btn-primary" disabled={isLoading} onClick={handleDisburseRequested}>
+              {isLoading ? "Processing…" : "Disburse"}
+            </button>
+            <button className="btn btn-outline" disabled={isLoading} onClick={handleCancelRequested}>
+              Cancel request
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Loan Request Form (shown when credit exists and there is no active loan) */}
       {!loanIsActive && hasCredit && (
         <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
@@ -615,11 +695,18 @@ const BorrowPage: NextPage = () => {
                 className="select select-bordered w-full"
                 value={repaymentPeriod}
                 onChange={e => setRepaymentPeriod(parseInt(e.target.value))}
+                disabled={!RELAYER_ENABLED}
               >
                 {[7, 14, 28, 56, 84, 182, 364].map(days => (
                   <option key={days} value={days}>{getPeriodLabel(days)}</option>
                 ))}
               </select>
+              {!RELAYER_ENABLED && (
+                <p className="text-xs text-gray-500 mt-2">
+                  With your own wallet the loan runs for the pool&apos;s default term of 30 days; chosen periods need the
+                  relayed version of this app.
+                </p>
+              )}
             </div>
           </div>
 
@@ -645,14 +732,14 @@ const BorrowPage: NextPage = () => {
               }
               onClick={handleOneClickBorrow}
             >
-              {isLoading ? 'Processing…' : 'One-Click Borrow — Sign Once, Get Funds'}
+              {isLoading ? "Processing…" : RELAYER_ENABLED ? "One-Click Borrow: sign once, get funds" : "Borrow (two wallet transactions)"}
             </button>
           </div>
         </div>
       )}
 
       {/* Active Loan & Repayment Section */}
-      {loanIsActive && (
+      {loanIsActive && !loanIsRequested && (
         <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
           <h2 className="text-xl font-semibold mb-4 flex items-center">
             <CurrencyDollarIcon className="h-5 w-5 mr-2" />
@@ -746,6 +833,14 @@ const BorrowPage: NextPage = () => {
 
                       // Check USDC balance first
                       await checkUSDCBalance(amountToRepay);
+
+                      if (!RELAYER_ENABLED) {
+                        // Wallet-direct: approve the pool for the amount, then repay; two transactions.
+                        await writeUsdc("approve", [MICROCREDIT_ADDRESS, amountToRepay]);
+                        await writeCreditAsync({ functionName: "repayLoan", args: [activeLoanId as bigint, amountToRepay] });
+                        await refreshAfterMutation();
+                        return;
+                      }
 
                       if (!publicClient || !USDC_ADDRESS || !USDC_ABI || !usdcPermitDomain) throw new Error("Missing contracts");
 
@@ -871,6 +966,15 @@ const BorrowPage: NextPage = () => {
 
                         // Check USDC balance first
                         await checkUSDCBalance(repayAmountBigInt);
+
+                        if (!RELAYER_ENABLED) {
+                          // Wallet-direct: approve the pool for the amount, then repay; two transactions.
+                          await writeUsdc("approve", [MICROCREDIT_ADDRESS, repayAmountBigInt]);
+                          await writeCreditAsync({ functionName: "repayLoan", args: [activeLoanId as bigint, repayAmountBigInt] });
+                          setRepayAmount("");
+                          await refreshAfterMutation();
+                          return;
+                        }
 
                         if (!publicClient || !USDC_ADDRESS || !USDC_ABI || !usdcPermitDomain) throw new Error("Missing contracts");
 

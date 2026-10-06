@@ -21,6 +21,12 @@ const isIpfs = process.env.NEXT_PUBLIC_IPFS_BUILD === "true";
 if (isIpfs) {
   nextConfig.output = "export";
   nextConfig.trailingSlash = true;
+  // Serve the export under a sub-path (a GitHub Pages project site) when NEXT_PUBLIC_BASE_PATH is set.
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH;
+  if (basePath) {
+    nextConfig.basePath = basePath;
+    nextConfig.assetPrefix = basePath;
+  }
   nextConfig.images = {
     unoptimized: true,
   };
