@@ -15,7 +15,7 @@ export const RELAYER_ENABLED = process.env.NEXT_PUBLIC_RELAYER_DISABLED !== "tru
 export const LIVE_DEPLOYMENT = {
   chainId: 84532,
   chainName: "Base Sepolia",
-  deployedCommit: "19b166e",
+  deployedCommit: "1812e7d",
   explorer: "https://sepolia.basescan.org",
 } as const;
 export const IS_LIVE_TESTNET = (CHAIN_ID as number) === LIVE_DEPLOYMENT.chainId;

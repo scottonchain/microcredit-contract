@@ -39,11 +39,13 @@ const { baseSepolia } = requireFromNextjs("viem/chains");
 const flags = new Set(process.argv.slice(2));
 const APP_URL = (process.env.APP_URL || "https://scottonchain.github.io/pool").replace(/\/$/, "");
 const RPC_URL = process.env.RPC_URL || "https://sepolia.base.org";
-// The pool and its token: the live mock-token pool by default; set POOL and USDC for another deployment, and
-// USDC_IS_MOCK=0 when the token has no public mint (Circle's USDC: fund the wallet from faucet.circle.com first).
-const POOL = process.env.POOL || "0xa49B9352B2e8C2B79b58cb4C60dB43342e08Afa8";
-const USDC = process.env.USDC || "0x7C46870111257d8A3aaF846BC6D2F7DA7FBb76f1";
-const USDC_IS_MOCK = (process.env.USDC_IS_MOCK ?? "1") !== "0";
+// The pool and its token: the public canonical-USDC pool by default (docs/TESTNET.md). Set POOL and USDC for another
+// deployment, and USDC_IS_MOCK=1 when the token is a free-mint MockUSDC (the retired mock pool
+// 0xa49B9352B2e8C2B79b58cb4C60dB43342e08Afa8 with 0x7C46870111257d8A3aaF846BC6D2F7DA7FBb76f1). With Circle's USDC the
+// wallet must already hold enough: fund it from faucet.circle.com first.
+const POOL = process.env.POOL || "0x73872B8fB7F1771C67911f03edc75aBdc9514973";
+const USDC = process.env.USDC || "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+const USDC_IS_MOCK = (process.env.USDC_IS_MOCK ?? "0") === "1";
 const CHAIN_ID_HEX = "0x14a34"; // 84532
 const WRONG_CHAIN_HEX = "0xaa36a7"; // 11155111, Ethereum Sepolia: the network the banner says this is not
 const LEND_AMOUNT = process.env.LEND_AMOUNT || "20";

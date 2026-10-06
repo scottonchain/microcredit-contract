@@ -35,7 +35,7 @@ export const TestnetBanner = () => {
           {BUILD_COMMIT ? `; this page was built from commit ${BUILD_COMMIT}` : ""}.{" "}
           {RELAYER_ENABLED
             ? "Transactions are relayed for you."
-            : "Your wallet signs and pays for each transaction: you need a little Base Sepolia ETH for gas, and test USDC is minted free on the lend and borrow pages. A new wallet has no credit to borrow against until someone who holds credit backs it or an issuer grants it a line."}{" "}
+            : "Your wallet signs and pays for each transaction: you need a little Base Sepolia ETH for gas and test USDC from Circle's faucet. A new wallet has no credit to borrow against until someone who holds credit backs it or an issuer grants it a line."}{" "}
           <a className="link" href={walkthroughUrl} target="_blank" rel="noreferrer">
             Step-by-step walkthrough
           </a>
