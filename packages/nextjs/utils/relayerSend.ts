@@ -69,7 +69,8 @@ const classifiable = (e: unknown) => {
 };
 
 /** A node saying it already holds these exact bytes: the broadcast succeeded earlier, so the outcome is as before. */
-export const isAlreadyKnown = (e: unknown) => /already known|known transaction|already imported|already exists/i.test(classifiable(e));
+export const isAlreadyKnown = (e: unknown) =>
+  /already known|known transaction|already imported|already exists/i.test(classifiable(e));
 
 /** The relayer account's nonce was already used: no transaction at that nonce can land any more. */
 export const isNonceTooLow = (e: unknown) => /nonce too low|nonce is too low/i.test(classifiable(e));
@@ -79,7 +80,12 @@ export const isNonceTooLow = (e: unknown) => /nonce too low|nonce is too low/i.t
  * `JournalWriteFailed` (nothing sent), `BroadcastRejected` (a nonce that was already consumed: nothing can land, the intent is
  * abandoned and a fresh attempt may follow) or `BroadcastUnconfirmed` (unknown: the entry stays `submitted`).
  */
-export async function sendHashFirst(journal: Journal, key: IntentKey, deps: SendDeps, now: () => string): Promise<string> {
+export async function sendHashFirst(
+  journal: Journal,
+  key: IntentKey,
+  deps: SendDeps,
+  now: () => string,
+): Promise<string> {
   const { hash, raw } = await deps.sign();
   const entry = journal.submitted(key, hash, now(), raw);
   try {
@@ -94,7 +100,14 @@ export async function sendHashFirst(journal: Journal, key: IntentKey, deps: Send
     if (isAlreadyKnown(e)) return hash;
     if (isNonceTooLow(e)) {
       // Freshly signed under the serialized queue: a consumed nonce means something else took it, never this transaction.
-      deps.append(journal.settle(key, "abandoned", "the relayer account nonce was already consumed: this transaction cannot land", now()));
+      deps.append(
+        journal.settle(
+          key,
+          "abandoned",
+          "the relayer account nonce was already consumed: this transaction cannot land",
+          now(),
+        ),
+      );
       throw new BroadcastRejected(hash, e);
     }
     throw new BroadcastUnconfirmed(hash, e);
