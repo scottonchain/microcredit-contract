@@ -29,7 +29,7 @@ import { ICreditUsage, OracleScoreProvider } from "../contracts/OracleScoreProvi
  *        TIMELOCK_DELAY                seconds, default 2 days, 1 to 30 days
  *        RISK_PREMIUM_BPS              default 800 (analysis/credit_risk, annual PD 5%)
  *        MAX_LOAN                      USDC, 6 decimals, default 25e6 (a pilot line)
- *        RESERVE_BPS                   default 6500 (analysis/credit_risk, annual PD 5%)
+ *        RESERVE_BPS                   default 4500, interim (owner decision; docs/ECONOMICS.md, "The reserve share")
  *        PROTOCOL_FEE_BPS              default 0
  *        ISSUANCE_BUDGET_LINES         default 20, so maxTotalScore = 20e6
  *        MAX_INCREASE_PER_REPORT_LINES default 5
@@ -76,7 +76,7 @@ contract DeployProductionScript is Script {
     uint256 public constant MAX_TIMELOCK_DELAY = 30 days;
     uint256 public constant DEFAULT_RISK_PREMIUM_BPS = 800;
     uint256 public constant DEFAULT_MAX_LOAN = 25e6;
-    uint256 public constant DEFAULT_RESERVE_BPS = 6_500;
+    uint256 public constant DEFAULT_RESERVE_BPS = 4_500;
     uint256 public constant DEFAULT_PROTOCOL_FEE_BPS = 0;
     uint256 public constant DEFAULT_ISSUANCE_BUDGET_LINES = 20;
     uint256 public constant DEFAULT_MAX_INCREASE_PER_REPORT_LINES = 5;

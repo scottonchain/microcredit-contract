@@ -201,7 +201,7 @@ contract DeployProductionTest is Test {
         assertEq(credit.effrRate(), 433);
         assertEq(credit.riskPremium(), 800);
         assertEq(credit.maxLoanAmount(), 25e6);
-        assertEq(credit.reserveBps(), 6500);
+        assertEq(credit.reserveBps(), 4500);
         assertEq(credit.protocolFeeBps(), 0);
         assertEq(credit.oracle(), admin);
         assertEq(address(credit.scoreProvider()), address(scores));
@@ -311,7 +311,7 @@ contract DeployProductionTest is Test {
         cfg.effrBps = 433;
         cfg.riskPremiumBps = 800;
         cfg.maxLoan = 25e6;
-        cfg.reserveBps = 6500;
+        cfg.reserveBps = 4500;
         cfg.protocolFeeBps = 0;
         cfg.issuanceBudgetLines = 20;
         cfg.maxIncreasePerReportLines = 5;

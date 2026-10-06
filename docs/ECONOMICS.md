@@ -40,9 +40,16 @@ principal,
 
 $$\mathrm{APY} \approx u\,a\,(1-f-r) + \text{(reserve released)} - \max\big(0,\ uL - \text{(reserve inflow)}\big).$$
 
-A reserve funded from lenders' own interest does not raise their expected return; it smooths it.
-Over a long horizon the reserve absorbs about $uL$ a year, so expected APY is close to
-$u\,(a(1-f) - L)$. External first-loss capital (`fundReserve`) does raise it.
+A reserve funded from lenders' own interest does not raise their expected return; it smooths it,
+up to the share that covers expected loss. Interest-funded reserve is never released
+(`releaseReserve` keeps all dues), so over a long horizon lenders' expected APY is
+
+$$u\,\big(a(1-f) - \max\{L,\ a\,r\}\big),$$
+
+which equals $u\,(a(1-f) - L)$ only while $r \le L/a$. Above that share every further point of $r$
+costs lenders $u\,a$ a year for good, because the excess accumulates in a balance they cannot
+receive (pricing paper, Theorem 2). External first-loss capital (`fundReserve`) does raise their
+return: it can be released above all dues ever paid.
 
 `MicrocreditLens.getFundingPoolAPY()` shows $u\,a\,(1-f-r)$: the projected return before default losses, net of
 the fee and the reserve share.
@@ -69,8 +76,19 @@ Two cautions from the calibration:
   premium (CI-18).
 
 The local demo deploys 500 bps and a 30% reserve share (expected loss at 3% annual PD). The
-production script defaults to 800 bps and 6,500 bps, the calibration for 5%
-(`docs/DEPLOYMENT.md`).
+production script defaults to 800 bps and 4,500 bps (`docs/DEPLOYMENT.md`).
+
+## The reserve share
+
+The `reserveBps` column above assumes the surplus over a cap is released to lenders, which the
+contract does not do. With the lock, at PD 5%, a 12.33% APR and utilisation 85%, the long-run
+expected APY above is 6.10% at the expected-loss share (41.8%), 5.76% at 45%, and 3.67% at 65%,
+against the 4.33% funding rate. The reserve share also sets how fast a repaying borrower earns
+credit (the same share of its interest becomes its dues), and how much risk lenders bear before the
+reserve has built up. Raising it raises the loan rate lenders need, which lowers the loan volume
+borrowers demand. The owner set the default to 4,500 on 2026-10-05 as an interim value. The final
+value is to follow a reviewed equilibrium analysis (loan demand, lender supply, the reserve share
+and pool liquidity) and other considerations, and until then it does not change (CI-29).
 
 ## Liquidity
 
