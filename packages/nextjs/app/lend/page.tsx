@@ -16,6 +16,7 @@ import { useUsdcBalance, useUsdcWrite } from "~~/hooks/useUsdc";
 import { TestnetMint } from "~~/components/TestnetMint";
 import { MICRO_DOMAIN, TYPES, readPermitDomain, roundDownToCent, splitSignature } from "~~/utils/eip712";
 import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, RELAYER_ENABLED, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
+import { assertSameSigner, captureSigner, requireHash } from "~~/utils/walletWrite";
 
 const LendPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -180,9 +181,12 @@ const LendPage: NextPage = () => {
       const receiver = connectedAddress as `0x${string}`;
 
       if (!RELAYER_ENABLED) {
-        // Wallet-direct: approve the pool for the amount, then deposit; two transactions, gas paid by the lender.
+        // Wallet-direct: approve the pool for the amount, then deposit; two transactions, gas paid by the lender,
+        // each required to have been sent and mined before the next step, by the same account on the same chain.
+        const signer = captureSigner("The deposit");
         await writeUsdc("approve", [MICROCREDIT_ADDRESS, amountInt]);
-        await writeContractAsync({ functionName: "depositFunds", args: [amountInt] });
+        assertSameSigner(signer);
+        requireHash(await writeContractAsync({ functionName: "depositFunds", args: [amountInt] }), "The deposit");
         await Promise.all([refetchPoolInfo(), refetchLenderPosition(), refetchUsdcBalance()]);
         setDepositAmount("");
         setErrorMessage(null);
@@ -276,7 +280,7 @@ const LendPage: NextPage = () => {
 
       if (!RELAYER_ENABLED) {
         // Wallet-direct: withdraw what the pool can pay now; the queue for the rest is relayer-only.
-        await writeContractAsync({ functionName: "withdrawFunds", args: [amountInt] });
+        requireHash(await writeContractAsync({ functionName: "withdrawFunds", args: [amountInt] }), "The withdrawal");
         await Promise.all([refetchPoolInfo(), refetchLenderPosition(), refetchUsdcBalance()]);
         setWithdrawAmount("");
         toast.success("Withdrawal confirmed", { position: "top-center" });

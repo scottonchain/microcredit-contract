@@ -15,6 +15,7 @@ import { getParsedError } from "~~/utils/scaffold-eth";
 import { formatUSDC } from "~~/utils/format";
 import { BackRequest, MICRO_DOMAIN, TYPES } from "~~/utils/eip712";
 import { BASE_PATH, CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, RELAYER_ENABLED } from "~~/utils/microcredit";
+import { assertSameSigner, captureSigner, requireHash } from "~~/utils/walletWrite";
 
 // useSearchParams() needs a Suspense boundary for the page to be prerendered at build time.
 export default function BackPage() {
@@ -113,8 +114,11 @@ function BackForm() {
     if (!connectedAddress || stakeShortfall === 0n) return;
     setStakeLoading(true);
     try {
+      // Two transactions, each required to have been sent and mined, by the same account on the same chain.
+      const signer = captureSigner("Staking");
       await writeUsdc("approve", [MICROCREDIT_ADDRESS, stakeShortfall]);
-      await writeCreditAsync({ functionName: "stake", args: [stakeShortfall] });
+      assertSameSigner(signer);
+      requireHash(await writeCreditAsync({ functionName: "stake", args: [stakeShortfall] }), "Staking");
       await refreshCredit();
       toast.success(`Staked ${formatUSDC(stakeShortfall)}`, { position: "top-center" });
     } catch (err: any) {
@@ -132,10 +136,13 @@ function BackForm() {
     try {
       if (!publicClient) throw new Error("Contract not available");
       if (!RELAYER_ENABLED) {
-        // Wallet-direct: the backer sends the transaction and pays the gas.
-        await writeCreditAsync({ functionName: "back", args: [borrower as `0x${string}`, amount] });
+        // Wallet-direct: the backer sends the transaction and pays the gas. Success is the mined hash, nothing less.
+        const txHash = requireHash(
+          await writeCreditAsync({ functionName: "back", args: [borrower as `0x${string}`, amount] }),
+          "The backing",
+        );
         await refreshCredit();
-        setSubmitted({ borrower, amount, txHash: undefined });
+        setSubmitted({ borrower, amount, txHash });
         toast.success("Backing recorded", { position: "top-center" });
         return;
       }
@@ -287,8 +294,9 @@ function BackForm() {
               </button>
             )}
             <div className="text-xs text-gray-500 text-center">
-              Backing is gasless: you sign a message and our relayer submits it. Staking is a normal wallet
-              transaction.
+              {RELAYER_ENABLED
+                ? "Backing is gasless: you sign a message and our relayer submits it. Staking is a normal wallet transaction."
+                : "Your wallet signs and pays for the backing transaction, and for staking: each is a normal wallet transaction on this network."}
             </div>
           </div>
         ) : (

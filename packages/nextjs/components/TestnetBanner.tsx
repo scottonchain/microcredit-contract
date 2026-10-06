@@ -9,6 +9,7 @@ import { BUILD_COMMIT, IS_LIVE_TESTNET, LIVE_DEPLOYMENT, MICROCREDIT_ADDRESS, RE
 export const TestnetBanner = () => {
   if (!IS_LIVE_TESTNET) return null;
   const poolUrl = `${LIVE_DEPLOYMENT.explorer}/address/${MICROCREDIT_ADDRESS}`;
+  const walkthroughUrl = `https://github.com/scottonchain/microcredit-contract/blob/${BUILD_COMMIT || "main"}/docs/TESTNET_WALKTHROUGH.md`;
   return (
     <div className="bg-warning text-warning-content text-sm px-4 py-2">
       <div className="max-w-5xl mx-auto space-y-1">
@@ -26,7 +27,11 @@ export const TestnetBanner = () => {
           {BUILD_COMMIT ? `; this page was built from commit ${BUILD_COMMIT}` : ""}.{" "}
           {RELAYER_ENABLED
             ? "Transactions are relayed for you."
-            : "Your wallet signs and pays for each transaction: you need a little Base Sepolia ETH from any public faucet, and test USDC is minted free on the lend and borrow pages. A new wallet has no credit to borrow against until someone who holds credit backs it or an issuer grants it a line; the borrow page explains how."}
+            : "Your wallet signs and pays for each transaction: you need a little Base Sepolia ETH for gas, and test USDC is minted free on the lend and borrow pages. A new wallet has no credit to borrow against until someone who holds credit backs it or an issuer grants it a line."}{" "}
+          <a className="link" href={walkthroughUrl} target="_blank" rel="noreferrer">
+            Step-by-step walkthrough
+          </a>
+          : test gas, test USDC, credit, the wallet prompts and what to do after a rejected or lost transaction.
         </p>
       </div>
     </div>

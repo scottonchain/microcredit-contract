@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { NextPage } from "next";
-import { useAccount, usePublicClient, useSignTypedData } from "wagmi";
+import { useAccount, usePublicClient, useSignTypedData, useWriteContract } from "wagmi";
 import { CreditCardIcon, CalculatorIcon, DocumentDuplicateIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
@@ -12,6 +12,20 @@ import { getParsedError } from "~~/utils/scaffold-eth";
 import { TestnetMint } from "~~/components/TestnetMint";
 import { toast } from "react-hot-toast";
 import { formatUSDC } from "~~/utils/format";
+import {
+  type OriginationIntent,
+  type ReconcileFacts,
+  clearIntent,
+  decideOrigination,
+  intentKey,
+  isUserRejection,
+  loadIntent,
+  matchRequestedLoan,
+  newIntent,
+  reconcileIntent,
+  saveIntent,
+} from "~~/utils/originationIntent";
+import { type Signer, assertSameSigner, captureSigner, requireHash } from "~~/utils/walletWrite";
 import { relayerErrorMessage } from "~~/utils/contractErrors";
 import QRCodeDisplay from "~~/components/QRCodeDisplay";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
@@ -32,10 +46,28 @@ const BorrowPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
   // Wallet-direct writes (used when this build has no relayer): the borrower signs and pays for each transaction.
   const { writeContractAsync: writeCreditAsync } = useScaffoldWriteContract({ contractName: "DecentralizedMicrocredit" });
+  // Raw wagmi write for the two origination transactions: it returns the hash as soon as the wallet does, so the
+  // intent below is bound to its transaction before the receipt is awaited (scaffold's transactor returns after mining).
+  const { writeContractAsync: wagmiWriteAsync } = useWriteContract();
   const writeUsdc = useUsdcWrite();
   const [loanAmount, setLoanAmount] = useState(""); // For loan requests
   const [repayAmount, setRepayAmount] = useState(""); // For partial repayments
-  const [repaymentPeriod, setRepaymentPeriod] = useState(7); // Default 1 week
+  const [repaymentPeriod, setRepaymentPeriod] = useState(7); // Default 1 week (relayed app only)
+  // Wallet-direct origination: the persisted intent and what reconciliation currently says about it.
+  const [intent, setIntentState] = useState<OriginationIntent | null>(null);
+  const [reconcileNote, setReconcileNote] = useState("");
+  const [mayDismiss, setMayDismiss] = useState(false);
+  const [offeredLoanId, setOfferedLoanId] = useState<bigint | undefined>(undefined);
+  // The term requestLoan applies when the loan is not relayed (seconds, from the deployed pool).
+  const { data: defaultLoanTerm } = useScaffoldReadContract({
+    contractName: "DecentralizedMicrocredit",
+    functionName: "DEFAULT_LOAN_TERM",
+  });
+  const effectivePeriodDays = RELAYER_ENABLED
+    ? repaymentPeriod
+    : defaultLoanTerm !== undefined
+      ? Number(defaultLoanTerm) / 86400
+      : 30;
   const [isLoading, setIsLoading] = useState(false);
   const [permitError, setPermitError] = useState<string | null>(null);
 
@@ -101,18 +133,18 @@ const BorrowPage: NextPage = () => {
     const baseAmount = borrowLimit[1];
     
     // Calculate weeks from repayment period (repaymentPeriod is in days)
-    const weeks = Math.ceil(repaymentPeriod / 7);
-    
+    const weeks = Math.ceil(effectivePeriodDays / 7);
+
     // For 1 week, full amount is available. For each additional week, reduce by 1%
     if (weeks <= 1) {
       return roundDownToNearestPenny(baseAmount);
     }
-    
+
     // Calculate reduction factor: (0.99)^(weeks-1)
     const reductionFactor = Math.pow(0.99, weeks - 1);
     const reducedAmount = BigInt(Math.floor(Number(baseAmount) * reductionFactor));
     return roundDownToNearestPenny(reducedAmount);
-  }, [borrowLimit, repaymentPeriod]);
+  }, [borrowLimit, effectivePeriodDays]);
 
   // Auto-update loan amount when repayment period changes
   useEffect(() => {
@@ -264,7 +296,7 @@ const BorrowPage: NextPage = () => {
     args: [
       connectedAddress as `0x${string}` | undefined,
       connectedAddress && loanAmount ? parseLoanAmount(loanAmount) ?? undefined : undefined,
-      connectedAddress && loanAmount ? BigInt(repaymentPeriod * 24 * 60 * 60) : undefined,
+      connectedAddress && loanAmount ? BigInt(Math.round(effectivePeriodDays * 24 * 60 * 60)) : undefined,
     ],
   });
 
@@ -407,6 +439,156 @@ const BorrowPage: NextPage = () => {
     };
   }, [publicClient, connectedAddress]);
 
+  // ───────────── Wallet-direct origination: an intent bound to its receipts, failing closed ─────────────
+  const storage = typeof window !== "undefined" ? window.localStorage : undefined;
+  const intentStorageKey = connectedAddress
+    ? intentKey(CHAIN_ID, MICROCREDIT_ADDRESS, connectedAddress as `0x${string}`)
+    : undefined;
+  const setIntent = useCallback(
+    (next: OriginationIntent | null) => {
+      if (intentStorageKey) {
+        if (next) saveIntent(storage, intentStorageKey, next);
+        else clearIntent(storage, intentStorageKey);
+      }
+      setIntentState(next);
+    },
+    [intentStorageKey, storage],
+  );
+  // The intent for this wallet: loaded on connect, and again whenever another tab changes it.
+  useEffect(() => {
+    if (RELAYER_ENABLED || !intentStorageKey) {
+      setIntentState(null);
+      return;
+    }
+    setIntentState(loadIntent(storage, intentStorageKey));
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === intentStorageKey) setIntentState(loadIntent(storage, intentStorageKey));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [intentStorageKey, storage]);
+
+  const newestLoanStatus = loanTerms !== undefined ? Number(loanTerms[0]) : undefined;
+  // What the page may offer: unloaded reads are never "no loan", and an unresolved intent always wins.
+  const decision = useMemo(
+    () => decideOrigination(intent, { loanIds: borrowerLoanIds, newestLoanStatus }),
+    [intent, borrowerLoanIds, newestLoanStatus],
+  );
+
+  // Reconcile an intent against the chain until it is settled: by its receipt when a hash exists, by a matching new
+  // loan when the wallet returned none; then offer the second step for exactly that loan id.
+  useEffect(() => {
+    if (!intent || !publicClient || !connectedAddress) {
+      setReconcileNote("");
+      setMayDismiss(false);
+      setOfferedLoanId(undefined);
+      return;
+    }
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const pool = { address: MICROCREDIT_ADDRESS, abi: MICROCREDIT_ABI } as const;
+    const run = async () => {
+      const facts: ReconcileFacts = {};
+      try {
+        if (intent.stage === "requesting" && intent.requestTxHash) {
+          facts.requestReceipt = await publicClient
+            .getTransactionReceipt({ hash: intent.requestTxHash })
+            .then(r => ({ status: r.status, logs: r.logs }))
+            .catch(() => null);
+        } else if (intent.stage === "requesting") {
+          const ids = (await publicClient.readContract({
+            ...pool,
+            functionName: "getBorrowerLoanIds",
+            args: [connectedAddress],
+          })) as readonly bigint[];
+          const fresh = ids.filter(id => !intent.idsBefore.includes(id.toString()));
+          facts.candidates = await Promise.all(
+            fresh.map(async loanId => {
+              const [loan, terms] = await Promise.all([
+                publicClient.readContract({ ...pool, functionName: "getLoan", args: [loanId] }) as Promise<any>,
+                publicClient.readContract({ ...pool, functionName: "getLoanTerms", args: [loanId] }) as Promise<any>,
+              ]);
+              return { loanId, status: Number(terms[0]), amount: loan[0] as bigint, requestedAtMs: Number(terms[2]) * 1000 };
+            }),
+          );
+        } else if (intent.stage === "requested") {
+          const terms = (await publicClient.readContract({
+            ...pool,
+            functionName: "getLoanTerms",
+            args: [BigInt(intent.loanId ?? "0")],
+          })) as any;
+          facts.loanStatus = Number(terms[0]);
+        } else if (intent.disburseTxHash) {
+          facts.disburseReceipt = await publicClient
+            .getTransactionReceipt({ hash: intent.disburseTxHash })
+            .then(r => ({ status: r.status }))
+            .catch(() => null);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setReconcileNote(`Could not read the chain (${getParsedError(e)}); retrying.`);
+        timer = setTimeout(run, 4000);
+        return;
+      }
+      if (cancelled) return;
+      const outcome = reconcileIntent(intent, facts, Date.now());
+      setMayDismiss(outcome.kind === "may_dismiss");
+      setOfferedLoanId(outcome.kind === "offer_disburse" ? outcome.loanId : undefined);
+      if (outcome.kind === "adopt") {
+        setIntent({ ...intent, stage: "requested", loanId: outcome.loanId.toString() });
+        return;
+      }
+      if (outcome.kind === "clear") {
+        setIntent(null);
+        void refreshAfterMutationRef.current();
+        return;
+      }
+      setReconcileNote(outcome.kind === "offer_disburse" ? "" : outcome.reason + ".");
+      timer = setTimeout(run, outcome.kind === "offer_disburse" ? 8000 : 4000);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [intent, publicClient, connectedAddress, setIntent]);
+
+  // The second origination transaction, bound to the loan id the first one created.
+  const disburseIntent = async (current: OriginationIntent, signer: Signer) => {
+    if (!publicClient) throw new Error("Contract not available");
+    const loanId = BigInt(current.loanId ?? "0");
+    assertSameSigner(signer);
+    await publicClient.simulateContract({
+      address: MICROCREDIT_ADDRESS,
+      abi: MICROCREDIT_ABI,
+      functionName: "disburseLoan",
+      args: [loanId],
+      account: signer.address,
+    });
+    // A rejected signature leaves the intent at "requested": the card keeps offering this loan id.
+    const hash = await wagmiWriteAsync({
+      address: MICROCREDIT_ADDRESS,
+      abi: MICROCREDIT_ABI,
+      functionName: "disburseLoan",
+      args: [loanId],
+      chainId: CHAIN_ID,
+    });
+    setIntent({ ...current, stage: "disbursing", disburseTxHash: hash });
+    const toastId = toast.loading("Waiting for the disbursement to be mined", { position: "top-center" });
+    try {
+      const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 180_000 });
+      if (receipt.status !== "success") {
+        setIntent({ ...current, stage: "requested" });
+        throw new Error("The disbursement reverted; the loan is still requested");
+      }
+    } finally {
+      toast.dismiss(toastId);
+    }
+    setIntent(null);
+    toast.success("Loan disbursed", { position: "top-center" });
+    await refreshAfterMutation();
+  };
+
   const handleOneClickBorrow = async () => {
     if (!loanAmount || !connectedAddress) return;
     
@@ -416,29 +598,71 @@ const BorrowPage: NextPage = () => {
       if (!principal) return;
       if (!publicClient) throw new Error("Contract not available");
       if (!RELAYER_ENABLED) {
-        // Wallet-direct: request, then disburse, as two transactions with the pool's default term. If the
-        // second is rejected, the loan stays requested and the page offers to disburse or cancel it.
-        const readIds = async () =>
-          (await publicClient.readContract({
+        // Wallet-direct: requestLoan, then disburseLoan, as two transactions with the pool's default term. The
+        // intent is persisted before the wallet is asked and bound to the transaction hash before the receipt is
+        // awaited; the loan id comes from this transaction's LoanRequested event, never from the id array's length.
+        if (decision.kind !== "allow_new_request") {
+          throw new Error("A loan request is still open or unresolved; finish or resolve it first");
+        }
+        const signer = captureSigner("The loan request");
+        const idsBefore = (await publicClient.readContract({
+          address: MICROCREDIT_ADDRESS,
+          abi: MICROCREDIT_ABI,
+          functionName: "getBorrowerLoanIds",
+          args: [signer.address],
+        })) as readonly bigint[];
+        // A simulation failure throws before any intent exists: nothing was broadcast.
+        await publicClient.simulateContract({
+          address: MICROCREDIT_ADDRESS,
+          abi: MICROCREDIT_ABI,
+          functionName: "requestLoan",
+          args: [principal],
+          account: signer.address,
+        });
+        const pending = newIntent({
+          chainId: CHAIN_ID,
+          pool: MICROCREDIT_ADDRESS,
+          borrower: signer.address,
+          amount: principal,
+          idsBefore,
+          now: Date.now(),
+        });
+        setIntent(pending);
+        let requestHash: `0x${string}`;
+        try {
+          requestHash = await wagmiWriteAsync({
             address: MICROCREDIT_ADDRESS,
             abi: MICROCREDIT_ABI,
-            functionName: "getBorrowerLoanIds",
-            args: [connectedAddress],
-          })) as readonly bigint[];
-        const before = (await readIds()).length;
-        await writeCreditAsync({ functionName: "requestLoan", args: [principal] });
-        // A public RPC can lag behind the mined block; wait until the new id is visible before sending the
-        // second transaction, so it never targets an older loan. If it never appears, the recovery card
-        // shows the requested loan after a reload.
-        let ids = await readIds();
-        for (let tries = 0; ids.length <= before && tries < 10; tries++) {
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          ids = await readIds();
+            functionName: "requestLoan",
+            args: [principal],
+            chainId: CHAIN_ID,
+          });
+        } catch (e) {
+          // Only a rejection in the wallet means nothing left it; any other failure keeps the intent for reconciliation.
+          if (isUserRejection(e)) setIntent(null);
+          throw e;
         }
-        if (ids.length <= before) throw new Error("The loan request is mined but not visible yet; reload the page to disburse it");
-        const newest = ids[ids.length - 1];
-        await writeCreditAsync({ functionName: "disburseLoan", args: [newest] });
-        await refreshAfterMutation();
+        const withHash: OriginationIntent = { ...pending, requestTxHash: requestHash };
+        setIntent(withHash);
+        const toastId = toast.loading("Waiting for the loan request to be mined", { position: "top-center" });
+        let receipt;
+        try {
+          receipt = await publicClient.waitForTransactionReceipt({ hash: requestHash, timeout: 180_000 });
+        } finally {
+          toast.dismiss(toastId);
+        }
+        if (receipt.status !== "success") {
+          setIntent(null);
+          throw new Error("The loan request reverted; nothing was reserved");
+        }
+        const loanId = matchRequestedLoan(receipt.logs, {
+          pool: MICROCREDIT_ADDRESS,
+          borrower: signer.address,
+          amount: principal,
+        });
+        const requested: OriginationIntent = { ...withHash, stage: "requested", loanId: loanId.toString() };
+        setIntent(requested);
+        await disburseIntent(requested, signer);
         setLoanAmount("");
         return;
       }
@@ -506,12 +730,27 @@ const BorrowPage: NextPage = () => {
     }
   };
 
-  const handleDisburseRequested = async () => {
-    if (activeLoanId === undefined) return;
+  // Second step for a requested loan, by its own id: the intent's loan, or one found on chain without an intent.
+  const handleDisburseRequested = async (loanId: bigint) => {
     setIsLoading(true);
     try {
-      await writeCreditAsync({ functionName: "disburseLoan", args: [activeLoanId as bigint] });
-      await refreshAfterMutation();
+      const signer = captureSigner("The disbursement");
+      const current: OriginationIntent =
+        intent && intent.loanId === loanId.toString()
+          ? intent
+          : {
+              ...newIntent({
+                chainId: CHAIN_ID,
+                pool: MICROCREDIT_ADDRESS,
+                borrower: signer.address,
+                amount: activePrincipal ?? 0n,
+                idsBefore: [],
+                now: Date.now(),
+              }),
+              stage: "requested",
+              loanId: loanId.toString(),
+            };
+      await disburseIntent(current, signer);
     } catch (error) {
       toast.error(`Disbursement failed: ${getParsedError(error)}`);
     } finally {
@@ -519,11 +758,11 @@ const BorrowPage: NextPage = () => {
     }
   };
 
-  const handleCancelRequested = async () => {
-    if (activeLoanId === undefined) return;
+  const handleCancelRequested = async (loanId: bigint) => {
     setIsLoading(true);
     try {
-      await writeCreditAsync({ functionName: "cancelLoan", args: [activeLoanId as bigint] });
+      requireHash(await writeCreditAsync({ functionName: "cancelLoan", args: [loanId] }), "The cancellation");
+      if (intent && intent.loanId === loanId.toString()) setIntent(null);
       await refreshAfterMutation();
     } catch (error) {
       toast.error(`Cancellation failed: ${getParsedError(error)}`);
@@ -650,28 +889,63 @@ const BorrowPage: NextPage = () => {
 
       {lendingPaused && <div className="alert alert-warning mb-6">New lending is paused. You can still repay.</div>}
 
-      {/* A requested loan that still needs its second transaction */}
-      {loanIsRequested && (
+      {/* An origination intent whose outcome is not settled: reconciliation, never a new request */}
+      {decision.kind === "reconcile" && (
+        <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8 border border-warning">
+          <h2 className="text-xl font-semibold mb-2">
+            {offeredLoanId !== undefined ? "Loan requested, not yet disbursed" : "Checking a loan request"}
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            {offeredLoanId !== undefined
+              ? `${formatUSDC(BigInt(decision.intent.amount))} is reserved for you as loan #${offeredLoanId.toString()} but has not been paid out. Disburse it to receive the funds, or cancel it to release the reservation. Nothing else can be requested until one of the two is done.`
+              : `A request for ${formatUSDC(BigInt(decision.intent.amount))} started at ${new Date(decision.intent.createdAt).toLocaleString()} is not settled yet${decision.intent.requestTxHash ? ` (transaction ${decision.intent.requestTxHash})` : " (the wallet returned no transaction hash)"}. ${reconcileNote} No new request is possible until it is.`}
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            {offeredLoanId !== undefined && (
+              <>
+                <button className="btn btn-primary" disabled={isLoading} onClick={() => handleDisburseRequested(offeredLoanId)}>
+                  {isLoading ? "Processing…" : "Disburse"}
+                </button>
+                <button className="btn btn-outline" disabled={isLoading} onClick={() => handleCancelRequested(offeredLoanId)}>
+                  Cancel request
+                </button>
+              </>
+            )}
+            {mayDismiss && (
+              <button className="btn btn-outline" disabled={isLoading} onClick={() => setIntent(null)}>
+                Dismiss: no matching loan was found
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* A requested loan on chain (this page, another tab or a direct call) that still needs its second transaction */}
+      {decision.kind === "requested_on_chain" && (
         <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8 border border-warning">
           <h2 className="text-xl font-semibold mb-2">Loan requested, not yet disbursed</h2>
           <p className="text-sm text-gray-600 mb-4">
-            {activePrincipal !== undefined ? formatUSDC(activePrincipal) : "A loan"} is reserved for you but has not been
-            paid out. Disburse it to receive the funds, or cancel it to release the reservation. Nothing else can be
-            requested until one of the two is done.
+            {activePrincipal !== undefined ? formatUSDC(activePrincipal) : "A loan"} is reserved for you as loan #
+            {decision.loanId.toString()} but has not been paid out. Disburse it to receive the funds, or cancel it to
+            release the reservation. Nothing else can be requested until one of the two is done.
           </p>
           <div className="flex gap-2">
-            <button className="btn btn-primary" disabled={isLoading} onClick={handleDisburseRequested}>
+            <button className="btn btn-primary" disabled={isLoading} onClick={() => handleDisburseRequested(decision.loanId)}>
               {isLoading ? "Processing…" : "Disburse"}
             </button>
-            <button className="btn btn-outline" disabled={isLoading} onClick={handleCancelRequested}>
+            <button className="btn btn-outline" disabled={isLoading} onClick={() => handleCancelRequested(decision.loanId)}>
               Cancel request
             </button>
           </div>
         </div>
       )}
 
-      {/* Loan Request Form (shown when credit exists and there is no active loan) */}
-      {!loanIsActive && hasCredit && (
+      {decision.kind === "loading" && connectedAddress && (
+        <div className="text-sm text-gray-500 mb-8">Loading your loans…</div>
+      )}
+
+      {/* Loan Request Form (shown when credit exists, the reads are loaded and nothing is open or unresolved) */}
+      {decision.kind === "allow_new_request" && hasCredit && (
         <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
           <h2 className="text-xl font-semibold mb-4 flex items-center">
             <CalculatorIcon className="h-5 w-5 mr-2" />
@@ -701,21 +975,26 @@ const BorrowPage: NextPage = () => {
             {/* Repayment Period */}
             <div className="bg-base-200 rounded-lg p-4">
               <label className="block text-sm font-medium mb-2">Repayment Period</label>
-              <select
-                className="select select-bordered w-full"
-                value={repaymentPeriod}
-                onChange={e => setRepaymentPeriod(parseInt(e.target.value))}
-                disabled={!RELAYER_ENABLED}
-              >
-                {[7, 14, 28, 56, 84, 182, 364].map(days => (
-                  <option key={days} value={days}>{getPeriodLabel(days)}</option>
-                ))}
-              </select>
-              {!RELAYER_ENABLED && (
-                <p className="text-xs text-gray-500 mt-2">
-                  With your own wallet the loan runs for the pool&apos;s default term of 30 days; chosen periods need the
-                  relayed version of this app.
-                </p>
+              {RELAYER_ENABLED ? (
+                <select
+                  className="select select-bordered w-full"
+                  value={repaymentPeriod}
+                  onChange={e => setRepaymentPeriod(parseInt(e.target.value))}
+                >
+                  {[7, 14, 28, 56, 84, 182, 364].map(days => (
+                    <option key={days} value={days}>{getPeriodLabel(days)}</option>
+                  ))}
+                </select>
+              ) : (
+                <>
+                  <div className="input input-bordered w-full flex items-center bg-base-100">
+                    {Math.round(effectivePeriodDays)} days (the pool&apos;s default term)
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    With your own wallet the loan runs for the pool&apos;s default term; chosen periods need the relayed
+                    version of this app. The estimate below is for that term.
+                  </p>
+                </>
               )}
             </div>
           </div>
@@ -845,9 +1124,15 @@ const BorrowPage: NextPage = () => {
                       await checkUSDCBalance(amountToRepay);
 
                       if (!RELAYER_ENABLED) {
-                        // Wallet-direct: approve the pool for the amount, then repay; two transactions.
+                        // Wallet-direct: approve the pool for the amount, then repay; two transactions, each required
+                        // to have been sent and mined before the next step, by the same account on the same chain.
+                        const signer = captureSigner("The repayment");
                         await writeUsdc("approve", [MICROCREDIT_ADDRESS, amountToRepay]);
-                        await writeCreditAsync({ functionName: "repayLoan", args: [activeLoanId as bigint, amountToRepay] });
+                        assertSameSigner(signer);
+                        requireHash(
+                          await writeCreditAsync({ functionName: "repayLoan", args: [activeLoanId as bigint, amountToRepay] }),
+                          "The repayment",
+                        );
                         await refreshAfterMutation();
                         return;
                       }
@@ -978,9 +1263,15 @@ const BorrowPage: NextPage = () => {
                         await checkUSDCBalance(repayAmountBigInt);
 
                         if (!RELAYER_ENABLED) {
-                          // Wallet-direct: approve the pool for the amount, then repay; two transactions.
+                          // Wallet-direct: approve the pool for the amount, then repay; two transactions, each required
+                          // to have been sent and mined before the next step, by the same account on the same chain.
+                          const signer = captureSigner("The repayment");
                           await writeUsdc("approve", [MICROCREDIT_ADDRESS, repayAmountBigInt]);
-                          await writeCreditAsync({ functionName: "repayLoan", args: [activeLoanId as bigint, repayAmountBigInt] });
+                          assertSameSigner(signer);
+                          requireHash(
+                            await writeCreditAsync({ functionName: "repayLoan", args: [activeLoanId as bigint, repayAmountBigInt] }),
+                            "The repayment",
+                          );
                           setRepayAmount("");
                           await refreshAfterMutation();
                           return;
