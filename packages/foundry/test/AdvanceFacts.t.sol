@@ -130,6 +130,68 @@ contract AdvanceFactsTest is MicrocreditTestBase {
         assertEq(credit.totalAssets(), assetsBefore, "lenders earned nothing");
     }
 
+    /// The candidate sheet's size and term (testbed #17, 2026-10-07): 1 USDC held the full 30 days still owes
+    /// under a cent, so repaying the principal alone closes it. `_repay` books interest first, so the borrower is
+    /// credited dues on interest it never paid in cash and the forgiven cent falls on the reserve (CI-30).
+    function testThirtyDayOneUsdcAdvanceIsClosedByItsPrincipal() public {
+        uint256 assetsBefore = credit.totalAssets();
+        uint256 loanId = _open(1e6);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
+        uint256 interest = credit.getCurrentOutstandingAmount(loanId) - 1e6;
+        emit log_named_uint("1 USDC, 30 days: interest accrued (base units)", interest);
+        assertEq(interest, 7_668, "933 bps on 1 USDC for 30 days, rounded down");
+
+        vm.prank(borrower);
+        usdc.approve(address(credit), 1e6);
+        vm.expectEmit(address(credit));
+        emit RepaymentApplied(loanId, interest, 1e6 - interest, 0);
+        vm.prank(borrower);
+        credit.repayLoan(loanId, 1e6); // principal only
+
+        (,,,, bool active) = credit.getLoan(loanId);
+        assertFalse(active, "closed as repaid");
+        emit log_named_uint("dues credited to the borrower", credit.duesPaid(borrower));
+        assertEq(credit.duesPaid(borrower), 3_450, "45% of the interest booked");
+        assertEq(credit.firstLossReserve(), 0, "the reserve share was absorbed by the forgiven balance");
+        assertEq(credit.totalAssets(), assetsBefore, "lenders got 1 USDC back and earned nothing");
+    }
+
+    /// The same advance in default, once with unsecured backing (issued credit) and once with secured (stake):
+    /// the loss is the unpaid principal, not the interest; credit burns and recovers no cash, stake does.
+    function testOneUsdcDefaultUnsecuredBurnsCreditStakeRecoversCash() public {
+        address unbacked = makeAddr("creditBacked");
+        address staked = makeAddr("stakeBacked");
+        address issuerBacker = makeAddr("issuerBacker");
+        address stakeBacker = makeAddr("stakeBacker");
+        vm.prank(owner);
+        credit.setScoreOverride(issuerBacker, SCALE / 100); // a 1 USDC line
+        vm.prank(issuerBacker);
+        credit.back(unbacked, 1e6);
+        _stake(stakeBacker, 1e6);
+        vm.prank(stakeBacker);
+        credit.back(staked, 1e6);
+
+        uint256[2] memory loss;
+        address[2] memory borrowers = [unbacked, staked];
+        for (uint256 i = 0; i < 2; i++) {
+            uint256 assetsBefore = credit.totalAssets();
+            vm.prank(borrowers[i]);
+            uint256 loanId = credit.requestLoan(1e6);
+            credit.disburseLoan(loanId);
+            (,,,, uint256 dueAt) = credit.getLoanTerms(loanId);
+            vm.warp(dueAt + credit.LATE_PERIOD() + 1);
+            credit.markDefaulted(loanId);
+            loss[i] = assetsBefore - credit.totalAssets();
+        }
+        emit log_named_uint("unsecured: lenders' loss (base units)", loss[0]);
+        emit log_named_uint("secured: lenders' loss (base units)", loss[1]);
+        assertEq(loss[0], 1e6, "the unpaid principal, not the interest, falls on the reserve and lenders");
+        assertEq(credit.creditLoss(issuerBacker), 1e6, "the backer's issued credit burns");
+        assertEq(credit.grantedCredit(issuerBacker), 0);
+        assertEq(loss[1], 0, "the slashed stake covers the principal");
+        assertEq(credit.stakeOf(stakeBacker), 0, "the backer's stake is gone");
+    }
+
     /// An advance near a cent can be closed having repaid a third of it: the cent is forgiven, not collected.
     function testAdvanceNearACentIsMostlyForgivenAtClosing() public {
         uint256 assetsBefore = credit.totalAssets();
