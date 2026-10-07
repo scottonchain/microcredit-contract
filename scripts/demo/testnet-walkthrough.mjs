@@ -142,14 +142,23 @@ async function walletRequest(method, params) {
         bridge.calls.push({ t: now(), who: bridge.active, method: "eth_sendTransaction", rejected: "disburseLoan" });
         throw new Error("WALLET_ERROR:4001:User rejected the request.");
       }
+      console.log(`    [${now()}] wallet got eth_sendTransaction ${selector} (page asked)`);
       const wait = bridge.lastSendAt + SEND_SPACING_MS - Date.now();
       if (wait > 0) await sleep(wait);
-      const hash = await wallets[bridge.active].sendTransaction({
-        to: tx.to,
-        data: tx.data,
-        value: tx.value ? BigInt(tx.value) : 0n,
-      });
+      let hash;
+      try {
+        hash = await wallets[bridge.active].sendTransaction({
+          to: tx.to,
+          data: tx.data,
+          value: tx.value ? BigInt(tx.value) : 0n,
+        });
+      } catch (e) {
+        console.log(`    SEND FAILED (${selector}): ${String((e && e.message) || e).split("\n").slice(0, 6).join(" | ").slice(0, 600)}`);
+        bridge.calls.push({ t: now(), who: bridge.active, method: "eth_sendTransaction", sendError: String((e && e.shortMessage) || (e && e.message) || e).slice(0, 300) });
+        throw e;
+      }
       bridge.lastSendAt = Date.now();
+      console.log(`    [${now()}] sent ${selector}`);
       bridge.sendCount += 1;
       bridge.txs.push({ t: now(), who: bridge.active, to: tx.to, selector, hash });
       console.log(`    tx ${selector} -> ${hash}`);
@@ -301,6 +310,19 @@ async function main() {
   await ctx.addInitScript(PROVIDER_INIT_SCRIPT);
   const page = await ctx.newPage();
   page.on("pageerror", e => console.log("   page error:", e.message.slice(0, 200)));
+  // Console errors and warnings, kept for the failure dump: the page's own reason for a stopped step is shown in an
+  // alert box (role=alert) and written to the console, and Hermes's earlier runs could not see either.
+  const consoleLog = [];
+  page.on("console", m => {
+    if (m.type() === "error" || m.type() === "warning") consoleLog.push(`${now()} ${m.type()}: ${m.text().slice(0, 300)}`);
+  });
+  async function failureDump(label, chars = 2500) {
+    console.log(`${label} PAGE TEXT AT FAILURE:`, (await page.evaluate(() => document.body.innerText)).slice(0, chars));
+    const alerts = await page.evaluate(() => Array.from(document.querySelectorAll('[role="alert"]')).map(e => e.innerText.slice(0, 400)));
+    console.log(`${label} ALERT BOXES:`, JSON.stringify(alerts));
+    console.log(`${label} CONSOLE (last 10):`, JSON.stringify(consoleLog.slice(-10)));
+    console.log(`${label} WALLET CALLS (last 12):`, JSON.stringify(bridge.calls.slice(-12)));
+  }
 
   try {
     await step("open and connect", async () => {
@@ -361,7 +383,7 @@ async function main() {
         await page.getByRole("button", { name: /^Deposit$/ }).click({ timeout: 15000 });
         const confirmed = await waitForText(page, "Deposit confirmed", 90000);
         const ok = await waitFor(async () => Number((await state(accounts.borrower.address)).lenderBalance) >= before + Number(LEND_AMOUNT) - 0.01, 60000);
-        if (!ok) { console.log("PAGE TEXT AT FAILURE:", (await page.evaluate(() => document.body.innerText)).slice(0, 1500)); throw new Error("lender balance did not rise"); }
+        if (!ok) { await failureDump("LEND"); throw new Error("lender balance did not rise"); }
         return `page said confirmed: ${confirmed}; lender balance rose`;
       });
     }
@@ -440,7 +462,7 @@ async function main() {
           await page.getByRole("button", { name: /^Disburse$/ }).click({ timeout: 15000 });
         }
         const active = await waitFor(async () => (await state(accounts.borrower.address)).loans.some(l => l.id === loanId.toString() && l.status === "Active"), 240000);
-        if (!active) throw new Error(`loan #${loanId} did not become Active`);
+        if (!active) { await failureDump("BORROW"); throw new Error(`loan #${loanId} did not become Active`); }
         const disb = bridge.txs.filter(t => t.selector === DISBURSE_SELECTOR).slice(-1)[0];
         const disbTx = disb ? await publicClient.getTransaction({ hash: disb.hash }) : null;
         const disbLoanId = disbTx ? BigInt("0x" + disbTx.input.slice(10)) : null;
@@ -473,7 +495,7 @@ async function main() {
         }
         if (!clicked) { console.log("REPAY PAGE TEXT:", (await page.evaluate(() => document.body.innerText)).slice(0, 1800)); console.log("BUTTONS", JSON.stringify(await page.evaluate(() => [...document.querySelectorAll("button")].map(x => x.innerText.trim()).filter(Boolean)))); throw new Error("no repay button found"); }
         const repaid = await waitFor(async () => (await state(accounts.borrower.address)).loans.some(l => l.id === open.id && l.status === "Repaid"), 90000);
-        if (!repaid) { console.log("REPAY PAGE TEXT AT FAILURE:", (await page.evaluate(() => document.body.innerText)).slice(0, 2500)); console.log("WALLET CALLS (last 12):", JSON.stringify(bridge.calls.slice(-12))); throw new Error(`loan #${open.id} did not become Repaid`); }
+        if (!repaid) { await failureDump("REPAY"); throw new Error(`loan #${open.id} did not become Repaid`); }
         return `loan #${open.id} repaid`;
       });
     }
