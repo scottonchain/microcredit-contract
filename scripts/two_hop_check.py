@@ -20,6 +20,11 @@ Flow (the amount is in USDC, six decimals on chain):
     two_hop_check.py controls --rpc URL --pool POOL --a A --b B --c C --stage after
     two_hop_check.py verify --before before.json --after after.json --amount 2 --route grant
 
+`snapshot` and `controls` take `--block N` to read the state as of block N instead of the latest,
+so a run that is already over can be checked again from its own blocks: snapshot just before and
+just after the `back` transaction, and run the controls at either. The node must still serve the
+state at that block.
+
 Exit status is 0 only when every check passed. A check that cannot apply (for example B already
 holds credit of its own, so the pass-on control proves nothing) is reported as NOT APPLICABLE and
 does not fail the run, but it is printed so the receipt says so.
@@ -165,11 +170,11 @@ def revert_selector(exc):
 # ───────────────────────────── snapshot ─────────────────────────────
 
 
-def read_account(url, pool, who):
+def read_account(url, pool, who, block="latest"):
     w = word_address(who)
-    one = lambda name: words_of(call(url, pool, calldata(SEL[name], w)))[0]
-    limit, available = words_of(call(url, pool, calldata(SEL["getBorrowLimit"], w)))
-    free_credit, free_stake = words_of(call(url, pool, calldata(SEL["getFreeCredit"], w)))
+    one = lambda name: words_of(call(url, pool, calldata(SEL[name], w), block=block))[0]
+    limit, available = words_of(call(url, pool, calldata(SEL["getBorrowLimit"], w), block=block))
+    free_credit, free_stake = words_of(call(url, pool, calldata(SEL["getFreeCredit"], w), block=block))
     return {
         "address": who,
         "granted": one("grantedCredit"),
@@ -188,48 +193,48 @@ def read_account(url, pool, who):
     }
 
 
-def read_edge(url, pool, backer, borrower):
+def read_edge(url, pool, backer, borrower, block="latest"):
     secured, unsecured = words_of(
-        call(url, pool, calldata(SEL["getBacking"], word_address(backer), word_address(borrower)))
+        call(url, pool, calldata(SEL["getBacking"], word_address(backer), word_address(borrower)), block=block)
     )
     return {"backer": backer, "borrower": borrower, "secured": secured, "unsecured": unsecured}
 
 
-def read_provider(url, pool):
+def read_provider(url, pool, block="latest"):
     """Freshness of the score provider: it is provider-wide, and a stale one zeroes every score."""
-    provider = "0x" + words_of(call(url, pool, SEL["scoreProvider"]))[0].to_bytes(20, "big").hex()
-    block = rpc(url, "eth_getBlockByNumber", ["latest", False])
-    now = int(block["timestamp"], 16)
-    info = {"provider": provider, "block": int(block["number"], 16), "block_time": now}
+    provider = "0x" + words_of(call(url, pool, SEL["scoreProvider"], block=block))[0].to_bytes(20, "big").hex()
+    header = rpc(url, "eth_getBlockByNumber", [block, False])
+    now = int(header["timestamp"], 16)
+    info = {"provider": provider, "block": int(header["number"], 16), "block_time": now}
     if int(provider, 16) == 0:
         return info
     try:
-        info["fresh"] = bool(words_of(call(url, provider, SEL["isFresh"]))[0])
-        last = words_of(call(url, provider, SEL["lastReportAt"]))[0]
-        age = words_of(call(url, provider, SEL["maxScoreAge"]))[0]
+        info["fresh"] = bool(words_of(call(url, provider, SEL["isFresh"], block=block))[0])
+        last = words_of(call(url, provider, SEL["lastReportAt"], block=block))[0]
+        age = words_of(call(url, provider, SEL["maxScoreAge"], block=block))[0]
         info["last_report_at"] = last
         info["max_score_age"] = age
         info["stale_at"] = last + age
-        info["epoch"] = words_of(call(url, provider, SEL["epoch"]))[0]
+        info["epoch"] = words_of(call(url, provider, SEL["epoch"], block=block))[0]
         info["seconds_left"] = max(0, last + age - now)
     except (RpcError, IndexError):
         info["fresh"] = None  # a provider without these views
     return info
 
 
-def take_snapshot(url, pool, a, b, c=None):
+def take_snapshot(url, pool, a, b, c=None, block="latest"):
     chain = int(rpc(url, "eth_chainId", []), 16)
     snap = {
         "chain_id": chain,
         "pool": pool,
-        "provider": read_provider(url, pool),
-        "a": read_account(url, pool, a),
-        "b": read_account(url, pool, b),
-        "edge_ab": read_edge(url, pool, a, b),
+        "provider": read_provider(url, pool, block),
+        "a": read_account(url, pool, a, block),
+        "b": read_account(url, pool, b, block),
+        "edge_ab": read_edge(url, pool, a, b, block),
     }
     if c:
-        snap["c"] = read_account(url, pool, c)
-        snap["edge_bc"] = read_edge(url, pool, b, c)
+        snap["c"] = read_account(url, pool, c, block)
+        snap["edge_bc"] = read_edge(url, pool, b, c, block)
     return snap
 
 
@@ -322,7 +327,7 @@ def verify(before, after, amount, route):
             out.append(("FAIL", "the score provider is stale in the %s snapshot and A holds no override: A's issued line reads 0" % label))
     prov = after.get("provider", {})
     if prov.get("fresh") and acct_uses_provider(after["a"]):
-        out.append(("NOTE", "the score provider reads stale %d s after the latest block: finish the cleanup (back(B, 0), releaseBudget) inside that window, or send a heartbeat report" % prov["seconds_left"]))
+        out.append(("NOTE", "the score provider reads stale %d s after the after-snapshot's block: finish the cleanup (back(B, 0), releaseBudget) inside that window, or send a heartbeat report" % prov["seconds_left"]))
     elif route == "grant" and after["a"]["override"] != 0:
         out.append(("NOTE", "A's line is an admin override, so the provider's clock does not apply to it"))
     return out
@@ -339,20 +344,20 @@ def usdc(n):
 # ───────────────────────────── controls ─────────────────────────────
 
 
-def simulate_revert(url, pool, frm, to_borrower, amount):
+def simulate_revert(url, pool, frm, to_borrower, amount, block="latest"):
     """Simulate frm.back(to_borrower, amount). Returns ('ok', None) or ('revert', selector)."""
     data = calldata(SEL["back"], word_address(to_borrower), word_uint(amount))
     try:
-        call(url, pool, data, frm=frm)
+        call(url, pool, data, frm=frm, block=block)
     except RpcError as exc:
         return "revert", revert_selector(exc)
     return "ok", None
 
 
-def controls(url, pool, a, b, c, stage):
+def controls(url, pool, a, b, c, stage, block="latest"):
     out = []
-    acct_a = read_account(url, pool, a)
-    acct_b = read_account(url, pool, b)
+    acct_a = read_account(url, pool, a, block)
+    acct_b = read_account(url, pool, b, block)
 
     # Control 1: B, holding only received backing, cannot pass it on to C.
     if capacity(acct_b) != 0:
@@ -360,14 +365,14 @@ def controls(url, pool, a, b, c, stage):
     elif acct_b["limit"] == 0 and stage == "before":
         out.append(("NOT APPLICABLE", "before the backing B has no limit at all; the pass-on control is meaningful after A backs B (run it with --stage after as well)"))
     else:
-        verdict, sel = simulate_revert(url, pool, b, c, MIN_BACKING)
+        verdict, sel = simulate_revert(url, pool, b, c, MIN_BACKING, block)
         out.append(_expect_insufficient("B (limit %s, free capacity 0) backing C with %s" % (usdc(acct_b["limit"]), usdc(MIN_BACKING)), verdict, sel))
 
     # Control 2: A cannot raise its backing of B above what it holds free.
-    edge = read_edge(url, pool, a, b)
+    edge = read_edge(url, pool, a, b, block)
     current = edge["secured"] + edge["unsecured"]
     over = max(current + capacity(acct_a) + 1, MIN_BACKING)
-    verdict, sel = simulate_revert(url, pool, a, b, over)
+    verdict, sel = simulate_revert(url, pool, a, b, over, block)
     out.append(
         _expect_insufficient(
             "A raising its backing of B to %s (holds %s now, free capacity %s)" % (usdc(over), usdc(current), usdc(capacity(acct_a))),
@@ -404,6 +409,19 @@ def parse_usdc(text):
     return int(value)
 
 
+def parse_block(text):
+    """A block number (decimal or 0x hex) as the hex tag eth_call takes, or 'latest'."""
+    if text == "latest":
+        return text
+    try:
+        n = int(text, 16) if text.lower().startswith("0x") else int(text)
+    except ValueError:
+        n = -1
+    if n < 0:
+        raise argparse.ArgumentTypeError("block must be 'latest' or a block number")
+    return hex(n)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -414,6 +432,7 @@ def main(argv=None):
         sp.add_argument("--a", required=True, help="the backer")
         sp.add_argument("--b", required=True, help="the borrower A backs")
         sp.add_argument("--c", help="a third address B would back (second hop)")
+        sp.add_argument("--block", type=parse_block, default="latest", help="read the state as of this block number (default latest)")
 
     s = sub.add_parser("snapshot", help="read the state of A, B (and C) and print or save it")
     common(s)
@@ -429,7 +448,7 @@ def main(argv=None):
 
     args = p.parse_args(argv)
     if args.cmd == "snapshot":
-        snap = take_snapshot(args.rpc, args.pool, args.a, args.b, args.c)
+        snap = take_snapshot(args.rpc, args.pool, args.a, args.b, args.c, args.block)
         text = json.dumps(snap, indent=2, sort_keys=True)
         if args.out:
             with open(args.out, "w") as f:
@@ -438,12 +457,12 @@ def main(argv=None):
         prov = snap["provider"]
         if "seconds_left" in prov:
             state = "fresh, reads stale in %d s" % prov["seconds_left"] if prov["fresh"] else "stale"
-            print("score provider %s (latest block time); epoch %s, a new report needs a higher one" % (state, prov.get("epoch")), file=sys.stderr)
+            print("score provider %s (time of block %d); epoch %s, a new report needs a higher one" % (state, prov["block"], prov.get("epoch")), file=sys.stderr)
         return 0
     if args.cmd == "controls":
         if not args.c:
             p.error("controls needs --c")
-        return print_results(controls(args.rpc, args.pool, args.a, args.b, args.c, args.stage))
+        return print_results(controls(args.rpc, args.pool, args.a, args.b, args.c, args.stage, args.block))
     with open(args.before) as f:
         before = json.load(f)
     with open(args.after) as f:

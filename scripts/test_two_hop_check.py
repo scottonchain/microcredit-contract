@@ -166,17 +166,27 @@ class Controls(unittest.TestCase):
     def tearDown(self):
         t.read_account, t.read_edge, t.simulate_revert = self._orig
 
-    def run_controls(self, acct_a, acct_b, verdicts, stage="after"):
-        t.read_account = lambda url, pool, who: acct_a if who == A else acct_b
-        t.read_edge = lambda url, pool, a, b: {"secured": 0, "unsecured": 0}
+    def run_controls(self, acct_a, acct_b, verdicts, stage="after", block="latest"):
+        self.blocks = []
+
+        def read_account(url, pool, who, blk):
+            self.blocks.append(blk)
+            return acct_a if who == A else acct_b
+
+        def read_edge(url, pool, a, b, blk):
+            self.blocks.append(blk)
+            return {"secured": 0, "unsecured": 0}
+
+        t.read_account, t.read_edge = read_account, read_edge
         calls = []
 
-        def fake(url, pool, frm, to, amount):
+        def fake(url, pool, frm, to, amount, blk):
+            self.blocks.append(blk)
             calls.append((frm, to, amount))
             return verdicts.pop(0)
 
         t.simulate_revert = fake
-        return t.controls("rpc", "pool", A, B, C, stage), calls
+        return t.controls("rpc", "pool", A, B, C, stage, block), calls
 
     def test_both_controls_pass_on_insufficient_credit(self):
         verdicts = [("revert", t.INSUFFICIENT_CREDIT), ("revert", t.INSUFFICIENT_CREDIT)]
@@ -205,6 +215,51 @@ class Controls(unittest.TestCase):
     def test_raise_control_never_asks_below_the_minimum_backing(self):
         _, calls = self.run_controls(account(A), account(B), [("revert", t.INSUFFICIENT_CREDIT)], stage="before")
         self.assertEqual(calls[-1][2], t.MIN_BACKING)
+
+    def test_every_read_and_simulation_uses_the_given_block(self):
+        verdicts = [("revert", t.INSUFFICIENT_CREDIT), ("revert", t.INSUFFICIENT_CREDIT)]
+        self.run_controls(account(A, free_credit=3 * U), account(B, limit=2 * U), verdicts, block="0x2d97976")
+        self.assertEqual(len(self.blocks), 5)
+        self.assertEqual(set(self.blocks), {"0x2d97976"})
+
+
+class BlockTag(unittest.TestCase):
+    """A snapshot taken at a past block reads every value, and the block header, at that block."""
+
+    def setUp(self):
+        self._orig = t.rpc
+
+    def tearDown(self):
+        t.rpc = self._orig
+
+    def test_snapshot_reads_everything_at_the_given_block(self):
+        seen = []
+
+        def fake(url, method, params):
+            seen.append((method, params))
+            if method == "eth_chainId":
+                return "0x14a34"
+            if method == "eth_getBlockByNumber":
+                return {"number": params[0], "timestamp": "0x10"}
+            if params[0]["data"] == t.SEL["scoreProvider"]:
+                return "0x" + "0" * 24 + "2" * 40  # a provider, so its four views are read too
+            return "0x" + "0" * 128
+
+        t.rpc = fake
+        snap = t.take_snapshot("rpc", "0x" + "1" * 40, A, B, C, block="0x2d97976")
+        self.assertEqual(snap["provider"]["block"], 0x2D97976)
+        calls = [p for m, p in seen if m == "eth_call"]
+        self.assertGreater(len(calls), 30)
+        self.assertEqual({p[1] for p in calls}, {"0x2d97976"})
+        self.assertIn(("eth_getBlockByNumber", ["0x2d97976", False]), seen)
+
+    def test_parse_block(self):
+        self.assertEqual(t.parse_block("latest"), "latest")
+        self.assertEqual(t.parse_block("47806838"), "0x2d97976")
+        self.assertEqual(t.parse_block("0x2D97976"), "0x2d97976")
+        for bad in ("-1", "pending", "1.5", ""):
+            with self.assertRaises(Exception):
+                t.parse_block(bad)
 
 
 class Helpers(unittest.TestCase):
