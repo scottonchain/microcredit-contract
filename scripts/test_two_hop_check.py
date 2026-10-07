@@ -245,7 +245,7 @@ class Selectors(unittest.TestCase):
 
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packages", "foundry", "out")
-PROVIDER_VIEWS = {"isFresh", "lastReportAt", "maxScoreAge"}
+PROVIDER_VIEWS = {"isFresh", "lastReportAt", "maxScoreAge", "epoch"}
 
 
 def artifact(contract):

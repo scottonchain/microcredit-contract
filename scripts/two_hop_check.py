@@ -55,6 +55,7 @@ import urllib.request
 from decimal import Decimal
 
 USDC = 10**6
+USER_AGENT = "two-hop-check/1 (+https://github.com/scottonchain/microcredit-contract)"
 MIN_BACKING = USDC  # the pool's MIN_BACKING
 
 SEL = {
@@ -75,6 +76,7 @@ SEL = {
     "isFresh": "0x6268ceaa",
     "lastReportAt": "0x92dc7b7b",
     "maxScoreAge": "0xc82bfbb7",
+    "epoch": "0x900cf0cf",
 }
 INSUFFICIENT_CREDIT = "0x8ac4bc73"
 
@@ -96,6 +98,7 @@ SIGNATURES = {
     "isFresh": "isFresh()",
     "lastReportAt": "lastReportAt()",
     "maxScoreAge": "maxScoreAge()",
+    "epoch": "epoch()",
     "InsufficientCredit": "InsufficientCredit()",
 }
 
@@ -108,7 +111,8 @@ class RpcError(Exception):
 
 def rpc(url, method, params):
     body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
-    req = urllib.request.Request(url, data=body, headers={"content-type": "application/json"})
+    # Some public endpoints refuse Python's default user agent with 403.
+    req = urllib.request.Request(url, data=body, headers={"content-type": "application/json", "user-agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=30) as resp:
         out = json.loads(resp.read())
     if "error" in out:
@@ -206,6 +210,7 @@ def read_provider(url, pool):
         info["last_report_at"] = last
         info["max_score_age"] = age
         info["stale_at"] = last + age
+        info["epoch"] = words_of(call(url, provider, SEL["epoch"]))[0]
         info["seconds_left"] = max(0, last + age - now)
     except (RpcError, IndexError):
         info["fresh"] = None  # a provider without these views
@@ -433,7 +438,7 @@ def main(argv=None):
         prov = snap["provider"]
         if "seconds_left" in prov:
             state = "fresh, reads stale in %d s" % prov["seconds_left"] if prov["fresh"] else "stale"
-            print("score provider %s (latest block time)" % state, file=sys.stderr)
+            print("score provider %s (latest block time); epoch %s, a new report needs a higher one" % (state, prov.get("epoch")), file=sys.stderr)
         return 0
     if args.cmd == "controls":
         if not args.c:
