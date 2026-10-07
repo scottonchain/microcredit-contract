@@ -5,11 +5,11 @@ const BorrowHelpPage: NextPage = () => {
   return (
     <div className="flex flex-col items-center pt-10 px-5 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold mb-6 text-center">Borrower Guide</h1>
-      <p className="text-gray-700 mb-4">
+      <p className="text-base-content mb-4">
         LoanLink lets you access small loans backed by your social reputation rather than traditional credit history. Here’s
         how to get started:
       </p>
-      <ol className="list-decimal list-inside space-y-3 text-gray-700">
+      <ol className="list-decimal list-inside space-y-3 text-base-content">
         <li>
           <span className="font-medium">Start from the credit you have.</span> Credit you earned before, or a line an
           institution extends to you, is yours to borrow against.
@@ -33,7 +33,7 @@ const BorrowHelpPage: NextPage = () => {
         </li>
       </ol>
 
-      <p className="text-gray-700 mt-6">
+      <p className="text-base-content mt-6">
         Need more help? Reach out on our&nbsp;
         <Link href="https://discord.gg" target="_blank" className="link">
           community Discord

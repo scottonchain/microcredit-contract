@@ -4,7 +4,7 @@ interface Step {
   icon: ReactNode;
   title: string;
   description: string;
-  badgeColor?: string; // tailwind bg-color, default blue
+  badgeColor?: string; // Optional paired background/text classes; defaults to the info palette.
 }
 
 interface Props {
@@ -21,13 +21,13 @@ const HowItWorks: React.FC<Props> = ({ title, steps, className }) => {
         {steps.map((step, idx) => (
           <div className="flex items-start space-x-3" key={idx}>
             <div
-              className={`${step.badgeColor ?? "bg-blue-500"} text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5`}
+              className={`${step.badgeColor ?? "bg-info text-info-content"} rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5`}
             >
               {idx + 1}
             </div>
             <div>
               <h3 className="font-medium">{step.title}</h3>
-              <p className="text-gray-600">{step.description}</p>
+              <p className="text-muted">{step.description}</p>
             </div>
           </div>
         ))}

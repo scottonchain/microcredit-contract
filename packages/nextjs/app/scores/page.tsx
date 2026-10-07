@@ -54,24 +54,24 @@ const CreditFigures = ({ account }: { account?: string }) => {
   return (
     <>
       <div className="text-center">
-        <div className="text-2xl font-bold text-blue-500">{granted !== undefined ? formatUSDC(granted) : "-"}</div>
-        <div className="text-sm text-gray-600">Own Credit</div>
-        <div className="text-xs text-gray-500 mt-2 space-y-0.5">
+        <div className="text-2xl font-bold text-info">{granted !== undefined ? formatUSDC(granted) : "-"}</div>
+        <div className="text-sm text-muted">Own Credit</div>
+        <div className="text-xs text-muted mt-2 space-y-0.5">
           <div>Issued line: {issuedLine !== undefined ? formatUSDC(issuedLine) : "-"}</div>
           <div>Earned from interest paid into the reserve: {duesPaid !== undefined ? formatUSDC(duesPaid) : "-"}</div>
           {creditLoss !== undefined && creditLoss > 0n && (
             <div>Charged for defaults of people backed: {formatUSDC(creditLoss)}</div>
           )}
           {defaults !== undefined && defaults > 0n && (
-            <div className="text-red-500">Defaulted on a loan: own credit is 0</div>
+            <div className="text-error">Defaulted on a loan: own credit is 0</div>
           )}
         </div>
       </div>
       <div className="text-center">
-        <div className="text-2xl font-bold text-green-500">
+        <div className="text-2xl font-bold text-success">
           {borrowLimit !== undefined ? formatUSDC(borrowLimit[0]) : "-"}
         </div>
-        <div className="text-sm text-gray-600">Credit Limit (own + backing)</div>
+        <div className="text-sm text-muted">Credit Limit (own + backing)</div>
       </div>
     </>
   );
@@ -85,7 +85,7 @@ const BackersList = ({ account }: { account: string }) => {
     args: [account as `0x${string}`],
   });
   const active = (backings ?? []).filter(b => b.secured + b.unsecured > 0n);
-  if (active.length === 0) return <div className="text-center text-gray-500 py-4">No one backs this address yet</div>;
+  if (active.length === 0) return <div className="text-center text-muted py-4">No one backs this address yet</div>;
   return (
     <>
       {active.map(b => (
@@ -123,11 +123,11 @@ const ScoresPage: NextPage = () => {
   const toPercent = (score: bigint | undefined) => Number(score ?? 0) / 10000; // SCALE=1e6 => /10000 -> percent
 
   const getCreditScoreColor = (score: number) => {
-    if (score < 30) return "text-red-500";
-    if (score < 50) return "text-orange-500";
-    if (score < 70) return "text-yellow-500";
-    if (score < 90) return "text-blue-500";
-    return "text-green-500";
+    if (score < 30) return "text-error";
+    if (score < 50) return "text-caution";
+    if (score < 70) return "text-caution";
+    if (score < 90) return "text-info";
+    return "text-success";
   };
 
   const getCreditScoreLabel = (score: number) => {
@@ -175,7 +175,7 @@ const ScoresPage: NextPage = () => {
               <button
                 onClick={handleSearch}
                 disabled={!searchAddress}
-                className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+                className="bg-info hover:brightness-90 disabled:bg-base-300 disabled:text-muted text-info-content font-bold py-3 px-6 rounded-lg transition-colors"
               >
                 Search
               </button>
@@ -191,7 +191,7 @@ const ScoresPage: NextPage = () => {
                   <div className={`text-5xl font-bold ${getCreditScoreColor(toPercent(userCreditScore))}`}>
                     {toPercent(userCreditScore).toFixed(2)}%
                   </div>
-                  <div className="text-sm text-gray-600">Credit Score</div>
+                  <div className="text-sm text-muted">Credit Score</div>
                   <div className="text-lg font-medium mt-1">
                     {getCreditScoreLabel(toPercent(userCreditScore))}
                   </div>
@@ -201,7 +201,7 @@ const ScoresPage: NextPage = () => {
               
               <div className="mt-6">
                 <h3 className="font-medium mb-2">Score Description</h3>
-                <p className="text-gray-600">
+                <p className="text-muted">
                   {getCreditScoreDescription(toPercent(userCreditScore))}
                 </p>
               </div>
@@ -221,7 +221,7 @@ const ScoresPage: NextPage = () => {
                   <div className={`text-5xl font-bold ${getCreditScoreColor(toPercent(searchedCreditScore))}`}>
                     {toPercent(searchedCreditScore).toFixed(2)}%
                   </div>
-                  <div className="text-sm text-gray-600">Credit Score</div>
+                  <div className="text-sm text-muted">Credit Score</div>
                   <div className="text-lg font-medium mt-1">
                     {getCreditScoreLabel(toPercent(searchedCreditScore))}
                   </div>
@@ -245,40 +245,40 @@ const ScoresPage: NextPage = () => {
               <div>
                 <h3 className="font-medium mb-3">Score Categories</h3>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded">
+                  <div className="flex items-center justify-between p-3 bg-success-surface rounded">
                     <div>
-                      <div className="font-medium text-green-800">Excellent (90-100%)</div>
-                      <div className="text-sm text-green-600">A line of 90 to 100% of the maximum loan</div>
+                      <div className="font-medium text-success">Excellent (90-100%)</div>
+                      <div className="text-sm text-success">A line of 90 to 100% of the maximum loan</div>
                     </div>
-                    <div className="text-2xl font-bold text-green-500">90-100%</div>
+                    <div className="text-2xl font-bold text-success">90-100%</div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded">
+                  <div className="flex items-center justify-between p-3 bg-info-surface rounded">
                     <div>
-                      <div className="font-medium text-blue-800">Very Good (70-89%)</div>
-                      <div className="text-sm text-blue-600">A line of 70 to 89% of the maximum loan</div>
+                      <div className="font-medium text-info">Very Good (70-89%)</div>
+                      <div className="text-sm text-info">A line of 70 to 89% of the maximum loan</div>
                     </div>
-                    <div className="text-2xl font-bold text-blue-500">70-89%</div>
+                    <div className="text-2xl font-bold text-info">70-89%</div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-yellow-50 rounded">
+                  <div className="flex items-center justify-between p-3 bg-warning-surface rounded">
                     <div>
-                      <div className="font-medium text-yellow-800">Good (50-69%)</div>
-                      <div className="text-sm text-yellow-600">A line of 50 to 69% of the maximum loan</div>
+                      <div className="font-medium text-caution">Good (50-69%)</div>
+                      <div className="text-sm text-caution">A line of 50 to 69% of the maximum loan</div>
                     </div>
-                    <div className="text-2xl font-bold text-yellow-500">50-69%</div>
+                    <div className="text-2xl font-bold text-caution">50-69%</div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-orange-50 rounded">
+                  <div className="flex items-center justify-between p-3 bg-warning-surface rounded">
                     <div>
-                      <div className="font-medium text-orange-800">Fair (30-49%)</div>
-                      <div className="text-sm text-orange-600">A line of 30 to 49% of the maximum loan</div>
+                      <div className="font-medium text-caution">Fair (30-49%)</div>
+                      <div className="text-sm text-caution">A line of 30 to 49% of the maximum loan</div>
                     </div>
-                    <div className="text-2xl font-bold text-orange-500">30-49%</div>
+                    <div className="text-2xl font-bold text-caution">30-49%</div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-red-50 rounded">
+                  <div className="flex items-center justify-between p-3 bg-error-surface rounded">
                     <div>
-                      <div className="font-medium text-red-800">Poor (0-29%)</div>
-                      <div className="text-sm text-red-600">A line of up to 29% of the maximum loan</div>
+                      <div className="font-medium text-error">Poor (0-29%)</div>
+                      <div className="text-sm text-error">A line of up to 29% of the maximum loan</div>
                     </div>
-                    <div className="text-2xl font-bold text-red-500">0-29%</div>
+                    <div className="text-2xl font-bold text-error">0-29%</div>
                   </div>
                 </div>
               </div>
@@ -287,39 +287,39 @@ const ScoresPage: NextPage = () => {
                 <h3 className="font-medium mb-3">How Credit Works</h3>
                 <div className="space-y-4">
                   <div className="flex items-start space-x-3">
-                    <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
+                    <div className="bg-info text-info-content rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
                       1
                     </div>
                     <div>
                       <h4 className="font-medium">Your Own Credit</h4>
-                      <p className="text-gray-600">Your issued line (your score, set by an institution or the credit oracle, times the maximum loan) plus the share of your interest that went into the first-loss reserve</p>
+                      <p className="text-muted">Your issued line (your score, set by an institution or the credit oracle, times the maximum loan) plus the share of your interest that went into the first-loss reserve</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
-                    <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
+                    <div className="bg-info text-info-content rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
                       2
                     </div>
                     <div>
                       <h4 className="font-medium">Backing</h4>
-                      <p className="text-gray-600">People with credit can back you from their own: their limit falls by exactly what yours gains</p>
+                      <p className="text-muted">People with credit can back you from their own: their limit falls by exactly what yours gains</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
-                    <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
+                    <div className="bg-info text-info-content rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
                       3
                     </div>
                     <div>
                       <h4 className="font-medium">Stake</h4>
-                      <p className="text-gray-600">Anyone can stake USDC to back someone with money instead of credit</p>
+                      <p className="text-muted">Anyone can stake USDC to back someone with money instead of credit</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
-                    <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
+                    <div className="bg-info text-info-content rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
                       4
                     </div>
                     <div>
                       <h4 className="font-medium">Defaults</h4>
-                      <p className="text-gray-600">Backers pay first: staked USDC is slashed and committed credit is lost, and the borrower cannot borrow again</p>
+                      <p className="text-muted">Backers pay first: staked USDC is slashed and committed credit is lost, and the borrower cannot borrow again</p>
                     </div>
                   </div>
                 </div>
@@ -333,41 +333,41 @@ const ScoresPage: NextPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
-                  <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
+                  <div className="bg-success text-success-content rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
                     1
                   </div>
                   <div>
                     <h3 className="font-medium">Ask to Be Backed</h3>
-                    <p className="text-gray-600">Share your backing link with people who know you and have credit</p>
+                    <p className="text-muted">Share your backing link with people who know you and have credit</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
+                  <div className="bg-success text-success-content rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
                     2
                   </div>
                   <div>
                     <h3 className="font-medium">Repay Loans on Time</h3>
-                    <p className="text-gray-600">The reserve share of the interest you pay adds to your own credit, and institutions look at your repayment history when setting your line</p>
+                    <p className="text-muted">The reserve share of the interest you pay adds to your own credit, and institutions look at your repayment history when setting your line</p>
                   </div>
                 </div>
               </div>
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
-                  <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
+                  <div className="bg-success text-success-content rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
                     3
                   </div>
                   <div>
                     <h3 className="font-medium">Keep Your Backers Whole</h3>
-                    <p className="text-gray-600">Your backers stand behind you; repaying protects their credit and stake</p>
+                    <p className="text-muted">Your backers stand behind you; repaying protects their credit and stake</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
+                  <div className="bg-success text-success-content rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
                     4
                   </div>
                   <div>
                     <h3 className="font-medium">Back Carefully</h3>
-                    <p className="text-gray-600">Back only people you trust: a default costs you the credit or stake you committed</p>
+                    <p className="text-muted">Back only people you trust: a default costs you the credit or stake you committed</p>
                   </div>
                 </div>
               </div>

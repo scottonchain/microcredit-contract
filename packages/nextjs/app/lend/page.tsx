@@ -385,20 +385,20 @@ const LendPage: NextPage = () => {
             
             {/* Debug panel hidden for cleaner demo; restore if needed */}
             {false && (
-              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="mb-4 p-3 bg-warning-surface border border-outline rounded-lg">
                 {/* original debug info here */}
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-center">
               <div>
-                <div className="text-2xl font-bold text-blue-500">
+                <div className="text-2xl font-bold text-info">
                   {lenderPrincipal !== undefined ? formatUSDC(lenderPrincipal) : "-"}
                 </div>
-                <div className="text-sm text-gray-600">Your Deposits</div>
+                <div className="text-sm text-muted">Your Deposits</div>
               </div>
               <div>
                 <div
-                  className={`text-2xl font-bold ${netEarnings !== undefined && netEarnings < 0n ? "text-red-500" : "text-green-500"}`}
+                  className={`text-2xl font-bold ${netEarnings !== undefined && netEarnings < 0n ? "text-error" : "text-success"}`}
                 >
                   <span className="font-medium">
                     {netEarnings === undefined
@@ -408,37 +408,37 @@ const LendPage: NextPage = () => {
                         : formatUSDC(netEarnings)}
                   </span>
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-muted">
                   Net Earnings*{netEarningsPct !== undefined ? ` (${netEarningsPct.toFixed(2)}%)` : ""}
                 </div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-purple-500">
+                <div className="text-2xl font-bold text-accent">
                   {loanRatePercent !== undefined ? loanRatePercent + "%" : "-"}
                 </div>
-                <div className="text-sm text-gray-600">Loan Rate (APR)</div>
+                <div className="text-sm text-muted">Loan Rate (APR)</div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-indigo-500">
                   {poolRatePercent !== undefined ? poolRatePercent + "%" : "-"}
                 </div>
-                <div className="text-sm text-gray-600">Funding Pool APY</div>
+                <div className="text-sm text-muted">Funding Pool APY</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-orange-500">
+                <div className="text-2xl font-bold text-caution">
                   {lenderBalance !== undefined ? formatUSDC(lenderBalance) : "-"}
                 </div>
-                <div className="text-sm text-gray-600">Current Value</div>
+                <div className="text-sm text-muted">Current Value</div>
               </div>
             </div>
-            <p className="text-sm text-gray-600 text-center mt-4">
+            <p className="text-sm text-muted text-center mt-4">
               First-loss reserve:{" "}
               <span className="font-semibold">
                 {firstLossReserve !== undefined ? formatUSDC(firstLossReserve) : "-"}
               </span>
               , pays default losses before your balance
             </p>
-            <p className="text-sm text-gray-600 text-center mt-1">
+            <p className="text-sm text-muted text-center mt-1">
               Pool utilisation:{" "}
               <span className="font-semibold">
                 {utilisationBp !== undefined ? `${(Number(utilisationBp) / 100).toFixed(2)}%` : "-"}
@@ -480,13 +480,13 @@ const LendPage: NextPage = () => {
             
             {/* Error Message */}
             {errorMessage && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <div className="text-sm text-red-800">
+              <div className="mb-4 p-3 bg-error-surface border border-outline rounded-lg">
+                <div className="text-sm text-error">
                   <div className="flex justify-between items-start">
                     <span className="font-medium">Error:</span>
                     <button 
                       onClick={() => setErrorMessage(null)}
-                      className="text-red-600 hover:text-red-800"
+                      className="text-error hover:text-error"
                     >
                       ✕
                     </button>
@@ -507,7 +507,7 @@ const LendPage: NextPage = () => {
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
                 placeholder="Enter amount in USDC"
-                className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 p-3 border border-outline rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 min="1"
                 max={Number(usdcBalance) / 1e6}
               />
@@ -524,7 +524,7 @@ const LendPage: NextPage = () => {
                     return Number(parsedAmount) / 1e6 > Number(usdcBalance) / 1e6;
                   })()
                 }
-                className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+                className="bg-info hover:brightness-90 disabled:bg-base-300 disabled:text-muted text-info-content font-bold py-3 px-6 rounded-lg transition-colors"
               >
                 {isLoading ? "Processing..." : "Deposit"}
               </button>
@@ -535,21 +535,21 @@ const LendPage: NextPage = () => {
               const parsedAmount = parseDepositAmount(depositAmount);
               if (!parsedAmount) return null;
               if (Number(parsedAmount) / 1e6 > Number(usdcBalance) / 1e6) {
-                return <div className="text-red-500 text-sm mt-1">Insufficient USDC balance.</div>;
+                return <div className="text-error text-sm mt-1">Insufficient USDC balance.</div>;
               }
               return null;
             })()}
 
             {/* Caption: one approval, no gas */}
-            <p className="text-xs text-gray-500 mt-2">One approval, no gas. We’ll ask you to approve this deposit; our relayer handles the transaction.</p>
+            <p className="text-xs text-muted mt-2">One approval, no gas. We’ll ask you to approve this deposit; our relayer handles the transaction.</p>
 
-            <p className="text-xs text-gray-500 mt-3">*Interest is credited to the pool as borrowers repay; default losses beyond the reserve, and provisions on overdue loans, reduce it. The Funding Pool APY is a projection from current utilisation, net of the protocol fee and the reserve share; the realised return is what the pool has actually earned.</p>
+            <p className="text-xs text-muted mt-3">*Interest is credited to the pool as borrowers repay; default losses beyond the reserve, and provisions on overdue loans, reduce it. The Funding Pool APY is a projection from current utilisation, net of the protocol fee and the reserve share; the realised return is what the pool has actually earned.</p>
             
 
             
             {/* Withdraw Funds */}
             {!RELAYER_ENABLED && (
-              <p className="text-xs text-gray-500 mb-2">
+              <p className="text-xs text-muted mb-2">
                 Your wallet withdraws what the pool can pay now. Queued withdrawals, for amounts the pool cannot pay yet,
                 need the relayed version of this app.
               </p>
@@ -570,7 +570,7 @@ const LendPage: NextPage = () => {
                       setWithdrawAll(false);
                     }}
                     placeholder="Enter amount to withdraw"
-                    className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="flex-1 p-3 border border-outline rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     min="1"
                     max={Number(lenderBalance) / 1e6}
                   />
@@ -599,12 +599,12 @@ const LendPage: NextPage = () => {
                       if (!parsedAmount) return true;
                       return Number(parsedAmount) / 1e6 > Number(lenderBalance) / 1e6;
                     })()}
-                    className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+                    className="bg-error hover:brightness-90 disabled:bg-base-300 disabled:text-muted text-error-content font-bold py-3 px-6 rounded-lg transition-colors"
                   >
                     {withdrawLoading ? "Withdrawing..." : "Withdraw"}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-muted mt-2">
                   Available to withdraw now:{" "}
                   <span className="font-semibold">
                     {maxWithdrawable !== undefined ? formatUSDC(maxWithdrawable) : "-"}
@@ -659,14 +659,14 @@ const AvailableLoanCard = ({
   };
 
   const getCreditScoreColorStyle = (score: bigint | undefined) => {
-    if (!score) return "text-gray-500";
+    if (!score) return "text-muted";
     return getCreditScoreColor(Number(score) / 1e4);
   };
 
   if (!loanDetails) {
     return (
-      <div className="border border-gray-200 rounded-lg p-4">
-        <div className="text-center text-gray-600">Loading loan details...</div>
+      <div className="border border-outline rounded-lg p-4">
+        <div className="text-center text-muted">Loading loan details...</div>
       </div>
     );
   }
@@ -675,7 +675,7 @@ const AvailableLoanCard = ({
   const [principal, outstanding, borrower, interestRate, isActive] = loanDetails;
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4">
+    <div className="border border-outline rounded-lg p-4">
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
         <div>
           <div className="font-medium">Borrower</div>
@@ -687,11 +687,11 @@ const AvailableLoanCard = ({
         </div>
         <div>
           <div className="font-medium">Interest Rate</div>
-          <div className="text-lg font-bold text-green-500">{formatInterestRate(interestRate)} APR</div>
+          <div className="text-lg font-bold text-success">{formatInterestRate(interestRate)} APR</div>
         </div>
         <div>
           <div className="font-medium">Status</div>
-          <div className={`text-lg font-bold ${isActive ? 'text-green-500' : 'text-gray-500'}`}>
+          <div className={`text-lg font-bold ${isActive ? 'text-success' : 'text-muted'}`}>
             {isActive ? 'Active' : 'Inactive'}
           </div>
         </div>
@@ -706,7 +706,7 @@ const AvailableLoanCard = ({
       <div className="flex gap-2 mt-4">
         <button
           onClick={onViewDetails}
-          className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center"
+          className="bg-neutral hover:brightness-90 text-neutral-content font-bold py-2 px-4 rounded-lg transition-colors flex items-center"
         >
           <EyeIcon className="h-4 w-4 mr-2" />
           View Details
@@ -714,7 +714,7 @@ const AvailableLoanCard = ({
         <button
           onClick={() => onFund(Number(loanId))}
           disabled={isLoading || !isActive}
-          className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+          className="bg-success hover:brightness-90 disabled:bg-base-300 disabled:text-muted text-success-content font-bold py-2 px-4 rounded-lg transition-colors"
         >
           {isLoading ? "Funding..." : "Fund Loan"}
         </button>
@@ -726,19 +726,19 @@ const AvailableLoanCard = ({
           <h4 className="font-medium mb-2">Loan Details</h4>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="text-gray-600">Principal:</span>
+              <span className="text-muted">Principal:</span>
               <div className="font-medium">{formatUSDC(principal)}</div>
             </div>
             <div>
-              <span className="text-gray-600">Outstanding:</span>
+              <span className="text-muted">Outstanding:</span>
               <div className="font-medium">{formatUSDC(outstanding)}</div>
             </div>
             <div>
-              <span className="text-gray-600">Interest Rate:</span>
+              <span className="text-muted">Interest Rate:</span>
               <div className="font-medium">{formatInterestRate(interestRate)} APR</div>
             </div>
             <div>
-              <span className="text-gray-600">Status:</span>
+              <span className="text-muted">Status:</span>
               <div className="font-medium">{isActive ? 'Active' : 'Inactive'}</div>
             </div>
           </div>

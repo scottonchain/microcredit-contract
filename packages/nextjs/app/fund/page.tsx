@@ -434,18 +434,18 @@ export default function FundPage() {
   return (
     <div className="container mx-auto px-4 py-10 max-w-lg">
       <h1 className="text-3xl font-bold mb-6">🚰 Faucet</h1>
-      <p className="mb-4 text-sm text-gray-700 break-all">
+      <p className="mb-4 text-sm text-base-content break-all">
         Connected Address: <span className="font-mono">{connectedAddress}</span>
       </p>
       
       {/* Wallet Balance Refresh Notice */}
-      <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2 text-yellow-800">💡 Wallet Balance Notice</h3>
-        <p className="text-sm text-yellow-700 mb-3">
+      <div className="mb-6 p-4 bg-warning-surface border border-outline rounded-lg">
+        <h3 className="text-lg font-semibold mb-2 text-caution">💡 Wallet Balance Notice</h3>
+        <p className="text-sm text-caution mb-3">
           After funding ETH or USDC, your wallet may not immediately show the updated balance due to caching. 
           Use the &quot;Refresh Wallet Balance&quot; button below to force your wallet to update.
         </p>
-        <div className="text-xs text-yellow-600">
+        <div className="text-xs text-caution">
           <strong>Alternative solutions:</strong>
           <ul className="mt-1 ml-4 list-disc">
             <li>Switch networks in your wallet and switch back</li>
@@ -456,23 +456,23 @@ export default function FundPage() {
       </div>
       
       {/* Current Balances */}
-      <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h3 className="text-lg font-semibold mb-3 text-blue-800">Current Balances</h3>
+      <div className="mb-6 p-4 bg-info-surface border border-outline rounded-lg">
+        <h3 className="text-lg font-semibold mb-3 text-info">Current Balances</h3>
         <div className="grid grid-cols-2 gap-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{ethBalance}</div>
-            <div className="text-sm text-blue-700">ETH</div>
+            <div className="text-2xl font-bold text-info">{ethBalance}</div>
+            <div className="text-sm text-info">ETH</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{usdcBalance}</div>
-            <div className="text-sm text-green-700">USDC</div>
+            <div className="text-2xl font-bold text-success">{usdcBalance}</div>
+            <div className="text-sm text-success">USDC</div>
           </div>
         </div>
       </div>
       
       {/* Mock USDC Token Address */}
       {USDC_ADDRESS ? (
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+        <div className="mb-6 p-4 bg-base-200 rounded-lg">
           <h3 className="text-lg font-semibold mb-2">Mock USDC Token</h3>
           <div className="flex items-start gap-4">
             {/* QR Code */}
@@ -482,14 +482,14 @@ export default function FundPage() {
                 className="cursor-pointer flex flex-col items-center"
               >
                 <QRCodeDisplay value={USDC_ADDRESS} size={80} />
-                <span className="text-xs text-gray-500 mt-2">Click to copy</span>
+                <span className="text-xs text-muted mt-2">Click to copy</span>
               </div>
             </div>
             
             {/* Address and Copy Button */}
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <p className="text-sm text-gray-700 break-all font-mono flex-1">
+                <p className="text-sm text-base-content break-all font-mono flex-1">
                   {USDC_ADDRESS}
                 </p>
                 <button
@@ -500,16 +500,16 @@ export default function FundPage() {
                   <DocumentDuplicateIcon className="h-4 w-4" />
                 </button>
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted">
                 Use this address to add Mock USDC to your wallet. Click the QR code or copy button to copy the address.
               </p>
             </div>
           </div>
         </div>
       ) : (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <h3 className="text-lg font-semibold mb-2 text-yellow-800">Mock USDC Not Deployed</h3>
-          <p className="text-sm text-yellow-700">
+        <div className="mb-6 p-4 bg-warning-surface border border-outline rounded-lg">
+          <h3 className="text-lg font-semibold mb-2 text-caution">Mock USDC Not Deployed</h3>
+          <p className="text-sm text-caution">
             Mock USDC contract is not deployed. Deploy contracts first to get the token address.
           </p>
         </div>

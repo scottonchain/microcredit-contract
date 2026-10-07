@@ -218,7 +218,7 @@ function BackForm() {
           </div>
         )}
         {arrivedViaLink && !submitted && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6 text-blue-800">
+          <div className="bg-info-surface border border-outline rounded-lg p-5 mb-6 text-info">
             {!connectedAddress ? (
               <>
                 <h3 className="text-lg font-semibold mb-1">Backing link detected</h3>
@@ -232,7 +232,7 @@ function BackForm() {
                 </p>
                 <button
                   onClick={copyLink}
-                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                  className="inline-flex items-center gap-2 bg-info hover:brightness-90 text-info-content text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
                 >
                   {linkCopied ? (
                     <>
@@ -262,19 +262,19 @@ function BackForm() {
           <div className="bg-base-200 border border-base-300 rounded-lg p-4 mb-6 text-sm">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <div className="text-gray-500">Your credit</div>
+                <div className="text-muted">Your credit</div>
                 <div className="text-xl font-bold">{formatUSDC(granted)}</div>
               </div>
               <div>
-                <div className="text-gray-500">Staked</div>
+                <div className="text-muted">Staked</div>
                 <div className="text-xl font-bold">{formatUSDC(staked ?? 0n)}</div>
               </div>
               <div>
-                <div className="text-gray-500">Free to back</div>
+                <div className="text-muted">Free to back</div>
                 <div className="text-xl font-bold">{formatUSDC(freeCredit + freeStake)}</div>
               </div>
             </div>
-            <p className="text-gray-500 mt-3">
+            <p className="text-muted mt-3">
               Backing moves part of your own credit to the borrower: your limit drops by what theirs gains. If they
               default, your backing pays first. Staked USDC is slashed and committed credit is lost. Without credit or
               stake you have nothing to back with.
@@ -315,7 +315,7 @@ function BackForm() {
                 {loading ? "Submitting..." : amount !== null ? `Back with ${formatUSDC(amount)}` : "Back"}
               </button>
             )}
-            <div className="text-xs text-gray-500 text-center">
+            <div className="text-xs text-muted text-center">
               {RELAYER_ENABLED
                 ? "Backing is gasless: you sign a message and our relayer submits it. Staking is a normal wallet transaction."
                 : "Your wallet signs and pays for the backing transaction, and for staking: each is a normal wallet transaction on this network."}
@@ -326,23 +326,23 @@ function BackForm() {
             <h2 className="text-xl font-semibold mb-4">Backing Recorded</h2>
             <div className="space-y-3 text-sm">
               <div>
-                <div className="text-gray-600">Backer</div>
+                <div className="text-muted">Backer</div>
                 {backerDisplayName ? <div className="font-semibold">{backerDisplayName}</div> : null}
-                <div className="font-mono break-all text-xs text-gray-500">{connectedAddress}</div>
+                <div className="font-mono break-all text-xs text-muted">{connectedAddress}</div>
               </div>
               <div>
-                <div className="text-gray-600">Borrower</div>
+                <div className="text-muted">Borrower</div>
                 {borrowerDisplayName ? <div className="font-semibold">{borrowerDisplayName}</div> : null}
-                <div className="font-mono break-all text-xs text-gray-500">{submitted.borrower}</div>
+                <div className="font-mono break-all text-xs text-muted">{submitted.borrower}</div>
               </div>
               <div>
-                <div className="text-gray-600">Backing</div>
+                <div className="text-muted">Backing</div>
                 <div className="font-medium">{formatUSDC(submitted.amount)}</div>
               </div>
               {submitted.txHash && (
                 <div>
-                  <div className="text-gray-600">Transaction</div>
-                  <div className="font-mono break-all text-xs text-gray-500">{submitted.txHash}</div>
+                  <div className="text-muted">Transaction</div>
+                  <div className="font-mono break-all text-xs text-muted">{submitted.txHash}</div>
                 </div>
               )}
             </div>

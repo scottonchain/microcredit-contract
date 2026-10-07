@@ -103,27 +103,27 @@ const EmergencyPausePanel = ({ isOwner }: { isOwner: boolean }) => {
   return (
     <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
       <h2 className="text-xl font-semibold mb-1">Emergency Pause</h2>
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-muted mb-4">
         Pausing stops new loans and disbursements. Repayments, defaults and withdrawals still work.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className={`p-4 rounded-lg ${paused ? "bg-red-50" : "bg-green-50"}`}>
-          <h3 className={`font-medium mb-2 ${paused ? "text-red-800" : "text-green-800"}`}>New Lending</h3>
-          <div className={`text-2xl font-bold ${paused ? "text-red-600" : "text-green-600"}`}>
+        <div className={`p-4 rounded-lg ${paused ? "bg-error-surface" : "bg-success-surface"}`}>
+          <h3 className={`font-medium mb-2 ${paused ? "text-error" : "text-success"}`}>New Lending</h3>
+          <div className={`text-2xl font-bold ${paused ? "text-error" : "text-success"}`}>
             {paused === undefined ? "-" : paused ? "Paused" : "Open"}
           </div>
-          <p className={`text-sm mt-1 ${paused ? "text-red-600" : "text-green-600"}`}>
+          <p className={`text-sm mt-1 ${paused ? "text-error" : "text-success"}`}>
             {paused ? "Only the owner can unpause." : "The guardian or the owner can pause at once."}
           </p>
         </div>
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h3 className="font-medium text-blue-800 mb-2">Guardian</h3>
+        <div className="bg-info-surface p-4 rounded-lg">
+          <h3 className="font-medium text-info mb-2">Guardian</h3>
           {hasGuardian ? (
             <Address address={guardian} />
           ) : (
-            <div className="text-2xl font-bold text-blue-600">{guardian === undefined ? "-" : "None"}</div>
+            <div className="text-2xl font-bold text-info">{guardian === undefined ? "-" : "None"}</div>
           )}
-          <p className="text-sm text-blue-600 mt-1">Can pause, but cannot unpause.</p>
+          <p className="text-sm text-info mt-1">Can pause, but cannot unpause.</p>
         </div>
       </div>
       {(isOwner || isGuardian) && (
@@ -149,11 +149,11 @@ const EmergencyPausePanel = ({ isOwner }: { isOwner: boolean }) => {
               {busy === "guardian" ? "Saving..." : "Set guardian"}
             </button>
           </div>
-          <p className="text-xs text-gray-500 mt-1">Set the zero address to remove the guardian.</p>
+          <p className="text-xs text-muted mt-1">Set the zero address to remove the guardian.</p>
         </div>
       ) : (
         !isGuardian && (
-          <p className="text-sm text-gray-500 mt-4">Only the guardian or the owner can pause. Only the owner can unpause.</p>
+          <p className="text-sm text-muted mt-4">Only the guardian or the owner can pause. Only the owner can unpause.</p>
         )
       )}
     </div>
@@ -236,15 +236,15 @@ const FirstLossReservePanel = ({ isOwner }: { isOwner: boolean }) => {
     <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
       <h2 className="text-xl font-semibold mb-4">First-Loss Reserve</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h3 className="font-medium text-blue-800 mb-2">Reserve Share</h3>
-          <div className="text-2xl font-bold text-blue-600">{bpsToPercent(reserveBps)}</div>
-          <p className="text-sm text-blue-600 mt-1">Of every interest payment (max {bpsToPercent(maxReserveBps)})</p>
+        <div className="bg-info-surface p-4 rounded-lg">
+          <h3 className="font-medium text-info mb-2">Reserve Share</h3>
+          <div className="text-2xl font-bold text-info">{bpsToPercent(reserveBps)}</div>
+          <p className="text-sm text-info mt-1">Of every interest payment (max {bpsToPercent(maxReserveBps)})</p>
         </div>
-        <div className="bg-green-50 p-4 rounded-lg">
-          <h3 className="font-medium text-green-800 mb-2">Reserve Balance</h3>
-          <div className="text-2xl font-bold text-green-600">{reserve !== undefined ? formatUSDC(reserve) : "-"}</div>
-          <p className="text-sm text-green-600 mt-1">
+        <div className="bg-success-surface p-4 rounded-lg">
+          <h3 className="font-medium text-success mb-2">Reserve Balance</h3>
+          <div className="text-2xl font-bold text-success">{reserve !== undefined ? formatUSDC(reserve) : "-"}</div>
+          <p className="text-sm text-success mt-1">
             Pays default losses that slashed stake does not cover, before they reach lenders
           </p>
         </div>
@@ -267,7 +267,7 @@ const FirstLossReservePanel = ({ isOwner }: { isOwner: boolean }) => {
             {busy === "fund" ? "Adding..." : "Add to reserve"}
           </button>
         </div>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-muted mt-1">
           Anyone can add. It is not a deposit: it earns nothing and cannot be withdrawn. Two transactions: approve
           USDC, then add.
         </p>
@@ -296,7 +296,7 @@ const FirstLossReservePanel = ({ isOwner }: { isOwner: boolean }) => {
                 {busy === "share" ? "Saving..." : "Set share"}
               </button>
             </div>
-            {shareTooHigh && <p className="text-xs text-red-500 mt-1">The maximum is {bpsToPercent(maxReserveBps)}.</p>}
+            {shareTooHigh && <p className="text-xs text-error mt-1">The maximum is {bpsToPercent(maxReserveBps)}.</p>}
           </div>
           <div>
             <label htmlFor="releaseAmount" className="block text-sm font-medium mb-2">
@@ -329,14 +329,14 @@ const FirstLossReservePanel = ({ isOwner }: { isOwner: boolean }) => {
               </button>
             </div>
             {releaseTooHigh ? (
-              <p className="text-xs text-red-500 mt-1">That is more than the reserve holds.</p>
+              <p className="text-xs text-error mt-1">That is more than the reserve holds.</p>
             ) : (
-              <p className="text-xs text-gray-500 mt-1">Moves USDC from the reserve into the pool, raising the share price.</p>
+              <p className="text-xs text-muted mt-1">Moves USDC from the reserve into the pool, raising the share price.</p>
             )}
           </div>
         </div>
       ) : (
-        <p className="text-sm text-gray-500 mt-4">
+        <p className="text-sm text-muted mt-4">
           Only the contract owner can change the reserve share or release the reserve.
         </p>
       )}
@@ -433,37 +433,37 @@ const IssuanceBudgetPanel = () => {
   return (
     <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
       <h2 className="text-xl font-semibold mb-1">Oracle Issuance Budget</h2>
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-muted mb-4">
         The most credit the oracle can issue in total, and in one report. Overrides set by the owner are not counted.
       </p>
       {!hasProvider ? (
-        <p className="text-sm text-gray-500">No score provider is set.</p>
+        <p className="text-sm text-muted">No score provider is set.</p>
       ) : !reportsBudget ? (
-        <p className="text-sm text-gray-500">The score provider does not report an issuance budget.</p>
+        <p className="text-sm text-muted">The score provider does not report an issuance budget.</p>
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-purple-50 p-4 rounded-lg">
-              <h3 className="font-medium text-purple-800 mb-2">Budget Held</h3>
-              <div className="text-2xl font-bold text-purple-600">
+            <div className="bg-accent-surface p-4 rounded-lg">
+              <h3 className="font-medium text-accent mb-2">Budget Held</h3>
+              <div className="text-2xl font-bold text-accent">
                 {formatUSDC(toUsdc(totalHeld))} <span className="text-base font-normal">of {formatUSDC(toUsdc(maxTotalScore))}</span>
               </div>
               <progress className="progress progress-primary w-full mt-2" value={usedPct} max={100} />
-              <p className="text-sm text-purple-600 mt-1">
+              <p className="text-sm text-accent mt-1">
                 {lines(totalHeld)} of {lines(maxTotalScore)} full lines of {formatUSDC(maxLoanAmount)}
               </p>
-              <p className="text-sm text-purple-600 mt-1">
+              <p className="text-sm text-accent mt-1">
                 Current lines: {formatUSDC(toUsdc(totalScore))} ({lines(totalScore)} full lines)
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted mt-1">
                 A lowered line keeps its budget until the account&apos;s line is unused. Then anyone can call
                 releaseBudget to free it.
               </p>
             </div>
-            <div className="bg-orange-50 p-4 rounded-lg">
-              <h3 className="font-medium text-orange-800 mb-2">Per Report</h3>
-              <div className="text-2xl font-bold text-orange-600">{formatUSDC(toUsdc(maxIncreasePerReport))}</div>
-              <p className="text-sm text-orange-600 mt-1">
+            <div className="bg-warning-surface p-4 rounded-lg">
+              <h3 className="font-medium text-caution mb-2">Per Report</h3>
+              <div className="text-2xl font-bold text-caution">{formatUSDC(toUsdc(maxIncreasePerReport))}</div>
+              <p className="text-sm text-caution mt-1">
                 Most one report may add ({lines(maxIncreasePerReport)} full lines)
               </p>
             </div>
@@ -506,14 +506,14 @@ const IssuanceBudgetPanel = () => {
                 <button className="btn btn-primary" disabled={!canSave} onClick={saveLimits}>
                   {saving ? "Saving..." : "Set issuance limits"}
                 </button>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted">
                   Stored in score units, so the USDC amounts follow the max loan. A budget below what is held blocks any
                   report that raises a score until held budget is back under it.
                 </p>
               </div>
             </div>
           ) : (
-            <div className="text-sm text-gray-500 mt-4 flex flex-wrap items-center gap-1">
+            <div className="text-sm text-muted mt-4 flex flex-wrap items-center gap-1">
               <span>Only the score provider&apos;s owner</span>
               {providerOwner && <Address address={providerOwner} />}
               <span>can change these.</span>
@@ -821,12 +821,12 @@ const AdminPage: NextPage = () => {
     }, [loanIds]);
 
     if (isLoading) {
-      return <span className="text-gray-500">Loading...</span>;
+      return <span className="text-muted">Loading...</span>;
     }
 
     return (
       <div className="text-sm">
-        <div className="text-gray-600">
+        <div className="text-muted">
           {formatUSDC(totalAmount)}
         </div>
       </div>
@@ -850,15 +850,15 @@ const AdminPage: NextPage = () => {
     }, [creditScore, maxLoanAmount]);
 
     if (!creditScore || creditScore === 0n) {
-      return <span className="text-gray-500">No credit</span>;
+      return <span className="text-muted">No credit</span>;
     }
 
     return (
       <div className="text-sm">
-        <div className="text-green-600 font-medium">
+        <div className="text-success font-medium">
           {formatUSDC(maxAllowedAmount)}
         </div>
-        <div className="text-gray-600 text-xs">
+        <div className="text-muted text-xs">
           Max eligible
         </div>
       </div>
@@ -903,13 +903,13 @@ const AdminPage: NextPage = () => {
     }, [borrowerLoanIds]);
 
     const getCreditScoreColor = (score: bigint | undefined) => {
-      if (!score) return "text-gray-500";
+      if (!score) return "text-muted";
       const percent = Number(score) / 1e4;
-      if (percent < 30) return "text-red-500";
-      if (percent < 50) return "text-orange-500";
-      if (percent < 70) return "text-yellow-500";
-      if (percent < 90) return "text-blue-500";
-      return "text-green-500";
+      if (percent < 30) return "text-error";
+      if (percent < 50) return "text-caution";
+      if (percent < 70) return "text-caution";
+      if (percent < 90) return "text-info";
+      return "text-success";
     };
 
     return (
@@ -926,7 +926,7 @@ const AdminPage: NextPage = () => {
           {borrowerLoanIds && borrowerLoanIds.length > 0 ? (
             <BorrowerLoanAmounts loanIds={borrowerLoanIds} />
           ) : (
-            <span className="text-gray-500">No loans</span>
+            <span className="text-muted">No loans</span>
           )}
         </td>
         <td>
@@ -1077,13 +1077,13 @@ const AdminPage: NextPage = () => {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} className="text-center text-gray-500 py-4">
+                  <td colSpan={4} className="text-center text-muted py-4">
                     Loading backings...
                   </td>
                 </tr>
               ) : filteredBackings.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-center text-gray-500 py-4">
+                  <td colSpan={4} className="text-center text-muted py-4">
                     {filter ? "No backings match your filter" : "No backings found"}
                   </td>
                 </tr>
@@ -1165,7 +1165,7 @@ const AdminPage: NextPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center text-gray-600">Checking admin access…</div>
+        <div className="text-center text-muted">Checking admin access…</div>
       </div>
     );
   }
@@ -1174,12 +1174,12 @@ const AdminPage: NextPage = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <ShieldCheckIcon className="h-16 w-16 mx-auto text-red-500 mb-4" />
-          <h1 className="text-2xl font-bold text-red-500 mb-2">Access Denied</h1>
-          <p className="text-gray-600 mb-4">
+          <ShieldCheckIcon className="h-16 w-16 mx-auto text-error mb-4" />
+          <h1 className="text-2xl font-bold text-error mb-2">Access Denied</h1>
+          <p className="text-muted mb-4">
             You need to be the contract owner, guardian, oracle, or whitelisted to access this page.
           </p>
-          <div className="space-y-2 text-sm text-gray-500">
+          <div className="space-y-2 text-sm text-muted">
             <div>
               Current Oracle: {oracle ? <Address address={oracle as `0x${string}`} /> : "Loading..."}
             </div>
@@ -1188,7 +1188,7 @@ const AdminPage: NextPage = () => {
             </div>
             <div>
               USDC Contract: {USDC_ADDRESS ? <Address address={USDC_ADDRESS as `0x${string}`} /> : "Loading..."}
-              {USDC_ADDRESS && <span className="text-xs text-gray-400 ml-2">({USDC_ADDRESS})</span>}
+              {USDC_ADDRESS && <span className="text-xs text-muted ml-2">({USDC_ADDRESS})</span>}
             </div>
             <div>Your Address: {connectedAddress ? <Address address={connectedAddress} /> : "Not connected"}</div>
           </div>
@@ -1206,32 +1206,32 @@ const AdminPage: NextPage = () => {
           {/* Overview cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-base-100 p-6 rounded-lg shadow text-center">
-              <div className="text-2xl font-bold text-green-500">
+              <div className="text-2xl font-bold text-success">
                 {poolInfo ? formatUSDC(poolInfo[0]) : "Loading…"}
               </div>
-              <div className="text-sm text-gray-600">Total Deposits</div>
+              <div className="text-sm text-muted">Total Deposits</div>
             </div>
             <div className="bg-base-100 p-6 rounded-lg shadow text-center">
-              <div className="text-2xl font-bold text-blue-500">
+              <div className="text-2xl font-bold text-info">
                 {availableFunds !== undefined ? formatUSDC(availableFunds) : "Loading…"}
               </div>
-              <div className="text-sm text-gray-600">Available Funds</div>
+              <div className="text-sm text-muted">Available Funds</div>
             </div>
             <div className="bg-base-100 p-6 rounded-lg shadow text-center">
-              <div className="text-2xl font-bold text-orange-500">
+              <div className="text-2xl font-bold text-caution">
                 {lenderCount !== undefined ? lenderCount.toString() : "Loading…"}
               </div>
-              <div className="text-sm text-gray-600">Active Lenders</div>
+              <div className="text-sm text-muted">Active Lenders</div>
             </div>
             <div className="bg-base-100 p-6 rounded-lg shadow text-center">
-              <div className="text-2xl font-bold text-purple-500">
+              <div className="text-2xl font-bold text-accent">
                 {gasPrice !== null ? gasPrice.toString() : "Loading…"}
               </div>
-              <div className="text-sm text-gray-600">Gas Price (wei)</div>
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="text-sm text-muted">Gas Price (wei)</div>
+              <div className="text-xs text-muted mt-1">
                 Base Fee: {baseFee !== null ? baseFee.toString() : "Loading…"} wei
               </div>
-              <div className="text-xs text-green-600 mt-1">
+              <div className="text-xs text-success mt-1">
                 {gasPrice === 0n ? "✅ FREE" : "💰 PAID"}
               </div>
             </div>
@@ -1254,34 +1254,34 @@ const AdminPage: NextPage = () => {
             <h2 className="text-xl font-semibold mb-4">⛽ Network Gas Fees</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="text-center">
-                <div className="text-lg font-semibold text-purple-600">
+                <div className="text-lg font-semibold text-accent">
                   {gasPrice !== null ? gasPrice.toString() : "Loading…"}
                 </div>
-                <div className="text-sm text-gray-600">Gas Price (wei)</div>
-                <div className="text-xs text-gray-500">
+                <div className="text-sm text-muted">Gas Price (wei)</div>
+                <div className="text-xs text-muted">
                   {gasPrice !== null ? `${(Number(gasPrice) / 1e9).toFixed(9)} Gwei` : ""}
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-semibold text-blue-600">
+                <div className="text-lg font-semibold text-info">
                   {baseFee !== null ? baseFee.toString() : "Loading…"}
                 </div>
-                <div className="text-sm text-gray-600">Base Fee (wei)</div>
-                <div className="text-xs text-gray-500">
+                <div className="text-sm text-muted">Base Fee (wei)</div>
+                <div className="text-xs text-muted">
                   {baseFee !== null ? `${(Number(baseFee) / 1e9).toFixed(9)} Gwei` : ""}
                 </div>
               </div>
               <div className="text-center">
-                <div className={`text-lg font-semibold ${gasPrice === 0n ? 'text-green-600' : 'text-red-600'}`}>
+                <div className={`text-lg font-semibold ${gasPrice === 0n ? 'text-success' : 'text-error'}`}>
                   {gasPrice === 0n ? "FREE" : "PAID"}
                 </div>
-                <div className="text-sm text-gray-600">Transaction Cost</div>
-                <div className="text-xs text-gray-500">
+                <div className="text-sm text-muted">Transaction Cost</div>
+                <div className="text-xs text-muted">
                   {gasPrice === 0n ? "No gas fees" : "Gas fees apply"}
                 </div>
               </div>
             </div>
-            <div className="mt-4 text-sm text-gray-600">
+            <div className="mt-4 text-sm text-muted">
               <p><strong>Network Status:</strong> {gasPrice === 0n ? "✅ Completely free transactions" : "⚠️ Gas fees are being charged"}</p>
               <p><strong>Configuration:</strong> Anvil local network with gas_price=0, base_fee=0</p>
               {gasPrice !== 0n && (
@@ -1293,7 +1293,7 @@ const AdminPage: NextPage = () => {
                   >
                     🔧 Force Zero Gas
                   </button>
-                  <span className="ml-2 text-xs text-gray-500">
+                  <span className="ml-2 text-xs text-muted">
                     Click if gas price is not zero despite configuration
                   </span>
                 </div>
@@ -1323,33 +1323,33 @@ const AdminPage: NextPage = () => {
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-green-50 p-4 rounded-lg">
-                <h3 className="font-medium text-green-800 mb-2">Total Pool</h3>
-                <div className="text-2xl font-bold text-green-600">
+              <div className="bg-success-surface p-4 rounded-lg">
+                <h3 className="font-medium text-success mb-2">Total Pool</h3>
+                <div className="text-2xl font-bold text-success">
                   {poolInfo ? formatUSDC(poolInfo[0]) : "Loading..."}
                 </div>
-                <p className="text-sm text-green-600 mt-1">Total deposits</p>
+                <p className="text-sm text-success mt-1">Total deposits</p>
               </div>
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-medium text-blue-800 mb-2">Amount Lent Out</h3>
-                <div className="text-2xl font-bold text-blue-600">
+              <div className="bg-info-surface p-4 rounded-lg">
+                <h3 className="font-medium text-info mb-2">Amount Lent Out</h3>
+                <div className="text-2xl font-bold text-info">
                   {totalLent ? formatUSDC(totalLent) : "Loading..."}
                 </div>
-                <p className="text-sm text-blue-600 mt-1">Currently active loans</p>
+                <p className="text-sm text-info mt-1">Currently active loans</p>
               </div>
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <h3 className="font-medium text-orange-800 mb-2">Available Funds</h3>
-                <div className="text-2xl font-bold text-orange-600">
+              <div className="bg-warning-surface p-4 rounded-lg">
+                <h3 className="font-medium text-caution mb-2">Available Funds</h3>
+                <div className="text-2xl font-bold text-caution">
                   {poolInfo ? formatUSDC(poolInfo[1]) : "Loading..."}
                 </div>
-                <p className="text-sm text-orange-600 mt-1">Liquid for lending/withdrawal</p>
+                <p className="text-sm text-caution mt-1">Liquid for lending/withdrawal</p>
               </div>
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <h3 className="font-medium text-purple-800 mb-2">Utilization</h3>
-                <div className="text-2xl font-bold text-purple-600">
+              <div className="bg-accent-surface p-4 rounded-lg">
+                <h3 className="font-medium text-accent mb-2">Utilization</h3>
+                <div className="text-2xl font-bold text-accent">
                   {poolInfo && totalLent ? `${((Number(totalLent) / Number(poolInfo[0])) * 100).toFixed(1)}%` : "Loading..."}
                 </div>
-                <p className="text-sm text-purple-600 mt-1">
+                <p className="text-sm text-accent mt-1">
                   Cap: {utilCap ? `${(Number(utilCap) / 100).toFixed(0)}%` : "Loading..."}
                 </p>
               </div>
@@ -1358,25 +1358,25 @@ const AdminPage: NextPage = () => {
             {/* Utilization Progress Bar */}
             {poolInfo && totalLent && utilCap && (
               <div className="mt-6">
-                <div className="flex justify-between text-sm text-gray-600 mb-2">
+                <div className="flex justify-between text-sm text-muted mb-2">
                   <span>Current Utilization</span>
                   <span>{((Number(totalLent) / Number(poolInfo[0])) * 100).toFixed(1)}% / {(Number(utilCap) / 100).toFixed(0)}%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
+                <div className="w-full bg-base-300 rounded-full h-3">
                   <div 
                     className={`h-3 rounded-full transition-all duration-300 ${
                       (Number(totalLent) / Number(poolInfo[0])) * 100 > (Number(utilCap) / 100) * 0.9 
-                        ? 'bg-red-500' 
+                        ? 'bg-error'
                         : (Number(totalLent) / Number(poolInfo[0])) * 100 > (Number(utilCap) / 100) * 0.7 
-                        ? 'bg-yellow-500' 
-                        : 'bg-green-500'
+                        ? 'bg-warning'
+                        : 'bg-success'
                     }`}
                     style={{ 
                       width: `${Math.min((Number(totalLent) / Number(poolInfo[0])) * 100, 100)}%` 
                     }}
                   ></div>
                 </div>
-                <div className="mt-2 text-xs text-gray-500">
+                <div className="mt-2 text-xs text-muted">
                   {poolInfo[2] ? `Reserved: ${formatUSDC(poolInfo[2])}` : ''}
                 </div>
               </div>
@@ -1388,20 +1388,20 @@ const AdminPage: NextPage = () => {
             <h2 className="text-xl font-semibold mb-4">Platform Overview</h2>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-6 text-center">
               <div>
-                <div className="text-2xl font-bold text-blue-500">{allLoanIds ? allLoanIds.length : "-"}</div>
-                <div className="text-sm text-gray-600">Total Loans</div>
+                <div className="text-2xl font-bold text-info">{allLoanIds ? allLoanIds.length : "-"}</div>
+                <div className="text-sm text-muted">Total Loans</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-green-500">{borrowerList ? borrowerList.length : "-"}</div>
-                <div className="text-sm text-gray-600">Borrowers</div>
+                <div className="text-2xl font-bold text-success">{borrowerList ? borrowerList.length : "-"}</div>
+                <div className="text-sm text-muted">Borrowers</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-purple-500">{lenderList ? lenderList.length : "-"}</div>
-                <div className="text-sm text-gray-600">Lenders</div>
+                <div className="text-2xl font-bold text-accent">{lenderList ? lenderList.length : "-"}</div>
+                <div className="text-sm text-muted">Lenders</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-orange-500">{backerList ? backerList.length : "-"}</div>
-                <div className="text-sm text-gray-600">Backers</div>
+                <div className="text-2xl font-bold text-caution">{backerList ? backerList.length : "-"}</div>
+                <div className="text-sm text-muted">Backers</div>
               </div>
             </div>
           </div>
@@ -1410,37 +1410,37 @@ const AdminPage: NextPage = () => {
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
             <h2 className="text-xl font-semibold mb-4">Interest Rate Configuration</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-medium text-blue-800 mb-2">Effective Federal Funds Rate (EFFR)</h3>
-                <div className="text-2xl font-bold text-blue-600">
+              <div className="bg-info-surface p-4 rounded-lg">
+                <h3 className="font-medium text-info mb-2">Effective Federal Funds Rate (EFFR)</h3>
+                <div className="text-2xl font-bold text-info">
                   {effrRate !== undefined ? (Number(effrRate) / 100).toFixed(2) : "-"}%
                 </div>
-                <p className="text-sm text-blue-600 mt-1">Base rate for all loans</p>
+                <p className="text-sm text-info mt-1">Base rate for all loans</p>
               </div>
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <h3 className="font-medium text-orange-800 mb-2">Risk Premium</h3>
-                <div className="text-2xl font-bold text-orange-600">
+              <div className="bg-warning-surface p-4 rounded-lg">
+                <h3 className="font-medium text-caution mb-2">Risk Premium</h3>
+                <div className="text-2xl font-bold text-caution">
                   {riskPremium !== undefined ? (Number(riskPremium) / 100).toFixed(2) : "-"}%
                 </div>
-                <p className="text-sm text-orange-600 mt-1">Platform risk adjustment</p>
+                <p className="text-sm text-caution mt-1">Platform risk adjustment</p>
               </div>
-              <div className="bg-green-50 p-4 rounded-lg">
-                <h3 className="font-medium text-green-800 mb-2">Loan Rate (APR)</h3>
-                <div className="text-2xl font-bold text-green-600">
+              <div className="bg-success-surface p-4 rounded-lg">
+                <h3 className="font-medium text-success mb-2">Loan Rate (APR)</h3>
+                <div className="text-2xl font-bold text-success">
                   {loanRate !== undefined ? (Number(loanRate) / 100).toFixed(2) : "-"}%
                 </div>
-                <p className="text-sm text-green-600 mt-1">EFFR + Risk Premium</p>
+                <p className="text-sm text-success mt-1">EFFR + Risk Premium</p>
               </div>
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <h3 className="font-medium text-purple-800 mb-2">Funding Pool APY</h3>
-                <div className="text-2xl font-bold text-purple-600">
+              <div className="bg-accent-surface p-4 rounded-lg">
+                <h3 className="font-medium text-accent mb-2">Funding Pool APY</h3>
+                <div className="text-2xl font-bold text-accent">
                   {fundingPoolAPY !== undefined ? (Number(fundingPoolAPY) / 100).toFixed(2) : "-"}%
                 </div>
-                <p className="text-sm text-purple-600 mt-1">Projected lender yield, net of fee and reserve</p>
+                <p className="text-sm text-accent mt-1">Projected lender yield, net of fee and reserve</p>
               </div>
             </div>
-            <div className="mt-4 p-3 bg-gray-100 rounded-md">
-              <p className="text-sm text-gray-700">
+            <div className="mt-4 p-3 bg-base-200 rounded-md">
+              <p className="text-sm text-base-content">
                 <strong>Note:</strong> EFFR should be updated to reflect current market conditions (currently 4.33%). 
                 Risk premium is set to 5% for platform sustainability.
               </p>
@@ -1472,21 +1472,21 @@ const AdminPage: NextPage = () => {
                 <h3 className="font-medium mb-2">System Health</h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div className="w-2 h-2 bg-success rounded-full"></div>
                     <span>Contract: Active</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div className="w-2 h-2 bg-success rounded-full"></div>
                     <span>Oracle: {oracle ? 'Set' : 'Not Set'}</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div className="w-2 h-2 bg-success rounded-full"></div>
                     <span>Score Provider: {scoreProvider && scoreProvider !== zeroAddress ? "Set" : "Not Set"}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div
                       className={`w-2 h-2 rounded-full ${
-                        utilisationPct < capPct * 0.9 ? "bg-green-500" : "bg-yellow-500"
+                        utilisationPct < capPct * 0.9 ? "bg-success" : "bg-warning"
                       }`}
                     ></div>
                     <span>
@@ -1496,7 +1496,7 @@ const AdminPage: NextPage = () => {
                   <div className="flex items-center space-x-2">
                     <div
                       className={`w-2 h-2 rounded-full ${
-                        utilisationPct < capPct * 0.9 ? "bg-green-500" : "bg-yellow-500"
+                        utilisationPct < capPct * 0.9 ? "bg-success" : "bg-warning"
                       }`}
                     ></div>
                     <span>Borrower Count: {borrowerList ? borrowerList.length : "-"}</span>
@@ -1504,7 +1504,7 @@ const AdminPage: NextPage = () => {
                   <div className="flex items-center space-x-2">
                     <div
                       className={`w-2 h-2 rounded-full ${
-                        utilisationPct < capPct * 0.9 ? "bg-green-500" : "bg-yellow-500"
+                        utilisationPct < capPct * 0.9 ? "bg-success" : "bg-warning"
                       }`}
                     ></div>
                     <span>Lender Count: {lenderList ? lenderList.length : "-"}</span>
@@ -1512,7 +1512,7 @@ const AdminPage: NextPage = () => {
                   <div className="flex items-center space-x-2">
                     <div
                       className={`w-2 h-2 rounded-full ${
-                        utilisationPct < capPct * 0.9 ? "bg-green-500" : "bg-yellow-500"
+                        utilisationPct < capPct * 0.9 ? "bg-success" : "bg-warning"
                       }`}
                     ></div>
                     <span>Backer Count: {backerList ? backerList.length : "-"}</span>
@@ -1523,11 +1523,11 @@ const AdminPage: NextPage = () => {
                 <h3 className="font-medium mb-2">Admin Status</h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div className="w-2 h-2 bg-success rounded-full"></div>
                     <span>Access: {hasAccess ? "Granted" : "Denied"}</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div className="w-2 h-2 bg-success rounded-full"></div>
                     <span>
                       {(() => {
                         const me = connectedAddress?.toLowerCase();
@@ -1555,11 +1555,11 @@ const AdminPage: NextPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-medium mb-2">Current Oracle</h3>
-                {oracle ? <Address address={oracle as `0x${string}`} /> : <div className="text-gray-500">Loading...</div>}
+                {oracle ? <Address address={oracle as `0x${string}`} /> : <div className="text-muted">Loading...</div>}
               </div>
               <div>
                 <h3 className="font-medium mb-2">Contract Owner</h3>
-                {owner ? <Address address={owner as `0x${string}`} /> : <div className="text-gray-500">Loading...</div>}
+                {owner ? <Address address={owner as `0x${string}`} /> : <div className="text-muted">Loading...</div>}
               </div>
             </div>
           </div>
@@ -1570,13 +1570,13 @@ const AdminPage: NextPage = () => {
             <div className="space-y-4">
               <div>
                 <h3 className="font-medium">Credit Score Management</h3>
-                <p className="text-sm text-gray-600">Update credit scores for users. Scores should be between 0-100 %.</p>
+                <p className="text-sm text-muted">Update credit scores for users. Scores should be between 0-100 %.</p>
               </div>
               <div>
                 <h3 className="font-medium">Oracle Setup</h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted">
                   Use the{" "}
-                  <a href="/oracle-setup" className="text-blue-500 underline">
+                  <a href="/oracle-setup" className="text-info underline">
                     Oracle Setup page
                   </a>{" "}
                   to manage oracle permissions.
@@ -1584,9 +1584,9 @@ const AdminPage: NextPage = () => {
               </div>
               <div>
                 <h3 className="font-medium">Debug Interface</h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted">
                   Use the{" "}
-                  <a href="/debug" className="text-blue-500 underline">
+                  <a href="/debug" className="text-info underline">
                     Debug page
                   </a>{" "}
                   to test contract functions and view contract state.
@@ -1598,7 +1598,7 @@ const AdminPage: NextPage = () => {
           {/* Site Map */}
           <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
             <h2 className="text-xl font-semibold mb-4">Site Map</h2>
-            <ul className="list-disc ml-5 space-y-2 text-blue-600">
+            <ul className="list-disc ml-5 space-y-2 text-info">
               <li><Link href="/">Home</Link></li>
               <li><Link href="/lend">Lender Portal</Link></li>
               <li><Link href="/borrower">Borrower Portal</Link></li>
