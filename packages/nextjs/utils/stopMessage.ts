@@ -19,7 +19,9 @@ export function networkHint(raw: string): string | undefined {
 
 /** `what` is the sentence start ("The repayment stopped"), `parsed` the readable error, `raw` everything the error said. */
 export function stopMessage(what: string, parsed: string, raw: string = parsed): string {
-  const body = parsed.length > MAX_LENGTH ? `${parsed.slice(0, MAX_LENGTH)}...` : parsed;
+  // viem appends the endpoint URL, the request body and its own version to an error: keep the reason, drop those.
+  const reason = parsed.split(/\s*\b(?:URL|Request body|Details|Version|Docs):/i)[0].trim() || parsed;
+  const body = reason.length > MAX_LENGTH ? `${reason.slice(0, MAX_LENGTH)}...` : reason;
   const hint = networkHint(`${parsed} ${raw}`);
   return `${what}: ${body}${hint ? ` ${hint}` : ""}`;
 }

@@ -32,3 +32,11 @@ test("the not-yet-visible message from the stable read passes through untouched"
     "The approval is mined but not yet visible to the network after 30 s; nothing further was sent. Wait a moment and press the button again: the earlier step is already in place.";
   assert.equal(stopMessage("The repayment stopped", msg), `The repayment stopped: ${msg}`);
 });
+
+test("viem's endpoint URL and request body are dropped, the status stays", () => {
+  const parsed = 'HTTP request failed. Status: 429 URL: https://rpc.example/key-123 Request body: {"method":"eth_sendRawTransaction","params":["0x02f8b1"]} Details: too many requests Version: viem@2';
+  const m = stopMessage("The repayment stopped", parsed);
+  assert.match(m, /^The repayment stopped: HTTP request failed\. Status: 429 /);
+  assert.ok(!/key-123|eth_sendRawTransaction|viem@2/.test(m));
+  assert.match(m, /limiting requests/);
+});
