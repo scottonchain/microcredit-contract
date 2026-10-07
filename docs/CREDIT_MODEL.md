@@ -147,8 +147,8 @@ so the same inequality bounded $\Lambda_L$ there, and since then $\Lambda_L$ has
 $D$ and $\varphi$ can only have grown. If the reserve was never exhausted, $\Lambda_L=0$. $\square$
 
 Lenders' realised loss plus what the reserve could not cover of their potential loss never exceeds
-the issued lines (plus surplus released to them, which cannot include dues, and a few sub-cent
-balances): earned credit costs lenders nothing, and while losses outrun the reserve, external
+the issued lines (plus surplus released to them, which cannot include dues, and the forgiven
+sub-cent balances $\varphi$, which a borrower can add to by up to a cent per loan, CI-30): earned credit costs lenders nothing, and while losses outrun the reserve, external
 first-loss capital $F$ comes straight off their exposure. The invariant suite checks this as I8.
 
 *The role of coverage $\kappa$.* The proof uses only $\kappa\le1$, so with fixed lines the bound
@@ -449,7 +449,9 @@ What the theorems do not say:
   line in its current cycle; the oracle budget is charged that way, owner overrides are not.
 - **Rounding.** Pro-rata charging leaves at most a few wei per edge per default on lenders, and
   sub-cent balances are forgiven at closing (absorbed by the reserve first). The invariant suite
-  carries both explicitly.
+  carries both explicitly. The forgiven term is not small in aggregate: a borrower can leave up to a cent of
+  each loan's interest unpaid and still be credited dues on it, so $\varphi$ is bounded by a cent per
+  loan, not by a constant (CI-30, `test/AdvanceFacts.t.sol`).
 - **The token.** USDC is assumed to transfer as specified. A blocklisted lender or borrower cannot
   move funds; a depeg moves every figure together. Neither creates credit.
 - **Ordering.** A backer cutting a backing and a borrower drawing on it can race in one block;
