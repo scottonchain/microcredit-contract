@@ -1,8 +1,8 @@
 # Testnet deployment (Base Sepolia)
 
-A deployment for persona testing by agents and people. It is a testnet with a free-mint token: nothing here has value, and this is not the production deployment (`DEPLOYMENT.md`).
+A deployment for persona testing by agents and people. It is a testnet: nothing here has value, and this is not the production deployment (`DEPLOYMENT.md`).
 
-Three deployments of the same contract code exist. The **live deployment** is the one agents use: it is run by Hermes, which holds every role. The **reference run** came first and is kept for its record, and a **duplicate run** by Hermes is recorded below. The contracts are identical in all three: `9ab3729` and `main` `19b166e` differ only outside `packages/foundry/contracts`.
+The **live deployment** is the canonical-USDC pool in the first section below: its token is Circle's Base Sepolia test USDC (obtained from Circle's faucet, never minted by this project), it runs `1812e7d`, and it is run by Hermes, which holds every role. Everything after that section is history: the **mock-token deployment** (a free-mint `MockUSDC`) with its scenario record, a **duplicate run** by Hermes and the **reference run**, which came first. Those three share the same contract code: `9ab3729` and `main` `19b166e` differ only outside `packages/foundry/contracts`. The live pool's contract differs from `19b166e` in `DecentralizedMicrocredit.sol` (7 insertions and 4 deletions by `git diff --stat 19b166e 1812e7d`).
 
 Commit ids: the repository's history was rewritten on 2026-10-04 to remove private identifiers from commit messages (file contents unchanged), so the broadcast logs record the pre-rewrite ids `73cb3f6` (now `9ab3729`) and `489f01a` (now `19b166e`).
 
@@ -33,7 +33,7 @@ Until the canonical-USDC deployment above went live, this was the deployment beh
 
 Chain: Base Sepolia (84532), RPC `https://sepolia.base.org`. Deployed 2026-10-03 from `main` `19b166e` with `script/DeployTestnet.s.sol` (`MAX_LOAN=100000000`). Broadcast logs: `packages/foundry/broadcast/DeployTestnet.s.sol/84532/run-1791065984302.json` and `TestnetScenarios.s.sol/84532/run-1791066260981.json`.
 
-`main` is ahead of the live pool: the CI-28 fix (anyone may repay a loan with their own USDC, so a backer can cure one before it defaults) is merged but not deployed. The live pool still refuses `repayLoan` from anyone but the borrower until it is redeployed; `repayWithPermit` with a permit that outlives the late period is the workaround there.
+`main` is ahead of this pool: the CI-28 fix (anyone may repay a loan with their own USDC, so a backer can cure one before it defaults) is merged but not deployed here (the canonical-USDC pool above has it). This pool still refuses `repayLoan` from anyone but the borrower; `repayWithPermit` with a permit that outlives the late period is the workaround there.
 
 | Contract | Address |
 | --- | --- |
