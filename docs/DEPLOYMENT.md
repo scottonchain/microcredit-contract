@@ -184,6 +184,39 @@ mistakes: EFFR above 2000 bps, a premium above 5000 bps, or `MAX_LOAN` outside 1
 - **Pinning.** Reports arrive only through the forwarder, from the configured workflow owner and
   id. Configuring them later is a timelock operation (`setForwarder`).
 
+## What the relayer service must satisfy, if one is named
+
+`RELAYER` names the one account allowed to submit meta-transactions. The contract already makes a
+duplicate submission harmless (a nonce is consumed once and a second use reverts with
+`InvalidNonce`), so these requirements are about the service that holds the key: what it tells a
+client, what it never sends twice, and what it records before it acts. The owner checks them before
+approving the address at gate 2. Each one is tied to what the code and its tests show today
+(`packages/nextjs/app/api/meta/relayer.ts`; the design note is
+`coordination/relayer-journal-design.md` in the testbed repository).
+
+- **Journal on, local key.** The service runs with `RELAYER_JOURNAL_PATH` set and signs with its
+  own key (`RELAYER_PRIVATE_KEY`), never through an unlocked node: the journal records the signed
+  transaction's hash and bytes before the broadcast, so a hash-less entry was never sent and a retry
+  rebroadcasts the identical bytes. The relayer refuses the journal on an unlocked node outside the
+  local chain.
+- **One process, one journal file.** The send queue is process-local and the journal has one
+  writer. Two processes with the same key would race on the account nonce.
+- **A restart loses nothing.** After a crash between broadcast and receipt, the same request is
+  answered 202 while unmined and 200 once mined, with one transaction in all. The repeatable check
+  is `yarn workspace @se-2/nextjs relayer:crash-check` (15 checks on a local chain). It has not
+  been run against a public endpoint or a testnet: attach a run of that kind to the approval when
+  it exists, and say so in the approval when it does not.
+- **Known gaps accepted or closed.** The design note lists seven: attribution of a consumed nonce
+  by decoding the consuming transaction's calldata, fee replacement of a stuck transaction, more
+  than one relayer process, confirmation depth against reorganisations, the receipt being read
+  from the same endpoint that took the write, permit-only routes' weaker key, and the fact that
+  the service is code and tests, not yet a service anyone outside the team has used.
+- **Key custody named.** Who holds the relayer key and where, how it is rotated, and what the
+  service's public endpoint and uptime practice are. Gas for the key is a running cost the
+  approval states.
+- **Nothing here covers a person's use of it.** A relayed transaction is a convenience for a
+  wallet that has no gas. It is not evidence that anyone has borrowed, repaid or benefited.
+
 ## What not to do
 
 - Do not set score overrides (`setScoreOverride`) on pseudonymous accounts. Overrides bypass the
