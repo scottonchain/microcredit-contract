@@ -35,6 +35,17 @@ What `verify` checks (A backs B with x):
 What `controls` simulates (eth_call, nothing is sent):
   - B, holding only received backing, cannot back C (`InsufficientCredit`).
   - A cannot raise its backing of B above what it holds free (`InsufficientCredit`).
+
+What it catches, from runs against deliberately broken copies of the pool (a scratch copy outside
+the repository, one source line changed each, deployed to a local Anvil):
+  - a backing that does not record the committed credit (grant route) or the committed stake
+    (stake route): checks 1 and 3 fail, since B's limit rises and A's capacity does not fall;
+  - free capacity that counts backing received: check 6 fails, and the pass-on control reports
+    NOT APPLICABLE because B then holds free capacity.
+What it cannot see: the coverage rule (an unsecured backing counts only as far as the backer's
+granted credit still covers what it committed). One backing step does not exercise it, so a pool
+that ignores the rule passes here. That rule needs a lost credit or an open loan on A, and is
+covered by `SybilResistance.t.sol` and the invariant suite, not by this script.
 """
 
 import argparse
