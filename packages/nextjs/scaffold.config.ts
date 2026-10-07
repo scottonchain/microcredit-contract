@@ -32,8 +32,14 @@ const scaffoldConfig = {
   // If you want to use a different RPC for a specific network, you can add it here.
   // The key is the chain ID, and the value is the HTTP RPC URL
   rpcOverrides: {
-    // Base Sepolia: the public endpoint unless NEXT_PUBLIC_RPC_URL_84532 names another at build time.
-    [chains.baseSepolia.id]: process.env.NEXT_PUBLIC_RPC_URL_84532 || "https://sepolia.base.org",
+    // Base Sepolia: a comma-separated list tried in order (the first that answers serves the read), unless
+    // NEXT_PUBLIC_RPC_URL_84532 names others at build time. The first is Base's own public endpoint; the second and third
+    // are free public endpoints that answered chain id 84532 with CORS open to the app's origin and 40 of 40 calls at
+    // about 20 a minute from the testbed operator's host (testbed issue 15 and contract issue 7, 2026-10-07). They are
+    // third parties: a visitor's page reads (balances, loans, the allowance) reach them only when the first one fails.
+    [chains.baseSepolia.id]:
+      process.env.NEXT_PUBLIC_RPC_URL_84532 ||
+      "https://sepolia.base.org,https://base-sepolia-rpc.publicnode.com,https://base-sepolia.gateway.tenderly.co",
   },
 
   // This is ours WalletConnect's default project ID.
