@@ -504,26 +504,26 @@ export default function PopulatePage() {
   if (loading) return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">🛠️ Admin: Populate Test Data</h1>
-      <div className="bg-base-200 border border-base-300 rounded-lg p-6 text-gray-600">Checking admin access…</div>
+      <div className="bg-base-200 border border-base-300 rounded-lg p-6 text-muted">Checking admin access…</div>
     </div>
   );
   if (!connectedAddress) return <p>🔌 Connect wallet…</p>;
   if (!admin) return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">🛠️ Admin: Populate Test Data</h1>
-      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-red-800 mb-4">⛔ Access Denied</h2>
-        <p className="text-red-700 mb-4">
+      <div className="bg-error-surface border border-outline rounded-lg p-6">
+        <h2 className="text-xl font-semibold text-error mb-4">⛔ Access Denied</h2>
+        <p className="text-error mb-4">
           You need to be the contract owner, oracle, or a whitelisted admin to access this page.
         </p>
-        <div className="bg-gray-100 p-3 rounded-md mb-4">
-          <p className="text-sm text-gray-700">
+        <div className="bg-base-200 p-3 rounded-md mb-4">
+          <p className="text-sm text-base-content">
             <strong>Your Address:</strong> {connectedAddress}
           </p>
         </div>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <h3 className="text-lg font-semibold text-yellow-800 mb-2">🔍 Debug Information</h3>
-          <div className="text-sm text-yellow-700 space-y-1">
+        <div className="bg-warning-surface border border-outline rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-caution mb-2">🔍 Debug Information</h3>
+          <div className="text-sm text-caution space-y-1">
             <p><strong>Contract Address:</strong> {MICROCREDIT_ADDRESS || "Not deployed"}</p>
             <p><strong>USDC Address:</strong> {USDC_ADDRESS || "Not deployed"}</p>
             <p><strong>Owner:</strong> {owner || "Loading..."}</p>
@@ -551,18 +551,18 @@ export default function PopulatePage() {
 
       
       {/* Configuration */}
-      <div className="bg-blue-50 p-4 rounded-lg mb-6">
+      <div className="bg-info-surface p-4 rounded-lg mb-6">
         <h3 className="text-lg font-semibold mb-4">⚙️ Configuration</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="numLenders" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="numLenders" className="block text-sm font-medium text-base-content mb-2">
               Number of Lenders
             </label>
             <select
               id="numLenders"
               value={numLenders}
               onChange={(e) => setNumLenders(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-outline rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value={1}>1</option>
               <option value={2}>2</option>
@@ -573,14 +573,14 @@ export default function PopulatePage() {
             </select>
           </div>
           <div>
-            <label htmlFor="numBorrowers" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="numBorrowers" className="block text-sm font-medium text-base-content mb-2">
               Number of Borrowers
             </label>
             <select
               id="numBorrowers"
               value={numBorrowers}
               onChange={(e) => setNumBorrowers(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-outline rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value={5}>5</option>
               <option value={10}>10</option>
@@ -598,18 +598,18 @@ export default function PopulatePage() {
               type="checkbox"
               checked={includeLenderAttestations}
               onChange={(e) => setIncludeLenderAttestations(e.target.checked)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              className="h-4 w-4 text-info focus:ring-primary border-outline rounded"
             />
-            <label htmlFor="includeLenderAttestations" className="ml-2 block text-sm text-gray-700">
+            <label htmlFor="includeLenderAttestations" className="ml-2 block text-sm text-base-content">
               Include lender-to-lender backing
             </label>
           </div>
-          <p className="text-xs text-gray-600 mt-1">
+          <p className="text-xs text-muted mt-1">
             When enabled, one random lender backs another with 10 USDC of its credit.
           </p>
         </div>
         <div className="mt-4">
-          <label htmlFor="attestationProbability" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="attestationProbability" className="block text-sm font-medium text-base-content mb-2">
             Lender-to-Borrower Backing Probability: {attestationProbability}%
           </label>
           <input
@@ -619,14 +619,14 @@ export default function PopulatePage() {
             max="100"
             value={attestationProbability}
             onChange={(e) => setAttestationProbability(Number(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            className="w-full h-2 bg-base-300 rounded-lg appearance-none cursor-pointer"
           />
-          <p className="text-xs text-gray-600 mt-1">
+          <p className="text-xs text-muted mt-1">
             Probability that a lender backs a given borrower. Lower values give fewer, sparser backings.
           </p>
         </div>
-        <div className="mt-4 p-3 bg-blue-100 rounded-md">
-          <p className="text-sm text-blue-800">
+        <div className="mt-4 p-3 bg-info-surface rounded-md">
+          <p className="text-sm text-info">
             <strong>Summary:</strong> This will create {numLenders} lenders (each given a full credit line to back from) and {numBorrowers} borrowers, 
             resulting in ~{Math.round((numLenders * numBorrowers * attestationProbability) / 100)} lender-to-borrower backings (at {attestationProbability}% probability)
             {includeLenderAttestations && numLenders >= 2 && `, plus 1 random lender-to-lender backing`}

@@ -44,7 +44,7 @@ export const Balance = ({ address, className = "", usdMode }: BalanceProps) => {
   if (isError) {
     return (
       <div className="border-2 border-base-content/30 rounded-md px-2 flex flex-col items-center max-w-fit cursor-pointer">
-        <div className="text-warning">Error</div>
+        <div className="text-caution">Error</div>
       </div>
     );
   }

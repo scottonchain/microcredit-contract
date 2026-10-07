@@ -44,7 +44,7 @@ const TransactionComp = ({ txHash }: { txHash: Hash }) => {
       </button>
       {transaction ? (
         <div className="overflow-x-auto">
-          <h2 className="text-3xl font-bold mb-4 text-center text-primary-content">Transaction Details</h2>{" "}
+          <h2 className="text-3xl font-bold mb-4 text-center text-base-content">Transaction Details</h2>{" "}
           <table className="table rounded-lg bg-base-100 w-full shadow-lg md:table-lg table-md">
             <tbody>
               <tr>

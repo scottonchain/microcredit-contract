@@ -44,6 +44,13 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
   const { resolvedTheme } = useTheme();
   const isDarkMode = resolvedTheme === "dark";
   const [mounted, setMounted] = useState(false);
+  const useDarkPalette = mounted && isDarkMode;
+  const walletTheme = (useDarkPalette ? darkTheme : lightTheme)({
+    accentColor: useDarkPalette ? "#78a9ff" : "#0f62fe",
+    accentColorForeground: useDarkPalette ? "#161616" : "#ffffff",
+  });
+  walletTheme.colors.modalTextSecondary = useDarkPalette ? "#c6c6c6" : "#525252";
+  walletTheme.colors.modalTextDim = walletTheme.colors.modalTextSecondary;
 
   useEffect(() => {
     setMounted(true);
@@ -52,10 +59,10 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <ProgressBar height="3px" color="#2299dd" />
+        <ProgressBar height="3px" color="var(--color-primary)" />
         <RainbowKitProvider
           avatar={BlockieAvatar}
-          theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
+          theme={walletTheme}
         >
           <DisplayNameProvider>
             <WalletErrorHandler />

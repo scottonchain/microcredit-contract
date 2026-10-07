@@ -849,26 +849,26 @@ const BorrowPage: NextPage = () => {
       {/* ── Credit Stats (always visible) ─────────────────────────── */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-base-100 rounded-lg p-4 shadow text-center">
-          <div className="text-xs text-gray-500 mb-1">Credit Limit</div>
+          <div className="text-xs text-muted mb-1">Credit Limit</div>
           <div className="text-2xl font-bold">{borrowLimit !== undefined ? formatUSDC(borrowLimit[0]) : "—"}</div>
-          <div className="text-xs text-gray-400">your credit + backing</div>
+          <div className="text-xs text-muted">your credit + backing</div>
           {duesPaid !== undefined && duesPaid > 0n && borrowLimit !== undefined && borrowLimit[0] > 0n && (
-            <div className="text-xs text-gray-500 mt-1">includes {formatUSDC(duesPaid)} earned from interest you paid into the reserve</div>
+            <div className="text-xs text-muted mt-1">includes {formatUSDC(duesPaid)} earned from interest you paid into the reserve</div>
           )}
         </div>
         <div className="bg-base-100 rounded-lg p-4 shadow text-center">
-          <div className="text-xs text-gray-500 mb-1">Max Loan</div>
+          <div className="text-xs text-muted mb-1">Max Loan</div>
           <div className="text-2xl font-bold">
             {maxEligibleAmount !== undefined ? formatUSDC(maxEligibleAmount) : "—"}
           </div>
-          <div className="text-xs text-gray-400">available now</div>
+          <div className="text-xs text-muted">available now</div>
         </div>
         <div className="bg-base-100 rounded-lg p-4 shadow text-center">
-          <div className="text-xs text-gray-500 mb-1">APR</div>
+          <div className="text-xs text-muted mb-1">APR</div>
           <div className="text-2xl font-bold">
             {borrowerAprPercent ? `${borrowerAprPercent}%` : "—"}
           </div>
-          <div className="text-xs text-gray-400">fixed rate</div>
+          <div className="text-xs text-muted">fixed rate</div>
         </div>
       </div>
 
@@ -883,19 +883,19 @@ const BorrowPage: NextPage = () => {
                 title="Click to copy link"
               >
                 <QRCodeDisplay value={backingUrl} size={72} />
-                <span className="text-xs text-gray-400 mt-1">scan or copy</span>
+                <span className="text-xs text-muted mt-1">scan or copy</span>
               </div>
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold mb-1">Share your backing link to get credit</p>
-              <p className="text-sm text-gray-500 mb-3">
+              <p className="text-sm text-muted mb-3">
                 You can borrow against credit you already have, or credit that someone who has credit backs you
                 with from their own. Send this link to people who know you: what they back you with becomes your
                 limit, and they stand behind it if you do not repay.
               </p>
               <div className="flex items-center gap-2">
                 <span
-                  className="text-xs text-blue-600 underline truncate cursor-pointer"
+                  className="text-xs text-info underline truncate cursor-pointer"
                   title={backingUrl}
                   onClick={copyBackingUrl}
                 >
@@ -928,7 +928,7 @@ const BorrowPage: NextPage = () => {
           <h2 className="text-xl font-semibold mb-2">
             {offeredLoanId !== undefined ? "Loan requested, not yet disbursed" : "Checking a loan request"}
           </h2>
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm text-muted mb-4">
             {offeredLoanId !== undefined
               ? `${formatUSDC(BigInt(decision.intent.amount))} is reserved for you as loan #${offeredLoanId.toString()} but has not been paid out. Disburse it to receive the funds, or cancel it to release the reservation. Nothing else can be requested until one of the two is done.`
               : `A request for ${formatUSDC(BigInt(decision.intent.amount))} started at ${new Date(decision.intent.createdAt).toLocaleString()} is not settled yet${decision.intent.requestTxHash ? ` (transaction ${decision.intent.requestTxHash})` : " (the wallet returned no transaction hash)"}. ${reconcileNote} No new request is possible until it is.`}
@@ -957,7 +957,7 @@ const BorrowPage: NextPage = () => {
       {decision.kind === "requested_on_chain" && (
         <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8 border border-warning">
           <h2 className="text-xl font-semibold mb-2">Loan requested, not yet disbursed</h2>
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm text-muted mb-4">
             {activePrincipal !== undefined ? formatUSDC(activePrincipal) : "A loan"} is reserved for you as loan #
             {decision.loanId.toString()} but has not been paid out. Disburse it to receive the funds, or cancel it to
             release the reservation. Nothing else can be requested until one of the two is done.
@@ -974,7 +974,7 @@ const BorrowPage: NextPage = () => {
       )}
 
       {decision.kind === "loading" && connectedAddress && (
-        <div className="text-sm text-gray-500 mb-8">Loading your loans…</div>
+        <div className="text-sm text-muted mb-8">Loading your loans…</div>
       )}
 
       {/* Loan Request Form (shown when credit exists, the reads are loaded and nothing is open or unresolved) */}
@@ -1023,7 +1023,7 @@ const BorrowPage: NextPage = () => {
                   <div className="input input-bordered w-full flex items-center bg-base-100">
                     {Math.round(effectivePeriodDays)} days (the pool&apos;s default term)
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-muted mt-2">
                     With your own wallet the loan runs for the pool&apos;s default term; chosen periods need the relayed
                     version of this app. The estimate below is for that term.
                   </p>
@@ -1035,7 +1035,7 @@ const BorrowPage: NextPage = () => {
           {/* Est. weekly payment preview */}
           {previewTermsData && loanAmount && (
             <div className="bg-base-200 rounded-lg p-3 mt-4 text-sm">
-              <span className="text-gray-600">Est. weekly payment: </span>
+              <span className="text-muted">Est. weekly payment: </span>
               <span className="font-semibold">{(Number(previewTermsData[1]) / 1e6).toFixed(2)} USDC</span>
             </div>
           )}
@@ -1075,15 +1075,15 @@ const BorrowPage: NextPage = () => {
               <h3 className="font-medium mb-3">Loan Summary</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Principal:</span>
+                  <span className="text-muted">Principal:</span>
                   <span className="font-medium">{loanRes.isLoading ? <span className="skeleton h-4 w-24 inline-block" /> : (activePrincipal !== undefined ? formatUSDC(activePrincipal) : "-")}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Outstanding:</span>
+                  <span className="text-muted">Outstanding:</span>
                   <span className="font-medium">{outRoundedRes.isLoading ? <span className="skeleton h-4 w-24 inline-block" /> : (displayOutstanding !== undefined ? formatUSDC(displayOutstanding) : "-")}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Status:</span>
+                  <span className="text-muted">Status:</span>
                   <span className="font-medium">{loanIsActive ? "Current" : "Closed"}</span>
                 </div>
               </div>
@@ -1094,19 +1094,19 @@ const BorrowPage: NextPage = () => {
               <h3 className="font-medium mb-3">Repayment Schedule</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Term:</span>
+                  <span className="text-muted">Term:</span>
                   <span className="font-medium">{loanTerms ? `${Number(loanTerms[1]) / 86400} days` : "-"}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Due Date:</span>
+                  <span className="text-muted">Due Date:</span>
                   <span className="font-medium">{dueAt !== undefined ? formatDate(dueAt) : "Not yet disbursed"}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Status:</span>
+                  <span className="text-muted">Status:</span>
                   {daysOverdue > 0 ? (
                     <span className="font-medium text-error">Overdue by {daysOverdue} days</span>
                   ) : (
-                    <span className="font-medium text-green-500">Current</span>
+                    <span className="font-medium text-success">Current</span>
                   )}
                 </div>
                 {daysOverdue > 0 && defaultableAt !== undefined && (
@@ -1120,14 +1120,14 @@ const BorrowPage: NextPage = () => {
           </div>
 
           {/* Repayment Actions */}
-          <div className="mt-6 pt-4 border-t border-gray-300">
+          <div className="mt-6 pt-4 border-t border-outline">
             <h3 className="font-medium mb-3">Make a Payment</h3>
-            <p className="text-xs text-gray-600 mb-3">One approval, no gas. You’ll sign a permit; our relayer submits the repayment.</p>
+            <p className="text-xs text-muted mb-3">One approval, no gas. You’ll sign a permit; our relayer submits the repayment.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Full Repayment */}
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h4 className="font-medium text-green-800 mb-2">Full Repayment</h4>
-                <p className="text-sm text-green-600 mb-3">Pay off your entire outstanding balance</p>
+              <div className="bg-success-surface border border-outline rounded-lg p-4">
+                <h4 className="font-medium text-success mb-2">Full Repayment</h4>
+                <p className="text-sm text-success mb-3">Pay off your entire outstanding balance</p>
                 <button
                   disabled={
                     isLoading ||
@@ -1258,23 +1258,23 @@ const BorrowPage: NextPage = () => {
                       setIsLoading(false);
                     }
                   }}
-                  className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                  className="w-full bg-success hover:brightness-90 disabled:bg-base-300 disabled:text-muted text-success-content font-bold py-2 px-4 rounded-lg transition-colors"
                 >
                   {isLoading ? "Processing..." : loanIsActive && displayOutstanding !== undefined ? `Pay ${formatUSDC(displayOutstanding)}` : "Pay"}
                 </button>
               </div>
 
               {/* Partial Repayment */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-medium text-blue-800 mb-2">Partial Repayment</h4>
-                <p className="text-sm text-blue-600 mb-3">Make a partial payment to reduce your balance</p>
+              <div className="bg-info-surface border border-outline rounded-lg p-4">
+                <h4 className="font-medium text-info mb-2">Partial Repayment</h4>
+                <p className="text-sm text-info mb-3">Make a partial payment to reduce your balance</p>
                 <div className="flex gap-2">
                   <input
                     type="number"
                     value={repayAmount}
                     onChange={(e) => setRepayAmount(e.target.value)}
                     placeholder="Enter amount in USDC"
-                    className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="flex-1 p-2 border border-outline rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     min="0.01"
                     step="0.01"
                   />
@@ -1401,14 +1401,14 @@ const BorrowPage: NextPage = () => {
                         setIsLoading(false);
                       }
                     }}
-                    className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                    className="bg-info hover:brightness-90 disabled:bg-base-300 disabled:text-muted text-info-content font-bold py-2 px-4 rounded-lg transition-colors"
                   >
                     {isLoading ? "Processing..." : "Repay"}
                   </button>
                 </div>
               </div>
               {permitError && (
-                <div className="col-span-1 md:col-span-2 mt-2 p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
+                <div className="col-span-1 md:col-span-2 mt-2 p-3 rounded-md bg-error-surface border border-outline text-error text-sm">
                   {permitError}
                 </div>
               )}

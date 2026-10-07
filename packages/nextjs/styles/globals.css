@@ -7,6 +7,17 @@
   --animate-pulse-fast: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+@theme inline {
+  --color-muted: var(--text-muted);
+  --color-caution: var(--text-caution);
+  --color-outline: var(--border-strong);
+  --color-info-surface: var(--surface-info);
+  --color-success-surface: var(--surface-success);
+  --color-warning-surface: var(--surface-warning);
+  --color-error-surface: var(--surface-error);
+  --color-accent-surface: var(--surface-accent);
+}
+
 @plugin "daisyui" {
   themes:
     light,
@@ -15,23 +26,40 @@
 
 @plugin "daisyui/theme" {
   name: "light";
+  default: true;
+  color-scheme: light;
 
-  --color-primary: #93bbfb;
-  --color-primary-content: #212638;
-  --color-secondary: #dae8ff;
-  --color-secondary-content: #212638;
-  --color-accent: #93bbfb;
-  --color-accent-content: #212638;
-  --color-neutral: #212638;
+  /* IBM Carbon Gray 10 palette, adapted to daisyUI's semantic roles.
+     https://www.carbondesignsystem.com/building-blocks/foundations/color/overview
+     Keep foreground/background pairs explicit; do not infer status text. */
+  --color-primary: #0f62fe;
+  --color-primary-content: #ffffff;
+  --color-secondary: #e0e0e0;
+  --color-secondary-content: #161616;
+  --color-accent: #6929c4;
+  --color-accent-content: #ffffff;
+  --color-neutral: #393939;
   --color-neutral-content: #ffffff;
   --color-base-100: #ffffff;
-  --color-base-200: #f4f8ff;
-  --color-base-300: #dae8ff;
-  --color-base-content: #212638;
-  --color-info: #93bbfb;
-  --color-success: #34eeb6;
-  --color-warning: #ffcf72;
-  --color-error: #ff8863;
+  --color-base-200: #f4f4f4;
+  --color-base-300: #e0e0e0;
+  --color-base-content: #161616;
+  --color-info: #0043ce;
+  --color-info-content: #ffffff;
+  --color-success: #0e6027;
+  --color-success-content: #ffffff;
+  --color-warning: #f1c21b;
+  --color-warning-content: #161616;
+  --color-error: #a2191f;
+  --color-error-content: #ffffff;
+  --text-muted: #525252;
+  --text-caution: #684e00;
+  --border-strong: #6f6f6f;
+  --surface-info: #edf5ff;
+  --surface-success: #defbe6;
+  --surface-warning: #fcf4d6;
+  --surface-error: #fff1f1;
+  --surface-accent: #f6f2ff;
 
   --radius-field: 9999rem;
   --radius-box: 1rem;
@@ -40,23 +68,38 @@
 
 @plugin "daisyui/theme" {
   name: "dark";
+  prefersdark: true;
+  color-scheme: dark;
 
-  --color-primary: #212638;
-  --color-primary-content: #f9fbff;
-  --color-secondary: #323f61;
-  --color-secondary-content: #f9fbff;
-  --color-accent: #4969a6;
-  --color-accent-content: #f9fbff;
-  --color-neutral: #f9fbff;
-  --color-neutral-content: #385183;
-  --color-base-100: #385183;
-  --color-base-200: #2a3655;
-  --color-base-300: #212638;
-  --color-base-content: #f9fbff;
-  --color-info: #385183;
-  --color-success: #34eeb6;
-  --color-warning: #ffcf72;
-  --color-error: #ff8863;
+  /* Carbon Gray 100: lighter accents on charcoal surfaces. */
+  --color-primary: #78a9ff;
+  --color-primary-content: #161616;
+  --color-secondary: #393939;
+  --color-secondary-content: #f4f4f4;
+  --color-accent: #d4bbff;
+  --color-accent-content: #161616;
+  --color-neutral: #c6c6c6;
+  --color-neutral-content: #161616;
+  --color-base-100: #262626;
+  --color-base-200: #161616;
+  --color-base-300: #393939;
+  --color-base-content: #f4f4f4;
+  --color-info: #a6c8ff;
+  --color-info-content: #161616;
+  --color-success: #6fdc8c;
+  --color-success-content: #161616;
+  --color-warning: #f1c21b;
+  --color-warning-content: #161616;
+  --color-error: #ffb3b8;
+  --color-error-content: #161616;
+  --text-muted: #c6c6c6;
+  --text-caution: #f1c21b;
+  --border-strong: #8d8d8d;
+  --surface-info: #001d6c;
+  --surface-success: #022d0d;
+  --surface-warning: #302400;
+  --surface-error: #520408;
+  --surface-accent: #31135e;
 
   --radius-field: 9999rem;
   --radius-box: 1rem;
@@ -65,21 +108,14 @@
   --tt-bg: var(--color-primary);
 }
 
-/*
-  The default border color has changed to `currentColor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
-*/
+/* Use the theme's strong border for controls without an explicit color. */
 @layer base {
   *,
   ::after,
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentColor);
+    border-color: var(--border-strong);
   }
 
   p {
@@ -117,5 +153,44 @@
 }
 
 .link:hover {
-  opacity: 80%;
+  text-decoration-thickness: 2px;
+}
+
+/* Preserve legibility for plain form controls as well as daisyUI inputs. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea {
+  color: var(--color-base-content);
+  background-color: var(--color-base-100);
+  border-color: var(--border-strong);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.input,
+.select,
+.textarea {
+  border-color: var(--border-strong);
+}
+
+.label,
+.label-text,
+.stat-desc {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.btn:disabled,
+.btn[disabled] {
+  color: var(--text-muted);
+  background-color: var(--color-base-300);
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 3px;
 }
