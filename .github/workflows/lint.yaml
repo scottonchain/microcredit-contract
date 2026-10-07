@@ -60,6 +60,9 @@ jobs:
       - name: Run Forge tests
         run: yarn foundry:test
 
+      - name: Test the two-hop conservation check script
+        run: python3 -m unittest scripts/test_two_hop_check.py -v
+
       - name: Start Anvil, deploy contracts (& generate contracts typescript output)
         run: |
           yarn chain > anvil.log 2>&1 &
