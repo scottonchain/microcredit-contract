@@ -206,6 +206,30 @@ contract AdvanceFactsTest is MicrocreditTestBase {
         assertEq(forgiven, 9_999);
     }
 
+    /// The forgiven cent is cash out of lenders' pockets, and the take repeats: a loan of 9,999 base units repaid
+    /// with 1 closes as repaid, so ten such loans hand the borrower 99,980 base units, leave no default and no
+    /// lasting use of its limit, and cost it only gas (CI-30).
+    function testSubCentLoansClosedByOneUnitTakeACentEachWithoutDefault() public {
+        uint256 assetsBefore = credit.totalAssets();
+        uint256 balanceBefore = usdc.balanceOf(borrower);
+        (uint256 limitBefore,) = credit.getBorrowLimit(borrower);
+        for (uint256 i = 0; i < 10; i++) {
+            uint256 loanId = _open(9_999);
+            _repay(borrower, loanId, 1);
+            (,,,, bool active) = credit.getLoan(loanId);
+            assertFalse(active, "closed as repaid");
+        }
+        uint256 taken = usdc.balanceOf(borrower) - balanceBefore;
+        emit log_named_uint("ten 9,999-unit loans repaid with 1 each: kept by the borrower (base units)", taken);
+        assertEq(taken, 10 * 9_998);
+        assertEq(assetsBefore - credit.totalAssets(), taken, "taken from lenders: the reserve is empty");
+        assertEq(credit.completedLoans(borrower), 10, "on the record as ten repaid loans");
+        assertEq(credit.defaultedLoans(borrower), 0, "and no default");
+        (uint256 limit, uint256 available) = credit.getBorrowLimit(borrower);
+        assertEq(limit, limitBefore);
+        assertEq(available, limitBefore, "the whole limit is free to do it again");
+    }
+
     // ───────────── where principal goes, and who repays ─────────────
 
     /// The relayed borrow-and-disburse sends principal to the signed `to`; the wallet-direct and
