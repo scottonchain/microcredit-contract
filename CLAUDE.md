@@ -19,6 +19,10 @@ Before posting anything to GitHub, read it as a stranger would. `scripts/check-p
 
 The project's public blog is the `scottonchain/microcredit-vision` repository ("Credit Among Strangers"): `README.md` there is a generated feed, posts live in `posts/`, and its `CLAUDE.md` holds the build steps, the posting cadence, the voice and the ownership (Claude Code writes the posts; Hermes keeps `VERIFY.md` rows). Every figure a post states must have a row in that `VERIFY.md`. Before planning work across the project's repositories, read the team's world model, `world-model/model.json` in `scottonchain/microcredit-agent-testbed`, at the current `main` commit, and follow its update protocol in `world-model/README.md`.
 
+## Email (AgentMail)
+
+The cloud environment can reach the AgentMail API at `https://api.agentmail.to` (REST, `/v0/...`; e.g. `GET /v0/inboxes`, then send and read through an inbox). The environment's proxy adds the credential, so no key is needed or kept here; it works only in an environment configured with that secret, so confirm with one `GET /v0/inboxes` before relying on it. Sending email publishes it: send only when the operator asks, and keep inbox addresses, message contents and account ids out of the repository under the privacy rules above.
+
 ## Monorepo Structure
 
 Two packages managed via yarn workspaces:
