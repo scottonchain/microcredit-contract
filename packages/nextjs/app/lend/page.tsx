@@ -18,6 +18,8 @@ import { MICRO_DOMAIN, TYPES, readPermitDomain, roundDownToCent, splitSignature 
 import { CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, RELAYER_ENABLED, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
 import { assertSameSigner, captureSigner, requireHash, waitForAllowance } from "~~/utils/walletWrite";
 import { usePoolToken } from "~~/hooks/usePoolToken";
+import { stopMessage } from "~~/utils/stopMessage";
+import { getParsedError } from "~~/utils/scaffold-eth";
 
 const LendPage: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -264,7 +266,7 @@ const LendPage: NextPage = () => {
       toast.success("Deposit submitted via relayer", { position: "top-center" });
     } catch (error: any) {
       console.error("Error depositing funds (meta):", error);
-      setErrorMessage(`Deposit failed: ${error?.message || "Unknown error"}`);
+      setErrorMessage(stopMessage("Deposit failed", getParsedError(error), String(error?.message ?? error)));
     } finally {
       setIsLoading(false);
     }
@@ -340,7 +342,7 @@ const LendPage: NextPage = () => {
       if (j?.queueId) toast.success(`Queued with id ${j.queueId}`, { position: "top-center" });
     } catch (error: any) {
       console.error("Error withdrawing funds (meta):", error);
-      setErrorMessage(`Withdrawal failed: ${error?.message || "Unknown error"}`);
+      setErrorMessage(stopMessage("Withdrawal failed", getParsedError(error), String(error?.message ?? error)));
     } finally {
       setWithdrawLoading(false);
     }
