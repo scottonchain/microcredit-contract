@@ -3,6 +3,7 @@ import { Chain, createClient, fallback, http } from "viem";
 import { hardhat } from "viem/chains";
 import { createConfig } from "wagmi";
 import scaffoldConfig, { DEFAULT_ALCHEMY_API_KEY, ScaffoldConfig } from "~~/scaffold.config";
+import { parseRpcUrls } from "~~/utils/rpcUrls";
 import { getAlchemyHttpUrl } from "~~/utils/scaffold-eth";
 
 const { targetNetworks } = scaffoldConfig;
@@ -27,7 +28,13 @@ export const wagmiConfig = createConfig({
 
     const rpcOverrideUrl = (scaffoldConfig.rpcOverrides as ScaffoldConfig["rpcOverrides"])?.[chain.id];
     if (rpcOverrideUrl) {
-      rpcFallbacks = [http(rpcOverrideUrl, localHttpOpts), http(undefined, localHttpOpts)];
+      const urls = parseRpcUrls(rpcOverrideUrl);
+      // With several endpoints a failing one is left quickly (one retry) so the next serves the read; with one, the
+      // chain's default endpoint stays as the last resort, as before.
+      rpcFallbacks =
+        urls.length > 1
+          ? urls.map(url => http(url, { ...localHttpOpts, retryCount: 1 }))
+          : [http(rpcOverrideUrl, localHttpOpts), http(undefined, localHttpOpts)];
     } else {
       const alchemyHttpUrl = getAlchemyHttpUrl(chain.id);
       if (alchemyHttpUrl) {
