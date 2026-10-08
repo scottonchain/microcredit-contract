@@ -35,6 +35,7 @@ contract OrderRouterHandler is CommonBase, StdCheats, StdUtils {
     BootstrapOrderRouter public immutable router;
     address public immutable stranger = address(0x57A4);
     address public immutable vendor = address(0x7E4D);
+    uint256 public constant OFFICER_KEY = 0x0FF1CE;
 
     address[] public roots;
     address[] public mids;
@@ -148,8 +149,45 @@ contract OrderRouterHandler is CommonBase, StdCheats, StdUtils {
         usdc.approve(address(router), price);
         try router.fund(i, price, cap, vm.getBlockTimestamp() + settleIn) {
             funded++;
+            _approveOrder(router.nextOrderId() - 1, amount, i.deadline);
         } catch { }
         vm.stopPrank();
+    }
+
+    /// @dev The officer approves the order for exactly its amount (any account may submit the signed approval).
+    function _approveOrder(uint256 id, uint256 amount, uint256 expiry) internal {
+        (,,,, bytes32 ih,,) = router.orders(id);
+        BootstrapOrderRouter.JobApproval memory a = BootstrapOrderRouter.JobApproval({
+            orderId: id,
+            intentHash: ih,
+            maxAmount: amount,
+            expiry: expiry,
+            policyVersion: router.policyVersion(),
+            officerEpoch: router.officerEpoch()
+        });
+        (uint8 v, bytes32 r, bytes32 sg) = vm.sign(OFFICER_KEY, router.approvalDigest(a));
+        try router.approveOrder(a, abi.encodePacked(r, sg, v)) { } catch { }
+    }
+
+    /// @dev The admin rotates or revokes the officer, the way an operator would: unused approvals die, no ledger moves.
+    function rotateOfficer(uint256 seed) external {
+        if (seed % 3 == 0 && router.officer() != address(0)) {
+            vm.prank(vm.addr(OFFICER_KEY)); // the officer revokes itself
+            router.revokeOfficer();
+        } else {
+            router.setOfficer(vm.addr(OFFICER_KEY), 1 + (seed % 5)); // the handler is the router's officer admin (set in the suite's setUp)
+        }
+    }
+
+    /// @dev The officer re-approves a funded order under the current epoch and policy (a stranger records it).
+    function reapprove(uint256 seed) external {
+        uint256 n = router.nextOrderId();
+        if (n <= 1) return;
+        uint256 id = 1 + (seed % (n - 1));
+        (,,,,,, BootstrapOrderRouter.State st) = router.orders(id);
+        if (st != BootstrapOrderRouter.State.Funded) return;
+        BootstrapOrderRouter.Intent memory i = router.intentOf(id);
+        _approveOrder(id, i.amount, i.deadline);
     }
 
     function originate(uint256 seed) external {

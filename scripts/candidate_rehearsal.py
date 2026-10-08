@@ -9,7 +9,7 @@ For a public chain the custodian runs the same calls with `--account <keystore>`
 `cast wallet sign --data` on the JSON that `typed-data` prints.
 
   candidate_rehearsal.py run --rpc http://127.0.0.1:8546 --pool 0x.. --router 0x.. [--with-default]
-  candidate_rehearsal.py typed-data pool|consent|accept --chain-id N --verifying 0x.. [fields as --key value]
+  candidate_rehearsal.py typed-data pool|consent|accept|approval --chain-id N --verifying 0x.. [fields as --key value]
 
 The product is one manager, `BootstrapOrderRouter`. The run: a lender deposits 5 USDC; the worker names the router as its
 manager; two roots deposit 1 USDC each; a customer funds an exact order (1 USDC advance to a vendor, 1.5 USDC price); the
@@ -44,6 +44,8 @@ CONSENT_FIELDS = [("from", "address"), ("to", "address"), ("borrower", "address"
                   ("maxTerm", "uint256"), ("version", "uint256"), ("expiry", "uint256")]
 ACCEPT_FIELDS = [("orderId", "uint256"), ("payer", "address"), ("price", "uint256"), ("maxDebt", "uint256"),
                  ("settleBy", "uint256"), ("intentHash", "bytes32")]
+APPROVAL_FIELDS = [("orderId", "uint256"), ("intentHash", "bytes32"), ("maxAmount", "uint256"), ("expiry", "uint256"),
+                   ("policyVersion", "uint256"), ("officerEpoch", "uint256")]
 INTENT_FIELDS = [("worker", "address"), ("vendor", "address"), ("amount", "uint256"), ("term", "uint256"),
                  ("maxAprBps", "uint256"), ("nonce", "uint256"), ("deadline", "uint256"), ("jobHash", "bytes32")]
 
@@ -63,6 +65,10 @@ def consent_typed(chain_id, router, m):
 
 def accept_typed(chain_id, router, m):
     return typed("AcceptOrder", ACCEPT_FIELDS, router_domain(chain_id, router), m)
+
+
+def approval_typed(chain_id, router, m):
+    return typed("JobApproval", APPROVAL_FIELDS, router_domain(chain_id, router), m)
 
 
 class Cast:
@@ -125,14 +131,14 @@ UNBOUND = f"originate({REQ_T},bytes,{PATH_T}[])"  # the unbound router's entry: 
 def run(a):
     c = Cast(a.rpc)
     chain = int(c.run("chain-id", "--rpc-url", a.rpc))
-    names = ["deployer", "lender", "worker", "root1", "root2", "mid", "vendor", "customer", "submitter", "worker2"]
+    names = ["deployer", "lender", "worker", "root1", "root2", "mid", "vendor", "customer", "submitter", "worker2", "officer"]
     roles = {}
     for n in names:
         w = json.loads(c.run("wallet", "new", "--json"))[0]
         roles[n] = w["address"]
         Cast.keys[w["address"].lower()] = w["private_key"]
         c.run("rpc", "--rpc-url", a.rpc, "anvil_setBalance", w["address"], "0xDE0B6B3A7640000")
-    L, W, R1, R2, M, V, C, S, W2 = (roles[k] for k in ("lender", "worker", "root1", "root2", "mid", "vendor", "customer", "submitter", "worker2"))
+    L, W, R1, R2, M, V, C, S, W2, O = (roles[k] for k in ("lender", "worker", "root1", "root2", "mid", "vendor", "customer", "submitter", "worker2", "officer"))
     pool, router, usdc = a.pool, a.router, a.usdc
     price, amount = usdc_amt(1.5), usdc_amt(1)
     log = []
@@ -153,7 +159,7 @@ def run(a):
     fund = {L: 5, R1: 1, R2: 1, C: 1.5 * (2 if a.with_default else 1)}
     for who, amt in fund.items():
         c.send(a.usdc_source, usdc, "transfer(address,uint256)", who, str(usdc_amt(amt)))
-    tracked = [L, W, R1, R2, M, V, C, S, W2]
+    tracked = [L, W, R1, R2, M, V, C, S, W2, O]
 
     def aggregate():
         vs = [v for v in (vault(W), vault(W2)) if v]
@@ -177,6 +183,14 @@ def run(a):
         c.send(r, router, "deposit(uint256)", str(usdc_amt(1)))
     step("two roots deposited 1 USDC each to the router")
 
+    # the credit officer: on the fork the router's admin (the deployer) is impersonated to name the rehearsal officer
+    admin = c.call(router, "officerAdmin()(address)")
+    c.run("rpc", "--rpc-url", a.rpc, "anvil_impersonateAccount", admin)
+    c.run("rpc", "--rpc-url", a.rpc, "anvil_setBalance", admin, "0xDE0B6B3A7640000")
+    c.send(admin, router, "setOfficer(address,uint256)", O, "1")
+    assert c.call(router, "officer()(address)").lower() == O.lower()
+    step("the router's admin named a credit officer (a fresh key) for policy version 1; before that the router had none and nothing could originate")
+
     def one_order(worker, job, split=(600_000, 400_000)):
         """Fund an exact order, sign everything, return what the submitter needs."""
         now = c.now()
@@ -198,13 +212,23 @@ def run(a):
             re = dict(zip([n for n, _ in CONSENT_FIELDS], [root, M, "0x" + "00" * 20, usdc_amt(100), 30 * DAY, 0, expiry]))
             me = dict(zip([n for n, _ in CONSENT_FIELDS], [M, worker, worker, usdc_amt(100), 30 * DAY, 0, expiry]))
             paths.append((part, re, c.sign(root, consent_typed(chain, router, re)), me, c.sign(M, consent_typed(chain, router, me))))
-        return order_id, req, pool_sig, accept_sig, paths
+        return order_id, req, pool_sig, accept_sig, paths, ihash
+
+    def approve(order_id, ihash, max_amount=None, signer=None):
+        """The officer signs a one-order approval; a stranger records it."""
+        a_ = dict(zip([n for n, _ in APPROVAL_FIELDS], [order_id, ihash, amount if max_amount is None else max_amount, c.now() + 30 * DAY,
+                  int(c.call(router, "policyVersion()(uint256)")), int(c.call(router, "officerEpoch()(uint256)"))]))
+        sig = c.sign(signer or O, approval_typed(chain, router, a_))
+        return a_, sig
+
+    def record(a_, sig):
+        return c.send(S, router, "approveOrder((uint256,bytes32,uint256,uint256,uint256,uint256),bytes)", tup(APPROVAL_FIELDS, a_), sig)
 
     def paths_arg(paths):
         return "[" + ",".join(f"({p},{tup(CONSENT_FIELDS, re)},{rs},{tup(CONSENT_FIELDS, me)},{ms})" for p, re, rs, me, ms in paths) + "]"
 
     # 4 order A: fund, sign, negative controls
-    id_a, req, pool_sig, accept_sig, paths = one_order(W, "rehearsal-A")
+    id_a, req, pool_sig, accept_sig, paths, ih_a = one_order(W, "rehearsal-A")
     step(f"customer funded order {id_a} (1 USDC advance to the vendor, price 1.5 USDC); worker signed the pool request and the acceptance; roots and mid signed consents")
     not_manager = c.selector("NotManager()")
     bad, out = c.call_reverts(pool, "requestLoan(uint256)", str(amount), frm=W)
@@ -220,6 +244,17 @@ def run(a):
     bad, _ = c.call_reverts(router, UNBOUND, tup(POOL_FIELDS, req), pool_sig, paths_arg(paths), frm=S)
     assert bad, "the unbound router entry must not exist here"
     step("negative controls refused: direct requestLoan by the worker, borrowAndDisburseMeta by a stranger, a tampered vendor, a forged consent, the unbound `originate` entry")
+    bad, out = c.call_reverts(router, ORIG, str(id_a), tup(POOL_FIELDS, req), pool_sig, accept_sig, paths_arg(paths), frm=S)
+    assert bad and c.selector("NoApproval()") in out, out
+    step("a funded, fully signed order with no officer approval is refused (NoApproval): the officer gate is separate from the roots' consents")
+    small, small_sig = approve(id_a, ih_a, max_amount=amount - 1)
+    record(small, small_sig)
+    bad, out = c.call_reverts(router, ORIG, str(id_a), tup(POOL_FIELDS, req), pool_sig, accept_sig, paths_arg(paths), frm=S)
+    assert bad and c.selector("ApprovalTooSmall()") in out, out
+    step("an officer approval for less than the order amount is refused (ApprovalTooSmall): the officer can only refuse or approve the whole order")
+    ok_, ok_sig = approve(id_a, ih_a)
+    record(ok_, ok_sig)
+    step("the officer approved the order for exactly its amount; a stranger recorded the signed approval")
 
     # 5 originate by a stranger
     v0, l0 = bal(V), int(c.call(pool, "totalLentOut()(uint256)"))
@@ -244,7 +279,9 @@ def run(a):
 
     # 7 optional default path on the fork (time travel)
     if a.with_default:
-        id_b, req_b, ps_b, as_b, paths_b = one_order(W2, "rehearsal-B")
+        id_b, req_b, ps_b, as_b, paths_b, ih_b = one_order(W2, "rehearsal-B")
+        ok_b, ok_b_sig = approve(id_b, ih_b)
+        record(ok_b, ok_b_sig)
         c.send(S, router, ORIG, str(id_b), tup(POOL_FIELDS, req_b), ps_b, as_b, paths_arg(paths_b))
         loan_b = int(c.call(pool, "getBorrowerLoanIds(address)(uint256[])", W2).strip("[]").split(",")[-1])
         c.send(C, router, "refundOrder(uint256)", str(id_b))
@@ -282,10 +319,10 @@ def main():
     r.add_argument("--usdc-source", default=USDC_SOURCE_DEFAULT)
     r.add_argument("--with-default", action="store_true")
     t = sub.add_parser("typed-data")
-    t.add_argument("kind", choices=["pool", "consent", "accept"])
+    t.add_argument("kind", choices=["pool", "consent", "accept", "approval"])
     t.add_argument("--chain-id", type=int, required=True)
     t.add_argument("--verifying", required=True)
-    for n, _ in POOL_FIELDS + CONSENT_FIELDS + ACCEPT_FIELDS:
+    for n, _ in POOL_FIELDS + CONSENT_FIELDS + ACCEPT_FIELDS + APPROVAL_FIELDS:
         try:
             t.add_argument(f"--{n}")
         except argparse.ArgumentError:
@@ -293,12 +330,12 @@ def main():
     a = ap.parse_args()
     if a.cmd == "run":
         return run(a)
-    fields = {"pool": POOL_FIELDS, "consent": CONSENT_FIELDS, "accept": ACCEPT_FIELDS}[a.kind]
+    fields = {"pool": POOL_FIELDS, "consent": CONSENT_FIELDS, "accept": ACCEPT_FIELDS, "approval": APPROVAL_FIELDS}[a.kind]
     msg = {n: getattr(a, n) for n, _ in fields}
     missing = [n for n, v in msg.items() if v is None]
     if missing:
         sys.exit("missing: " + ", ".join("--" + m for m in missing))
-    print(json.dumps({"pool": pool_typed, "consent": consent_typed, "accept": accept_typed}[a.kind](a.chain_id, a.verifying, msg), indent=1))
+    print(json.dumps({"pool": pool_typed, "consent": consent_typed, "accept": accept_typed, "approval": approval_typed}[a.kind](a.chain_id, a.verifying, msg), indent=1))
     return 0
 
 

@@ -25,6 +25,14 @@ import { StakeRouterBase } from "./TransitiveStakeRouter.sol";
  *      (`free`/`locked`) and customers' escrow (`totalEscrowHeld`); origination never treats escrow as backing and
  *      a root can withdraw only from `free`.
  *      The accounting identity: `token.balanceOf(this) = totalFree + totalEscrowHeld + identified stray transfers`.
+ *      Second gate, the credit officer (an AI agent's key, or a contract that wraps it): an order originates only
+ *      with that officer's one-order `JobApproval` (order, intent hash, maximum amount, expiry, policy version and
+ *      officer epoch). The two gates are separate and both must pass: the roots' consents and balances (the graph)
+ *      set the ceiling, re-derived at execution and never read from the approval; the approval can only refuse or
+ *      stay at or above the order's amount, so it cannot create, raise, move or revive capacity. The officer and
+ *      its admin touch no ledger and no consent; revoking or rotating the officer (a new epoch) voids unused
+ *      approvals and stops new admissions only: settlement, refund, sync, repayment and a root's withdrawal read no
+ *      officer state. The router starts with no officer, so nothing originates until the admin sets one.
  */
 contract BootstrapOrderRouter is StakeRouterBase {
     using SafeERC20 for IERC20;
@@ -59,6 +67,29 @@ contract BootstrapOrderRouter is StakeRouterBase {
         State state;
     }
 
+    /// @dev The officer's one-order approval: bound to the order and its intent hash, with a ceiling on the amount.
+    struct JobApproval {
+        uint256 orderId;
+        bytes32 intentHash;
+        uint256 maxAmount;
+        uint256 expiry;
+        uint256 policyVersion;
+        uint256 officerEpoch;
+    }
+
+    struct Approval {
+        uint256 maxAmount;
+        uint256 expiry;
+        uint256 policyVersion;
+        uint256 officerEpoch;
+    }
+
+    address public officer; // zero: no officer, no admissions (fail closed)
+    address public officerAdmin; // sets or revokes the officer; touches no ledger and no consent
+    uint256 public officerEpoch = 1;
+    uint256 public policyVersion = 1;
+    mapping(uint256 => Approval) public approvals;
+
     uint256 public nextOrderId = 1;
     /// @notice Customers' USDC held for open orders (Funded or Bound); disjoint from the roots' `free` and `locked`.
     uint256 public totalEscrowHeld;
@@ -79,6 +110,9 @@ contract BootstrapOrderRouter is StakeRouterBase {
     error IntentMismatch();
     error DebtExceedsCap();
     error DebtNotCleared();
+    error NoApproval();
+    error ApprovalTooSmall();
+    error NotOfficerAdmin();
 
     event Funded(
         uint256 indexed orderId, address indexed payer, address indexed worker, uint256 price, bytes32 intentHash
@@ -86,8 +120,73 @@ contract BootstrapOrderRouter is StakeRouterBase {
     event Originated(uint256 indexed orderId, uint256 indexed loanId);
     event Settled(uint256 indexed orderId, uint256 debtPaid, uint256 workerPaid);
     event Refunded(uint256 indexed orderId, uint256 amount);
+    event OfficerSet(address indexed officer, uint256 epoch, uint256 policyVersion);
+    event OfficerAdminSet(address indexed admin);
+    event OrderApproved(uint256 indexed orderId, uint256 maxAmount, uint256 expiry);
 
-    constructor(DecentralizedMicrocredit pool_) StakeRouterBase(pool_) EIP712("BootstrapOrderRouter", "1") { }
+    bytes32 public constant APPROVAL_TYPEHASH = keccak256(
+        "JobApproval(uint256 orderId,bytes32 intentHash,uint256 maxAmount,uint256 expiry,uint256 policyVersion,uint256 officerEpoch)"
+    );
+
+    constructor(DecentralizedMicrocredit pool_) StakeRouterBase(pool_) EIP712("BootstrapOrderRouter", "1") {
+        officerAdmin = msg.sender;
+        emit OfficerAdminSet(msg.sender);
+    }
+
+    modifier onlyOfficerAdmin() {
+        if (msg.sender != officerAdmin) revert NotOfficerAdmin();
+        _;
+    }
+
+    /// @notice Name the officer and the policy version approvals must carry. A new epoch voids every approval not yet
+    ///         used. Moves no funds and changes no consent.
+    function setOfficer(address newOfficer, uint256 newPolicyVersion) external onlyOfficerAdmin {
+        officer = newOfficer;
+        policyVersion = newPolicyVersion;
+        unchecked {
+            ++officerEpoch;
+        }
+        emit OfficerSet(newOfficer, officerEpoch, newPolicyVersion);
+    }
+
+    /// @notice Stop new admissions at once: the admin or the officer itself clears the officer and voids unused approvals.
+    function revokeOfficer() external {
+        if (msg.sender != officerAdmin && msg.sender != officer) revert NotOfficerAdmin();
+        officer = address(0);
+        unchecked {
+            ++officerEpoch;
+        }
+        emit OfficerSet(address(0), officerEpoch, policyVersion);
+    }
+
+    function setOfficerAdmin(address newAdmin) external onlyOfficerAdmin {
+        officerAdmin = newAdmin;
+        emit OfficerAdminSet(newAdmin);
+    }
+
+    function approvalDigest(JobApproval memory a) public view returns (bytes32) {
+        return _hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    APPROVAL_TYPEHASH, a.orderId, a.intentHash, a.maxAmount, a.expiry, a.policyVersion, a.officerEpoch
+                )
+            )
+        );
+    }
+
+    /// @notice Record the officer's signed approval for one funded order. Anyone may submit it. It binds the order
+    ///         and its intent hash and carries the officer epoch and policy version it was signed under.
+    function approveOrder(JobApproval calldata a, bytes calldata officerSig) external {
+        Order storage o = orders[a.orderId];
+        if (o.state != State.Funded) revert InvalidOrder();
+        if (
+            officer == address(0) || a.intentHash != o.intentHash || a.officerEpoch != officerEpoch
+                || a.policyVersion != policyVersion || a.expiry <= block.timestamp || a.maxAmount == 0
+        ) revert NoApproval();
+        if (!SignatureChecker.isValidSignatureNow(officer, approvalDigest(a), officerSig)) revert InvalidConsent();
+        approvals[a.orderId] = Approval(a.maxAmount, a.expiry, a.policyVersion, a.officerEpoch);
+        emit OrderApproved(a.orderId, a.maxAmount, a.expiry);
+    }
 
     function intentHash(Intent memory i) public view returns (bytes32) {
         return keccak256(
@@ -168,6 +267,16 @@ contract BootstrapOrderRouter is StakeRouterBase {
                 || req.maxAprBps != i.maxAprBps || req.nonce != i.nonce || req.deadline != i.deadline
         ) revert IntentMismatch();
         if (!SignatureChecker.isValidSignatureNow(i.worker, acceptanceDigest(id), orderSig)) revert InvalidConsent();
+        {
+            // the officer gate: a live approval under the current epoch and policy, for at least this amount
+            Approval memory ap = approvals[id];
+            if (
+                officer == address(0) || ap.officerEpoch != officerEpoch || ap.policyVersion != policyVersion
+                    || ap.expiry < block.timestamp
+            ) revert NoApproval();
+            if (req.amount > ap.maxAmount) revert ApprovalTooSmall();
+        }
+        delete approvals[id]; // one order, one use
 
         o.state = State.Bound; // before the external calls
         loanId = _originateLot(req, poolSig, paths);

@@ -27,6 +27,10 @@ class RehearsalTypedDataTest(unittest.TestCase):
         self.assertEqual(type_string("AcceptOrder", cr.ACCEPT_FIELDS),
                          source_string("BootstrapOrderRouter.sol", "ACCEPT_TYPEHASH"))
 
+    def test_approval_type_matches_the_order_router(self):
+        self.assertEqual(type_string("JobApproval", cr.APPROVAL_FIELDS),
+                         source_string("BootstrapOrderRouter.sol", "APPROVAL_TYPEHASH"))
+
     def test_intent_struct_matches_the_order_router(self):
         text = open(os.path.join(SRC, "BootstrapOrderRouter.sol")).read()
         body = re.search(r"struct Intent \{(.*?)\}", text, re.S).group(1)

@@ -23,10 +23,15 @@ contract DeployBootstrapCandidate is Script {
         pool.setReserveBps(4500);
         MicrocreditLens lens = new MicrocreditLens(pool);
         BootstrapOrderRouter router = new BootstrapOrderRouter(pool);
+        // The credit officer: its own key, set by the router's admin (the deployer). With no OFFICER the router has no
+        // officer and nothing can originate (fail closed); the admin sets one later with setOfficer.
+        address officer = vm.envOr("OFFICER", address(0));
+        if (officer != address(0)) router.setOfficer(officer, 1);
         vm.stopBroadcast();
         console.log("candidate pool", address(pool));
         console.log("candidate lens", address(lens));
         console.log("candidate bootstrap order router", address(router));
+        console.log("credit officer (zero: none, nothing originates)", officer);
         // No scores or overrides: the bootstrap uses the roots' stake through the router only.
         // No token mints, original-pool calls, funding or relayed signatures in this script.
     }

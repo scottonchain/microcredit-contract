@@ -52,6 +52,18 @@ Roots' USDC (`free`, `locked`) and customers' escrow (`totalEscrowHeld`) share t
 `free`; escrow leaves only through `settleOrder` or `refundOrder`; origination draws only on roots' `free` and never
 treats escrow as backing.
 
+## The officer gate (second gate)
+
+Operator direction of 2026-10-08, reconciled with the transitive target in testbed issue 17 (comment 6065169803): every new loan needs a credit officer's approval of that exact job, and the officer cannot create credit. Origination is the AND of two separately versioned gates.
+
+- **Graph gate (first, unchanged).** The roots' consents, versions, exposure limits and free balances, re-derived at execution. It sets the ceiling. Nothing the officer signs is read as capacity.
+- **Officer gate (second, new).** `approveOrder(JobApproval, sig)` records the officer's EIP-712 approval for one funded order: order id, intent hash, maximum amount, expiry, policy version and officer epoch. `originateOrder` then requires a live approval under the current epoch and policy version for at least the order's amount (`NoApproval`, `ApprovalTooSmall`). The intent is exact, so the officer can only refuse or approve the whole order; it cannot raise, add, move or revive anything. An approval is consumed by origination and bound to one order.
+- **Officer control.** `officerAdmin` (the deployer at first; `setOfficerAdmin` hands it over) names the officer and the policy version with `setOfficer`; the admin or the officer itself clears it with `revokeOfficer`. Either bumps the epoch, which voids every unused approval. Neither touches a ledger, a consent or a root's balance. The router starts with no officer, so nothing originates until one is named (fail closed). The officer key is separate from the roots' keys and from the worker's.
+- **Outage.** No officer, a revoked officer or an officer contract that reverts on every call stops new admissions and nothing else: `settleOrder`, `refundOrder`, `sync`, repayment by anyone and a root's withdrawal read no officer state (`testAnOutageStopsNewAdmissionsOnlyAndLeavesEveryExitWorking`).
+- **Tests.** `testNoApprovalNoOrigination`, `testRouterStartsWithoutAnOfficerAndFailsClosed`, `testAnApprovalBelowTheAmountCannotOriginate`, `testAValidApprovalNeverCreatesCapacity`, `testRevokingTheGraphDefeatsAValidApprovalWithoutTouchingIt`, `testRotatingOrRevokingTheOfficerVoidsUnusedApprovalsAndMovesNoMoney`, `testRotationWithTheSamePolicyStillVoidsOldApprovals`, `testOnlyTheAdminOrTheOfficerCanChangeTheOfficer`, `testAnApprovalForOneOrderCannotBeUsedForAnother`, `testGrantedCreditDoesNotLetAManagedWorkerSkipTheOfficer`; the invariant campaign (O1 to O7) now also rotates and revokes the officer. Seven deliberate bugs in the gate are each caught.
+
+**Scope, stated.** The gate binds every worker that names this router as its only pool manager before any backing exists, which is how the pilot is set up. It does **not** bind a borrower who names no manager, or who clears its manager with `setManager(0)` while it owes nothing and holds no backing; and an owner or oracle granted line is capacity the officer did not approve, usable by such a borrower through the pool's ordinary entries. A pool-wide guarantee needs an immutable origination authority fixed at construction and checked in `_originateLoan` for every route (it also removes `managerOf`, `setManager` and their locks); a governed authority would be an owner bypass. Its bytes are being measured; the pool is 24,538 of 24,576 today. Tracked as CI-32.
+
 ## What is tested
 
 - `BootstrapOrderRouter.t.sol` (25 tests; 27 with the two token cases in `fork/BootstrapOrderRouterFork.t.sol`, run

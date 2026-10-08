@@ -35,6 +35,8 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
     uint256 internal root2Key;
     address internal mid1;
     uint256 internal mid1Key;
+    address internal officer;
+    uint256 internal officerKey;
     uint256 internal minted; // USDC created after setUp through _mint
     uint256 internal baseline; // the known holders' total balance at the end of setUp
 
@@ -48,6 +50,8 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
         vm.prank(owner);
         credit.setReserveBps(4_500);
         router = new BootstrapOrderRouter(credit);
+        (officer, officerKey) = makeAddrAndKey("officer");
+        router.setOfficer(officer, 1); // this contract deployed the router, so it is the officer admin
         _give(lender, LIQUIDITY);
         vm.startPrank(lender);
         usdc.approve(address(credit), LIQUIDITY);
@@ -121,11 +125,42 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
         });
     }
 
+    /// @dev Funds an order and records the officer's approval for exactly its amount, as every order needs one.
     function _fund(BootstrapOrderRouter.Intent memory i, uint256 cap, uint256 settleIn) internal returns (uint256 id) {
+        id = _fundUnapproved(i, cap, settleIn);
+        _approve(id, i.amount);
+    }
+
+    function _fundUnapproved(BootstrapOrderRouter.Intent memory i, uint256 cap, uint256 settleIn)
+        internal
+        returns (uint256 id)
+    {
         vm.startPrank(customer);
         usdc.approve(address(router), ORDER_PRICE);
         id = router.fund(i, ORDER_PRICE, cap, block.timestamp + settleIn);
         vm.stopPrank();
+    }
+
+    function _approval(uint256 id, uint256 maxAmount)
+        internal
+        view
+        returns (BootstrapOrderRouter.JobApproval memory a, bytes memory sig)
+    {
+        (,,,, bytes32 ih,,) = router.orders(id);
+        a = BootstrapOrderRouter.JobApproval({
+            orderId: id,
+            intentHash: ih,
+            maxAmount: maxAmount,
+            expiry: block.timestamp + 60 days,
+            policyVersion: router.policyVersion(),
+            officerEpoch: router.officerEpoch()
+        });
+        sig = _signDigest(officerKey, router.approvalDigest(a));
+    }
+
+    function _approve(uint256 id, uint256 maxAmount) internal {
+        (BootstrapOrderRouter.JobApproval memory a, bytes memory sig) = _approval(id, maxAmount);
+        router.approveOrder(a, sig);
     }
 
     function _req(BootstrapOrderRouter.Intent memory i)
@@ -435,6 +470,7 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
         usdc.approve(address(router), ORDER_PRICE);
         uint256 second = router.fund(j, ORDER_PRICE, ORDER_PRICE, block.timestamp + 120 days);
         vm.stopPrank();
+        _approve(second, j.amount);
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(j);
         bytes memory poolSig = _signBorrowAndDisburse(workerKey, req);
         bytes memory orderSig = _orderSig(workerKey, second);
@@ -504,6 +540,7 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
         usdc.approve(address(router), ORDER_PRICE);
         uint256 other = router.fund(j, ORDER_PRICE, ORDER_PRICE, block.timestamp + 120 days);
         vm.stopPrank();
+        _approve(other, j.amount);
         bytes memory wrong = _orderSig(workerKey, other);
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(i);
         bytes memory poolSig = _signBorrowAndDisburse(workerKey, req);
@@ -757,6 +794,7 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
         usdc.approve(address(router), ORDER_PRICE);
         uint256 id = router.fund(i, ORDER_PRICE, ORDER_PRICE, block.timestamp + 120 days);
         vm.stopPrank();
+        _approve(id, i.amount);
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(i);
         bytes memory poolSig = _signBorrowAndDisburse(workerKey, req);
         bytes memory orderSig = _orderSig(workerKey, id);
@@ -770,5 +808,235 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(vendor), input);
         _exit();
         _conserved();
+    }
+
+    // ───────────── the officer gate (second gate; the roots' consents and balances stay the first) ─────────────
+
+    function _originateFor(uint256 id, BootstrapOrderRouter.Intent memory i, uint256 split) internal returns (uint256) {
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(i);
+        bytes memory poolSig = _signBorrowAndDisburse(workerKey, req);
+        bytes memory orderSig = _orderSig(workerKey, id);
+        StakeRouterBase.Path[] memory ps = _two(worker, i.amount, split);
+        vm.prank(relayer);
+        return router.originateOrder(id, req, poolSig, orderSig, ps);
+    }
+
+    function testNoApprovalNoOrigination() public {
+        BootstrapOrderRouter.Intent memory i = _intent(worker, INPUT_COST);
+        uint256 id = _fundUnapproved(i, ORDER_PRICE, 120 days);
+        vm.expectRevert(BootstrapOrderRouter.NoApproval.selector);
+        this.originateExternal(id, i, 600_000);
+        assertEq(usdc.balanceOf(vendor), 0, "the vendor was never paid");
+        assertEq(router.totalLocked(), 0, "and no root was committed");
+        _approve(id, i.amount);
+        _originateFor(id, i, 600_000); // with the approval, the same call succeeds
+    }
+
+    /// @dev External wrapper so vm.expectRevert sees one call (helper calls consume it).
+    function originateExternal(uint256 id, BootstrapOrderRouter.Intent memory i, uint256 split) external {
+        _originateFor(id, i, split);
+    }
+
+    function testRouterStartsWithoutAnOfficerAndFailsClosed() public {
+        BootstrapOrderRouter fresh = new BootstrapOrderRouter(credit);
+        assertEq(fresh.officer(), address(0));
+        assertEq(fresh.officerAdmin(), address(this));
+        // no officer: even a well-formed signature by anyone cannot be recorded
+        BootstrapOrderRouter.Intent memory i = _intent(worker, INPUT_COST);
+        vm.startPrank(customer);
+        usdc.approve(address(fresh), ORDER_PRICE);
+        uint256 id = fresh.fund(i, ORDER_PRICE, ORDER_PRICE, block.timestamp + 120 days);
+        vm.stopPrank();
+        (,,,, bytes32 ih,,) = fresh.orders(id);
+        BootstrapOrderRouter.JobApproval memory a = BootstrapOrderRouter.JobApproval(
+            id, ih, i.amount, block.timestamp + 1 days, fresh.policyVersion(), fresh.officerEpoch()
+        );
+        bytes memory sig = _signDigest(officerKey, fresh.approvalDigest(a));
+        vm.expectRevert(BootstrapOrderRouter.NoApproval.selector);
+        fresh.approveOrder(a, sig);
+    }
+
+    function testAnApprovalBelowTheAmountCannotOriginate() public {
+        BootstrapOrderRouter.Intent memory i = _intent(worker, INPUT_COST);
+        uint256 id = _fundUnapproved(i, ORDER_PRICE, 120 days);
+        _approve(id, i.amount - 1); // the officer may approve less, which refuses this exact order
+        vm.expectRevert(BootstrapOrderRouter.ApprovalTooSmall.selector);
+        this.originateExternal(id, i, 600_000);
+    }
+
+    function testAValidApprovalNeverCreatesCapacity() public {
+        // the approval allows a huge amount, but one root holds only ROOT_FUND free: capacity is re-derived at execution
+        BootstrapOrderRouter.Intent memory i = _intent(worker, ORDER_PRICE);
+        uint256 id = _fundUnapproved(i, ORDER_PRICE, 120 days);
+        _approve(id, type(uint128).max);
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(i);
+        bytes memory poolSig = _signBorrowAndDisburse(workerKey, req);
+        bytes memory orderSig = _orderSig(workerKey, id);
+        StakeRouterBase.Path[] memory ps = _one(_path(root1Key, root1, worker, ORDER_PRICE, 100e6));
+        vm.prank(relayer);
+        vm.expectRevert(StakeRouterBase.InsufficientFree.selector);
+        router.originateOrder(id, req, poolSig, orderSig, ps);
+        assertEq(router.totalLocked(), 0, "nothing was committed");
+        assertEq(usdc.balanceOf(vendor), 0, "the vendor was never paid");
+    }
+
+    function testRevokingTheGraphDefeatsAValidApprovalWithoutTouchingIt() public {
+        BootstrapOrderRouter.Intent memory i = _intent(worker, INPUT_COST);
+        uint256 id = _fund(i, ORDER_PRICE, 120 days);
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(i);
+        bytes memory poolSig = _signBorrowAndDisburse(workerKey, req);
+        bytes memory orderSig = _orderSig(workerKey, id);
+        StakeRouterBase.Path[] memory ps = _two(worker, INPUT_COST, 600_000); // consents signed at the current version
+        vm.prank(root1);
+        router.revokeRootEdge(mid1); // the root withdraws its consent: the graph version moves
+        (uint256 maxBefore,,,) = router.approvals(id);
+        vm.prank(relayer);
+        vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
+        router.originateOrder(id, req, poolSig, orderSig, ps);
+        (uint256 maxAfter,,,) = router.approvals(id);
+        assertEq(maxAfter, maxBefore, "the approval is untouched: the two gates are independent");
+        assertEq(router.totalLocked(), 0);
+    }
+
+    function testRotatingOrRevokingTheOfficerVoidsUnusedApprovalsAndMovesNoMoney() public {
+        BootstrapOrderRouter.Intent memory i = _intent(worker, INPUT_COST);
+        uint256 id = _fund(i, ORDER_PRICE, 120 days);
+        uint256 free1 = router.free(root1);
+        uint256 free2 = router.free(root2);
+        uint256 held = router.totalEscrowHeld();
+        uint256 routerCash = usdc.balanceOf(address(router));
+
+        router.setOfficer(officer, 2); // same key, new policy version and epoch
+        assertEq(router.free(root1), free1);
+        assertEq(router.free(root2), free2);
+        assertEq(router.totalEscrowHeld(), held);
+        assertEq(usdc.balanceOf(address(router)), routerCash, "rotation moves no money");
+        vm.expectRevert(BootstrapOrderRouter.NoApproval.selector);
+        this.originateExternal(id, i, 600_000); // the old approval is void under the new epoch and policy
+
+        _approve(id, i.amount); // the officer signs again under the new version
+        _originateFor(id, i, 600_000);
+
+        // revoking by the officer itself stops new admissions at once
+        BootstrapOrderRouter.Intent memory j = _intent(worker, INPUT_COST);
+        j.jobHash = keccak256("job-2");
+        uint256 id2 = _fund(j, ORDER_PRICE, 120 days);
+        vm.prank(officer);
+        router.revokeOfficer();
+        assertEq(router.officer(), address(0));
+        (BootstrapOrderRouter.JobApproval memory a, bytes memory sig) = _approval(id2, j.amount);
+        vm.expectRevert(BootstrapOrderRouter.NoApproval.selector);
+        router.approveOrder(a, sig);
+    }
+
+    function testRotationWithTheSamePolicyStillVoidsOldApprovals() public {
+        BootstrapOrderRouter.Intent memory i = _intent(worker, INPUT_COST);
+        uint256 id = _fund(i, ORDER_PRICE, 120 days);
+        (BootstrapOrderRouter.JobApproval memory stale, bytes memory staleSig) = _approval(id, i.amount);
+        router.setOfficer(officer, router.policyVersion()); // same key, same policy, new epoch
+        vm.expectRevert(BootstrapOrderRouter.NoApproval.selector);
+        this.originateExternal(id, i, 600_000); // the approval recorded before the rotation is void
+        vm.expectRevert(BootstrapOrderRouter.NoApproval.selector);
+        router.approveOrder(stale, staleSig); // and a signature made under the old epoch is not recorded either
+        _approve(id, i.amount);
+        _originateFor(id, i, 600_000);
+    }
+
+    function testOnlyTheAdminOrTheOfficerCanChangeTheOfficer() public {
+        vm.prank(stranger);
+        vm.expectRevert(BootstrapOrderRouter.NotOfficerAdmin.selector);
+        router.setOfficer(stranger, 1);
+        vm.prank(stranger);
+        vm.expectRevert(BootstrapOrderRouter.NotOfficerAdmin.selector);
+        router.revokeOfficer();
+        vm.prank(stranger);
+        vm.expectRevert(BootstrapOrderRouter.NotOfficerAdmin.selector);
+        router.setOfficerAdmin(stranger);
+        // the officer cannot name its successor or the admin
+        vm.prank(officer);
+        vm.expectRevert(BootstrapOrderRouter.NotOfficerAdmin.selector);
+        router.setOfficer(officer, 9);
+    }
+
+    function testAnApprovalForOneOrderCannotBeUsedForAnother() public {
+        BootstrapOrderRouter.Intent memory i = _intent(worker, INPUT_COST);
+        uint256 id1 = _fundUnapproved(i, ORDER_PRICE, 120 days);
+        BootstrapOrderRouter.Intent memory j = _intent(worker, INPUT_COST);
+        j.jobHash = keccak256("job-2");
+        uint256 id2 = _fundUnapproved(j, ORDER_PRICE, 120 days);
+        (BootstrapOrderRouter.JobApproval memory a, bytes memory sig) = _approval(id1, i.amount);
+        a.orderId = id2; // the signature binds the order id and the intent hash
+        vm.expectRevert(BootstrapOrderRouter.NoApproval.selector); // wrong intent hash for order 2
+        router.approveOrder(a, sig);
+        (,,,, bytes32 ih2,,) = router.orders(id2);
+        a.intentHash = ih2; // the right intent for order 2, but the officer signed order 1
+        vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
+        router.approveOrder(a, sig);
+    }
+
+    function testAnOutageStopsNewAdmissionsOnlyAndLeavesEveryExitWorking() public {
+        (uint256 id, uint256 loanId) = _bound();
+        BootstrapOrderRouter.Intent memory j = _intent(worker2, INPUT_COST);
+        uint256 open = _fund(j, ORDER_PRICE, 120 days); // funded and approved, not yet originated
+        // the officer vanishes and, worse, becomes a contract that reverts on every call
+        router.setOfficer(address(new AlwaysReverts()), 2);
+
+        // repayment by anyone, third-party cure and settlement read no officer state
+        vm.startPrank(stranger);
+        usdc.approve(address(credit), type(uint256).max);
+        _mint(stranger, INPUT_COST);
+        vm.stopPrank();
+        uint256 debt = credit.getCurrentOutstandingAmount(loanId);
+        vm.startPrank(stranger);
+        usdc.approve(address(credit), debt);
+        credit.repayLoan(loanId, debt);
+        vm.stopPrank();
+        vm.prank(customer);
+        router.settleOrder(id);
+        router.sync(worker);
+        // the unoriginated order cannot be admitted, but its customer refunds at once
+        vm.expectRevert(BootstrapOrderRouter.NoApproval.selector);
+        this.originateWorker2(open, j, 600_000);
+        uint256 before = usdc.balanceOf(customer);
+        vm.prank(customer);
+        router.refundOrder(open);
+        assertEq(usdc.balanceOf(customer) - before, ORDER_PRICE);
+        // and a root withdraws its free cash
+        uint256 f = router.free(root1);
+        vm.prank(root1);
+        router.withdraw(f);
+        assertEq(router.free(root1), 0);
+    }
+
+    function originateWorker2(uint256 id, BootstrapOrderRouter.Intent memory i, uint256 split) external {
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(i);
+        bytes memory poolSig = _signBorrowAndDisburse(worker2Key, req);
+        bytes memory orderSig = _orderSig(worker2Key, id);
+        StakeRouterBase.Path[] memory ps = _two(worker2, i.amount, split);
+        vm.prank(relayer);
+        router.originateOrder(id, req, poolSig, orderSig, ps);
+    }
+
+    function testGrantedCreditDoesNotLetAManagedWorkerSkipTheOfficer() public {
+        // an owner override or oracle line is capacity the officer did not approve; the manager gate still
+        // refuses every caller but the router, and the router refuses without an approval
+        vm.prank(owner);
+        credit.setScoreOverride(worker, 1e6);
+        BootstrapOrderRouter.Intent memory i = _intent(worker, INPUT_COST);
+        uint256 id = _fundUnapproved(i, ORDER_PRICE, 120 days);
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(i);
+        bytes memory poolSig = _signBorrowAndDisburse(workerKey, req);
+        vm.prank(relayer);
+        vm.expectRevert(DecentralizedMicrocredit.NotManager.selector);
+        credit.borrowAndDisburseMeta(req, poolSig);
+        vm.expectRevert(BootstrapOrderRouter.NoApproval.selector);
+        this.originateExternal(id, i, 600_000);
+    }
+}
+
+/// @dev A stand-in for a broken or hostile officer contract: every call reverts.
+contract AlwaysReverts {
+    fallback() external {
+        revert("officer down");
     }
 }

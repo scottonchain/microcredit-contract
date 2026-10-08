@@ -38,9 +38,11 @@ contract BootstrapOrderRouterInvariantTest is MicrocreditTestBase {
         _deposit(address(0x1E4D), POOL);
         router = new BootstrapOrderRouter(credit);
         handler = new OrderRouterHandler(credit, usdc, router);
+        router.setOfficer(vm.addr(handler.OFFICER_KEY()), 1);
+        router.setOfficerAdmin(address(handler)); // the handler rotates and revokes the officer during the campaign
         baseline = handler.holders();
         targetContract(address(handler));
-        bytes4[] memory selectors = new bytes4[](10);
+        bytes4[] memory selectors = new bytes4[](12);
         selectors[0] = OrderRouterHandler.rootDeposit.selector;
         selectors[1] = OrderRouterHandler.rootWithdraw.selector;
         selectors[2] = OrderRouterHandler.fund.selector;
@@ -51,6 +53,8 @@ contract BootstrapOrderRouterInvariantTest is MicrocreditTestBase {
         selectors[7] = OrderRouterHandler.warp.selector;
         selectors[8] = OrderRouterHandler.defaultOne.selector;
         selectors[9] = OrderRouterHandler.syncOne.selector;
+        selectors[10] = OrderRouterHandler.rotateOfficer.selector;
+        selectors[11] = OrderRouterHandler.reapprove.selector;
         targetSelector(FuzzSelector({ addr: address(handler), selectors: selectors }));
     }
 
