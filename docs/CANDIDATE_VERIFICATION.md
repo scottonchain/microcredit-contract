@@ -10,7 +10,7 @@ three; the order escrow and the unbound two-hop router are components that are n
 python3 scripts/verify_candidate_deployment.py --rpc <url> --pool 0x.. --lens 0x.. --router 0x.. [--json]
 ```
 
-Run `forge build` at the reviewed commit first (`packages/foundry/out`). For each contract it fetches the code, zeroes the immutable slots on both sides (the constructor writes them into the runtime code), and compares: `match_strict`, and `match_ignoring_metadata` (the CBOR trailer can differ between hosts). It reports size against EIP-170, the immutable values found and the sha256 of the compiled ABI, then reads the wiring through getters (pool token and parameters, `lens.pool`, `router.pool/token`). Exit 0 only if every contract matches without metadata and every wiring check holds.
+Run `forge build` at the reviewed commit first (`packages/foundry/out`). For each contract it fetches the code, zeroes the immutable slots on both sides (the constructor writes them into the runtime code), and compares: `match_strict`, and `match_ignoring_metadata` (the CBOR trailer can differ between hosts). It reports size against EIP-170, the immutable values found and the sha256 of the compiled ABI, then reads the wiring through getters (pool token and parameters, `pool.ORIGINATOR`, `lens.credit`, `router.pool/token`). A getter that is missing from the artifact, or a link that is zero or absent, stops the run: a value that was not read cannot pass a check (the first version of the lens check read a getter the lens does not have and passed vacuously; `test_verify_candidate_deployment.py` now rejects a lens wired to another pool and a missing link). Exit 0 only if every contract matches without metadata and every wiring check holds.
 
 ## Build facts at the reviewed head
 

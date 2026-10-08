@@ -49,6 +49,43 @@ def strip_metadata(code):
 def addr_word(h):
     return "0x" + h[-40:]
 
+ZERO = "0x" + "0" * 40
+
+
+def read_wiring(get, sel):
+    """Read every wiring value through getters. A getter the artifact does not have, or that returns nothing, raises:
+    a check can never pass because its value was not read (Codex review 5462466632, the lens.pool false positive)."""
+    need = {"pool": ("usdc()", "owner()", "effrRate()", "riskPremium()", "maxLoanAmount()", "ORIGINATOR()"),
+            "lens": ("credit()",),
+            "router": ("pool()", "token()", "officer()", "officerAdmin()")}
+    for role, fns in need.items():
+        for fn in fns:
+            if fn not in sel[role]:
+                raise SystemExit(f"{role} artifact has no {fn}: the wiring cannot be verified")
+    w = {"pool.usdc": addr_word(get("pool", "usdc()")), "pool.owner": addr_word(get("pool", "owner()"))}
+    for fn in ("effrRate()", "riskPremium()", "maxLoanAmount()"):
+        w["pool." + fn] = int(get("pool", fn), 16)
+    w["lens.credit"] = addr_word(get("lens", "credit()"))  # MicrocreditLens names the pool `credit`
+    w["router.pool"], w["router.token"] = addr_word(get("router", "pool()")), addr_word(get("router", "token()"))
+    w["pool.ORIGINATOR"] = addr_word(get("pool", "ORIGINATOR()"))
+    w["router.officer"] = addr_word(get("router", "officer()"))  # zero until the admin names one: nothing originates before that
+    w["router.officerAdmin"] = addr_word(get("router", "officerAdmin()"))
+    return w
+
+
+def wiring_checks(w, chain_id, pool, router):
+    """Every entry is a strict comparison of a value that was read; a missing or zero link fails."""
+    def same(x, y):
+        return isinstance(x, str) and isinstance(y, str) and x.lower() == y.lower() and x.lower() != ZERO
+    return {
+        "pool.usdc == Circle Base Sepolia USDC (chain 84532 only)": chain_id != 84532 or w.get("pool.usdc") == USDC_BASE_SEPOLIA,
+        "router.pool == pool": same(w.get("router.pool"), pool),
+        "pool.ORIGINATOR == router (the pool admits no other originator, for any borrower)": same(w.get("pool.ORIGINATOR"), router),
+        "router.token == pool.usdc": same(w.get("router.token"), w.get("pool.usdc")),
+        "lens.credit == pool (the lens reads this pool)": same(w.get("lens.credit"), pool),
+        "pool params 433/500/100e6": (w.get("pool.effrRate()"), w.get("pool.riskPremium()"), w.get("pool.maxLoanAmount()")) == (433, 500, 100_000_000),
+    }
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -85,23 +122,8 @@ def main():
         return call(a.rpc, getattr(a, role), "0x" + sel[role][fn], args)
 
     w = report["wiring"]
-    w["pool.usdc"] = addr_word(get("pool", "usdc()"))
-    w["pool.owner"] = addr_word(get("pool", "owner()"))
-    for fn in ("effrRate()", "riskPremium()", "maxLoanAmount()"):
-        w["pool." + fn] = int(get("pool", fn), 16)
-    w["lens.pool"] = addr_word(get("lens", "pool()")) if "pool()" in sel["lens"] else None
-    w["router.pool"], w["router.token"] = addr_word(get("router", "pool()")), addr_word(get("router", "token()"))
-    w["pool.ORIGINATOR"] = addr_word(get("pool", "ORIGINATOR()"))
-    w["router.officer"] = addr_word(get("router", "officer()"))  # zero until the admin names one: nothing originates before that
-    w["router.officerAdmin"] = addr_word(get("router", "officerAdmin()"))
-    checks = {
-        "pool.usdc == Circle Base Sepolia USDC (chain 84532 only)": report["rpc_chain_id"] != 84532 or w["pool.usdc"] == USDC_BASE_SEPOLIA,
-        "router.pool == pool": w["router.pool"].lower() == a.pool.lower(),
-        "pool.ORIGINATOR == router (the pool admits no other originator, for any borrower)": w["pool.ORIGINATOR"].lower() == a.router.lower(),
-        "router.token == pool.usdc": w["router.token"] == w["pool.usdc"],
-        "lens.pool == pool": w["lens.pool"] is None or w["lens.pool"].lower() == a.pool.lower(),
-        "pool params 433/500/100e6": (w["pool.effrRate()"], w["pool.riskPremium()"], w["pool.maxLoanAmount()"]) == (433, 500, 100_000_000),
-    }
+    w.update(read_wiring(get, sel))
+    checks = wiring_checks(w, report["rpc_chain_id"], a.pool, a.router)
     report["checks"] = checks
     ok &= all(checks.values())
     report["ok"] = ok

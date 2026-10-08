@@ -8,32 +8,44 @@ cd "$(dirname "$0")/.."
 HEAD_SHA=$(git rev-parse HEAD); SHORT=$(git rev-parse --short=7 HEAD)
 OUT=${1:-evidence/bootstrap-candidate-$SHORT}
 test -z "$(git status --porcelain -- packages scripts docs/*.md CLAUDE.md)" || { echo "tree is not clean"; exit 1; }
-mkdir -p "$OUT/logs"
+rm -rf "$OUT/logs"; rm -f "$OUT/README.md" "$OUT/SHA256SUMS" "$OUT/FAILED.txt"; mkdir -p "$OUT/logs"
 RPC=https://sepolia.base.org
 ORACLE=0x000000000000000000000000000000000000dEaD
 SENDER=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+# Every run records its exit code and its log; nothing is swallowed. scripts/candidate_evidence_gate.py then refuses to let
+# a packet exist unless every run exited 0 and its own summary line says it passed (Codex review 5462466632).
+RC="$OUT/logs/exit-codes.txt"; : > "$RC"
+run() {  # run NAME LOGFILE COMMAND...
+  local name=$1 log=$2 rc=0; shift 2
+  "$@" > "$OUT/logs/$log" 2>&1 || rc=$?
+  echo "$name $rc" >> "$RC"
+}
 # `forge build --sizes` exits non-zero because an invariant test handler (CreditHandler) is over 24,576 bytes; it is never deployed
 ( cd packages/foundry && forge build >/dev/null && { forge build --sizes || true; } ) > "$OUT/logs/build-sizes.txt" 2>&1
 ( cd packages/foundry && forge --version && grep -E "solc_version|via_ir|optimizer|evm_version" foundry.toml ) > "$OUT/logs/toolchain.txt" 2>&1
-( cd packages/foundry && forge test ) > "$OUT/logs/forge-test-local.txt" 2>&1 || true
-( cd packages/foundry && BASE_SEPOLIA_RPC_URL=$RPC forge test --match-path 'test/fork/*Router*' ) > "$OUT/logs/forge-test-fork-routers.txt" 2>&1 || true
-( cd packages/foundry && FOUNDRY_INVARIANT_RUNS=512 FOUNDRY_INVARIANT_DEPTH=150 forge test --match-path 'test/invariant/*Router*' ) > "$OUT/logs/invariant-deep.txt" 2>&1 || true
-python3 scripts/candidate_mutants.py > "$OUT/logs/mutants.txt" 2>&1 || true
-( cd scripts && for t in test_verify_candidate_deployment test_candidate_rehearsal test_two_hop_check; do echo "== $t"; python3 -m unittest $t 2>&1 | tail -3; done ) > "$OUT/logs/python-tests.txt" 2>&1
-fork_deploy() {  # starts a fresh fork, deploys the candidate, prints "pool lens router"
+run forge-test-local forge-test-local.txt bash -c 'cd packages/foundry && forge test'
+run forge-test-fork-routers forge-test-fork-routers.txt bash -c "cd packages/foundry && BASE_SEPOLIA_RPC_URL=$RPC forge test --match-path 'test/fork/*Router*'"
+run invariant-deep invariant-deep.txt bash -c "cd packages/foundry && FOUNDRY_INVARIANT_RUNS=512 FOUNDRY_INVARIANT_DEPTH=150 forge test --match-path 'test/invariant/*Router*'"
+run mutants mutants.txt python3 scripts/candidate_mutants.py
+run python-tests python-tests.txt bash -c 'cd scripts && python3 -m unittest test_verify_candidate_deployment test_candidate_evidence_gate test_candidate_rehearsal test_two_hop_check'
+fork_deploy() {  # starts a fresh fork, deploys the candidate, prints "pool lens router" (and stops if any is not an address)
   pkill -x anvil || true; sleep 1
   (anvil --fork-url $RPC --chain-id 84532 --port 8546 --silent > /tmp/anvil-evidence.log 2>&1 &)
   timeout 90 bash -c 'until curl -s -m 2 -X POST -H "content-type: application/json" --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_chainId\",\"params\":[]}" http://127.0.0.1:8546 | grep -q result; do sleep 1; done'
   local o; o=$(cd packages/foundry && BOOTSTRAP_ORACLE=$ORACLE forge script script/DeployBootstrapCandidate.s.sol --rpc-url http://127.0.0.1:8546 --broadcast --unlocked --sender $SENDER 2>&1)
   rm -rf packages/foundry/broadcast/DeployBootstrapCandidate.s.sol
-  echo "$o" | awk '/candidate pool/{p=$NF} /candidate lens/{l=$NF} /candidate bootstrap order router/{r=$NF} END{print p, l, r}'
+  local line; line=$(echo "$o" | awk '/candidate pool/{p=$NF} /candidate lens/{l=$NF} /candidate bootstrap order router/{r=$NF} END{print p, l, r}')
+  for a in $line; do [[ $a =~ ^0x[0-9a-fA-F]{40}$ ]] || { echo "deploy did not print three addresses: $line" >&2; exit 1; }; done
+  [[ $(wc -w <<<"$line") -eq 3 ]] || { echo "deploy did not print three addresses: $line" >&2; exit 1; }
+  echo "$line"
 }
 read -r P L R < <(fork_deploy)
 python3 scripts/verify_candidate_deployment.py --rpc http://127.0.0.1:8546 --pool "$P" --lens "$L" --router "$R" --json > "$OUT/logs/verifier.json"
-python3 scripts/candidate_rehearsal.py run --rpc http://127.0.0.1:8546 --pool "$P" --router "$R" > "$OUT/logs/rehearsal-normal.txt" 2>&1 || true
+run rehearsal-normal rehearsal-normal.txt python3 scripts/candidate_rehearsal.py run --rpc http://127.0.0.1:8546 --pool "$P" --router "$R"
 read -r P L R < <(fork_deploy)
-python3 scripts/candidate_rehearsal.py run --rpc http://127.0.0.1:8546 --pool "$P" --router "$R" --with-default > "$OUT/logs/rehearsal-with-default.txt" 2>&1 || true
+run rehearsal-with-default rehearsal-with-default.txt python3 scripts/candidate_rehearsal.py run --rpc http://127.0.0.1:8546 --pool "$P" --router "$R" --with-default
 pkill -x anvil || true
+python3 scripts/candidate_evidence_gate.py "$OUT" || { echo "the evidence run did not pass; see $OUT/FAILED.txt and the logs"; exit 1; }
 python3 - "$OUT" "$HEAD_SHA" <<'PY'
 import json, re, sys, hashlib, os
 out, head = sys.argv[1], sys.argv[2]
@@ -64,7 +76,8 @@ time; fork runs and rehearsals ran on a local Anvil fork of Base Sepolia with Ci
 {chr(10).join(rows)}
 
 Full `forge build --sizes` is in `logs/build-sizes.txt`. Every contract matched the compiled artifact strictly (immutables
-zeroed on both sides) and every wiring check held.
+zeroed on both sides) and every wiring check held, including `lens.credit == pool` read through the lens's own getter.
+`scripts/candidate_evidence_gate.py` refused to complete this packet unless every run exited 0 and its summary line passed.
 
 ## Tests
 
