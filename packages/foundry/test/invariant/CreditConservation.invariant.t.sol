@@ -290,6 +290,23 @@ contract CreditConservationInvariantTest is MicrocreditTestBase {
      *      (unpaid principal less incoming secured backing when last impaired, released by
      *      principal repaid, cleared on close or default).
      */
+    /**
+     * @dev No principal is written off at a repaid close (the CI-30 fix): a loan closes short only
+     *      on interest, so every repaid loan has repaid its whole principal, the model's write-off
+     *      counters stay at zero, and the P&L identity below carries no forgiven term.
+     */
+    function invariant_I9_noPrincipalForgiven() public view {
+        assertEq(handler.forgiven(), 0, "I9: principal written off at a repaid close");
+        assertEq(handler.reserveForgiven(), 0, "I9: the reserve paid for a repaid close");
+        for (uint256 i = 0; i < handler.loanCount(); i++) {
+            CreditHandler.LoanModel memory m = handler.loanAt(i);
+            if (m.status == DecentralizedMicrocredit.LoanStatus.Repaid) {
+                assertEq(m.principalRepaid, m.principal, "I9: a repaid loan with principal unpaid");
+                assertGe(m.repaid, m.principal, "I9: a repaid loan paid less than its principal");
+            }
+        }
+    }
+
     function invariant_I7_impairment() public view {
         uint256 impaired = credit.totalImpaired();
         assertLe(impaired, credit.totalLentOut(), "I7: provision exceeds principal lent out");

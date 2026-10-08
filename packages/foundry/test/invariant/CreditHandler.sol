@@ -131,9 +131,10 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
     uint256 public reserveUsed;
     uint256 public reserveReleased;
     uint256 public reserveFunded;
-    uint256 public reserveForgiven; // sub-cent balances forgiven at closing, absorbed by the reserve
+    uint256 public reserveForgiven; // principal written off at closing, absorbed by the reserve: zero since the CI-30 fix
+    uint256 public interestForgiven; // sub-cent interest forgiven at closing, never booked and earning no dues
     uint256 internal _reserveBeforeRepay;
-    uint256 public forgiven; // unpaid principal written off when a loan closes under a cent
+    uint256 public forgiven; // unpaid principal written off when a loan closes: zero since the CI-30 fix (I9)
     uint256 public donated;
 
     // ───────────────────────────── health ghosts ─────────────────────────────
@@ -827,12 +828,16 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
         m.disbursedAt = vm.getBlockTimestamp();
     }
 
-    /// @dev Interest first, then principal; the loan closes once less than a cent is left.
+    /// @dev Interest first, then principal. The loan closes once less than a cent is left and that
+    ///      rest is interest (the payment covered every unit of principal); the interest it leaves is
+    ///      never booked, so it earns no dues. A payment short of the principal keeps the loan open.
     function _recordRepayment(uint256 idx, uint256 accrued, uint256 owed, uint256 amount, uint256 paid) internal {
         LoanModel storage m = _loans[idx];
         if (paid != Math.min(amount, owed)) _mismatch("repay: pulled other than min(amount, outstanding)");
         uint256 interestDue = accrued - (m.repaid - m.principalRepaid);
-        uint256 interest = Math.min(paid, interestDue);
+        uint256 rest = owed - paid;
+        bool closes = rest < CENT && rest <= interestDue;
+        uint256 interest = closes ? interestDue - rest : Math.min(paid, interestDue);
         uint256 fee = (interest * feeBps) / BASIS_POINTS;
         uint256 toReserve = (interest * reserveBps) / BASIS_POINTS;
         m.repaid += paid;
@@ -843,9 +848,9 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
         reserveIn += toReserve;
         poolInterest += interest - fee;
         dues[m.borrower] += toReserve;
-        if (owed - paid < CENT) {
-            forgiven += m.principal - m.principalRepaid;
-            reserveForgiven += Math.min(m.principal - m.principalRepaid, _reserveBeforeRepay + toReserve);
+        if (closes) {
+            interestForgiven += rest;
+            forgiven += m.principal - m.principalRepaid; // zero by construction; I9 checks it stays so
             m.impaired = 0;
             m.status = DecentralizedMicrocredit.LoanStatus.Repaid;
         }

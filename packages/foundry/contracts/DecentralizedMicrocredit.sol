@@ -690,8 +690,10 @@ contract DecentralizedMicrocredit is EIP712 {
 
     /**
      * @notice Repay with a single EIP-2612 permit signature; anyone (e.g. a relayer) may submit.
-     * @param amount Amount to repay; 0 repays the cent-rounded outstanding balance.
-     *        The amount pulled never exceeds the permit `value`.
+     * @param amount Amount to repay; 0 repays the outstanding balance. The amount pulled never
+     *        exceeds the permit `value`; the UI permits the balance rounded up to the cent
+     *        (`MicrocreditLens.getOutstandingRoundedToCent`), so interest accrued since the
+     *        signature is at most a sub-cent shortfall, forgiven at closing.
      */
     function repayWithPermit(
         address borrower,
@@ -708,7 +710,7 @@ contract DecentralizedMicrocredit is EIP712 {
 
         _permit(borrower, value, deadline, v, r, s);
 
-        uint256 spend = amount == 0 ? _roundToCent(getCurrentOutstandingAmount(loanId)) : amount;
+        uint256 spend = amount == 0 ? getCurrentOutstandingAmount(loanId) : amount;
         if (spend > value) {
             spend = value;
         }
@@ -877,8 +879,8 @@ contract DecentralizedMicrocredit is EIP712 {
     /**
      * @notice Repay a loan in full via relayer, optionally executing an ERC-2612 permit first.
      * @dev `req.amount == 0` repays everything. A non-zero amount must be within 1 cent of the
-     *      current outstanding balance; the canonical balance is pulled either way. Balances
-     *      under 1 cent are forgiven without a transfer.
+     *      current outstanding balance; the canonical balance is pulled either way, however small
+     *      (until the CI-30 fix a balance under a cent was closed here without a transfer).
      */
     function repayLoanMeta(RepayRequest calldata req, bytes calldata sig, PermitData calldata permit)
         external
@@ -898,12 +900,6 @@ contract DecentralizedMicrocredit is EIP712 {
         require(loan.borrower == req.borrower, WrongBorrower());
 
         uint256 out = getCurrentOutstandingAmount(req.loanId);
-        if (out < CENT) {
-            _closeLoan(loan, LoanStatus.Repaid);
-            emit MetaLoanRepaid(req.borrower, req.loanId, 0);
-            return;
-        }
-
         if (permit.deadline != 0) {
             _permit(req.borrower, permit);
             require(permit.value >= out, PermitValueTooLow());
@@ -1295,16 +1291,20 @@ contract DecentralizedMicrocredit is EIP712 {
 
     /**
      * @dev Pulls `min(amount, outstanding)` from `payer` and closes the loan once less than a
-     *      cent remains (sub-cent balances are forgiven). Returns the amount pulled.
+     *      cent remains and that rest is unpaid interest: the sub-cent balance forgiven is never
+     *      principal, and the interest it forgives is never booked, so it earns no dues (CI-30).
+     *      Returns the amount pulled.
      */
     function _repay(uint256 loanId, Loan storage loan, address payer, uint256 amount) internal returns (uint256 paid) {
         uint256 owed = getCurrentOutstandingAmount(loanId);
         paid = amount < owed ? amount : owed;
+        uint256 interestDue = _interestAccrued(loan) - (loan.repaid - loan.principalRepaid);
+        uint256 rest = owed - paid;
+        bool closes = rest < CENT && rest <= interestDue;
         if (paid > 0) {
             _pullUsdc(payer, paid);
 
-            uint256 interestDue = _interestAccrued(loan) - (loan.repaid - loan.principalRepaid);
-            uint256 interest = paid < interestDue ? paid : interestDue;
+            uint256 interest = closes ? interestDue - rest : Math.min(paid, interestDue);
             uint256 principal = paid - interest;
             uint256 fee = (interest * protocolFeeBps) / BASIS_POINTS;
             uint256 toReserve = (interest * reserveBps) / BASIS_POINTS;
@@ -1323,26 +1323,24 @@ contract DecentralizedMicrocredit is EIP712 {
             firstLossReserve += toReserve;
             emit RepaymentApplied(loanId, interest, principal, fee);
         }
-        if (owed - paid < CENT) {
+        if (closes) {
             _closeLoan(loan, LoanStatus.Repaid);
         }
         _tryFillWithdrawalQueue(QUEUE_FILLS_PER_CALL);
     }
 
     /**
-     * @dev Closes a repaid or cancelled loan. For a repaid loan, any principal still unpaid
-     *      (under a cent, see {_repay}) is written off; a cancelled loan was never lent out.
+     * @dev Closes a repaid or cancelled loan. A repaid loan has no principal unpaid ({_repay}
+     *      closes short only on interest), so nothing is written off; a cancelled loan was never
+     *      lent out and releases the principal it reserved.
      */
     function _closeLoan(Loan storage loan, LoanStatus status) internal {
-        uint256 unpaid = loan.principal - loan.principalRepaid;
         if (status == LoanStatus.Repaid) {
-            totalLentOut -= unpaid;
-            firstLossReserve -= Math.min(unpaid, firstLossReserve); // the forgiven sub-cent is a loss
             totalImpaired -= loan.impaired;
             loan.impaired = 0;
             completedLoans[loan.borrower] += 1;
         }
-        _outstandingPrincipal[loan.borrower] -= unpaid;
+        _outstandingPrincipal[loan.borrower] -= loan.principal - loan.principalRepaid;
         activeLoanCount[loan.borrower] -= 1;
         loan.status = status;
     }
@@ -1506,9 +1504,5 @@ contract DecentralizedMicrocredit is EIP712 {
             item.active = false;
             withdrawalHead++;
         }
-    }
-
-    function _roundToCent(uint256 x) internal pure returns (uint256) {
-        return ((x + CENT / 2) / CENT) * CENT;
     }
 }

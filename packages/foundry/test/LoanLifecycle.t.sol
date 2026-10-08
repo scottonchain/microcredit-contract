@@ -521,9 +521,11 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         credit.back(brighton, 5e6);
     }
 
-    /// @dev Found by invariant fuzzing: with the reserve larger than the pool, a forgiven sub-cent
-    ///      balance took the pool below the reserve and totalAssets underflowed, blocking deposits
-    ///      and loans. The forgiven amount is a loss and is now taken from the reserve first.
+    /// @dev Found by invariant fuzzing (CI-23): with the reserve larger than the pool, a forgiven
+    ///      sub-cent balance took the pool below the reserve and totalAssets underflowed, blocking
+    ///      deposits and loans. Since the CI-30 fix a loan closes short only on interest, so a
+    ///      repaid close writes nothing off and never debits the reserve; the pool keeps working
+    ///      with lenders fully exited and the reserve as the only cash.
     function testForgivenSubCentCannotBrickThePool() public {
         address institution = makeAddr("institution");
         usdc.mint(institution, 2_000e6);
@@ -535,17 +537,41 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         uint256 loanId = _borrow(LOAN);
         vm.prank(lender);
         credit.withdrawFunds(type(uint256).max);
+        vm.warp(vm.getBlockTimestamp() + 1 days); // a day of interest, under a cent on 40 USDC
 
+        uint256 reserveBefore = credit.firstLossReserve();
         uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        assertGt(owed, LOAN);
         usdc.mint(brighton, owed);
         vm.startPrank(brighton);
         usdc.approve(address(credit), owed - 1);
-        credit.repayLoan(loanId, owed - 1); // a unit short: closes, the unit is forgiven
+        credit.repayLoan(loanId, owed - 1); // a unit of interest short: closes, the unit is forgiven
         vm.stopPrank();
         assertEq(uint256(_status(loanId)), uint256(DecentralizedMicrocredit.LoanStatus.Repaid));
+        assertEq(credit.totalLentOut(), 0, "every unit of principal was paid");
+        assertGe(credit.firstLossReserve(), reserveBefore, "a repaid close never debits the reserve");
 
-        assertEq(credit.totalAssets(), 0);
         _deposit(carol, 100e6);
-        assertApproxEqAbs(credit.lenderBalance(carol), 100e6, 2);
+        assertGe(credit.lenderBalance(carol), 100e6 - 2);
+        assertLe(credit.lenderBalance(carol), 100e6 + 10_000, "at most the orphaned sub-cent interest on top");
+    }
+
+    /// A payment short of the principal does not close the loan: the shortfall is owed, not forgiven.
+    function testPrincipalShortfallKeepsTheLoanOpen() public {
+        uint256 loanId = _borrow(LOAN);
+        usdc.mint(brighton, LOAN);
+        vm.startPrank(brighton);
+        usdc.approve(address(credit), LOAN - 1);
+        credit.repayLoan(loanId, LOAN - 1); // inside the first day: no interest, so the unit short is principal
+        vm.stopPrank();
+        assertEq(uint256(_status(loanId)), uint256(DecentralizedMicrocredit.LoanStatus.Active));
+        assertEq(credit.getCurrentOutstandingAmount(loanId), 1);
+        assertEq(credit.totalLentOut(), 1);
+
+        vm.startPrank(brighton);
+        usdc.approve(address(credit), 1);
+        credit.repayLoan(loanId, 1);
+        vm.stopPrank();
+        assertEq(uint256(_status(loanId)), uint256(DecentralizedMicrocredit.LoanStatus.Repaid));
     }
 }

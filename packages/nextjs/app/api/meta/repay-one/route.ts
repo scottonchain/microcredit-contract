@@ -10,7 +10,7 @@ import {
 
 /**
  * Gasless repayment authorized by a single EIP-2612 permit (no separate EIP-712 request).
- * `amount: "0"` repays the cent-rounded outstanding balance, capped at the permit value.
+ * `amount: "0"` repays the outstanding balance, capped at the permit value (the UI permits the balance rounded up to the cent).
  */
 export const POST = relayerRoute(async body => {
   if (body.signature || body.req) {
