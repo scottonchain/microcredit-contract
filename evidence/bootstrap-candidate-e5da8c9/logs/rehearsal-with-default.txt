@@ -1,0 +1,16 @@
+- funded roles by impersonating the USDC holder; aggregate of roles+vaults+pool+router before = 10000000 units
+- lender deposited 5 USDC to the candidate pool
+- the pool's immutable originator is the router: no worker names anything, and no other caller can originate for any borrower
+- two roots deposited 1 USDC each to the router
+- the router's admin named a credit officer (a fresh key) for policy version 1; before that the router had none and nothing could originate
+- customer funded order 1 (1 USDC advance to the vendor, price 1.5 USDC); worker signed the pool request and the acceptance; roots and mid signed consents
+- negative controls refused: direct requestLoan by the worker, borrowAndDisburseMeta by a stranger, a tampered vendor, a forged consent, the unbound `originate` entry
+- a funded, fully signed order with no officer approval is refused (NoApproval): the officer gate is separate from the roots' consents
+- an officer approval for less than the order amount is refused (ApprovalTooSmall): the officer can only refuse or approve the whole order
+- the officer approved the order for exactly its amount; a stranger recorded the signed approval
+- originateOrder by a stranger (tx 0xd47e1dd268f9d3f16b4cbcfb2b2f52bfd6331ec3d0ad526ffcd21f7ea396dbea): loan 1 bound to order 1, vendor +1 USDC, pool lent out +1 USDC; roots locked 0.6 and 0.4 USDC; the customer's escrow stays apart
+- replay of the same order and signatures refused
+- customer settled: the 1 USDC debt was repaid first (loan closed), the worker received 500000 units, the roots' lot returned, escrow is zero
+- [fork time travel] order 2: the customer refunded and nobody cured the loan; defaulted after 7+30 days; sync attributed the whole lot to the roots pro rata (lossOf = 600000 and 400000); lenders lost no principal
+- roots and lender withdrew everything; aggregate after = 10000000 units (before 10000000)
+REHEARSAL OK (with default path)
