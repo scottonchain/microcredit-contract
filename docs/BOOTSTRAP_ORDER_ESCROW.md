@@ -1,3 +1,5 @@
+> **SUPERSEDED (2026-10-08).** `BootstrapOrderEscrow` depended on the per-borrower manager (`setManager`, `managerOf`), which the pool no longer has: the pool now names one immutable originator (CI-31, CI-32) and `BootstrapOrderRouter` composes this adapter's funded exact order, debt-first settlement and refund with the two-hop stake and the officer gate. The contract and its tests were removed; this note stays as the record of the first design (its acceptance criteria were met by the router's tests).
+
 # Funded-order adapter (`BootstrapOrderEscrow`)
 
 An external testnet adapter that lets a consenting customer's funded order pay a worker's pool loan first. It is the

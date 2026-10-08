@@ -57,8 +57,7 @@ export const CONTRACT_ERROR_MESSAGES: Record<MicrocreditErrorName, string> = {
   InsufficientCredit: "You do not have that much free credit or stake to back with.",
   BackingInUse: "That backing is covering money the borrower still owes. You can lower it once they repay.",
   StakeCommitted: "That stake is committed to backing someone. Withdraw the backing first.",
-  NotManager: "This account's loans can only be started by the manager it chose. Ask the manager to submit the request.",
-  ManagerLocked: "The manager can only be changed while the account owes nothing and has no backing.",
+  NotManager: "Loans from this pool can only be started by the one party it was built to accept (its originator).",
   InsufficientStake: "That is more than you have staked.",
   // inherited from OpenZeppelin
   SafeERC20FailedOperation: "The USDC transfer failed. Check your balance and approval.",

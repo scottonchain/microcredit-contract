@@ -91,9 +91,13 @@ def main():
         w["pool." + fn] = int(get("pool", fn), 16)
     w["lens.pool"] = addr_word(get("lens", "pool()")) if "pool()" in sel["lens"] else None
     w["router.pool"], w["router.token"] = addr_word(get("router", "pool()")), addr_word(get("router", "token()"))
+    w["pool.ORIGINATOR"] = addr_word(get("pool", "ORIGINATOR()"))
+    w["router.officer"] = addr_word(get("router", "officer()"))  # zero until the admin names one: nothing originates before that
+    w["router.officerAdmin"] = addr_word(get("router", "officerAdmin()"))
     checks = {
         "pool.usdc == Circle Base Sepolia USDC (chain 84532 only)": report["rpc_chain_id"] != 84532 or w["pool.usdc"] == USDC_BASE_SEPOLIA,
         "router.pool == pool": w["router.pool"].lower() == a.pool.lower(),
+        "pool.ORIGINATOR == router (the pool admits no other originator, for any borrower)": w["pool.ORIGINATOR"].lower() == a.router.lower(),
         "router.token == pool.usdc": w["router.token"] == w["pool.usdc"],
         "lens.pool == pool": w["lens.pool"] is None or w["lens.pool"].lower() == a.pool.lower(),
         "pool params 433/500/100e6": (w["pool.effrRate()"], w["pool.riskPremium()"], w["pool.maxLoanAmount()"]) == (433, 500, 100_000_000),

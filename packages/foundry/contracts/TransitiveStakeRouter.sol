@@ -57,8 +57,9 @@ contract StakeVault {
  *         trusts vouches for a borrower, and the borrower borrows against the root's stake without any
  *         issuer or credit officer. Nothing here creates credit: every unit a borrower can draw through
  *         the router is USDC a root deposited and consented to risk.
- * @dev The borrower names the concrete router as its pool manager (`setManager`) before any backing exists,
- *      so the pool refuses every origination for that borrower that does not come from there (CI-31). A
+ * @dev The pool is built with the concrete router as its immutable originator (`ORIGINATOR`), so the pool
+ *      refuses every origination, for every borrower and on every route, that does not come from here (CI-31,
+ *      CI-32); the constructor refuses a pool that names anyone else. A
  *      certificate is the borrower's signed pool request plus up to MAX_PATHS paths; each path is a root
  *      and a mid with two EIP-712 consents, each with a live-exposure limit, a term limit, a version and an
  *      expiry. Root consent: root to mid, with `borrower` as its scope (zero: any borrower the mid vouches
@@ -156,6 +157,7 @@ abstract contract StakeRouterBase is EIP712, ReentrancyGuard {
     event RootLoss(address indexed root, address indexed borrower, uint256 indexed loanId, uint256 loss);
 
     constructor(DecentralizedMicrocredit pool_) {
+        if (pool_.ORIGINATOR() != address(this)) revert NotManager(); // the pool must name this router as its only originator
         pool = pool_;
         token = pool_.usdc();
     }
@@ -208,7 +210,6 @@ abstract contract StakeRouterBase is EIP712, ReentrancyGuard {
         if (borrower == address(0) || borrower == address(this) || req.to == address(this)) {
             revert InvalidCertificate();
         }
-        if (pool.managerOf(borrower) != address(this)) revert NotManager();
         if (_sync(borrower)) revert OpenLot();
 
         Lot storage lot = _lots[borrower];

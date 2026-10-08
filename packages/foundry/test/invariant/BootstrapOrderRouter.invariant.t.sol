@@ -34,9 +34,11 @@ contract BootstrapOrderRouterInvariantTest is MicrocreditTestBase {
     uint256 internal baseline;
 
     function setUp() public {
-        _deploy(433, 500, 100e6);
+        address routerAddr = makeAddr("router");
+        _deployWithOriginator(433, 500, 100e6, routerAddr);
         _deposit(address(0x1E4D), POOL);
-        router = new BootstrapOrderRouter(credit);
+        deployCodeTo("BootstrapOrderRouter.sol:BootstrapOrderRouter", abi.encode(credit), routerAddr);
+        router = BootstrapOrderRouter(routerAddr);
         handler = new OrderRouterHandler(credit, usdc, router);
         router.setOfficer(vm.addr(handler.OFFICER_KEY()), 1);
         router.setOfficerAdmin(address(handler)); // the handler rotates and revokes the officer during the campaign

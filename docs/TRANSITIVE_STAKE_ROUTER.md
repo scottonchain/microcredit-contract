@@ -1,18 +1,19 @@
 # Two-hop stake router (`TransitiveStakeRouter`, on `StakeRouterBase`)
 
-> The bootstrap product is `BootstrapOrderRouter` (`BOOTSTRAP_ORDER_ROUTER.md`), which adds the customer's funded order to this machinery on one manager. `TransitiveStakeRouter` is the unbound building block: it binds no order. Both share `StakeRouterBase`.
+> The bootstrap product is `BootstrapOrderRouter` (`BOOTSTRAP_ORDER_ROUTER.md`), which adds the customer's funded order and a credit officer's approval to this machinery, as the pool's one originator. `TransitiveStakeRouter` is the unbound building block: it binds no order. Both share `StakeRouterBase`.
 
 An external testnet router for transitive trust without an issuer or a credit officer. A **root** puts USDC in; a
 **mid** it trusts vouches for a **borrower**; the borrower borrows against the root's stake. It is the first
 deployable form of the end state the operator set (trust passing through people, not through an officer): the
-pool is unchanged apart from the manager gate (CI-31), and nothing here creates credit. Not a human-lending release.
+pool differs from the live one only in an immutable originator gate (CI-31, CI-32), and nothing here creates credit. Not a human-lending release.
 The proof obligations are in the theory repository (`action:transitive-conservation-theorem`); this document states
 what the code does and where it stops.
 
 ## Flow
 
-1. The borrower names the router as its pool manager (`pool.setManager(router)`), **before any backing exists**. One
-   direct transaction by the borrower (a gas cost to count as subsidy).
+1. The pool was built with this router as its immutable originator (`pool.ORIGINATOR()`), so the borrower does nothing
+   on chain, and no other caller can originate for any borrower. The router's constructor refuses a pool that does not
+   name it.
 2. A root deposits USDC into the router (`deposit`); it sits in `free[root]` and can be withdrawn (`withdraw`) while it
    is not allocated.
 3. The root signs an EIP-712 `EdgeConsent(from=root, to=mid, borrower=scope, limit, maxTerm, version, expiry)` where
@@ -27,7 +28,7 @@ what the code does and where it stops.
    one to four paths whose amounts sum to the loan amount, each path being a root, a mid, their two consents and
    signatures (ERC-1271 accepted) and its amount. The router checks every consent (signer, version, expiry, term,
    limit), moves each root's USDC from `free` to `locked`, sends the sum to the borrower's `StakeVault`, which stakes it
-   and backs the borrower with all of it (secured), then calls `pool.borrowAndDisburseMeta` as the borrower's manager.
+   and backs the borrower with all of it (secured), then calls `pool.borrowAndDisburseMeta` as the pool's originator.
 5. When the loan has closed (repaid by anyone, or defaulted by `markDefaulted`), anyone calls `sync(borrower)` (every
    origination runs it first). The vault drops the backing, unstakes and returns what the pool did not slash; the
    loss is the lot less what came back, attributed to the roots pro rata to their path amounts (rounded down, the few
@@ -47,13 +48,13 @@ what the code does and where it stops.
   paths (R3); an open lot's vault stakes the whole lot and has no unsecured backing, a closed lot leaves nothing (R4). The pool's principal lent out equals the active lots' unpaid principal (R7).
 - **Codex's bypass regression** (`testCertifiedLoanRepaidDirectlyAtPoolCannotBeReopenedOnAnyOtherPath`): after a
   certified loan is repaid directly at the pool, `requestLoan`, `requestLoanMeta` by another relayer and
-  `borrowAndDisburseMeta` by another caller all revert `NotManager`.
+  `borrowAndDisburseMeta` by another caller all revert `NotManager` (the originator gate, `OriginatorGate.t.sol`).
 - Concurrent certificates for one root's funds, one root for two borrowers, a shared mid edge (diamond), repeated
   edges, cycles and aliases at the address level, partial repayment then default, a third-party backer sharing the
   slash, stale syncs, replay, relayer whitelist and a donation to the vault are each a test.
 - Mutation check: ten deliberate bugs in the router (loss to one path only, an exposure not released, loss ignored on
   return, the vault balance counted, the backing slot kept, `locked` not released, a limit off by one, the consent
-  version ignored, the loan amount not tied to the paths, the manager check dropped) are each caught by these suites.
+  version ignored, the loan amount not tied to the paths, the router built against a pool that does not name it) are each caught by these suites.
 
 ## Limits, stated
 
@@ -70,11 +71,9 @@ what the code does and where it stops.
   `markDefaulted` (permissionless, `LATE_PERIOD` after due). The pool allows 32 backers per borrower: a griefer can fill
   them with 1 USDC backings of a managed borrower and block the vault's backing, and the borrower must then use
   another address (CI-31 note). A third-party backer on the same borrower shares the slash, so roots lose less.
-  Likewise a stranger can back a fresh address before it names its manager; the pool then refuses `setManager`
-  (`ManagerLocked`) until that backing is withdrawn, so the borrower uses another address. Both cost the griefer a
-  stake it can recover, and neither touches safety.
+  The griefing costs a stake the griefer can recover, and does not touch safety.
 - **Minimum.** A transitive loan is at least `MIN_BACKING` (1 USDC), the pool's minimum backing.
-- **One open loan per borrower**, one router per borrower (the manager), and the pool's relayer whitelist, if enabled,
+- **One open loan per borrower**, one router per pool (the originator), and the pool's relayer whitelist, if enabled,
   must name the router.
 - **Stake earns nothing** at the current parameters (`ColdStartFacts.t.sol`): a root is a sponsor, not an investor. The
   router does not change the economics; it is the credit-conservation mechanism, not an incentive design.

@@ -19,10 +19,16 @@ contract DeployBootstrapCandidate is Script {
         address oracle = vm.envAddress("BOOTSTRAP_ORACLE");
         require(oracle != address(0), "oracle required");
         vm.startBroadcast();
-        DecentralizedMicrocredit pool = new DecentralizedMicrocredit(433, 500, 100e6, CIRCLE_BASE_SEPOLIA_USDC, oracle);
-        pool.setReserveBps(4500);
+        (, address deployer,) = vm.readCallers();
+        // The pool names the router as its immutable originator, so the router's address is fixed first: it is the
+        // third contract this account creates (pool, lens, router) and the script checks the prediction.
+        address predictedRouter = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        DecentralizedMicrocredit pool =
+            new DecentralizedMicrocredit(433, 500, 100e6, CIRCLE_BASE_SEPOLIA_USDC, oracle, predictedRouter);
         MicrocreditLens lens = new MicrocreditLens(pool);
         BootstrapOrderRouter router = new BootstrapOrderRouter(pool);
+        require(address(router) == predictedRouter, "router address mispredicted");
+        pool.setReserveBps(4500);
         // The credit officer: its own key, set by the router's admin (the deployer). With no OFFICER the router has no
         // officer and nothing can originate (fail closed); the admin sets one later with setOfficer.
         address officer = vm.envOr("OFFICER", address(0));
@@ -30,7 +36,7 @@ contract DeployBootstrapCandidate is Script {
         vm.stopBroadcast();
         console.log("candidate pool", address(pool));
         console.log("candidate lens", address(lens));
-        console.log("candidate bootstrap order router", address(router));
+        console.log("candidate bootstrap order router (the pool's immutable originator)", address(router));
         console.log("credit officer (zero: none, nothing originates)", officer);
         // No scores or overrides: the bootstrap uses the roots' stake through the router only.
         // No token mints, original-pool calls, funding or relayed signatures in this script.

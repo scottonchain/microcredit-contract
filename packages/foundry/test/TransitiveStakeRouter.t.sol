@@ -58,28 +58,28 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
     );
 
     function setUp() public virtual {
-        _deployProtocol();
+        address routerAddr = makeAddr("router"); // the pool names this address as its only originator, then the router is placed there
+        _deployProtocol(routerAddr);
         _give(makeAddr("poolLender"), 1_000e6);
         vm.startPrank(makeAddr("poolLender"));
         usdc.approve(address(credit), 1_000e6);
         credit.depositFunds(1_000e6);
         vm.stopPrank();
-        router = new TransitiveStakeRouter(credit);
+        deployCodeTo("TransitiveStakeRouter.sol:TransitiveStakeRouter", abi.encode(credit), routerAddr);
+        router = TransitiveStakeRouter(routerAddr);
         (root1, root1Pk) = makeAddrAndKey("root1");
         (root2, root2Pk) = makeAddrAndKey("root2");
         (mid1, mid1Pk) = makeAddrAndKey("mid1");
         (mid2, mid2Pk) = makeAddrAndKey("mid2");
         (borrower, borrowerPk) = makeAddrAndKey("borrower");
         (borrower2, borrower2Pk) = makeAddrAndKey("borrower2");
-        _manage(borrower);
-        _manage(borrower2);
     }
 
     // ───────────── helpers ─────────────
 
     /// @dev The fork suite overrides these two to run the same tests against Circle's USDC.
-    function _deployProtocol() internal virtual {
-        _deploy(433, 500, 100e6);
+    function _deployProtocol(address originator) internal virtual {
+        _deployWithOriginator(433, 500, 100e6, originator);
     }
 
     function _give(address who, uint256 amount) internal virtual {
@@ -92,11 +92,6 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         usdc.approve(address(credit), amount);
         credit.stake(amount);
         vm.stopPrank();
-    }
-
-    function _manage(address who) internal {
-        vm.prank(who);
-        credit.setManager(address(router));
     }
 
     function _fund(address root, uint256 amount) internal {
@@ -546,42 +541,47 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         assertEq(router.locked(address(wallet)), 2e6);
     }
 
-    // ───────────── the manager gate ─────────────
+    // ───────────── the originator gate ─────────────
 
-    function testBorrowerMustHaveNamedTheRouter() public {
-        (address plain, uint256 plainPk) = makeAddrAndKey("plain");
-        _fund(root1, 10e6);
-        StakeRouterBase.Path memory p = _path(root1Pk, root1, mid1Pk, mid1, plain, 2e6);
-        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(plain, 2e6);
-        bytes memory sig = _signBorrowAndDisburse(plainPk, req);
+    function testRouterRefusesAPoolThatNamesSomeoneElseAsOriginator() public {
+        vm.startPrank(owner);
+        DecentralizedMicrocredit open = new DecentralizedMicrocredit(433, 500, 100e6, address(usdc), oracle, address(0));
+        DecentralizedMicrocredit other =
+            new DecentralizedMicrocredit(433, 500, 100e6, address(usdc), oracle, makeAddr("someoneElse"));
+        vm.stopPrank();
         vm.expectRevert(StakeRouterBase.NotManager.selector);
-        router.originate(req, sig, _one(p)); // no manager
-
-        vm.prank(plain);
-        credit.setManager(makeAddr("someoneElse"));
+        new TransitiveStakeRouter(open); // an open pool does not bind origination, so no router may claim it
         vm.expectRevert(StakeRouterBase.NotManager.selector);
-        router.originate(req, sig, _one(p)); // another manager
+        new TransitiveStakeRouter(other);
     }
 
-    function testManagerCannotBeChangedWhileTheLotIsLive() public {
-        uint256 loanId = _simple(10e6, 4e6);
-        vm.prank(borrower);
-        vm.expectRevert(DecentralizedMicrocredit.ManagerLocked.selector);
-        credit.setManager(address(0));
+    function testTheOriginatorIsFixedAndThereIsNoManagerSetter() public {
+        assertEq(credit.ORIGINATOR(), address(router));
+        // the per-borrower manager and its setter no longer exist: a borrower cannot name, clear or change anything
+        (bool ok,) = address(credit).call(abi.encodeWithSignature("setManager(address)", address(0)));
+        assertFalse(ok, "setManager must not exist");
+        (ok,) = address(credit).call(abi.encodeWithSignature("managerOf(address)", borrower));
+        assertFalse(ok, "managerOf must not exist");
+        // and nothing the owner holds can move it
+        (ok,) = address(credit).call(abi.encodeWithSignature("setOriginator(address)", stranger));
+        assertFalse(ok, "no originator setter");
+    }
 
-        _repayAll(stranger, loanId);
-        vm.prank(borrower);
-        vm.expectRevert(DecentralizedMicrocredit.ManagerLocked.selector);
-        credit.setManager(address(0)); // loan closed, vault backing still live until synced
-
-        router.sync(borrower);
-        vm.prank(borrower);
-        credit.setManager(address(0)); // clean: free to leave, and then the router can no longer originate
-        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 2e6);
-        bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
-        StakeRouterBase.Path[] memory pp = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6));
-        vm.expectRevert(StakeRouterBase.NotManager.selector);
-        router.originate(req, sig, pp);
+    function testAnOwnerGrantedLineOrOrdinaryBackingDoesNotOpenAnotherDoor() public {
+        (address plain, uint256 plainPk) = makeAddrAndKey("plain");
+        vm.prank(owner);
+        credit.setScoreOverride(plain, 1e6); // a granted line: capacity the roots did not consent to
+        _poolStake(stranger, 5e6);
+        vm.prank(stranger);
+        credit.back(plain, 2e6); // ordinary backing from someone else's stake
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(plain, 1e6);
+        bytes memory sig = _signBorrowAndDisburse(plainPk, req);
+        vm.prank(plain);
+        vm.expectRevert(DecentralizedMicrocredit.NotManager.selector);
+        credit.requestLoan(1e6);
+        vm.prank(relayer);
+        vm.expectRevert(DecentralizedMicrocredit.NotManager.selector);
+        credit.borrowAndDisburseMeta(req, sig);
     }
 
     function testRelayerWhitelistMustNameTheRouter() public {
@@ -774,16 +774,17 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 2e6);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
 
-        // another router (the borrower names it manager, so the manager check passes): consents signed for `router` fail
-        TransitiveStakeRouter other = new TransitiveStakeRouter(credit);
-        vm.prank(borrower);
-        credit.setManager(address(other));
+        // another router on its own pool (that pool names it as originator): consents signed for `router` fail there
+        address otherAddr = makeAddr("otherRouter");
+        vm.prank(owner);
+        DecentralizedMicrocredit otherPool =
+            new DecentralizedMicrocredit(433, 500, 100e6, address(usdc), oracle, otherAddr);
+        deployCodeTo("TransitiveStakeRouter.sol:TransitiveStakeRouter", abi.encode(otherPool), otherAddr);
+        TransitiveStakeRouter other = TransitiveStakeRouter(otherAddr);
         vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
         other.originate(req, sig, ps);
 
         // the same router on another chain id: the consent domain changed
-        vm.prank(borrower);
-        credit.setManager(address(router));
         vm.chainId(block.chainid + 1);
         vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
         router.originate(req, sig, ps);
@@ -906,6 +907,15 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
 
     // ───────────── attribution arithmetic ─────────────
 
+    /// @dev The harness is a router, so its pool must name it as originator: place it at an address a fresh pool names.
+    function _harness() internal returns (AttributionHarness) {
+        address hAddr = makeAddr("harness");
+        vm.prank(owner);
+        DecentralizedMicrocredit hp = new DecentralizedMicrocredit(433, 500, 100e6, address(usdc), oracle, hAddr);
+        deployCodeTo("TransitiveStakeRouter.t.sol:AttributionHarness", abi.encode(hp), hAddr);
+        return AttributionHarness(hAddr);
+    }
+
     function testFuzzAttributionSumsToTheLossAndNeverExceedsAPath(
         uint96 a0,
         uint96 a1,
@@ -914,7 +924,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         uint8 n,
         uint256 lossSeed
     ) public {
-        AttributionHarness h = new AttributionHarness(credit);
+        AttributionHarness h = _harness();
         uint256 count = bound(n, 1, 4);
         uint96[4] memory raw = [a0, a1, a2, a3];
         StakeRouterBase.PathLot[] memory paths = new StakeRouterBase.PathLot[](count);

@@ -49,8 +49,9 @@ class RehearsalTypedDataTest(unittest.TestCase):
     def test_the_candidate_deploys_one_manager_and_no_unbound_router(self):
         deploy = open(os.path.join(SRC, "..", "script", "DeployBootstrapCandidate.s.sol")).read()
         self.assertIn("new BootstrapOrderRouter(pool)", deploy)
+        self.assertIn("predictedRouter", deploy)
         self.assertNotIn("new TransitiveStakeRouter", deploy)
-        self.assertNotIn("new BootstrapOrderEscrow", deploy)
+        self.assertNotIn("BootstrapOrderEscrow", deploy)
 
     def test_typed_data_shape(self):
         m = dict(zip([n for n, _ in cr.CONSENT_FIELDS], ["0xa", "0xb", "0xc", 5, 6, 0, 9]))

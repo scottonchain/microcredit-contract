@@ -11,8 +11,7 @@ For a public chain the custodian runs the same calls with `--account <keystore>`
   candidate_rehearsal.py run --rpc http://127.0.0.1:8546 --pool 0x.. --router 0x.. [--with-default]
   candidate_rehearsal.py typed-data pool|consent|accept|approval --chain-id N --verifying 0x.. [fields as --key value]
 
-The product is one manager, `BootstrapOrderRouter`. The run: a lender deposits 5 USDC; the worker names the router as its
-manager; two roots deposit 1 USDC each; a customer funds an exact order (1 USDC advance to a vendor, 1.5 USDC price); the
+The product is one originator, `BootstrapOrderRouter`, which the pool names at construction. The run: a lender deposits 5 USDC; two roots deposit 1 USDC each; a customer funds an exact order (1 USDC advance to a vendor, 1.5 USDC price); the
 roots and a mid sign consents, the worker signs the pool request and its acceptance of the order; negative controls (every
 direct origination path, a tampered request, a forged consent and the unbound router entry refuse); anyone submits
 `originateOrder`; a replay refuses; the customer settles (the debt is paid first, the worker receives the remainder, the
@@ -172,10 +171,8 @@ def run(a):
     c.send(L, usdc, "approve(address,uint256)", pool, str(usdc_amt(5)))
     c.send(L, pool, "depositFunds(uint256)", str(usdc_amt(5)))
     step("lender deposited 5 USDC to the candidate pool")
-    for w in (W, W2) if a.with_default else (W,):
-        c.send(w, pool, "setManager(address)", router)
-        assert c.call(pool, "managerOf(address)(address)", w).lower() == router.lower()
-    step("worker named the router as its only manager (before any backing exists)")
+    assert c.call(pool, "ORIGINATOR()(address)").lower() == router.lower()
+    step("the pool's immutable originator is the router: no worker names anything, and no other caller can originate for any borrower")
 
     # 3 roots deposit
     for r in (R1, R2):

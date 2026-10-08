@@ -1,22 +1,22 @@
 # The bootstrap order router (`BootstrapOrderRouter`)
 
-One manager for the bootstrap product: a consenting customer's **funded exact order** pays a named loan first, and the
-loan is **backed by roots' stake** through the two-hop router. It composes `BootstrapOrderEscrow` and
-`TransitiveStakeRouter` into a single contract because a worker can name only one pool manager and backing locks that
-choice (CI-31); two managers could never act on the same loan. Testnet only; not a human-lending release. The pool is
-unchanged apart from the manager gate. This document states what the code does and where it stops; the base
-machinery (consents, vault, `sync`, loss attribution) is described in `TRANSITIVE_STAKE_ROUTER.md`.
+The single originator of the bootstrap product's pool: a consenting customer's **funded exact order** pays a named loan
+first, and the loan is **backed by roots' stake** through the two-hop router, **and approved by a credit officer**. It
+composes the funded-order escrow and the two-hop stake machinery into one contract because a pool has exactly one
+originator (`ORIGINATOR`, immutable, named at construction: CI-31, CI-32). Testnet only; not a human-lending release.
+The pool differs from the live one only in that gate. This document states what the code does and where it stops; the
+base machinery (consents, vault, `sync`, loss attribution) is described in `TRANSITIVE_STAKE_ROUTER.md`.
 
 Components kept for their own tests and labelled as such: `TransitiveStakeRouter` (the unbound two-hop router: anyone
-holding the borrower's signed pool request and the consents may originate; it binds no order) and
-`BootstrapOrderEscrow` (an order adapter backed by a sponsor's own stake at the pool). Neither is deployed by
-`DeployBootstrapCandidate.s.sol`, and an order-bound worker has no unbound entry: `BootstrapOrderRouter` has exactly
-one origination function, `originateOrder`.
+holding the borrower's signed pool request and the consents may originate; it binds no order, and needs a pool that
+names it). The earlier funded-order adapter `BootstrapOrderEscrow` depended on a per-borrower manager, which no longer
+exists, and was removed; this contract replaces it (git history keeps it). `DeployBootstrapCandidate.s.sol` deploys the
+pool, its lens and this router only, and `BootstrapOrderRouter` has exactly one origination function, `originateOrder`.
 
 ## Flow
 
-1. The worker (a borrower with no credit, no ETH, no USDC) names the router as its pool manager, **before any backing
-   exists**: the one direct transaction it needs.
+1. The worker (a borrower with no credit, no ETH, no USDC) does nothing on chain: the pool already admits only this
+   router as originator, for every borrower.
 2. Roots deposit USDC (`deposit`); it sits in `free[root]`. Roots and mids sign EIP-712 `EdgeConsent`s (below).
 3. A customer funds an order: `fund(Intent, price, maxDebt, settleBy)`. The intent is the pool request field for field
    (worker, vendor, amount, term, max APR, the worker's pool nonce, the deadline) plus a job hash; the pool and token
@@ -26,7 +26,7 @@ one origination function, `originateOrder`.
 5. Anyone submits `originateOrder(id, request, poolSig, orderSig, paths)`. The router checks the order is Funded and
    in its window, every request field equals the intent, the worker's acceptance verifies (EOA or ERC-1271), then in
    one transaction reserves the roots' USDC along one to four consented paths, sends it to the worker's vault, which
-   stakes it and backs the worker with all of it (secured), calls `pool.borrowAndDisburseMeta` as the worker's manager,
+   stakes it and backs the worker with all of it (secured), calls `pool.borrowAndDisburseMeta` as the pool's originator,
    and binds the new loan to the order (`loanOrder`).
 6. The customer accepts delivery with `settleOrder(id)`: the loan's current debt is repaid out of the order's escrow
    first (capped by `maxDebt` and the price), the worker receives the remainder, and the roots' lot is returned in the
@@ -60,9 +60,9 @@ Operator direction of 2026-10-08, reconciled with the transitive target in testb
 - **Officer gate (second, new).** `approveOrder(JobApproval, sig)` records the officer's EIP-712 approval for one funded order: order id, intent hash, maximum amount, expiry, policy version and officer epoch. `originateOrder` then requires a live approval under the current epoch and policy version for at least the order's amount (`NoApproval`, `ApprovalTooSmall`). The intent is exact, so the officer can only refuse or approve the whole order; it cannot raise, add, move or revive anything. An approval is consumed by origination and bound to one order.
 - **Officer control.** `officerAdmin` (the deployer at first; `setOfficerAdmin` hands it over) names the officer and the policy version with `setOfficer`; the admin or the officer itself clears it with `revokeOfficer`. Either bumps the epoch, which voids every unused approval. Neither touches a ledger, a consent or a root's balance. The router starts with no officer, so nothing originates until one is named (fail closed). The officer key is separate from the roots' keys and from the worker's.
 - **Outage.** No officer, a revoked officer or an officer contract that reverts on every call stops new admissions and nothing else: `settleOrder`, `refundOrder`, `sync`, repayment by anyone and a root's withdrawal read no officer state (`testAnOutageStopsNewAdmissionsOnlyAndLeavesEveryExitWorking`).
-- **Tests.** `testNoApprovalNoOrigination`, `testRouterStartsWithoutAnOfficerAndFailsClosed`, `testAnApprovalBelowTheAmountCannotOriginate`, `testAValidApprovalNeverCreatesCapacity`, `testRevokingTheGraphDefeatsAValidApprovalWithoutTouchingIt`, `testRotatingOrRevokingTheOfficerVoidsUnusedApprovalsAndMovesNoMoney`, `testRotationWithTheSamePolicyStillVoidsOldApprovals`, `testOnlyTheAdminOrTheOfficerCanChangeTheOfficer`, `testAnApprovalForOneOrderCannotBeUsedForAnother`, `testGrantedCreditDoesNotLetAManagedWorkerSkipTheOfficer`; the invariant campaign (O1 to O7) now also rotates and revokes the officer. Seven deliberate bugs in the gate are each caught.
+- **Tests.** `testNoApprovalNoOrigination`, `testRouterStartsWithoutAnOfficerAndFailsClosed`, `testAnApprovalBelowTheAmountCannotOriginate`, `testAValidApprovalNeverCreatesCapacity`, `testRevokingTheGraphDefeatsAValidApprovalWithoutTouchingIt`, `testRotatingOrRevokingTheOfficerVoidsUnusedApprovalsAndMovesNoMoney`, `testRotationWithTheSamePolicyStillVoidsOldApprovals`, `testOnlyTheAdminOrTheOfficerCanChangeTheOfficer`, `testAnApprovalForOneOrderCannotBeUsedForAnother`, `testGrantedCreditDoesNotLetAWorkerSkipTheOfficer`, `testNoBorrowerCanBeOriginatedOutsideTheRouterWhateverSupportsIt`, `testRouterRefusesAPoolThatDoesNotNameItAsOriginator`; the invariant campaign (O1 to O7) now also rotates and revokes the officer. Seven deliberate bugs in the gate are each caught.
 
-**Scope, stated.** The gate binds every worker that names this router as its only pool manager before any backing exists, which is how the pilot is set up. It does **not** bind a borrower who names no manager, or who clears its manager with `setManager(0)` while it owes nothing and holds no backing; and an owner or oracle granted line is capacity the officer did not approve, usable by such a borrower through the pool's ordinary entries. A pool-wide guarantee needs an immutable origination authority fixed at construction and checked in `_originateLoan` for every route (it also removes `managerOf`, `setManager` and their locks); a governed authority would be an owner bypass. Its bytes are being measured; the pool is 24,538 of 24,576 today. Tracked as CI-32.
+**Scope.** The pool is built with this router as its immutable originator, so the second gate covers every borrower on every route (`requestLoan`, `requestLoanMeta`, `borrowAndDisburseMeta`): a borrower with nothing, an owner-granted line, an oracle score, ordinary backing and stake all reach the same refusal (`NotManager`) unless the call comes from this router, and the router refuses without a live approval. There is no `setManager` and no originator setter, not even for the owner (`testNoBorrowerCanBeOriginatedOutsideTheRouterWhateverSupportsIt`, `OriginatorGate.t.sol`). The router refuses to be built against a pool that does not name it. What this does not do: a pool with a zero originator is open (the live pool and the other suites), and the officer is a single key (or a contract wrapping one) whose compromise lets it approve jobs up to the graph's capacity but never beyond it. CI-32 is closed for this pool.
 
 ## What is tested
 
@@ -96,11 +96,10 @@ Operator direction of 2026-10-08, reconciled with the transitive target in testb
 - **The customer decides acceptance, not an oracle.** Rejection refunds the customer and leaves the debt with the worker
   and the loss with the roots; the roots consented to the worker and the job class, not to the customer's verdict.
   Customer, worker and roots may be one party's aliases; nothing here detects it.
-- **One open lot per worker**, one manager per worker, and the pool's relayer whitelist, if enabled, must name the router.
+- **One open lot per worker**, and the pool's relayer whitelist, if enabled, must name the router.
 - **A mid has no capital at risk** and the submitter picks the paths among the consents it holds (see
   `TRANSITIVE_STAKE_ROUTER.md`). Consents of one version on one edge are interchangeable.
-- **Liveness only:** a stranger can back a fresh address before it names a manager (the pool then refuses
-  `setManager`), and can fill the pool's 32 backer slots; neither touches safety.
+- **Liveness only:** a stranger can fill a worker's 32 backer slots in the pool; it touches no safety property.
 - **Token risk:** a blacklisted vendor makes `originateOrder` fail whole; a blacklisted worker blocks `settleOrder`,
   and the customer can still refund (tested on the fork).
 - **Not audited; testnet only.** The live Base Sepolia pool keeps its old bytecode.

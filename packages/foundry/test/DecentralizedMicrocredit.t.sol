@@ -127,7 +127,8 @@ contract DecentralizedMicrocreditTest is MicrocreditTestBase {
     function testLenderCannotWithdrawMoreThanAvailablePoolFunds() public {
         // Fresh pool funded by a single lender.
         vm.prank(owner);
-        DecentralizedMicrocredit pool = new DecentralizedMicrocredit(750, 250, type(uint256).max, address(usdc), oracle);
+        DecentralizedMicrocredit pool =
+            new DecentralizedMicrocredit(750, 250, type(uint256).max, address(usdc), oracle, address(0));
         vm.startPrank(owner);
         pool.setScoreOverride(borrower, SCALE);
         vm.stopPrank();

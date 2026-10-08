@@ -50,9 +50,17 @@ abstract contract MicrocreditTestBase is Test {
         keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     function _deploy(uint256 effrRate, uint256 riskPremium, uint256 maxLoanAmount) internal {
+        _deployWithOriginator(effrRate, riskPremium, maxLoanAmount, address(0));
+    }
+
+    /// @dev `originator` is the only caller that may originate loans (zero: an open pool). A router test passes the
+    ///      address its router will have: `vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + k)`.
+    function _deployWithOriginator(uint256 effrRate, uint256 riskPremium, uint256 maxLoanAmount, address originator)
+        internal
+    {
         usdc = new MockUSDC();
         vm.prank(owner);
-        credit = new DecentralizedMicrocredit(effrRate, riskPremium, maxLoanAmount, address(usdc), oracle);
+        credit = new DecentralizedMicrocredit(effrRate, riskPremium, maxLoanAmount, address(usdc), oracle, originator);
         lens = new MicrocreditLens(credit);
         scores = new OracleScoreProvider(owner, oracle, MAX_SCORE_AGE, ISSUANCE_BUDGET);
         vm.startPrank(owner);

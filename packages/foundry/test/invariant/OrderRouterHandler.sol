@@ -84,8 +84,6 @@ contract OrderRouterHandler is CommonBase, StdCheats, StdUtils {
             _workerKeys.push(k);
             address w = vm.addr(k);
             workers.push(w);
-            vm.prank(w);
-            credit_.setManager(address(router_));
         }
         for (uint256 i = 0; i < NC; i++) {
             customers.push(address(uint160(0xC057 + i)));

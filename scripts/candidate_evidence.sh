@@ -17,6 +17,8 @@ SENDER=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 ( cd packages/foundry && forge --version && grep -E "solc_version|via_ir|optimizer|evm_version" foundry.toml ) > "$OUT/logs/toolchain.txt" 2>&1
 ( cd packages/foundry && forge test ) > "$OUT/logs/forge-test-local.txt" 2>&1 || true
 ( cd packages/foundry && BASE_SEPOLIA_RPC_URL=$RPC forge test --match-path 'test/fork/*Router*' ) > "$OUT/logs/forge-test-fork-routers.txt" 2>&1 || true
+( cd packages/foundry && FOUNDRY_INVARIANT_RUNS=512 FOUNDRY_INVARIANT_DEPTH=150 forge test --match-path 'test/invariant/*Router*' ) > "$OUT/logs/invariant-deep.txt" 2>&1 || true
+python3 scripts/candidate_mutants.py > "$OUT/logs/mutants.txt" 2>&1 || true
 ( cd scripts && for t in test_verify_candidate_deployment test_candidate_rehearsal test_two_hop_check; do echo "== $t"; python3 -m unittest $t 2>&1 | tail -3; done ) > "$OUT/logs/python-tests.txt" 2>&1
 fork_deploy() {  # starts a fresh fork, deploys the candidate, prints "pool lens router"
   pkill -x anvil || true; sleep 1
@@ -70,6 +72,7 @@ zeroed on both sides) and every wiring check held.
 - Router fork suites against Circle's USDC (`logs/forge-test-fork-routers.txt`): {fork}
 - Script tests (`logs/python-tests.txt`): verifier, rehearsal typed-data drift, two-hop check.
 - Deep invariant campaigns (512 runs of depth 150, both router suites) are recorded in `logs/invariant-deep.txt`.
+- Mutation check (`scripts/candidate_mutants.py`, one planted bug at a time, each must fail the suite): `logs/mutants.txt`.
 - Rehearsals with `cast` on a fresh fork: `logs/rehearsal-normal.txt`, `logs/rehearsal-with-default.txt`.
 
 Local Forge here is 1.5.1; CI uses 1.8.5, which counts each invariant campaign as one test, so counts differ by tool version.

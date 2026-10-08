@@ -120,8 +120,6 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
             _borrowerKeys.push(k);
             address b = vm.addr(k);
             borrowers.push(b);
-            vm.prank(b);
-            credit_.setManager(address(router_));
         }
     }
 

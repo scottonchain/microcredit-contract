@@ -584,6 +584,11 @@ const deployedContracts = {
               type: "address",
               internalType: "address",
             },
+            {
+              name: "_originator",
+              type: "address",
+              internalType: "address",
+            },
           ],
           stateMutability: "nonpayable",
         },
@@ -700,6 +705,19 @@ const deployedContracts = {
               name: "",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "ORIGINATOR",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
             },
           ],
           stateMutability: "view",
@@ -1866,25 +1884,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "managerOf",
-          inputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "markDefaulted",
           inputs: [
             {
@@ -2511,19 +2510,6 @@ const deployedContracts = {
               name: "threshold",
               type: "uint256",
               internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "setManager",
-          inputs: [
-            {
-              name: "manager",
-              type: "address",
-              internalType: "address",
             },
           ],
           outputs: [],
@@ -3827,11 +3813,6 @@ const deployedContracts = {
         {
           type: "error",
           name: "LoanNotRequested",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "ManagerLocked",
           inputs: [],
         },
         {
@@ -4922,6 +4903,11 @@ const deployedContracts = {
               type: "address",
               internalType: "address",
             },
+            {
+              name: "_originator",
+              type: "address",
+              internalType: "address",
+            },
           ],
           stateMutability: "nonpayable",
         },
@@ -5038,6 +5024,19 @@ const deployedContracts = {
               name: "",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "ORIGINATOR",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
             },
           ],
           stateMutability: "view",
@@ -6204,25 +6203,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "managerOf",
-          inputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "markDefaulted",
           inputs: [
             {
@@ -6849,19 +6829,6 @@ const deployedContracts = {
               name: "threshold",
               type: "uint256",
               internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "setManager",
-          inputs: [
-            {
-              name: "manager",
-              type: "address",
-              internalType: "address",
             },
           ],
           outputs: [],
@@ -8165,11 +8132,6 @@ const deployedContracts = {
         {
           type: "error",
           name: "LoanNotRequested",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "ManagerLocked",
           inputs: [],
         },
         {

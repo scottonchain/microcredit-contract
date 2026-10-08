@@ -44,7 +44,7 @@ contract BaseSepoliaUsdcForkTest is MicrocreditTestBase {
 
         usdc = MockUSDC(BASE_SEPOLIA_USDC); // only ERC-20 and EIP-2612 functions are called on it
         vm.prank(owner);
-        credit = new DecentralizedMicrocredit(433, 500, 100e6, BASE_SEPOLIA_USDC, oracle);
+        credit = new DecentralizedMicrocredit(433, 500, 100e6, BASE_SEPOLIA_USDC, oracle, address(0));
         lens = new MicrocreditLens(credit);
         scores = new OracleScoreProvider(owner, oracle, MAX_SCORE_AGE, ISSUANCE_BUDGET);
         vm.startPrank(owner);

@@ -37,9 +37,11 @@ contract TransitiveStakeRouterInvariantTest is MicrocreditTestBase {
     RouterHandler internal handler;
 
     function setUp() public {
-        _deploy(433, 500, 100e6);
+        address routerAddr = makeAddr("router");
+        _deployWithOriginator(433, 500, 100e6, routerAddr);
         _deposit(makeAddr("poolLender"), POOL);
-        router = new TransitiveStakeRouter(credit);
+        deployCodeTo("TransitiveStakeRouter.sol:TransitiveStakeRouter", abi.encode(credit), routerAddr);
+        router = TransitiveStakeRouter(routerAddr);
         handler = new RouterHandler(credit, usdc, router);
         targetContract(address(handler));
         bytes4[] memory selectors = new bytes4[](11);

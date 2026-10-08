@@ -133,7 +133,8 @@ contract DeployProductionScript is Script {
         d.timelock = new TimelockController(cfg.timelockDelay, governors, governors, address(0));
 
         // The constructor makes the deployer owner; ADMIN gets the oracle role (markKYCVerified).
-        d.credit = new DecentralizedMicrocredit(cfg.effrBps, cfg.riskPremiumBps, cfg.maxLoan, cfg.usdc, cfg.admin);
+        d.credit =
+            new DecentralizedMicrocredit(cfg.effrBps, cfg.riskPremiumBps, cfg.maxLoan, cfg.usdc, cfg.admin, address(0));
         d.lens = new MicrocreditLens(d.credit);
         // No reporter: scores arrive only through a pinned CRE workflow, once one is configured.
         d.scores =

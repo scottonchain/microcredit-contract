@@ -62,7 +62,12 @@ contract DeployTestnetScript is Script {
             d.usdc = address(new MockUSDC());
         }
         d.credit = new DecentralizedMicrocredit(
-            _envUint("EFFR_BPS", 433), _envUint("RISK_PREMIUM_BPS", 500), _envUint("MAX_LOAN", 25e6), d.usdc, d.deployer
+            _envUint("EFFR_BPS", 433),
+            _envUint("RISK_PREMIUM_BPS", 500),
+            _envUint("MAX_LOAN", 25e6),
+            d.usdc,
+            d.deployer,
+            address(0)
         );
         d.lens = new MicrocreditLens(d.credit);
         d.scores =

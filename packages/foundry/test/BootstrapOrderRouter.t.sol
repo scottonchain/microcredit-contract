@@ -46,10 +46,12 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
         (root1, root1Key) = makeAddrAndKey("root1");
         (root2, root2Key) = makeAddrAndKey("root2");
         (mid1, mid1Key) = makeAddrAndKey("mid1");
-        _deployProtocol();
+        address routerAddr = makeAddr("router"); // the pool names this address as its immutable originator; the router is then placed there
+        _deployProtocol(routerAddr);
         vm.prank(owner);
         credit.setReserveBps(4_500);
-        router = new BootstrapOrderRouter(credit);
+        deployCodeTo("BootstrapOrderRouter.sol:BootstrapOrderRouter", abi.encode(credit), routerAddr);
+        router = BootstrapOrderRouter(routerAddr);
         (officer, officerKey) = makeAddrAndKey("officer");
         router.setOfficer(officer, 1); // this contract deployed the router, so it is the officer admin
         _give(lender, LIQUIDITY);
@@ -60,11 +62,7 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
         _give(customer, CUSTOMER_BUDGET);
         _rootFund(root1, ROOT_FUND);
         _rootFund(root2, ROOT_FUND);
-        // order matters: the worker names its manager first; the router makes the backing at origination
-        vm.prank(worker);
-        credit.setManager(address(router));
-        vm.prank(worker2);
-        credit.setManager(address(router));
+        // no worker names anything: the pool itself admits only the router as originator
         assertEq(worker.balance, 0, "worker starts without ETH");
         assertEq(usdc.balanceOf(worker), 0, "worker starts without USDC");
         assertEq(credit.grantedCredit(worker), 0, "worker starts without credit");
@@ -74,8 +72,20 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
     // ───────────── helpers ─────────────
 
     /// @dev The fork suite overrides these two to run the same tests against Circle's USDC.
-    function _deployProtocol() internal virtual {
-        _deploy(433, 500, 100e6);
+    function _deployProtocol(address originator) internal virtual {
+        _deployWithOriginator(433, 500, 100e6, originator);
+    }
+
+    /// @dev A second pool that names its own router as originator, with that router placed at `makeAddr(name)`.
+    function _pairedRouter(string memory name)
+        internal
+        returns (DecentralizedMicrocredit pool2, BootstrapOrderRouter r2)
+    {
+        address addr = makeAddr(name);
+        vm.prank(owner);
+        pool2 = new DecentralizedMicrocredit(433, 500, 100e6, address(usdc), oracle, addr);
+        deployCodeTo("BootstrapOrderRouter.sol:BootstrapOrderRouter", abi.encode(pool2), addr);
+        r2 = BootstrapOrderRouter(addr);
     }
 
     function _give(address who, uint256 amount) internal virtual {
@@ -550,32 +560,60 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
         router.originateOrder(id, req, poolSig, wrong, ps);
     }
 
-    function testUnmanagedWorkerCannotBeOriginatedByTheRouter() public {
-        (address other, uint256 otherKey) = makeAddrAndKey("other-worker");
-        BootstrapOrderRouter.Intent memory i = _intent(other, INPUT_COST);
-        uint256 id = _fund(i, ORDER_PRICE, 120 days);
-        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(i);
-        bytes memory poolSig = _signBorrowAndDisburse(otherKey, req);
-        bytes memory orderSig = _orderSig(otherKey, id);
-        StakeRouterBase.Path[] memory ps = _two(other, INPUT_COST, 600_000);
-        vm.prank(relayer);
+    function testRouterRefusesAPoolThatDoesNotNameItAsOriginator() public {
+        vm.startPrank(owner);
+        DecentralizedMicrocredit open = new DecentralizedMicrocredit(433, 500, 100e6, address(usdc), oracle, address(0));
+        vm.stopPrank();
         vm.expectRevert(StakeRouterBase.NotManager.selector);
-        router.originateOrder(id, req, poolSig, orderSig, ps);
+        new BootstrapOrderRouter(open);
     }
 
-    function testBackingBeforeTheManagerLocksTheChoiceAndLiveBackingFixesIt() public {
-        (address late,) = makeAddrAndKey("late-worker");
-        _poolStake(makeAddr("s3"), 1e6);
+    /// @dev CI-32, the universal gate: whatever supports a borrower, no route into the pool but the router originates.
+    function testNoBorrowerCanBeOriginatedOutsideTheRouterWhateverSupportsIt() public {
+        assertEq(credit.ORIGINATOR(), address(router));
+        (address plain, uint256 plainKey) = makeAddrAndKey("plain-borrower");
+        // (a) an owner-granted line, (b) ordinary stake backing from a stranger, (c) both
+        vm.prank(owner);
+        credit.setScoreOverride(plain, 1e6);
+        _poolStake(makeAddr("s3"), 3e6);
         vm.prank(makeAddr("s3"));
-        credit.back(late, 1e6);
-        vm.prank(late);
-        vm.expectRevert(DecentralizedMicrocredit.ManagerLocked.selector);
-        credit.setManager(address(router));
+        credit.back(plain, 2e6);
 
-        _bound(); // and a live router lot fixes the worker's manager too
-        vm.prank(worker);
-        vm.expectRevert(DecentralizedMicrocredit.ManagerLocked.selector);
-        credit.setManager(address(0));
+        vm.prank(plain);
+        vm.expectRevert(DecentralizedMicrocredit.NotManager.selector);
+        credit.requestLoan(1e6); // direct
+        DecentralizedMicrocredit.LoanRequest memory lr = DecentralizedMicrocredit.LoanRequest({
+            borrower: plain, amount: 1e6, nonce: credit.nonces(plain), deadline: _deadline()
+        });
+        bytes memory lsig = _signLoanRequest(plainKey, lr);
+        vm.prank(relayer);
+        vm.expectRevert(DecentralizedMicrocredit.NotManager.selector);
+        credit.requestLoanMeta(lr, lsig); // meta
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = DecentralizedMicrocredit.BorrowAndDisburse({
+            borrower: plain,
+            amount: 1e6,
+            to: vendor,
+            repaymentPeriod: TERM,
+            maxAprBps: 933,
+            nonce: credit.nonces(plain),
+            deadline: _deadline()
+        });
+        bytes memory sig = _signBorrowAndDisburse(plainKey, req);
+        vm.prank(relayer);
+        vm.expectRevert(DecentralizedMicrocredit.NotManager.selector);
+        credit.borrowAndDisburseMeta(req, sig); // vendor-directed
+        vm.prank(address(0xBEEF));
+        vm.expectRevert(DecentralizedMicrocredit.NotManager.selector);
+        credit.borrowAndDisburseMeta(req, sig); // any other caller
+
+        // there is no setter to reset: the per-borrower manager no longer exists, and nothing can change the originator
+        (bool ok,) = address(credit).call(abi.encodeWithSignature("setManager(address)", address(0)));
+        assertFalse(ok, "setManager must not exist");
+        (ok,) = address(credit).call(abi.encodeWithSignature("managerOf(address)", plain));
+        assertFalse(ok, "managerOf must not exist");
+        (ok,) = address(credit).call(abi.encodeWithSignature("setOriginator(address)", plain));
+        assertFalse(ok, "no originator setter");
+        assertEq(usdc.balanceOf(vendor), 0, "the vendor was never paid");
     }
 
     // ───────────── replay and duplicate execution ─────────────
@@ -613,7 +651,7 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
         StakeRouterBase.Path[] memory ps = _two(worker, INPUT_COST, 600_000);
 
         // another router: same pool, same signatures, funded the same way; the pool names only the first router
-        BootstrapOrderRouter other = new BootstrapOrderRouter(credit);
+        (, BootstrapOrderRouter other) = _pairedRouter("router2");
         vm.startPrank(customer);
         usdc.approve(address(other), ORDER_PRICE);
         uint256 otherId = other.fund(i, ORDER_PRICE, ORDER_PRICE, block.timestamp + 120 days);
@@ -838,7 +876,7 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
     }
 
     function testRouterStartsWithoutAnOfficerAndFailsClosed() public {
-        BootstrapOrderRouter fresh = new BootstrapOrderRouter(credit);
+        (, BootstrapOrderRouter fresh) = _pairedRouter("router3");
         assertEq(fresh.officer(), address(0));
         assertEq(fresh.officerAdmin(), address(this));
         // no officer: even a well-formed signature by anyone cannot be recorded
@@ -1017,8 +1055,8 @@ contract BootstrapOrderRouterTest is MicrocreditTestBase {
         router.originateOrder(id, req, poolSig, orderSig, ps);
     }
 
-    function testGrantedCreditDoesNotLetAManagedWorkerSkipTheOfficer() public {
-        // an owner override or oracle line is capacity the officer did not approve; the manager gate still
+    function testGrantedCreditDoesNotLetAWorkerSkipTheOfficer() public {
+        // an owner override or oracle line is capacity the officer did not approve; the pool's originator gate
         // refuses every caller but the router, and the router refuses without an approval
         vm.prank(owner);
         credit.setScoreOverride(worker, 1e6);
