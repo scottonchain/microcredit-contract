@@ -30,6 +30,34 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual(v.strip_metadata(a), v.strip_metadata(b))
 
 
+def blob(h, version=b"\x00\x08\x21"):
+    return v.META_PREFIX + h + v.META_SUFFIX + version + b"\x00\x33"
+
+
+class PortableHashTest(unittest.TestCase):
+    """Two checkouts of one source differ in every metadata hash, including one carried inside a contract that creates another."""
+
+    def code(self, inner, outer, body=b"\x60\x80\x60\x40" * 6, version=b"\x00\x08\x21"):
+        inner_code = body + blob(inner, version)
+        return body + inner_code + b"\x5b" * 4 + body + blob(outer, version)
+
+    def test_metadata_hashes_anywhere_in_the_code_do_not_change_the_portable_form(self):
+        a = self.code(b"\x11" * 34, b"\x22" * 34)
+        b = self.code(b"\x99" * 34, b"\x88" * 34)
+        self.assertNotEqual(a, b)
+        self.assertNotEqual(v.strip_metadata(a), v.strip_metadata(b))  # the old comparison still saw the inner blob
+        self.assertEqual(v.portable(a), v.portable(b))
+
+    def test_a_real_code_difference_or_a_solc_version_difference_still_shows(self):
+        a = self.code(b"\x11" * 34, b"\x22" * 34)
+        self.assertNotEqual(v.portable(a), v.portable(self.code(b"\x11" * 34, b"\x22" * 34, body=b"\x60\x80\x60\x41" * 6)))
+        self.assertNotEqual(v.portable(a), v.portable(self.code(b"\x11" * 34, b"\x22" * 34, version=b"\x00\x08\x22")))
+
+    def test_the_marker_bytes_without_the_solc_suffix_are_left_alone(self):
+        fake = b"\x01" * 8 + v.META_PREFIX + b"\x77" * 34 + b"\x00" * 12
+        self.assertEqual(v.zero_metadata_hashes(fake), fake)
+
+
 POOL = "0x" + "11" * 20
 OTHER = "0x" + "22" * 20
 ROUTER = "0x" + "33" * 20

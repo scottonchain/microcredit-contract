@@ -1,4 +1,4 @@
-import json, os, tempfile, unittest
+import contextlib, io, json, os, tempfile, unittest
 import candidate_evidence_gate as g
 
 POOL = "0x" + "11" * 20
@@ -13,12 +13,14 @@ GOOD = {
     "rehearsal-with-default.txt": "- sync attributed the lot\nREHEARSAL OK (with default path)\n",
     "toolchain.txt": "forge Version: 1.5.1-stable\n",
     "build-sizes.txt": "| DecentralizedMicrocredit | 24,439 |\n",
+    "fork-block.txt": "41234567 0x" + "ab" * 32 + "\n",
 }
 
 
 def verifier(**over):
     v = {"ok": True, "rpc_chain_id": 84532,
-         "contracts": {r: {"address": POOL if r == "pool" else "0x" + "22" * 20, "match_strict": True} for r in ("pool", "lens", "router")},
+         "contracts": {r: {"address": POOL if r == "pool" else "0x" + "22" * 20, "match_strict": True,
+                           "masked_nometa_sha256_build": "ab" * 32, "masked_nometa_sha256_onchain": "ab" * 32} for r in ("pool", "lens", "router")},
          "wiring": {"lens.credit": POOL}, "checks": {g.LENS_CHECK: True, "router.pool == pool": True}}
     v.update(over)
     return v
@@ -30,9 +32,14 @@ class GateTest(unittest.TestCase):
         os.makedirs(os.path.join(d, "logs"))
         for n, t in {**GOOD, **(files or {})}.items():
             if t is not None:
-                open(os.path.join(d, "logs", n), "w").write(t)
-        open(os.path.join(d, "logs", "verifier.json"), "w").write(json.dumps(ver if ver is not None else verifier()))
+                self.write(d, n, t)
+        self.write(d, "verifier.json", json.dumps(ver if ver is not None else verifier()))
         return d
+
+    @staticmethod
+    def write(d, name, text):
+        with open(os.path.join(d, "logs", name), "w") as f:
+            f.write(text)
 
     def test_a_clean_packet_passes(self):
         self.assertEqual(g.gate(self.packet()), [])
@@ -66,7 +73,15 @@ class GateTest(unittest.TestCase):
         self.assertTrue(g.gate(self.packet({"rehearsal-normal.txt": "- replay refused\nTraceback ...\n"})))
         self.assertTrue(g.gate(self.packet({"rehearsal-with-default.txt": "REHEARSAL OK\n"})))
 
+    def test_harmless_output_after_a_passing_unittest_summary_does_not_fail_the_suite(self):
+        # Codex review 5463115207: the suite includes the gate's own tests, which print after the summary of an earlier module
+        log = "Ran 55 tests in 0.1s\n\nOK\nEVIDENCE GATE FAILED:\n- mutants: exited 1\nResourceWarning: unclosed file\n"
+        self.assertEqual(g.gate(self.packet({"python-tests.txt": log})), [])
+        self.assertEqual(g.gate(self.packet({"python-tests.txt": "..\nRan 3 tests in 0.1s\n\nOK\n\n"})), [])
+
     def test_python_test_failures_fail(self):
+        self.assertTrue(g.gate(self.packet({"python-tests.txt": "Ran 55 tests in 0.1s\n\nNOT OK\n"})))
+        self.assertTrue(g.gate(self.packet({"python-tests.txt": "OK\nRan 0 tests in 0.0s\n"})))
         self.assertTrue(g.gate(self.packet({"python-tests.txt": "Ran 55 tests in 0.1s\n\nFAILED (failures=1)\n"})))
         self.assertTrue(g.gate(self.packet({"python-tests.txt": "ERROR: test_x\nRan 3 tests in 0.1s\n\nOK\n"})))
 
@@ -80,16 +95,28 @@ class GateTest(unittest.TestCase):
         weak = verifier()
         weak["contracts"]["router"]["match_strict"] = False
         self.assertTrue(any("strict" in b for b in g.gate(self.packet(ver=weak))))
+        odd = verifier()
+        odd["contracts"]["lens"]["masked_nometa_sha256_onchain"] = "cd" * 32
+        self.assertTrue(any("metadata-free" in b for b in g.gate(self.packet(ver=odd))))
+        gone = verifier()
+        del gone["contracts"]["pool"]["masked_nometa_sha256_build"]
+        self.assertTrue(any("metadata-free" in b for b in g.gate(self.packet(ver=gone))))
+
+    def test_the_pinned_fork_block_must_be_recorded(self):
+        for text in ("", "41234567\n", "0 0x" + "ab" * 32, "41234567 nothex"):
+            self.assertTrue(any("fork-block" in b for b in g.gate(self.packet({"fork-block.txt": text}))), text)
 
     def test_main_writes_failed_txt_and_nothing_else_on_failure_and_clears_it_on_success(self):
         d = self.packet({"mutants.txt": "18 mutants, 2 survived or did not compile\n"})
-        self.assertEqual(g.sys.argv.__class__, list)
+        argv, self.saved = g.sys.argv, g.sys.argv
+        self.addCleanup(setattr, g.sys, "argv", argv)
         g.sys.argv = ["gate", d]
-        self.assertEqual(g.main(), 1)
-        self.assertTrue(os.path.exists(os.path.join(d, "FAILED.txt")))
-        self.assertFalse(os.path.exists(os.path.join(d, "README.md")))
-        open(os.path.join(d, "logs", "mutants.txt"), "w").write(GOOD["mutants.txt"])
-        self.assertEqual(g.main(), 0)
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):  # the gate's messages are not test output
+            self.assertEqual(g.main(), 1)
+            self.assertTrue(os.path.exists(os.path.join(d, "FAILED.txt")))
+            self.assertFalse(os.path.exists(os.path.join(d, "README.md")))
+            self.write(d, "mutants.txt", GOOD["mutants.txt"])
+            self.assertEqual(g.main(), 0)
         self.assertFalse(os.path.exists(os.path.join(d, "FAILED.txt")))
 
 

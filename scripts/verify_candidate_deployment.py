@@ -46,6 +46,30 @@ def strip_metadata(code):
     return code[:-(n + 2)] if 0 < n < len(code) - 2 else code
 
 
+META_PREFIX = bytes.fromhex("a264697066735822")  # CBOR map {"ipfs": <34-byte multihash>, "solc": <3 bytes>} as solc 0.8 writes it
+META_SUFFIX = bytes.fromhex("64736f6c6343")
+
+
+def zero_metadata_hashes(code):
+    """Zero the 34-byte ipfs hash of every metadata blob in `code`, the trailing one and any carried inside (a contract that
+    creates another contract holds that contract's creation code, metadata included). The hash depends on the checkout path;
+    the solc version bytes next to it are kept."""
+    b, i = bytearray(code), 0
+    while True:
+        i = code.find(META_PREFIX, i)
+        if i < 0:
+            return bytes(b)
+        j = i + len(META_PREFIX)
+        if code[j + 34:j + 34 + len(META_SUFFIX)] == META_SUFFIX:
+            b[j:j + 34] = b"\0" * 34
+        i = j
+
+
+def portable(code):
+    """What two hosts building the same source must agree on: the code without metadata anywhere."""
+    return zero_metadata_hashes(strip_metadata(code))
+
+
 def addr_word(h):
     return "0x" + h[-40:]
 
@@ -105,7 +129,7 @@ def main():
         refs = art["deployedBytecode"]["immutableReferences"]
         m_on, m_built = mask(onchain, refs), mask(built, refs)
         strict = m_on == m_built
-        nometa = strip_metadata(m_on) == strip_metadata(m_built)
+        nometa = portable(m_on) == portable(m_built)
         imm = {}
         for ast, spans in refs.items():
             vals = {onchain[s["start"]:s["start"] + s["length"]].hex() for s in spans}
@@ -113,6 +137,9 @@ def main():
         report["contracts"][role] = {
             "address": getattr(a, role), "onchain_bytes": len(onchain), "eip170_margin": 24576 - len(onchain),
             "masked_sha256_onchain": hashlib.sha256(m_on).hexdigest(), "masked_sha256_build": hashlib.sha256(m_built).hexdigest(),
+            # the CBOR trailer carries the compiler's metadata hash, which depends on the checkout path: compare hosts on this one
+            "masked_nometa_sha256_onchain": hashlib.sha256(portable(m_on)).hexdigest(),
+            "masked_nometa_sha256_build": hashlib.sha256(portable(m_built)).hexdigest(),
             "match_strict": strict, "match_ignoring_metadata": nometa, "immutables": imm,
             "abi_sha256": hashlib.sha256(json.dumps(art["abi"], sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
         }

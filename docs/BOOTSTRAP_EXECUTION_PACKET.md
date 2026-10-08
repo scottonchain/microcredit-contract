@@ -28,8 +28,8 @@ custodian's keystores with throwaway keys and the funding by impersonation with 
 3. **G2 deployment.** Run the deploy script with the custodian's keystore (`--account`, `--sender`),
    `BOOTSTRAP_ORACLE` set to an address the custodian controls (no scores are used) and **no** `OFFICER` (the router starts
    with no officer, so nothing can originate yet). Record the three addresses and transaction hashes. Then `python3 scripts/verify_candidate_deployment.py --rpc <url> --pool .. --lens .. --router ..
-   --json`: all three strict matches and every wiring check must pass, and the masked-runtime and ABI sha256 values must
-   equal the head's `logs/verifier.json`; `pool.ORIGINATOR == router` and `router.officer == 0x0` are in the report. Anything
+   --json`: all three strict matches and every wiring check must pass, and the metadata-free masked-runtime hashes (`masked_nometa_sha256_*`) and the ABI sha256
+   values must equal the head's `logs/verifier.json` (the full `masked_sha256_*` carries a compiler metadata hash that depends on the checkout path, so it differs between hosts); `pool.ORIGINATOR == router` and `router.officer == 0x0` are in the report. Anything
    else: stop, nothing was funded.
 4. **G3 officer.** The router's admin (the deployer) calls `R.setOfficer(officer, 1)`. Read back `R.officer()`, `R.policyVersion()
    = 1` and `R.officerEpoch()`; record them. The officer key is not any of the other roles' keys.

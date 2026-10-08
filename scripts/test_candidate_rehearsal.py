@@ -8,8 +8,13 @@ def type_string(name, fields):
     return f"{name}(" + ",".join(f"{t} {n}" for n, t in fields) + ")"
 
 
+def read_text(path):
+    with open(path) as f:
+        return f.read()
+
+
 def source_string(file, constant):
-    text = open(os.path.join(SRC, file)).read()
+    text = read_text(os.path.join(SRC, file))
     m = re.search(constant + r"\s*=\s*keccak256\(\s*\"([^\"]+)\"", text)
     return m.group(1)
 
@@ -32,14 +37,14 @@ class RehearsalTypedDataTest(unittest.TestCase):
                          source_string("BootstrapOrderRouter.sol", "APPROVAL_TYPEHASH"))
 
     def test_intent_struct_matches_the_order_router(self):
-        text = open(os.path.join(SRC, "BootstrapOrderRouter.sol")).read()
+        text = read_text(os.path.join(SRC, "BootstrapOrderRouter.sol"))
         body = re.search(r"struct Intent \{(.*?)\}", text, re.S).group(1)
         fields = [tuple(reversed(line.split("//")[0].strip().rstrip(";").split())) for line in body.splitlines() if line.strip() and not line.strip().startswith("//")]
         self.assertEqual([(n, t) for n, t in fields], cr.INTENT_FIELDS)
 
     def test_domains_match_the_constructors(self):
-        pool = open(os.path.join(SRC, "DecentralizedMicrocredit.sol")).read()
-        router = open(os.path.join(SRC, "BootstrapOrderRouter.sol")).read()
+        pool = read_text(os.path.join(SRC, "DecentralizedMicrocredit.sol"))
+        router = read_text(os.path.join(SRC, "BootstrapOrderRouter.sol"))
         self.assertIn('EIP712("DecentralizedMicrocredit", "1")', pool)
         self.assertIn('EIP712("BootstrapOrderRouter", "1")', router)
         self.assertEqual(cr.pool_domain(1, "0x1")["name"], "DecentralizedMicrocredit")
@@ -47,7 +52,7 @@ class RehearsalTypedDataTest(unittest.TestCase):
         self.assertEqual(cr.router_domain(1, "0x1")["version"], "1")
 
     def test_the_candidate_deploys_one_manager_and_no_unbound_router(self):
-        deploy = open(os.path.join(SRC, "..", "script", "DeployBootstrapCandidate.s.sol")).read()
+        deploy = read_text(os.path.join(SRC, "..", "script", "DeployBootstrapCandidate.s.sol"))
         self.assertIn("new BootstrapOrderRouter(pool)", deploy)
         self.assertIn("predictedRouter", deploy)
         self.assertNotIn("new TransitiveStakeRouter", deploy)

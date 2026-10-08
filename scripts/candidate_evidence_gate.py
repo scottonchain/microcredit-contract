@@ -58,12 +58,14 @@ def gate(out):
     if not m or int(m.group(1)) == 0:
         bad.append("mutants: the last line is not 'N mutants, 0 survived or did not compile'")
 
-    py = read("python-tests.txt") or ""
-    ran = re.findall(r"^Ran (\d+) tests?", py, re.M)
-    if not ran or int(ran[-1]) == 0:
-        bad.append("python-tests: no 'Ran N tests' line")
-    if re.search(r"^(FAILED|ERROR)", py, re.M) or not py.rstrip().endswith("OK"):
-        bad.append("python-tests: not a clean OK")
+    py = (read("python-tests.txt") or "").splitlines()
+    ran = [int(x) for x in re.findall(r"^Ran (\d+) tests?\b", "\n".join(py), re.M)]
+    if not ran or ran[-1] == 0:
+        bad.append("python-tests: no positive 'Ran N tests' line")
+    elif "OK" not in [x.strip() for x in py[max(i for i, x in enumerate(py) if re.match(r"Ran \d+ tests?\b", x)):]]:
+        bad.append("python-tests: no exact 'OK' line after the last 'Ran N tests' summary")
+    if any(re.match(r"(FAILED|ERROR)\b", x) for x in py):
+        bad.append("python-tests: a FAILED or ERROR line")
 
     for name, final in (("rehearsal-normal", "REHEARSAL OK"), ("rehearsal-with-default", "REHEARSAL OK (with default path)")):
         ls = [x for x in (read(name + ".txt") or "").splitlines() if x.strip()]
@@ -93,9 +95,15 @@ def gate(out):
             c = v.get("contracts", {}).get(role)
             if not c or c.get("match_strict") is not True:
                 bad.append(f"verifier: {role} is not a strict build match")
+            elif not re.fullmatch(r"[0-9a-f]{64}", str(c.get("masked_nometa_sha256_build", ""))) or \
+                    c.get("masked_nometa_sha256_build") != c.get("masked_nometa_sha256_onchain"):
+                bad.append(f"verifier: {role} has no equal metadata-free masked-runtime hashes")
         if v.get("rpc_chain_id") != 84532:
             bad.append(f"verifier: chain id {v.get('rpc_chain_id')} is not 84532")
 
+    fb = (read("fork-block.txt") or "").split()
+    if len(fb) != 2 or not fb[0].isdigit() or int(fb[0]) == 0 or not re.fullmatch(r"0x[0-9a-fA-F]{64}", fb[1]):
+        bad.append("fork-block.txt: no pinned block number and hash")
     for name in ("toolchain.txt", "build-sizes.txt"):
         if not (read(name) or "").strip():
             bad.append(f"{name}: empty or missing")
