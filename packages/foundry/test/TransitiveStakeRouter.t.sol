@@ -57,9 +57,13 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         "EdgeConsent(address from,address to,address borrower,uint256 limit,uint256 maxTerm,uint256 version,uint256 expiry)"
     );
 
-    function setUp() public {
-        _deploy(433, 500, 100e6);
-        _deposit(makeAddr("poolLender"), 1_000e6);
+    function setUp() public virtual {
+        _deployProtocol();
+        _give(makeAddr("poolLender"), 1_000e6);
+        vm.startPrank(makeAddr("poolLender"));
+        usdc.approve(address(credit), 1_000e6);
+        credit.depositFunds(1_000e6);
+        vm.stopPrank();
         router = new TransitiveStakeRouter(credit);
         (root1, root1Pk) = makeAddrAndKey("root1");
         (root2, root2Pk) = makeAddrAndKey("root2");
@@ -73,13 +77,30 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
 
     // ───────────── helpers ─────────────
 
+    /// @dev The fork suite overrides these two to run the same tests against Circle's USDC.
+    function _deployProtocol() internal virtual {
+        _deploy(433, 500, 100e6);
+    }
+
+    function _give(address who, uint256 amount) internal virtual {
+        usdc.mint(who, amount);
+    }
+
+    function _poolStake(address who, uint256 amount) internal {
+        _give(who, amount);
+        vm.startPrank(who);
+        usdc.approve(address(credit), amount);
+        credit.stake(amount);
+        vm.stopPrank();
+    }
+
     function _manage(address who) internal {
         vm.prank(who);
         credit.setManager(address(router));
     }
 
     function _fund(address root, uint256 amount) internal {
-        usdc.mint(root, amount);
+        _give(root, amount);
         vm.startPrank(root);
         usdc.approve(address(router), amount);
         router.deposit(amount);
@@ -174,7 +195,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
 
     function _repayAll(address payer, uint256 loanId) internal {
         uint256 owed = credit.getCurrentOutstandingAmount(loanId);
-        usdc.mint(payer, owed);
+        _give(payer, owed);
         vm.startPrank(payer);
         usdc.approve(address(credit), owed);
         credit.repayLoan(loanId, owed);
@@ -182,7 +203,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
     }
 
     function _repayPart(address payer, uint256 loanId, uint256 amount) internal {
-        usdc.mint(payer, amount);
+        _give(payer, amount);
         vm.startPrank(payer);
         usdc.approve(address(credit), amount);
         credit.repayLoan(loanId, amount);
@@ -651,7 +672,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
 
     function testAThirdPartyBackerShareTheSlashSoTheRootsLoseLess() public {
         address extra = makeAddr("extraBacker");
-        _stake(extra, 6e6);
+        _poolStake(extra, 6e6);
         vm.prank(extra);
         credit.back(borrower, 6e6); // allowed after the manager is set: only the manager changes are locked
         uint256 loanId = _simple(10e6, 4e6);
@@ -695,8 +716,8 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
 
     function testStrayUsdcInTheRouterOrVaultDoesNotChangeAccounting() public {
         uint256 loanId = _simple(10e6, 4e6);
-        usdc.mint(address(router), 3e6);
-        usdc.mint(_vault(borrower), 3e6);
+        _give(address(router), 3e6);
+        _give(_vault(borrower), 3e6);
         _repayAll(stranger, loanId);
         router.sync(borrower);
         assertEq(router.free(root1), 10e6);
@@ -708,7 +729,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
 
     function testDonationToTheVaultCannotHideALossNorBreakTheLedger() public {
         uint256 loanId = _simple(10e6, 4e6);
-        usdc.mint(_vault(borrower), 3e6);
+        _give(_vault(borrower), 3e6);
         _defaultLoan(loanId);
         router.sync(borrower);
         assertEq(router.lossOf(root1), 4e6, "the loss is the pool's slash, whatever sits in the vault");

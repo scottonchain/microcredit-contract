@@ -28,7 +28,7 @@ what the code does and where it stops.
    remaining units one each to paths that can still bear them, so no path ever bears more than its own amount). The
    rest goes back to each root's `free`.
 
-## What is guaranteed (tests: `TransitiveStakeRouter.t.sol`, 31 tests; `invariant/TransitiveStakeRouter.invariant.t.sol`)
+## What is guaranteed (tests: `TransitiveStakeRouter.t.sol`, 31 tests, also run against Circle's USDC on a Base Sepolia fork in `fork/TransitiveStakeRouterFork.t.sol`; `invariant/TransitiveStakeRouter.invariant.t.sol`)
 
 - **Every unit a borrower draws through the router is a root's USDC held as the borrower's secured backing**, so a
   default charges the roots' stake first and lenders lose nothing while the lot covers the loan (invariant R5: pool
