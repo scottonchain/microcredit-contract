@@ -52,17 +52,20 @@ def pinned_block(url, back=3):
 
 
 def alive(pid):
+    """True while `pid` is a running process. No /proc: in a PID namespace its numbers need not match the ones fork returns
+    (Codex review 5463220882: a stopped child kept being read as alive)."""
+    try:
+        done, _ = os.waitpid(pid, os.WNOHANG)  # our own child: this also reaps it once it has exited
+        return done != pid
+    except ChildProcessError:
+        pass  # not our child (an earlier helper process started it): signal 0 is all that is left
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
         return False
     except PermissionError:
         return True
-    try:  # a zombie still answers kill(0); treat it as dead
-        with open(f"/proc/{pid}/stat") as f:
-            return f.read().rsplit(")", 1)[1].split()[0] != "Z"
-    except OSError:
-        return True
+    return True
 
 
 def start(argv, port, log_path, pidfile, probe=chain_id_probe, ready_timeout=90.0):
@@ -118,8 +121,10 @@ def stop(pidfile, port, timeout=15.0):
                 end = time.time() + 5
                 while alive(pid) and time.time() < end:
                     time.sleep(0.1)
-            if alive(pid):
+            if alive(pid) and port_open(port):
                 raise ForkError(f"pid {pid} would not stop")
+            # SIGKILL cannot be ignored: a pid that still answers signal 0 while its port is closed is an exited child that
+            # nobody has reaped yet (its parent was the earlier helper process), not a running fork.
         os.remove(pidfile)
     end = time.time() + timeout
     while port_open(port) and time.time() < end:

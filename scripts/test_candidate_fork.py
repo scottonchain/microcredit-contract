@@ -1,4 +1,5 @@
-import os, socket, sys, tempfile, threading, unittest
+import builtins, os, socket, subprocess, sys, tempfile, time, unittest
+from unittest import mock
 import candidate_fork as f
 
 SERVER = """
@@ -48,6 +49,46 @@ class ForkTest(unittest.TestCase):
         self.assertTrue(f.port_open(self.port))
         f.stop(self.pidfile, self.port)
         self.assertFalse(f.alive(pid))
+        self.assertFalse(f.port_open(self.port))
+        self.assertFalse(os.path.exists(self.pidfile))
+
+    def test_alive_never_consults_proc(self):
+        # Codex review 5463220882: in a PID namespace /proc/<pid> need not be the child; a stopped child read as alive for good
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        real_open = builtins.open
+
+        def no_proc(path, *a, **k):
+            if str(path).startswith("/proc"):
+                raise AssertionError("alive() read " + str(path))
+            return real_open(path, *a, **k)
+
+        with mock.patch("builtins.open", no_proc):
+            self.assertTrue(f.alive(child.pid))
+            child.kill()
+            for _ in range(100):
+                if not f.alive(child.pid):
+                    break
+                time.sleep(0.05)
+            self.assertFalse(f.alive(child.pid))  # waitpid reaped it, so a zombie reads as dead
+        child.wait()
+
+    def test_a_fork_started_by_an_earlier_process_is_stopped_by_a_later_one(self):
+        # the evidence script runs `start` and `stop` as separate processes, so the child is not the stopper's own child
+        fake = os.path.join(self.dir, "fake-anvil")
+        with open(fake, "w") as fh:
+            fh.write("#!" + sys.executable + "\nimport sys\nargs = sys.argv[1:]\nport = args[args.index('--port') + 1]\n"
+                     "sys.argv = ['x', port]\nexec(compile(" + repr(SERVER) + ", 'server', 'exec'))\n")
+        os.chmod(fake, 0o755)
+        here = os.path.dirname(os.path.abspath(f.__file__))
+        out = subprocess.run([sys.executable, os.path.join(here, "candidate_fork.py"), "start", "--rpc", "http://unused", "--block", "1",
+                              "--port", str(self.port), "--log", self.log, "--pidfile", self.pidfile, "--anvil", fake],
+                             capture_output=True, text=True, timeout=60)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        pid = int(out.stdout.strip())
+        self.started.append(pid)
+        self.assertTrue(f.alive(pid))
+        self.assertTrue(f.port_open(self.port))
+        f.stop(self.pidfile, self.port)
         self.assertFalse(f.port_open(self.port))
         self.assertFalse(os.path.exists(self.pidfile))
 
