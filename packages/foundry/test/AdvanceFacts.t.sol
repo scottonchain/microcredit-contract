@@ -80,9 +80,10 @@ contract AdvanceFactsTest is MicrocreditTestBase {
         assertEq(owed - 10e6, 2_556, "933 bps on 10 USDC for one day");
     }
 
-    // ───────────── the cent: interest and balances under it are not collected ─────────────
+    // ───────────── the cent: interest under it is forgiven at closing, principal never is ─────────────
 
-    /// A 1 USDC advance held a week owes less than a cent of interest, so repaying only its principal closes it.
+    /// A 1 USDC advance held a week owes less than a cent of interest, so repaying only its principal closes it:
+    /// the interest is forgiven, never booked, and earns no dues. Repaying the full balance instead collects it.
     function testShortSmallAdvanceIsClosedByRepayingItsPrincipalOnly() public {
         uint256 assetsBefore = credit.totalAssets();
         uint256 loanId = _open(1e6);
@@ -91,25 +92,34 @@ contract AdvanceFactsTest is MicrocreditTestBase {
         emit log_named_uint("1 USDC, 7 days: interest accrued (base units)", owed - 1e6);
         assertLt(owed - 1e6, CENT, "under a cent of interest");
 
-        _repay(borrower, loanId, 1e6); // principal only
+        vm.prank(borrower);
+        usdc.approve(address(credit), 1e6);
+        vm.expectEmit(address(credit));
+        emit RepaymentApplied(loanId, 0, 1e6, 0); // the payment is all principal; the interest is forgiven
+        vm.prank(borrower);
+        credit.repayLoan(loanId, 1e6);
 
         (,,,, bool active) = credit.getLoan(loanId);
         assertFalse(active, "closed as repaid");
         assertEq(credit.totalLentOut(), 0);
-        uint256 duesPaid = credit.duesPaid(borrower);
-        emit log_named_uint("dues credited to the borrower", duesPaid);
-        emit log_named_uint("reserve afterwards", credit.firstLossReserve());
-        emit log_named_uint("lenders' totalAssets, before minus after", assetsBefore - credit.totalAssets());
-        assertEq(duesPaid, (owed - 1e6) * RESERVE_BPS / 10_000, "dues are the reserve share of the interest applied");
-        assertEq(credit.firstLossReserve(), 0, "the reserve share was absorbed by the forgiven balance");
-        assertGt(credit.totalDuesPaid(), credit.firstLossReserve(), "so the dues credit is not held by reserve cash");
+        assertEq(credit.duesPaid(borrower), 0, "no dues on interest never paid");
+        assertEq(credit.firstLossReserve(), 0, "the reserve received nothing and paid nothing");
         assertEq(credit.totalAssets(), assetsBefore, "lenders got their principal back and earned nothing");
+
+        uint256 second = _open(1e6);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
+        uint256 interest = credit.getCurrentOutstandingAmount(second) - 1e6;
+        usdc.mint(borrower, interest);
+        _repay(borrower, second, 1e6 + interest); // in full: the sub-cent interest is collected
+        emit log_named_uint("the same advance repaid in full: dues credited (base units)", credit.duesPaid(borrower));
+        assertEq(credit.duesPaid(borrower), interest * RESERVE_BPS / 10_000, "dues on the interest paid in cash");
+        assertEq(credit.firstLossReserve(), credit.duesPaid(borrower), "and the reserve holds them");
     }
 
     /// Ten daily cycles of a 38 USDC advance, each repaid with its principal only (the interest of one day on 38
-    /// USDC is just under a cent). The borrower pays no cash interest, yet earns dues each time and the reserve
-    /// holds none of it. CI-29 in docs/CREDIT_INTEGRITY_ISSUES.md.
-    function testDailyCyclesOfSubCentInterestBuildDuesTheReserveDoesNotHold() public {
+    /// USDC is just under a cent): the borrower pays no cash interest and earns no dues for it. Before the CI-30
+    /// fix it was credited dues on every cycle (docs/CREDIT_INTEGRITY_ISSUES.md).
+    function testDailyCyclesOfSubCentInterestRepaidAtPrincipalEarnNoDues() public {
         uint256 assetsBefore = credit.totalAssets();
         uint256 cycles = 10;
         for (uint256 i = 0; i < cycles; i++) {
@@ -118,21 +128,19 @@ contract AdvanceFactsTest is MicrocreditTestBase {
             assertLt(credit.getCurrentOutstandingAmount(loanId) - 38e6, CENT, "under a cent of interest");
             _repay(borrower, loanId, 38e6);
         }
-        uint256 dues = credit.duesPaid(borrower);
         emit log_named_uint("daily cycles", cycles);
-        emit log_named_uint("dues credit earned (base units)", dues);
         emit log_named_uint("cash interest the borrower paid (base units)", usdc.balanceOf(borrower));
-        emit log_named_uint("reserve (base units)", credit.firstLossReserve());
-        assertGt(dues, 0);
+        assertEq(credit.duesPaid(borrower), 0, "no dues: the interest was forgiven, not booked");
+        assertEq(credit.totalDuesPaid(), 0);
         assertEq(credit.firstLossReserve(), 0);
-        assertEq(credit.totalDuesPaid(), dues);
+        assertEq(credit.completedLoans(borrower), cycles, "the loans are on the record as repaid");
         assertEq(usdc.balanceOf(borrower), 0, "no cash interest: the borrower repaid exactly what it received");
-        assertEq(credit.totalAssets(), assetsBefore, "lenders earned nothing");
+        assertEq(credit.totalAssets(), assetsBefore, "lenders earned nothing and lost nothing");
     }
 
     /// The candidate sheet's size and term (testbed #17, 2026-10-07): 1 USDC held the full 30 days still owes
-    /// under a cent, so repaying the principal alone closes it. `_repay` books interest first, so the borrower is
-    /// credited dues on interest it never paid in cash and the forgiven cent falls on the reserve (CI-30).
+    /// under a cent, so repaying the principal alone closes it. The payment is booked as principal; the interest
+    /// is forgiven, so no dues are credited and the reserve is untouched (the CI-30 fix).
     function testThirtyDayOneUsdcAdvanceIsClosedByItsPrincipal() public {
         uint256 assetsBefore = credit.totalAssets();
         uint256 loanId = _open(1e6);
@@ -144,15 +152,14 @@ contract AdvanceFactsTest is MicrocreditTestBase {
         vm.prank(borrower);
         usdc.approve(address(credit), 1e6);
         vm.expectEmit(address(credit));
-        emit RepaymentApplied(loanId, interest, 1e6 - interest, 0);
+        emit RepaymentApplied(loanId, 0, 1e6, 0);
         vm.prank(borrower);
         credit.repayLoan(loanId, 1e6); // principal only
 
         (,,,, bool active) = credit.getLoan(loanId);
         assertFalse(active, "closed as repaid");
-        emit log_named_uint("dues credited to the borrower", credit.duesPaid(borrower));
-        assertEq(credit.duesPaid(borrower), 3_450, "45% of the interest booked");
-        assertEq(credit.firstLossReserve(), 0, "the reserve share was absorbed by the forgiven balance");
+        assertEq(credit.duesPaid(borrower), 0, "no dues on the forgiven interest");
+        assertEq(credit.firstLossReserve(), 0, "the reserve is untouched");
         assertEq(credit.totalAssets(), assetsBefore, "lenders got 1 USDC back and earned nothing");
     }
 
@@ -192,42 +199,56 @@ contract AdvanceFactsTest is MicrocreditTestBase {
         assertEq(credit.stakeOf(stakeBacker), 0, "the backer's stake is gone");
     }
 
-    /// An advance near a cent can be closed having repaid a third of it: the cent is forgiven, not collected.
-    function testAdvanceNearACentIsMostlyForgivenAtClosing() public {
+    /// An advance near a cent cannot be closed by repaying a third of it: the rest is principal, so the loan stays
+    /// open until it is paid, and nothing is forgiven.
+    function testAdvanceNearACentStaysOpenUntilItsPrincipalIsRepaid() public {
         uint256 assetsBefore = credit.totalAssets();
         uint256 loanId = _open(15_000); // 0.015 USDC
-        _repay(borrower, loanId, 5_001); // leaves 9,999: under a cent
+        _repay(borrower, loanId, 5_001); // leaves 9,999 of principal: under a cent, still owed
 
         (,,,, bool active) = credit.getLoan(loanId);
-        assertFalse(active, "closed as repaid");
-        uint256 forgiven = assetsBefore - credit.totalAssets();
-        emit log_named_uint("0.015 USDC advance, repaid (base units)", 5_001);
-        emit log_named_uint("forgiven, borne by the reserve then lenders (base units)", forgiven);
-        assertEq(forgiven, 9_999);
+        assertTrue(active, "still open");
+        assertEq(credit.getCurrentOutstandingAmount(loanId), 9_999);
+        assertEq(credit.totalAssets(), assetsBefore, "nothing forgiven");
+
+        _repay(borrower, loanId, 9_999);
+        (,,,, active) = credit.getLoan(loanId);
+        assertFalse(active, "closed once the principal is paid in full");
+        assertEq(credit.totalAssets(), assetsBefore);
     }
 
-    /// The forgiven cent is cash out of lenders' pockets, and the take repeats: a loan of 9,999 base units repaid
-    /// with 1 closes as repaid, so ten such loans hand the borrower 99,980 base units, leave no default and no
-    /// lasting use of its limit, and cost it only gas (CI-30).
-    function testSubCentLoansClosedByOneUnitTakeACentEachWithoutDefault() public {
+    /// The CI-30 take, closed: a loan of 9,999 base units repaid with 1 used to close as repaid and hand the
+    /// borrower the rest, ten times over. Now each stays open: the borrower holds nothing it does not owe, the
+    /// principal is still lent out and uses the limit, and the only ways out are to repay or to default and be
+    /// blocked.
+    function testSubCentLoansRepaidWithOneUnitStayOpenAndUseTheLimit() public {
         uint256 assetsBefore = credit.totalAssets();
-        uint256 balanceBefore = usdc.balanceOf(borrower);
         (uint256 limitBefore,) = credit.getBorrowLimit(borrower);
+        uint256[] memory loanIds = new uint256[](10);
         for (uint256 i = 0; i < 10; i++) {
-            uint256 loanId = _open(9_999);
-            _repay(borrower, loanId, 1);
-            (,,,, bool active) = credit.getLoan(loanId);
-            assertFalse(active, "closed as repaid");
+            loanIds[i] = _open(9_999);
+            _repay(borrower, loanIds[i], 1);
+            (,,,, bool active) = credit.getLoan(loanIds[i]);
+            assertTrue(active, "still open");
         }
-        uint256 taken = usdc.balanceOf(borrower) - balanceBefore;
-        emit log_named_uint("ten 9,999-unit loans repaid with 1 each: kept by the borrower (base units)", taken);
-        assertEq(taken, 10 * 9_998);
-        assertEq(assetsBefore - credit.totalAssets(), taken, "taken from lenders: the reserve is empty");
-        assertEq(credit.completedLoans(borrower), 10, "on the record as ten repaid loans");
-        assertEq(credit.defaultedLoans(borrower), 0, "and no default");
+        emit log_named_uint(
+            "ten 9,999-unit loans repaid with 1 each: held by the borrower (base units)", usdc.balanceOf(borrower)
+        );
+        assertEq(usdc.balanceOf(borrower), 10 * 9_998, "held, and still owed");
+        assertEq(credit.totalLentOut(), 10 * 9_998, "still lent out");
+        assertEq(credit.totalAssets(), assetsBefore, "lenders lost nothing");
+        assertEq(credit.completedLoans(borrower), 0, "nothing on the record as repaid");
         (uint256 limit, uint256 available) = credit.getBorrowLimit(borrower);
         assertEq(limit, limitBefore);
-        assertEq(available, limitBefore, "the whole limit is free to do it again");
+        assertEq(available, limitBefore - 10 * 9_998, "the limit stays used");
+
+        (,,,, uint256 dueAt) = credit.getLoanTerms(loanIds[0]);
+        vm.warp(dueAt + credit.LATE_PERIOD() + 1);
+        credit.markDefaulted(loanIds[0]);
+        assertEq(credit.defaultedLoans(borrower), 1, "walking away from one is a default");
+        vm.prank(borrower);
+        vm.expectRevert();
+        credit.requestLoan(9_999); // and a defaulter borrows no more
     }
 
     // ───────────── where principal goes, and who repays ─────────────

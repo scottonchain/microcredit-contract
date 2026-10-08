@@ -133,7 +133,7 @@ The contract stores two basis-point values:
 - `effrRate`: Effective Federal Funds Rate, intended to come from the Pyth Network oracle in production (set manually during local testing).
 - `riskPremium`: additional spread to cover platform risk.
 
-The borrower's APR is `effrRate + riskPremium`, fixed when the loan is created. Simple interest accrues on the principal from disbursement, with none during the first 24 hours. Partial repayments reduce the outstanding balance, a repayment never pulls more than is owed, and balances under one cent are forgiven when the loan closes.
+The borrower's APR is `effrRate + riskPremium`, fixed when the loan is created. Simple interest accrues on the principal from disbursement, with none during the first 24 hours. Partial repayments reduce the outstanding balance, a repayment never pulls more than is owed, and once every unit of principal is paid any interest under one cent is forgiven and the loan closes; a payment short of the principal leaves it open.
 
 ## User Guides
 

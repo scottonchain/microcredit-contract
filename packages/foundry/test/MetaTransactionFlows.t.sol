@@ -678,19 +678,23 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(borrower), 0, "pulls the canonical outstanding");
     }
 
-    function testRepayLoanMetaForgivesSubCentBalance() public {
+    /// A loan whose whole balance is under a cent is still collected on the relayed path: until the
+    /// CI-30 fix it was closed here without a transfer, a free half cent per loan.
+    function testRepayLoanMetaPullsASubCentBalance() public {
         uint256 loanId = _borrow(5_000); // half a cent
         DecentralizedMicrocredit.RepayRequest memory req = _repayRequest(loanId, 0);
         bytes memory sig = _signRepayRequest(borrowerPk, req);
+        vm.prank(borrower);
+        usdc.approve(address(credit), 5_000);
 
         vm.expectEmit(address(credit));
-        emit MetaLoanRepaid(borrower, loanId, 0);
+        emit MetaLoanRepaid(borrower, loanId, 5_000);
         vm.prank(relayer);
         credit.repayLoanMeta(req, sig, _noPermit());
 
         (,,,, bool active) = credit.getLoan(loanId);
         assertFalse(active);
-        assertEq(usdc.balanceOf(borrower), 5_000, "nothing pulled");
+        assertEq(usdc.balanceOf(borrower), 0, "the half cent was pulled");
         assertEq(credit.totalLentOut(), 0);
     }
 }

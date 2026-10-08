@@ -137,7 +137,9 @@ Sybil influence in credit networks and in SybilLimit-style defences, where it is
 **Corollary (lenders pay only for issued lines).** Dues are exactly the reserve's inflow from
 interest. Let $R$ be the reserve on hand, $\Lambda_L$ the part of $\Lambda$ the reserve did not pay,
 $F$ the capital added with `fundReserve`, $D$ what was released to lenders and $\varphi$ the
-forgiven sub-cent balances the reserve absorbed, so $R=\sum_a d(a)+F-(\Lambda-\Lambda_L)-D-\varphi$. Then
+principal written off at repaid closings that the reserve absorbed (identically zero since the
+CI-30 fix: a loan closes short only on interest, which is never booked), so
+$R=\sum_a d(a)+F-(\Lambda-\Lambda_L)-D-\varphi$. Then
 $$\Lambda_L + \max(0,\ U-R) \;\le\; \sum_a \ell(a) + D + \varphi.$$
 
 *Proof.* Subtracting $R$ from both sides of Theorem 2 gives
@@ -147,8 +149,8 @@ so the same inequality bounded $\Lambda_L$ there, and since then $\Lambda_L$ has
 $D$ and $\varphi$ can only have grown. If the reserve was never exhausted, $\Lambda_L=0$. $\square$
 
 Lenders' realised loss plus what the reserve could not cover of their potential loss never exceeds
-the issued lines (plus surplus released to them, which cannot include dues, and the forgiven
-sub-cent balances $\varphi$, which a borrower can add to by up to a cent per loan, CI-30): earned credit costs lenders nothing, and while losses outrun the reserve, external
+the issued lines (plus surplus released to them, which cannot include dues; the write-off term
+$\varphi$ is zero since the CI-30 fix): earned credit costs lenders nothing, and while losses outrun the reserve, external
 first-loss capital $F$ comes straight off their exposure. The invariant suite checks this as I8.
 
 *The role of coverage $\kappa$.* The proof uses only $\kappa\le1$, so with fixed lines the bound
@@ -448,10 +450,12 @@ What the theorems do not say:
 - **Lines fixed, or Theorem 2'.** With lines that change, the bound is on each account's highest
   line in its current cycle; the oracle budget is charged that way, owner overrides are not.
 - **Rounding.** Pro-rata charging leaves at most a few wei per edge per default on lenders, and
-  sub-cent balances are forgiven at closing (absorbed by the reserve first). The invariant suite
-  carries both explicitly. The forgiven term is not small in aggregate: a borrower can leave up to a cent of
-  each loan's interest unpaid and still be credited dues on it, so $\varphi$ is bounded by a cent per
-  loan, not by a constant (CI-30, `test/AdvanceFacts.t.sol`).
+  under a cent of interest is forgiven at closing: never booked, so it earns no dues and costs
+  lenders nothing but that interest; a payment short of the principal keeps the loan open. Until
+  the CI-30 fix (2026-10-08) the forgiven rest could be principal, charged to the reserve, and a
+  borrower could repeat it and be credited dues on interest it never paid; `test/AdvanceFacts.t.sol`
+  pins the fixed behaviour, and the invariant suite checks that no principal is written off at a
+  repaid close (I9).
 - **The token.** USDC is assumed to transfer as specified. A blocklisted lender or borrower cannot
   move funds; a depeg moves every figure together. Neither creates credit.
 - **Ordering.** A backer cutting a backing and a borrower drawing on it can race in one block;

@@ -47,13 +47,14 @@ contract LoanAccountingTest is MicrocreditTestBase {
         assertEq(outstanding, PRINCIPAL + (PRINCIPAL * RATE) / 10_000);
     }
 
-    function testOutstandingRoundedToNearestCent() public {
+    function testOutstandingRoundedUpToTheCent() public {
         uint256 loanId = _openLoan(PRINCIPAL);
         vm.warp(vm.getBlockTimestamp() + 10 days);
         uint256 exact = credit.getCurrentOutstandingAmount(loanId);
         uint256 rounded = lens.getOutstandingRoundedToCent(loanId);
         assertEq(rounded % 10_000, 0);
-        assertLe(rounded > exact ? rounded - exact : exact - rounded, 5_000);
+        assertGe(rounded, exact, "never below what is owed");
+        assertLt(rounded - exact, 10_000);
     }
 
     function testRepayLoanInFullClosesLoan() public {
@@ -144,18 +145,14 @@ contract LoanAccountingTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(borrower), PRINCIPAL - 300e6);
     }
 
-    /// The borrower UI pays `getOutstandingRoundedToCent` with amount = 0. When that rounds
-    /// down, the sub-cent remainder must be forgiven rather than leaving the loan open.
+    /// The borrower UI permits `getOutstandingRoundedToCent` (rounded up) and pays with amount = 0:
+    /// the pool pulls the exact balance, never the rounding, and the loan closes.
     function testRepayWithPermitCentRoundedPayoffClosesLoan() public {
         uint256 loanId = _openLoan(PRINCIPAL);
-        uint256 owed;
-        for (uint256 day = 2; day < 60; day++) {
-            vm.warp(vm.getBlockTimestamp() + 1 days);
-            owed = credit.getCurrentOutstandingAmount(loanId);
-            if (owed % 10_000 != 0 && owed % 10_000 < 5_000) break;
-        }
+        vm.warp(vm.getBlockTimestamp() + 10 days);
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
         uint256 rounded = lens.getOutstandingRoundedToCent(loanId);
-        assertLt(rounded, owed, "fixture should round down");
+        assertGe(rounded, owed, "rounded up");
         usdc.mint(borrower, rounded - PRINCIPAL);
 
         DecentralizedMicrocredit.PermitData memory p = _signPermit(borrowerPk, rounded, _deadline());
@@ -164,6 +161,28 @@ contract LoanAccountingTest is MicrocreditTestBase {
 
         (,,,, bool active) = credit.getLoan(loanId);
         assertFalse(active);
+        assertEq(usdc.balanceOf(borrower), rounded - owed, "only the exact balance was pulled");
+        assertEq(credit.totalLentOut(), 0);
+    }
+
+    /// A permit signed a moment before more interest accrued still closes the loan: the pull is
+    /// capped at the permit value, and the shortfall is interest under a cent, forgiven at closing.
+    function testRepayWithPermitStalePermitClosesWhenShortfallIsInterest() public {
+        uint256 loanId = _openLoan(PRINCIPAL);
+        vm.warp(vm.getBlockTimestamp() + 10 days);
+        uint256 value = credit.getCurrentOutstandingAmount(loanId);
+        DecentralizedMicrocredit.PermitData memory p = _signPermit(borrowerPk, value, _deadline());
+        vm.warp(vm.getBlockTimestamp() + 1 minutes);
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        assertGt(owed, value, "interest accrued since the signature");
+        assertLt(owed - value, 10_000);
+        usdc.mint(borrower, value - PRINCIPAL);
+
+        vm.prank(relayer);
+        credit.repayWithPermit(borrower, loanId, 0, p.value, p.deadline, p.v, p.r, p.s);
+
+        (,,,, bool active) = credit.getLoan(loanId);
+        assertFalse(active, "closed: the shortfall was interest");
         assertEq(usdc.balanceOf(borrower), 0);
         assertEq(credit.totalLentOut(), 0);
     }

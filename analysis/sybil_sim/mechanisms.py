@@ -33,7 +33,7 @@ import networkx as nx
 USDC = 10**6  # one USDC in micro-USDC
 SCALE = 10**6  # credit scores and attestation weights (1e6 = 100%)
 BASIS_POINTS = 10_000
-CENT = 10_000  # balances under one cent are forgiven on repayment
+CENT = 10_000  # interest under one cent is forgiven at closing; a principal shortfall keeps the loan open
 HOUR = 3_600
 DAY = 86_400
 SECONDS_PER_YEAR = 365 * DAY
@@ -339,16 +339,20 @@ class Protocol:
         return owed - loan.repaid if owed > loan.repaid else 0
 
     def repay(self, loan_id: int, amount: int | None = None) -> int:
-        """`_repay`: settle interest first, then principal; close below one cent. Returns USDC paid."""
+        """`_repay`: settle interest first, then principal. The loan closes once under a cent is left
+        and that rest is interest (the payment covered every unit of principal); the forgiven interest
+        is never booked. A payment short of the principal keeps the loan open. Returns USDC paid."""
         loan = self.loans[loan_id]
         if loan.status is not Status.ACTIVE:
             raise Revert("LoanNotActive")
         owed = self.amount_owed(loan_id)
         paid = owed if amount is None else min(amount, owed)
+        interest_due = self.interest_accrued(loan) - (loan.repaid - loan.principal_repaid)
+        rest = owed - paid
+        closes = rest < CENT and rest <= interest_due
         if paid > 0:
             self._pull(loan.borrower, paid)
-            interest_due = self.interest_accrued(loan) - (loan.repaid - loan.principal_repaid)
-            interest = min(paid, interest_due)
+            interest = interest_due - rest if closes else min(paid, interest_due)
             principal = paid - interest
             fee = interest * self.p.protocol_fee_bps // BASIS_POINTS
             to_reserve = interest * self.p.reserve_bps // BASIS_POINTS
@@ -363,10 +367,8 @@ class Protocol:
             self.interest_paid[loan.borrower] += interest
             self.principal_paid[loan.borrower] += principal
             self._on_interest_paid(loan.borrower, interest, fee, to_reserve)
-        if owed - paid < CENT:
-            unpaid = loan.principal - loan.principal_repaid
-            self.total_lent_out -= unpaid
-            self.outstanding[loan.borrower] -= unpaid
+        if closes:
+            assert loan.principal_repaid == loan.principal  # nothing is written off at a repaid close
             self.active_loan_count[loan.borrower] -= 1
             self.completed_loans[loan.borrower] += 1
             loan.status = Status.REPAID

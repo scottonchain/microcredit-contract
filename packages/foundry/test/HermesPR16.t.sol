@@ -101,8 +101,9 @@ contract HermesPR16Test is MicrocreditTestBase {
         reserve = credit.firstLossReserve();
     }
 
-    /// A stranger can close a loan up to 1 cent short; the forgiven sub-cent comes out of the
-    /// reserve (or lenders). Measures the cost to the pool of that forgiveness.
+    /// A stranger can close a loan up to 1 cent short of its interest; the forgiven sub-cent is
+    /// interest that is never booked (no dues on it, no reserve debit), never principal. Measures
+    /// what the pool gains from the repayment net of that forgiveness.
     function testStrangerCanTriggerSubCentForgivenessOnly() public {
         _stake(x, 20e6);
         vm.prank(x);
@@ -121,6 +122,7 @@ contract HermesPR16Test is MicrocreditTestBase {
         emit log_named_uint("stranger paid", owed - 9_999);
         // the pool's accounting is the interest due minus what was forgiven (<1 cent), never a loss on principal
         assertEq(credit.totalLentOut(), 0);
+        assertGe(credit.totalAssets(), assetsBefore, "the pool never loses on a close short of interest");
     }
 
     // ───────────── 2. early release ─────────────

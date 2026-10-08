@@ -24,7 +24,7 @@ USDC = 10**6  # one USDC in micro-USDC
 SCALE = 10**6  # OracleScoreProvider.SCALE: one full line of maxLoanAmount
 MAX_BATCH = 500  # OracleScoreProvider.MAX_BATCH
 BASIS_POINTS = 10_000
-CENT = 10_000  # balances under a cent are forgiven at closing
+CENT = 10_000  # interest under a cent is forgiven at closing; a principal shortfall keeps the loan open
 HOUR = 3_600
 DAY = 86_400
 SECONDS_PER_YEAR = 365 * DAY
@@ -384,28 +384,30 @@ class Pool:
         return max(0, loan.principal + self.interest_accrued(loan, now) - loan.repaid)
 
     def repay(self, loan: Loan, now: int, amount: int | None = None) -> int:
-        """`_repay`: interest first; closes below a cent. Returns the amount paid."""
+        """`_repay`: interest first; closes once under a cent is left and that rest is interest (the
+        payment covered every unit of principal), which is forgiven and never booked. A payment short
+        of the principal keeps the loan open. Returns the amount paid."""
         if loan.status != LoanStatus.ACTIVE:
             raise Revert("LoanNotActive")
         owed = self.outstanding(loan, now)
         paid = owed if amount is None else min(amount, owed)
         acct = self.account(loan.borrower)
+        interest_due = self.interest_accrued(loan, now) - loan.interest_paid
+        rest = owed - paid
+        closes = rest < CENT and rest <= interest_due
         if paid > 0:
-            interest_due = self.interest_accrued(loan, now) - loan.interest_paid
-            interest = min(paid, interest_due)
+            interest = interest_due - rest if closes else min(paid, interest_due)
             principal = paid - interest
             loan.repaid += paid
             loan.principal_repaid += principal
             acct.outstanding -= principal
             acct.dues_paid += (interest * self.reserve_bps) // BASIS_POINTS
-        if owed - paid < CENT:
-            unpaid = loan.principal - loan.principal_repaid
-            acct.outstanding -= unpaid
+        if closes:
+            assert loan.principal_repaid == loan.principal  # nothing is written off at a repaid close
             acct.active_loan_count -= 1
             acct.completed_loans += 1
             loan.status = LoanStatus.REPAID
             loan.closed_at = now
-            self.lender_loss += unpaid
         return paid
 
     def mark_defaulted(self, loan: Loan, now: int) -> int:
