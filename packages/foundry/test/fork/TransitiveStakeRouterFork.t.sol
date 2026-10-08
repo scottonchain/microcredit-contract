@@ -5,7 +5,7 @@ import { DecentralizedMicrocredit } from "../../contracts/DecentralizedMicrocred
 import { MicrocreditLens } from "../../contracts/MicrocreditLens.sol";
 import { MockUSDC } from "../../contracts/MockUSDC.sol";
 import { ICreditUsage, OracleScoreProvider } from "../../contracts/OracleScoreProvider.sol";
-import { TransitiveStakeRouter } from "../../contracts/TransitiveStakeRouter.sol";
+import { StakeRouterBase, TransitiveStakeRouter } from "../../contracts/TransitiveStakeRouter.sol";
 import { TransitiveStakeRouterTest } from "../TransitiveStakeRouter.t.sol";
 
 /// @dev The blacklist functions of Circle's FiatToken (v2.2) used below.
@@ -75,12 +75,12 @@ contract TransitiveStakeRouterForkTest is TransitiveStakeRouterTest {
         _blacklist(vendor);
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 2e6);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
-        TransitiveStakeRouter.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6));
+        StakeRouterBase.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6));
         vm.expectRevert();
         router.originate(req, sig, ps);
         assertEq(router.free(root1), 10e6, "the failed origination left the ledger untouched");
         assertEq(router.locked(root1), 0);
-        assertEq(router.edgeUsed(router.edgeKey(root1, mid1, borrower)), 0);
+        assertEq(router.edgeUsed(router.edgeKey(root1, mid1, address(0))), 0);
         assertEq(credit.nonces(borrower), 0, "and the borrower's pool nonce unspent");
     }
 }

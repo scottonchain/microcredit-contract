@@ -23,13 +23,30 @@ class RehearsalTypedDataTest(unittest.TestCase):
         self.assertEqual(type_string("EdgeConsent", cr.CONSENT_FIELDS),
                          source_string("TransitiveStakeRouter.sol", "CONSENT_TYPEHASH"))
 
+    def test_accept_type_matches_the_order_router(self):
+        self.assertEqual(type_string("AcceptOrder", cr.ACCEPT_FIELDS),
+                         source_string("BootstrapOrderRouter.sol", "ACCEPT_TYPEHASH"))
+
+    def test_intent_struct_matches_the_order_router(self):
+        text = open(os.path.join(SRC, "BootstrapOrderRouter.sol")).read()
+        body = re.search(r"struct Intent \{(.*?)\}", text, re.S).group(1)
+        fields = [tuple(reversed(line.split("//")[0].strip().rstrip(";").split())) for line in body.splitlines() if line.strip() and not line.strip().startswith("//")]
+        self.assertEqual([(n, t) for n, t in fields], cr.INTENT_FIELDS)
+
     def test_domains_match_the_constructors(self):
         pool = open(os.path.join(SRC, "DecentralizedMicrocredit.sol")).read()
-        router = open(os.path.join(SRC, "TransitiveStakeRouter.sol")).read()
+        router = open(os.path.join(SRC, "BootstrapOrderRouter.sol")).read()
         self.assertIn('EIP712("DecentralizedMicrocredit", "1")', pool)
-        self.assertIn('EIP712("TransitiveStakeRouter", "1")', router)
+        self.assertIn('EIP712("BootstrapOrderRouter", "1")', router)
         self.assertEqual(cr.pool_domain(1, "0x1")["name"], "DecentralizedMicrocredit")
-        self.assertEqual(cr.router_domain(1, "0x1")["name"], "TransitiveStakeRouter")
+        self.assertEqual(cr.router_domain(1, "0x1")["name"], "BootstrapOrderRouter")
+        self.assertEqual(cr.router_domain(1, "0x1")["version"], "1")
+
+    def test_the_candidate_deploys_one_manager_and_no_unbound_router(self):
+        deploy = open(os.path.join(SRC, "..", "script", "DeployBootstrapCandidate.s.sol")).read()
+        self.assertIn("new BootstrapOrderRouter(pool)", deploy)
+        self.assertNotIn("new TransitiveStakeRouter", deploy)
+        self.assertNotIn("new BootstrapOrderEscrow", deploy)
 
     def test_typed_data_shape(self):
         m = dict(zip([n for n, _ in cr.CONSENT_FIELDS], ["0xa", "0xb", "0xc", 5, 6, 0, 9]))

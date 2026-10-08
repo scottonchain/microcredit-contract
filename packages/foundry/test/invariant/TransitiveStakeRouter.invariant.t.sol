@@ -3,7 +3,7 @@ pragma solidity ^0.8.30;
 
 import { console } from "forge-std/console.sol";
 import { DecentralizedMicrocredit } from "../../contracts/DecentralizedMicrocredit.sol";
-import { StakeVault, TransitiveStakeRouter } from "../../contracts/TransitiveStakeRouter.sol";
+import { StakeRouterBase, StakeVault, TransitiveStakeRouter } from "../../contracts/TransitiveStakeRouter.sol";
 import { MicrocreditTestBase } from "../utils/MicrocreditTestBase.sol";
 import { RouterHandler } from "./RouterHandler.sol";
 
@@ -87,14 +87,11 @@ contract TransitiveStakeRouterInvariantTest is MicrocreditTestBase {
             assertEq(router.locked(r), handler.expectedLocked(r), "locked is the sum of open paths");
             for (uint256 j = 0; j < handler.NM(); j++) {
                 address m = handler.mids(j);
-                for (uint256 k = 0; k < handler.NB(); k++) {
-                    address b = handler.borrowers(k);
-                    assertEq(
-                        router.edgeUsed(router.edgeKey(r, m, b)),
-                        handler.expectedEdgeUsed(r, m, b),
-                        "root edge exposure"
-                    );
-                }
+                assertEq(
+                    router.edgeUsed(router.edgeKey(r, m, address(0))),
+                    handler.expectedRootEdgeUsed(r, m),
+                    "shared root edge exposure: all borrowers together"
+                );
             }
         }
         for (uint256 j = 0; j < handler.NM(); j++) {

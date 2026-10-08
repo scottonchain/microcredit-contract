@@ -6,7 +6,7 @@ import { StdCheats } from "forge-std/StdCheats.sol";
 import { StdUtils } from "forge-std/StdUtils.sol";
 import { DecentralizedMicrocredit } from "../../contracts/DecentralizedMicrocredit.sol";
 import { MockUSDC } from "../../contracts/MockUSDC.sol";
-import { TransitiveStakeRouter } from "../../contracts/TransitiveStakeRouter.sol";
+import { StakeRouterBase, TransitiveStakeRouter } from "../../contracts/TransitiveStakeRouter.sol";
 
 /**
  * @dev Drives the two-hop router for the allocation-certificate invariants with a fixed cast: three roots,
@@ -165,11 +165,11 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
         if ((seed >> 8) % 2 == 0) {
             address r = roots[(seed >> 16) % NR];
             vm.prank(r);
-            router.revokeEdge(mids[(seed >> 24) % NM], b);
+            router.revokeRootEdge(mids[(seed >> 24) % NM]);
         } else {
             address m = mids[(seed >> 16) % NM];
             vm.prank(m);
-            router.revokeEdge(b, b);
+            router.revokeMidEdge(b);
         }
         revocations++;
     }
@@ -183,7 +183,7 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
 
         uint256 n = 1 + ((seed >> 8) % 4);
         uint256 term = bound(seed >> 16, 1 days, 30 days);
-        TransitiveStakeRouter.Path[] memory paths = new TransitiveStakeRouter.Path[](n);
+        StakeRouterBase.Path[] memory paths = new StakeRouterBase.Path[](n);
         uint256 total;
         for (uint256 i = 0; i < n; i++) {
             uint256 h = uint256(keccak256(abi.encode(seed, i)));
@@ -233,10 +233,7 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
             if (n > 1) multiPathLots++;
         } catch (bytes memory err) {
             bytes4 sel = bytes4(err);
-            if (
-                sel == TransitiveStakeRouter.InsufficientFree.selector
-                    || sel == TransitiveStakeRouter.LimitExceeded.selector
-            ) {
+            if (sel == StakeRouterBase.InsufficientFree.selector || sel == StakeRouterBase.LimitExceeded.selector) {
                 refusals++;
             } else {
                 unexpectedReverts++;
@@ -483,14 +480,22 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
         }
     }
 
-    /// @dev Live exposure the model expects on the edge (from, to, borrower): the root edge when `from` is a
-    ///      root and `to` a mid, the mid edge when `from` is a mid and `to` the borrower.
+    /// @dev Live exposure the model expects on a mid edge (mid, borrower).
     function expectedEdgeUsed(address from, address to, address borrower) external view returns (uint256 sum) {
         LotM storage lot = _lots[borrower];
         for (uint256 j = 0; j < lot.paths.length; j++) {
             PathM storage p = lot.paths[j];
-            if (p.root == from && p.mid == to) sum += p.amount;
             if (p.mid == from && borrower == to) sum += p.amount;
+        }
+    }
+
+    /// @dev Live exposure the model expects on the shared root edge (root, mid): all borrowers together.
+    function expectedRootEdgeUsed(address root, address mid) external view returns (uint256 sum) {
+        for (uint256 i = 0; i < NB; i++) {
+            LotM storage lot = _lots[borrowers[i]];
+            for (uint256 j = 0; j < lot.paths.length; j++) {
+                if (lot.paths[j].root == root && lot.paths[j].mid == mid) sum += lot.paths[j].amount;
+            }
         }
     }
 
@@ -506,19 +511,19 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
     function _path(uint256 ri, uint256 mi, uint256 bi, uint256 amount, bool tightRoot, bool tightMid)
         internal
         view
-        returns (TransitiveStakeRouter.Path memory p)
+        returns (StakeRouterBase.Path memory p)
     {
         address b = borrowers[bi];
-        TransitiveStakeRouter.Consent memory re = TransitiveStakeRouter.Consent({
+        StakeRouterBase.Consent memory re = StakeRouterBase.Consent({
             from: roots[ri],
             to: mids[mi],
-            borrower: b,
+            borrower: (amount + ri + mi + bi) % 2 == 0 ? address(0) : b, // wildcard or exact scope
             limit: tightRoot ? amount : 100e6,
             maxTerm: 30 days,
-            version: router.edgeVersion(router.edgeKey(roots[ri], mids[mi], b)),
+            version: router.edgeVersion(router.edgeKey(roots[ri], mids[mi], address(0))),
             expiry: vm.getBlockTimestamp() + 60 days
         });
-        TransitiveStakeRouter.Consent memory me = TransitiveStakeRouter.Consent({
+        StakeRouterBase.Consent memory me = StakeRouterBase.Consent({
             from: mids[mi],
             to: b,
             borrower: b,
@@ -534,7 +539,7 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
         p.midSig = _signConsent(_midKeys[mi], me);
     }
 
-    function _signConsent(uint256 pk, TransitiveStakeRouter.Consent memory c) internal view returns (bytes memory) {
+    function _signConsent(uint256 pk, StakeRouterBase.Consent memory c) internal view returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, router.consentDigest(c));
         return abi.encodePacked(r, s, v);
     }

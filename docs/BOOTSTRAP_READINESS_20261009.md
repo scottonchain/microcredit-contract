@@ -10,6 +10,13 @@ contract acceptance specification, not a replacement planning database. Basis:
 testbed `115bfb04a6a5fa4e17d2a25ca2dc59a3a20b78df` (model v0.1.83), contract
 `9f5c1434a1fa99bec7939bbf458f86ddee55bec9`.
 
+> **Status at the repaired candidate head.** The numbers and the open gate in the next section describe the first packet at
+> contract main `9f5c143` (historical; they are not evidence for the candidate). Since then: the atomic settlement
+> adapter and the roots' two-hop stake are one manager, `BootstrapOrderRouter` (`BOOTSTRAP_ORDER_ROUTER.md`), with debt-first
+> settlement, rejection and default tests, and a shared root-to-mid budget; the candidate's evidence is pinned to one
+> head in `evidence/bootstrap-candidate-<head>/` and `CANDIDATE_VERIFICATION.md`. This document stays the acceptance
+> specification; the gates below are checked against that directory, not against the older figures.
+
 ## What this first test packet establishes
 
 `test/BootstrapReadiness.t.sol` adds integrated tests of the existing pool using
@@ -19,7 +26,7 @@ no mints after setup, including when the order fails. All 7.5 USDC remain
 attributed across participants and pool throughout each test.
 
 Nine focused tests passed with Forge 1.8.5 and Solidity 0.8.33. The full Forge
-suite passed **220 tests, with 12 public-fork tests skipped** and zero failures.
+suite passed **220 tests, with 12 public-fork tests skipped** and zero failures (at `9f5c143`, historical).
 The new sub-cent principal test fails as expected against deployed source
 `1812e7d`, so it distinguishes the old defect from the corrected candidate.
 Focused test logs, the full-suite summary, build settings and checksums are in

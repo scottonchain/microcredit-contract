@@ -1,4 +1,6 @@
-# Two-hop stake router (`TransitiveStakeRouter`)
+# Two-hop stake router (`TransitiveStakeRouter`, on `StakeRouterBase`)
+
+> The bootstrap product is `BootstrapOrderRouter` (`BOOTSTRAP_ORDER_ROUTER.md`), which adds the customer's funded order to this machinery on one manager. `TransitiveStakeRouter` is the unbound building block: it binds no order. Both share `StakeRouterBase`.
 
 An external testnet router for transitive trust without an issuer or a credit officer. A **root** puts USDC in; a
 **mid** it trusts vouches for a **borrower**; the borrower borrows against the root's stake. It is the first
@@ -13,10 +15,14 @@ what the code does and where it stops.
    direct transaction by the borrower (a gas cost to count as subsidy).
 2. A root deposits USDC into the router (`deposit`); it sits in `free[root]` and can be withdrawn (`withdraw`) while it
    is not allocated.
-3. The root signs an EIP-712 `EdgeConsent(from=root, to=mid, borrower, limit, maxTerm, version, expiry)`; the mid signs
+3. The root signs an EIP-712 `EdgeConsent(from=root, to=mid, borrower=scope, limit, maxTerm, version, expiry)` where
+   `scope` is zero (any borrower the mid vouches for) or one exact borrower; the mid signs
    `EdgeConsent(from=mid, to=borrower, borrower, ...)`. `limit` caps the **live** USDC exposure along that edge,
-   `maxTerm` the repayment period of any loan that uses it. A signer voids all its consents for an edge with
-   `revokeEdge(to, borrower)` (the version moves on); live exposure stays until its loans close.
+   `maxTerm` the repayment period of any loan that uses it. **The root edge is `(root, mid)`: its exposure, version and
+   revocation are shared across every borrower the root has delegated to that mid** (a cap on the relationship, not on
+   one loan); the mid edge is `(mid, borrower)`. A root voids every consent for a mid with `revokeRootEdge(mid)`, a mid
+   voids its consents for a borrower with `revokeMidEdge(borrower)` (the version moves on); live exposure stays until
+   its loans close. The EIP-712 domain is `("TransitiveStakeRouter", "2")`.
 4. The borrower signs the pool's `BorrowAndDisburse` as usual. Anyone submits `originate(request, poolSig, paths)`:
    one to four paths whose amounts sum to the loan amount, each path being a root, a mid, their two consents and
    signatures (ERC-1271 accepted) and its amount. The router checks every consent (signer, version, expiry, term,
@@ -28,13 +34,14 @@ what the code does and where it stops.
    remaining units one each to paths that can still bear them, so no path ever bears more than its own amount). The
    rest goes back to each root's `free`.
 
-## What is guaranteed (tests: `TransitiveStakeRouter.t.sol`, 33 tests, also run against Circle's USDC on a Base Sepolia fork in `fork/TransitiveStakeRouterFork.t.sol`; `invariant/TransitiveStakeRouter.invariant.t.sol`)
+## What is guaranteed (tests: `TransitiveStakeRouter.t.sol`, 37 tests, also run against Circle's USDC on a Base Sepolia fork in `fork/TransitiveStakeRouterFork.t.sol` (39 with two token cases); `invariant/TransitiveStakeRouter.invariant.t.sol`)
 
 - **Every unit a borrower draws through the router is a root's USDC held as the borrower's secured backing**, so a
   default charges the roots' stake first and lenders lose nothing while the lot covers the loan (invariant R5: pool
   total assets never fall below the deposit when every loan is a router loan).
 - **A root's exposure is what it consented to.** Per edge, live exposure never exceeds the limit of the consent it was
-  admitted under; a root loses at most its path amounts; revocation, expiry and term caps bind new allocations.
+  admitted under, and the root-to-mid edge is one bucket across all borrowers (R3 sums the open paths over each
+  `(root, mid)` pair; a cap of 2.0 with 1.2 used by one borrower refuses 1.2 for another although the root holds more); a root loses at most its path amounts; revocation, expiry and term caps bind new allocations.
 - **Conservation per root:** deposits less withdrawals less attributed losses equal `free + locked` (R2); the router
   holds exactly the free balances plus stray transfers (R1); `locked` and each edge's exposure are the sum of the open
   paths (R3); an open lot's vault stakes the whole lot and has no unsecured backing, a closed lot leaves nothing (R4). The pool's principal lent out equals the active lots' unpaid principal (R7).
@@ -54,7 +61,7 @@ what the code does and where it stops.
   and a borrower puts only their own USDC at risk: nothing is manufactured, but the "trust" is circular.
 - **A mid has no capital at risk.** The mid's consent bounds how much can be allocated through it; a bad vouch costs the
   roots, not the mid (reputation only). Mid capital as first loss is the next stage and needs its own proof.
-- **Consents of one version on one edge are interchangeable.** The limit applied is the one on the consent presented, and exposure is counted per edge across all of them, so a signer who wants to lower a limit must revoke (the version moves on), not sign a lower one.
+- **Consents of one version on one edge are interchangeable.** The limit applied is the one on the consent presented, and exposure is counted per edge across all of them (for a root edge, across all borrowers and both scopes), so a signer who wants to lower a limit must revoke (the version moves on), not sign a lower one (`testAHigherLimitConsentOfTheSameVersionStaysUsableUntilTheRootRevokes`).
 - **The submitter picks the paths** among the consents it holds. Every pick is inside every signer's consent. A signer
   who wants a single use sets the limit to that use and revokes after.
 - **The borrower chooses terms and vendor** inside the consents (term up to the consents' `maxTerm`, any recipient
@@ -71,5 +78,5 @@ what the code does and where it stops.
   must name the router.
 - **Stake earns nothing** at the current parameters (`ColdStartFacts.t.sol`): a root is a sponsor, not an investor. The
   router does not change the economics; it is the credit-conservation mechanism, not an incentive design.
-- **Not audited, testnet only.** The deploy script (`DeployBootstrapCandidate.s.sol`) deploys it next to the pool and the
-  order escrow; a borrower uses one manager or the other.
+- **Not audited, testnet only.** `DeployBootstrapCandidate.s.sol` deploys `BootstrapOrderRouter` (this machinery plus the
+  order), not this unbound router.

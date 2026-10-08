@@ -2,7 +2,7 @@
 pragma solidity ^0.8.30;
 
 import { DecentralizedMicrocredit } from "../contracts/DecentralizedMicrocredit.sol";
-import { StakeVault, TransitiveStakeRouter } from "../contracts/TransitiveStakeRouter.sol";
+import { StakeRouterBase, StakeVault, TransitiveStakeRouter } from "../contracts/TransitiveStakeRouter.sol";
 import { MicrocreditTestBase } from "./utils/MicrocreditTestBase.sol";
 
 /// @dev Exposes the router's loss attribution so it can be fuzzed on its own.
@@ -107,12 +107,12 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         vm.stopPrank();
     }
 
-    function _digest(TransitiveStakeRouter.Consent memory c) internal view returns (bytes32) {
+    function _digest(StakeRouterBase.Consent memory c) internal view returns (bytes32) {
         bytes32 domain = keccak256(
             abi.encode(
                 EIP712_DOMAIN_TYPEHASH,
                 keccak256("TransitiveStakeRouter"),
-                keccak256("1"),
+                keccak256("2"),
                 block.chainid,
                 address(router)
             )
@@ -126,20 +126,20 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
     function _consent(address from, address to, address forBorrower, uint256 limit)
         internal
         view
-        returns (TransitiveStakeRouter.Consent memory c)
+        returns (StakeRouterBase.Consent memory c)
     {
-        c = TransitiveStakeRouter.Consent({
+        c = StakeRouterBase.Consent({
             from: from,
             to: to,
             borrower: forBorrower,
             limit: limit,
             maxTerm: TERM,
-            version: router.edgeVersion(router.edgeKey(from, to, forBorrower)),
+            version: router.edgeVersion(router.edgeKey(from, to, to == forBorrower ? forBorrower : address(0))),
             expiry: block.timestamp + 30 days
         });
     }
 
-    function _signConsent(uint256 pk, TransitiveStakeRouter.Consent memory c) internal view returns (bytes memory) {
+    function _signConsent(uint256 pk, StakeRouterBase.Consent memory c) internal view returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, _digest(c));
         return abi.encodePacked(r, s, v);
     }
@@ -147,17 +147,17 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
     function _path(uint256 rPk, address r, uint256 mPk, address m, address forBorrower, uint256 amount)
         internal
         view
-        returns (TransitiveStakeRouter.Path memory p)
+        returns (StakeRouterBase.Path memory p)
     {
-        TransitiveStakeRouter.Consent memory re = _consent(r, m, forBorrower, LIMIT);
-        TransitiveStakeRouter.Consent memory me = _consent(m, forBorrower, forBorrower, LIMIT);
-        p = TransitiveStakeRouter.Path({
+        StakeRouterBase.Consent memory re = _consent(r, m, forBorrower, LIMIT);
+        StakeRouterBase.Consent memory me = _consent(m, forBorrower, forBorrower, LIMIT);
+        p = StakeRouterBase.Path({
             amount: amount, rootEdge: re, rootSig: _signConsent(rPk, re), midEdge: me, midSig: _signConsent(mPk, me)
         });
     }
 
-    function _one(TransitiveStakeRouter.Path memory p) internal pure returns (TransitiveStakeRouter.Path[] memory ps) {
-        ps = new TransitiveStakeRouter.Path[](1);
+    function _one(StakeRouterBase.Path memory p) internal pure returns (StakeRouterBase.Path[] memory ps) {
+        ps = new StakeRouterBase.Path[](1);
         ps[0] = p;
     }
 
@@ -177,7 +177,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         });
     }
 
-    function _originate(uint256 bPk, address who, uint256 amount, TransitiveStakeRouter.Path[] memory paths)
+    function _originate(uint256 bPk, address who, uint256 amount, StakeRouterBase.Path[] memory paths)
         internal
         returns (uint256 loanId)
     {
@@ -233,7 +233,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         (uint256 secured, uint256 unsecured) = credit.getBacking(_vault(borrower), borrower);
         assertEq(secured, 4e6);
         assertEq(unsecured, 0);
-        assertEq(router.edgeUsed(router.edgeKey(root1, mid1, borrower)), 4e6);
+        assertEq(router.edgeUsed(router.edgeKey(root1, mid1, address(0))), 4e6);
         assertEq(router.edgeUsed(router.edgeKey(mid1, borrower, borrower)), 4e6);
         (bool open, uint256 lotLoan, uint256 lotAmount,) = router.lotOf(borrower);
         assertTrue(open);
@@ -248,7 +248,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         assertEq(router.locked(root1), 0);
         assertEq(router.lossOf(root1), 0);
         assertEq(credit.stakeOf(_vault(borrower)), 0);
-        assertEq(router.edgeUsed(router.edgeKey(root1, mid1, borrower)), 0);
+        assertEq(router.edgeUsed(router.edgeKey(root1, mid1, address(0))), 0);
         assertEq(router.totalLocked(), 0);
         assertEq(usdc.balanceOf(address(router)), router.totalFree());
 
@@ -305,7 +305,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
     function testTwoRootsAndTwoMidsSplitOneLot() public {
         _fund(root1, 10e6);
         _fund(root2, 10e6);
-        TransitiveStakeRouter.Path[] memory ps = new TransitiveStakeRouter.Path[](2);
+        StakeRouterBase.Path[] memory ps = new StakeRouterBase.Path[](2);
         ps[0] = _path(root1Pk, root1, mid1Pk, mid1, borrower, 3e6);
         ps[1] = _path(root2Pk, root2, mid2Pk, mid2, borrower, 2e6);
         uint256 loanId = _originate(borrowerPk, borrower, 5e6, ps);
@@ -330,8 +330,8 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         _originate(borrowerPk, borrower, 3e6, _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 3e6)));
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower2, 3e6);
         bytes memory sig = _signBorrowAndDisburse(borrower2Pk, req);
-        TransitiveStakeRouter.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower2, 3e6));
-        vm.expectRevert(TransitiveStakeRouter.InsufficientFree.selector);
+        StakeRouterBase.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower2, 3e6));
+        vm.expectRevert(StakeRouterBase.InsufficientFree.selector);
         router.originate(req, sig, ps);
         // two exposures that fit are both fine
         _originate(borrower2Pk, borrower2, 2e6, _one(_path(root1Pk, root1, mid1Pk, mid1, borrower2, 2e6)));
@@ -343,9 +343,9 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         _fund(root1, 10e6);
         _fund(root2, 10e6);
         // mid1 vouches for the borrower up to 4e6 live exposure in total; two roots route through it
-        TransitiveStakeRouter.Consent memory me = _consent(mid1, borrower, borrower, 4e6);
+        StakeRouterBase.Consent memory me = _consent(mid1, borrower, borrower, 4e6);
         bytes memory meSig = _signConsent(mid1Pk, me);
-        TransitiveStakeRouter.Path[] memory ps = new TransitiveStakeRouter.Path[](2);
+        StakeRouterBase.Path[] memory ps = new StakeRouterBase.Path[](2);
         ps[0] = _path(root1Pk, root1, mid1Pk, mid1, borrower, 3e6);
         ps[1] = _path(root2Pk, root2, mid1Pk, mid1, borrower, 2e6);
         ps[0].midEdge = me;
@@ -354,7 +354,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         ps[1].midSig = meSig;
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 5e6);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
-        vm.expectRevert(TransitiveStakeRouter.LimitExceeded.selector);
+        vm.expectRevert(StakeRouterBase.LimitExceeded.selector);
         router.originate(req, sig, ps); // 3e6 + 2e6 > 4e6 through the same mid edge
 
         ps[1].amount = 1e6;
@@ -366,9 +366,9 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
 
     function testRepeatedRootEdgeInOneCertificateCountsTwiceAgainstTheLimit() public {
         _fund(root1, 10e6);
-        TransitiveStakeRouter.Consent memory re = _consent(root1, mid1, borrower, 4e6);
+        StakeRouterBase.Consent memory re = _consent(root1, mid1, borrower, 4e6);
         bytes memory reSig = _signConsent(root1Pk, re);
-        TransitiveStakeRouter.Path[] memory ps = new TransitiveStakeRouter.Path[](2);
+        StakeRouterBase.Path[] memory ps = new StakeRouterBase.Path[](2);
         ps[0] = _path(root1Pk, root1, mid1Pk, mid1, borrower, 3e6);
         ps[1] = _path(root1Pk, root1, mid1Pk, mid1, borrower, 3e6);
         ps[0].rootEdge = re;
@@ -377,7 +377,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         ps[1].rootSig = reSig;
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 6e6);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
-        vm.expectRevert(TransitiveStakeRouter.LimitExceeded.selector);
+        vm.expectRevert(StakeRouterBase.LimitExceeded.selector);
         router.originate(req, sig, ps);
     }
 
@@ -389,25 +389,25 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
 
         // root == mid
-        TransitiveStakeRouter.Path memory p = _path(root1Pk, root1, root1Pk, root1, borrower, 2e6);
-        vm.expectRevert(TransitiveStakeRouter.InvalidCertificate.selector);
+        StakeRouterBase.Path memory p = _path(root1Pk, root1, root1Pk, root1, borrower, 2e6);
+        vm.expectRevert(StakeRouterBase.InvalidCertificate.selector);
         router.originate(req, sig, _one(p));
 
         // mid == borrower
         p = _path(root1Pk, root1, borrowerPk, borrower, borrower, 2e6);
-        vm.expectRevert(TransitiveStakeRouter.InvalidCertificate.selector);
+        vm.expectRevert(StakeRouterBase.InvalidCertificate.selector);
         router.originate(req, sig, _one(p));
 
         // root == borrower (the borrower backing itself through a mid)
         _fund(borrower, 10e6);
         p = _path(borrowerPk, borrower, mid1Pk, mid1, borrower, 2e6);
-        vm.expectRevert(TransitiveStakeRouter.InvalidCertificate.selector);
+        vm.expectRevert(StakeRouterBase.InvalidCertificate.selector);
         router.originate(req, sig, _one(p));
 
         // the router as a root or mid
         p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
         p.rootEdge.to = address(router);
-        vm.expectRevert(TransitiveStakeRouter.InvalidCertificate.selector);
+        vm.expectRevert(StakeRouterBase.InvalidCertificate.selector);
         router.originate(req, sig, _one(p));
     }
 
@@ -417,19 +417,19 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
 
         // mid2's consent in place of mid1's
-        TransitiveStakeRouter.Path memory p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
-        TransitiveStakeRouter.Path memory other = _path(root2Pk, root2, mid2Pk, mid2, borrower, 2e6);
+        StakeRouterBase.Path memory p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
+        StakeRouterBase.Path memory other = _path(root2Pk, root2, mid2Pk, mid2, borrower, 2e6);
         p.midEdge = other.midEdge;
         p.midSig = other.midSig;
-        vm.expectRevert(TransitiveStakeRouter.InvalidCertificate.selector);
+        vm.expectRevert(StakeRouterBase.InvalidCertificate.selector);
         router.originate(req, sig, _one(p));
 
         // a root consent for another terminal borrower
         p = _path(root1Pk, root1, mid1Pk, mid1, borrower2, 2e6);
-        TransitiveStakeRouter.Path memory good = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
+        StakeRouterBase.Path memory good = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
         p.midEdge = good.midEdge;
         p.midSig = good.midSig;
-        vm.expectRevert(TransitiveStakeRouter.InvalidCertificate.selector);
+        vm.expectRevert(StakeRouterBase.InvalidCertificate.selector);
         router.originate(req, sig, _one(p));
     }
 
@@ -438,21 +438,21 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 5e6);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
 
-        TransitiveStakeRouter.Path[] memory none = new TransitiveStakeRouter.Path[](0);
-        vm.expectRevert(TransitiveStakeRouter.InvalidCertificate.selector);
+        StakeRouterBase.Path[] memory none = new StakeRouterBase.Path[](0);
+        vm.expectRevert(StakeRouterBase.InvalidCertificate.selector);
         router.originate(req, sig, none);
 
-        TransitiveStakeRouter.Path[] memory five = new TransitiveStakeRouter.Path[](5);
+        StakeRouterBase.Path[] memory five = new StakeRouterBase.Path[](5);
         for (uint256 i = 0; i < 5; i++) {
             five[i] = _path(root1Pk, root1, mid1Pk, mid1, borrower, 1e6);
         }
-        vm.expectRevert(TransitiveStakeRouter.InvalidCertificate.selector);
+        vm.expectRevert(StakeRouterBase.InvalidCertificate.selector);
         router.originate(req, sig, five);
-        TransitiveStakeRouter.Path[] memory pp = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 4e6));
-        vm.expectRevert(TransitiveStakeRouter.AmountMismatch.selector);
+        StakeRouterBase.Path[] memory pp = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 4e6));
+        vm.expectRevert(StakeRouterBase.AmountMismatch.selector);
         router.originate(req, sig, pp); // sums to 4e6, loan is 5e6
-        TransitiveStakeRouter.Path[] memory pp2 = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 0));
-        vm.expectRevert(TransitiveStakeRouter.InvalidCertificate.selector);
+        StakeRouterBase.Path[] memory pp2 = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 0));
+        vm.expectRevert(StakeRouterBase.InvalidCertificate.selector);
         router.originate(req, sig, pp2);
     }
 
@@ -460,7 +460,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         _fund(root1, 5e6);
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 5e5);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
-        TransitiveStakeRouter.Path[] memory pp = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 5e5));
+        StakeRouterBase.Path[] memory pp = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 5e5));
         vm.expectRevert(DecentralizedMicrocredit.BackingTooSmall.selector);
         router.originate(req, sig, pp);
     }
@@ -473,53 +473,53 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
 
         // expired
-        TransitiveStakeRouter.Path memory p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
+        StakeRouterBase.Path memory p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
         p.rootEdge.expiry = block.timestamp - 1;
         p.rootSig = _signConsent(root1Pk, p.rootEdge);
-        vm.expectRevert(TransitiveStakeRouter.InvalidConsent.selector);
+        vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
         router.originate(req, sig, _one(p));
 
         // signed by someone else
         p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
         p.rootSig = _signConsent(root2Pk, p.rootEdge);
-        vm.expectRevert(TransitiveStakeRouter.InvalidConsent.selector);
+        vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
         router.originate(req, sig, _one(p));
 
         // a field changed after signing
         p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
         p.midEdge.limit = 1_000e6;
-        vm.expectRevert(TransitiveStakeRouter.InvalidConsent.selector);
+        vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
         router.originate(req, sig, _one(p));
 
         // the loan is larger than the consent's limit
         p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
         p.rootEdge.limit = 1e6;
         p.rootSig = _signConsent(root1Pk, p.rootEdge);
-        vm.expectRevert(TransitiveStakeRouter.LimitExceeded.selector);
+        vm.expectRevert(StakeRouterBase.LimitExceeded.selector);
         router.originate(req, sig, _one(p));
 
         // the loan runs longer than the root allowed
         p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
         p.rootEdge.maxTerm = 3 days;
         p.rootSig = _signConsent(root1Pk, p.rootEdge);
-        vm.expectRevert(TransitiveStakeRouter.InvalidConsent.selector);
+        vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
         router.originate(req, sig, _one(p)); // the request's term is 7 days
 
         // the mid's term cap binds as well
         p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
         p.midEdge.maxTerm = 3 days;
         p.midSig = _signConsent(mid1Pk, p.midEdge);
-        vm.expectRevert(TransitiveStakeRouter.InvalidConsent.selector);
+        vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
         router.originate(req, sig, _one(p));
     }
 
     function testRevokedConsentCannotBeUsedAndLiveExposureIsUnaffected() public {
         _fund(root1, 10e6);
-        TransitiveStakeRouter.Path memory p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
+        StakeRouterBase.Path memory p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
         uint256 loanId = _originate(borrowerPk, borrower, 2e6, _one(p));
 
         vm.prank(root1);
-        router.revokeEdge(mid1, borrower);
+        router.revokeRootEdge(mid1);
         assertEq(router.locked(root1), 2e6, "the live lot stays");
 
         _repayAll(stranger, loanId);
@@ -528,7 +528,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
 
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 2e6);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
-        vm.expectRevert(TransitiveStakeRouter.InvalidConsent.selector);
+        vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
         router.originate(req, sig, _one(p)); // the old consent has the old version
 
         // a fresh consent of the new version works
@@ -538,7 +538,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
     function testSmartWalletRootSignsThroughErc1271() public {
         SmartRoot wallet = new SmartRoot();
         _fund(address(wallet), 10e6);
-        TransitiveStakeRouter.Path memory p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
+        StakeRouterBase.Path memory p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
         p.rootEdge.from = address(wallet);
         wallet.approve(_digest(p.rootEdge));
         p.rootSig = hex"";
@@ -551,15 +551,15 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
     function testBorrowerMustHaveNamedTheRouter() public {
         (address plain, uint256 plainPk) = makeAddrAndKey("plain");
         _fund(root1, 10e6);
-        TransitiveStakeRouter.Path memory p = _path(root1Pk, root1, mid1Pk, mid1, plain, 2e6);
+        StakeRouterBase.Path memory p = _path(root1Pk, root1, mid1Pk, mid1, plain, 2e6);
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(plain, 2e6);
         bytes memory sig = _signBorrowAndDisburse(plainPk, req);
-        vm.expectRevert(TransitiveStakeRouter.NotManager.selector);
+        vm.expectRevert(StakeRouterBase.NotManager.selector);
         router.originate(req, sig, _one(p)); // no manager
 
         vm.prank(plain);
         credit.setManager(makeAddr("someoneElse"));
-        vm.expectRevert(TransitiveStakeRouter.NotManager.selector);
+        vm.expectRevert(StakeRouterBase.NotManager.selector);
         router.originate(req, sig, _one(p)); // another manager
     }
 
@@ -579,8 +579,8 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         credit.setManager(address(0)); // clean: free to leave, and then the router can no longer originate
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 2e6);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
-        TransitiveStakeRouter.Path[] memory pp = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6));
-        vm.expectRevert(TransitiveStakeRouter.NotManager.selector);
+        StakeRouterBase.Path[] memory pp = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6));
+        vm.expectRevert(StakeRouterBase.NotManager.selector);
         router.originate(req, sig, pp);
     }
 
@@ -591,7 +591,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         vm.stopPrank();
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 2e6);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
-        TransitiveStakeRouter.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6));
+        StakeRouterBase.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6));
         vm.expectRevert();
         router.originate(req, sig, ps);
 
@@ -607,8 +607,8 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         _simple(10e6, 4e6);
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 1e6);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
-        TransitiveStakeRouter.Path[] memory pp = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 1e6));
-        vm.expectRevert(TransitiveStakeRouter.OpenLot.selector);
+        StakeRouterBase.Path[] memory pp = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 1e6));
+        vm.expectRevert(StakeRouterBase.OpenLot.selector);
         router.originate(req, sig, pp);
     }
 
@@ -616,7 +616,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         _fund(root1, 10e6);
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 2e6);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
-        TransitiveStakeRouter.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6));
+        StakeRouterBase.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6));
         uint256 loanId = router.originate(req, sig, ps);
         _repayAll(stranger, loanId);
         vm.expectRevert(); // the pool nonce is spent
@@ -628,7 +628,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
     function testPartialRepaymentThenDefaultChargesTheUnpaidPrincipalToTheRootsProRata() public {
         _fund(root1, 10e6);
         _fund(root2, 10e6);
-        TransitiveStakeRouter.Path[] memory ps = new TransitiveStakeRouter.Path[](2);
+        StakeRouterBase.Path[] memory ps = new StakeRouterBase.Path[](2);
         ps[0] = _path(root1Pk, root1, mid1Pk, mid1, borrower, 6e6);
         ps[1] = _path(root2Pk, root2, mid2Pk, mid2, borrower, 4e6);
         uint256 loanId = _originate(borrowerPk, borrower, 10e6, ps);
@@ -665,7 +665,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         router.sync(borrower);
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 1e6);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
-        TransitiveStakeRouter.Path[] memory pp = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 1e6));
+        StakeRouterBase.Path[] memory pp = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 1e6));
         vm.expectRevert(DecentralizedMicrocredit.BorrowerInDefault.selector); // the pool refuses backing a defaulted borrower
         router.originate(req, sig, pp);
     }
@@ -689,13 +689,13 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         uint256 loanId = _simple(10e6, 4e6);
         vm.startPrank(root1);
         router.withdraw(6e6);
-        vm.expectRevert(TransitiveStakeRouter.InsufficientFree.selector);
+        vm.expectRevert(StakeRouterBase.InsufficientFree.selector);
         router.withdraw(1);
         vm.stopPrank();
 
         _repayAll(stranger, loanId);
         vm.prank(root1);
-        vm.expectRevert(TransitiveStakeRouter.InsufficientFree.selector);
+        vm.expectRevert(StakeRouterBase.InsufficientFree.selector);
         router.withdraw(1); // closed but not yet synced
 
         vm.prank(stranger);
@@ -739,19 +739,19 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
 
     function testConsentLimitBoundaryIsExact() public {
         _fund(root1, 10e6);
-        TransitiveStakeRouter.Path memory p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
+        StakeRouterBase.Path memory p = _path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6);
         p.rootEdge.limit = 2e6 - 1; // one unit short of the loan
         p.rootSig = _signConsent(root1Pk, p.rootEdge);
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 2e6);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
-        TransitiveStakeRouter.Path[] memory ps = _one(p);
-        vm.expectRevert(TransitiveStakeRouter.LimitExceeded.selector);
+        StakeRouterBase.Path[] memory ps = _one(p);
+        vm.expectRevert(StakeRouterBase.LimitExceeded.selector);
         router.originate(req, sig, ps);
 
         p.rootEdge.limit = 2e6; // exactly the loan
         p.rootSig = _signConsent(root1Pk, p.rootEdge);
         router.originate(req, sig, _one(p));
-        assertEq(router.edgeUsed(router.edgeKey(root1, mid1, borrower)), 2e6);
+        assertEq(router.edgeUsed(router.edgeKey(root1, mid1, address(0))), 2e6);
     }
 
     function testDirectRepaymentBeforeSyncDoesNotFreeRootCapacityForAnotherBorrower() public {
@@ -760,8 +760,8 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         _repayAll(stranger, loanId); // the pool has capacity again; the router has not synced
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower2, 3e6);
         bytes memory sig = _signBorrowAndDisburse(borrower2Pk, req);
-        TransitiveStakeRouter.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower2, 3e6));
-        vm.expectRevert(TransitiveStakeRouter.InsufficientFree.selector);
+        StakeRouterBase.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower2, 3e6));
+        vm.expectRevert(StakeRouterBase.InsufficientFree.selector);
         router.originate(req, sig, ps); // only 2e6 is free until the first lot is synced
         router.sync(borrower);
         router.originate(req, sig, ps);
@@ -770,7 +770,7 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
 
     function testConsentDoesNotReplayOnAnotherRouterOrChain() public {
         _fund(root1, 10e6);
-        TransitiveStakeRouter.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6));
+        StakeRouterBase.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6));
         DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 2e6);
         bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
 
@@ -778,14 +778,14 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         TransitiveStakeRouter other = new TransitiveStakeRouter(credit);
         vm.prank(borrower);
         credit.setManager(address(other));
-        vm.expectRevert(TransitiveStakeRouter.InvalidConsent.selector);
+        vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
         other.originate(req, sig, ps);
 
         // the same router on another chain id: the consent domain changed
         vm.prank(borrower);
         credit.setManager(address(router));
         vm.chainId(block.chainid + 1);
-        vm.expectRevert(TransitiveStakeRouter.InvalidConsent.selector);
+        vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
         router.originate(req, sig, ps);
     }
 
@@ -799,10 +799,109 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
     }
 
     function testDepositRefusesAFeeOnTransferShortfallAndZero() public {
-        vm.expectRevert(TransitiveStakeRouter.ZeroAmount.selector);
+        vm.expectRevert(StakeRouterBase.ZeroAmount.selector);
         router.deposit(0);
-        vm.expectRevert(TransitiveStakeRouter.ZeroAmount.selector);
+        vm.expectRevert(StakeRouterBase.ZeroAmount.selector);
         router.withdraw(0);
+    }
+
+    // ───────────── shared root edge: one budget for the relationship (Codex review of 6fe6f41) ─────────────
+
+    /// @dev A path whose root consent names `scope` (zero: any borrower the mid vouches for) and caps the shared edge at `cap`.
+    function _scopedPath(address scope, uint256 cap, address forBorrower, uint256 amount)
+        internal
+        view
+        returns (StakeRouterBase.Path memory p)
+    {
+        StakeRouterBase.Consent memory re = _consent(root1, mid1, scope, cap);
+        StakeRouterBase.Consent memory me = _consent(mid1, forBorrower, forBorrower, LIMIT);
+        p = StakeRouterBase.Path({
+            amount: amount,
+            rootEdge: re,
+            rootSig: _signConsent(root1Pk, re),
+            midEdge: me,
+            midSig: _signConsent(mid1Pk, me)
+        });
+    }
+
+    function testRootToMidCapIsSharedAcrossBorrowers() public {
+        _fund(root1, 5e6); // far more than 1.2 USDC: the cash is not what binds
+        uint256 cap = 2e6; // the pool's smallest backing is 1 USDC, so the example scales to 1.2 + 1.2 against 2.0
+        uint256 first =
+            _originate(borrowerPk, borrower, 1_200_000, _one(_scopedPath(address(0), cap, borrower, 1_200_000)));
+        assertEq(router.edgeUsed(router.edgeKey(root1, mid1, address(0))), 1_200_000);
+
+        // borrower2 shares the same (root1, mid1) budget: 1.2 + 1.2 exceeds the 2.0 cap
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower2, 1_200_000);
+        bytes memory sig = _signBorrowAndDisburse(borrower2Pk, req);
+        StakeRouterBase.Path[] memory second = _one(_scopedPath(address(0), cap, borrower2, 1_200_000));
+        vm.expectRevert(StakeRouterBase.LimitExceeded.selector);
+        router.originate(req, sig, second);
+        assertEq(router.free(root1), 5e6 - 1_200_000, "the failed origination moved nothing");
+
+        // once the first loan has closed and synced, the budget is free again
+        _repayAll(stranger, first);
+        router.sync(borrower);
+        assertEq(router.edgeUsed(router.edgeKey(root1, mid1, address(0))), 0);
+        router.originate(req, sig, second);
+        assertEq(router.edgeUsed(router.edgeKey(root1, mid1, address(0))), 1_200_000);
+    }
+
+    function testExactScopeNamesOneBorrowerAndWildcardNamesAny() public {
+        _fund(root1, 5e6);
+        // a consent scoped to borrower2 cannot be used for borrower
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 1e6);
+        bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
+        StakeRouterBase.Path[] memory wrong = _one(_scopedPath(borrower2, 4e6, borrower, 1e6));
+        vm.expectRevert(StakeRouterBase.InvalidCertificate.selector);
+        router.originate(req, sig, wrong);
+
+        // exact scope for borrower works for borrower, and the wildcard works for borrower2
+        router.originate(req, sig, _one(_scopedPath(borrower, 4e6, borrower, 1e6)));
+        _originate(borrower2Pk, borrower2, 1e6, _one(_scopedPath(address(0), 4e6, borrower2, 1e6)));
+        assertEq(router.edgeUsed(router.edgeKey(root1, mid1, address(0))), 2e6, "both scopes spend one bucket");
+    }
+
+    function testRevokingTheRootEdgeInvalidatesEveryBorrowersConsentButAMidRevocationIsLocal() public {
+        _fund(root1, 5e6);
+        StakeRouterBase.Path memory p1 = _scopedPath(address(0), 4e6, borrower, 1e6);
+        StakeRouterBase.Path memory p2 = _scopedPath(address(0), 4e6, borrower2, 1e6);
+
+        // the mid revokes borrower: only that terminal edge dies
+        vm.prank(mid1);
+        router.revokeMidEdge(borrower);
+        DecentralizedMicrocredit.BorrowAndDisburse memory r1 = _req(borrower, 1e6);
+        bytes memory s1 = _signBorrowAndDisburse(borrowerPk, r1);
+        vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
+        router.originate(r1, s1, _one(p1));
+        _originate(borrower2Pk, borrower2, 1e6, _one(p2)); // borrower2's edge and the root edge are untouched
+
+        // the root revokes mid1: every consent it signed for that relationship is void, whatever its scope
+        vm.prank(root1);
+        router.revokeRootEdge(mid1);
+        StakeRouterBase.Path memory fresh = _scopedPath(address(0), 4e6, borrower, 1e6);
+        fresh.midEdge = _consent(mid1, borrower, borrower, LIMIT); // the mid re-signs its new version
+        fresh.midSig = _signConsent(mid1Pk, fresh.midEdge);
+        fresh.rootEdge = p1.rootEdge; // the old root consent (version 0)
+        fresh.rootSig = p1.rootSig;
+        vm.expectRevert(StakeRouterBase.InvalidConsent.selector);
+        router.originate(r1, s1, _one(fresh));
+        fresh.rootEdge = _consent(root1, mid1, address(0), 4e6); // the root re-signs its new version
+        fresh.rootSig = _signConsent(root1Pk, fresh.rootEdge);
+        router.originate(r1, s1, _one(fresh));
+    }
+
+    function testAHigherLimitConsentOfTheSameVersionStaysUsableUntilTheRootRevokes() public {
+        // stated limit of the design: a lower-limit signature does not void a higher one already disclosed
+        _fund(root1, 5e6);
+        StakeRouterBase.Path memory high = _scopedPath(address(0), 4e6, borrower, 3e6);
+        StakeRouterBase.Path memory low = _scopedPath(address(0), 1e6, borrower, 3e6); // root later signed a tighter cap
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 3e6);
+        bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
+        vm.expectRevert(StakeRouterBase.LimitExceeded.selector);
+        router.originate(req, sig, _one(low));
+        router.originate(req, sig, _one(high)); // the earlier, higher consent still works
+        assertEq(router.edgeUsed(router.edgeKey(root1, mid1, address(0))), 3e6);
     }
 
     // ───────────── attribution arithmetic ─────────────
@@ -818,12 +917,11 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         AttributionHarness h = new AttributionHarness(credit);
         uint256 count = bound(n, 1, 4);
         uint96[4] memory raw = [a0, a1, a2, a3];
-        TransitiveStakeRouter.PathLot[] memory paths = new TransitiveStakeRouter.PathLot[](count);
+        StakeRouterBase.PathLot[] memory paths = new StakeRouterBase.PathLot[](count);
         uint256 total;
         for (uint256 i = 0; i < count; i++) {
             uint256 amt = bound(raw[i], 1, 1e12);
-            paths[i] =
-                TransitiveStakeRouter.PathLot({ root: address(uint160(i + 1)), mid: address(0xBEEF), amount: amt });
+            paths[i] = StakeRouterBase.PathLot({ root: address(uint160(i + 1)), mid: address(0xBEEF), amount: amt });
             total += amt;
         }
         uint256 loss = bound(lossSeed, 0, total);

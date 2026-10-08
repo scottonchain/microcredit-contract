@@ -53,32 +53,36 @@ contract StakeVault {
 }
 
 /**
- * @notice Testnet router for two-hop, stake-rooted credit: a root puts USDC in, a mid-level party it
+ * @notice Shared machinery of the two-hop, stake-rooted routers: a root puts USDC in, a mid-level party it
  *         trusts vouches for a borrower, and the borrower borrows against the root's stake without any
  *         issuer or credit officer. Nothing here creates credit: every unit a borrower can draw through
  *         the router is USDC a root deposited and consented to risk.
- * @dev The borrower names this contract as its pool manager (`setManager`) before any backing exists, so
- *      the pool refuses every origination for that borrower that does not come from here (CI-31). A
+ * @dev The borrower names the concrete router as its pool manager (`setManager`) before any backing exists,
+ *      so the pool refuses every origination for that borrower that does not come from there (CI-31). A
  *      certificate is the borrower's signed pool request plus up to MAX_PATHS paths; each path is a root
- *      and a mid with two EIP-712 consents (root to mid for this borrower, mid to this borrower), each with
- *      a live-exposure limit, a term limit, a version and an expiry. Admission moves the roots' USDC to the
- *      borrower's vault, which backs the borrower in the pool, then submits the borrower's request. The lot
- *      stays locked until the loan has closed; `sync` (anyone, and run first by every origination) then
- *      returns it, and a default's loss is attributed to the roots pro rata to their path amounts.
+ *      and a mid with two EIP-712 consents, each with a live-exposure limit, a term limit, a version and an
+ *      expiry. Root consent: root to mid, with `borrower` as its scope (zero: any borrower the mid vouches
+ *      for; otherwise that one borrower). Its exposure, version and revocation are shared across every
+ *      borrower the root has delegated to that mid, so the limit is a cap on the relationship, not on one
+ *      loan. Mid consent: mid to this borrower. Admission moves the roots' USDC to the borrower's vault,
+ *      which backs the borrower in the pool, then submits the borrower's request. The lot stays locked
+ *      until the loan has closed; `sync` (anyone, and run first by every origination) then returns it, and a
+ *      default's loss is attributed to the roots pro rata to their path amounts.
  *      The submitter picks the paths among the consents it holds: every choice stays inside each signer's
  *      consent, and a signer who wants a single use sets the limit to that use and revokes after.
  *      What is not guarded here is stated in docs/TRANSITIVE_STAKE_ROUTER.md (aliases, mids with no
  *      capital at risk, third-party backers filling the pool's backer slots, loan terms chosen by the
  *      borrower inside the consents). Not a human-lending release.
  */
-contract TransitiveStakeRouter is EIP712, ReentrancyGuard {
+abstract contract StakeRouterBase is EIP712, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant MAX_PATHS = 4;
 
-    /// @dev One edge of trust. Root to mid: `to` is the mid and `borrower` the terminal borrower it may
-    ///      be spent on. Mid to borrower: `to == borrower`. `limit` caps the live USDC exposure along the
-    ///      edge, `maxTerm` the repayment period (seconds) of any loan that uses it.
+    /// @dev One edge of trust. Root to mid: `to` is the mid and `borrower` the scope (zero: any borrower the mid
+    ///      vouches for, otherwise that one borrower); usage and version are shared across all of them. Mid to
+    ///      borrower: `to == borrower == borrower`. `limit` caps the live USDC exposure along the edge, `maxTerm`
+    ///      the repayment period (seconds) of any loan that uses it.
     struct Consent {
         address from;
         address to;
@@ -146,12 +150,12 @@ contract TransitiveStakeRouter is EIP712, ReentrancyGuard {
 
     event Deposited(address indexed root, uint256 amount);
     event Withdrawn(address indexed root, uint256 amount);
-    event EdgeRevoked(address indexed from, address indexed to, address indexed borrower, uint256 newVersion);
+    event EdgeRevoked(address indexed from, address indexed to, address indexed scope, uint256 newVersion);
     event Allocated(address indexed borrower, uint256 indexed loanId, uint256 amount, uint256 paths);
     event Released(address indexed borrower, uint256 indexed loanId, uint256 returned, uint256 loss);
     event RootLoss(address indexed root, address indexed borrower, uint256 indexed loanId, uint256 loss);
 
-    constructor(DecentralizedMicrocredit pool_) EIP712("TransitiveStakeRouter", "1") {
+    constructor(DecentralizedMicrocredit pool_) {
         pool = pool_;
         token = pool_.usdc();
     }
@@ -178,28 +182,28 @@ contract TransitiveStakeRouter is EIP712, ReentrancyGuard {
         emit Withdrawn(msg.sender, amount);
     }
 
-    /// @notice Void every consent the caller signed for the edge (caller to `to`, for `borrower`). Live
-    ///         exposure stays until its loans close; only new allocations need a consent of the new version.
-    function revokeEdge(address to, address borrower) external {
-        bytes32 key = edgeKey(msg.sender, to, borrower);
-        uint256 v = ++edgeVersion[key];
-        emit EdgeRevoked(msg.sender, to, borrower, v);
+    /// @notice Void every root consent the caller signed for `mid`, whatever borrower it names. Live exposure
+    ///         stays until its loans close; only new allocations need a consent of the new version.
+    function revokeRootEdge(address mid) external {
+        uint256 v = ++edgeVersion[edgeKey(msg.sender, mid, address(0))];
+        emit EdgeRevoked(msg.sender, mid, address(0), v);
+    }
+
+    /// @notice Void every mid consent the caller signed for `borrower`.
+    function revokeMidEdge(address borrower) external {
+        uint256 v = ++edgeVersion[edgeKey(msg.sender, borrower, borrower)];
+        emit EdgeRevoked(msg.sender, borrower, borrower, v);
     }
 
     // ───────────────────────────── origination ─────────────────────────────
 
-    /**
-     * @notice Admit a certificate and originate the borrower's loan, atomically. Anyone may call; the
-     *         borrower and the signers of the consents need no ETH.
-     * @param req The borrower's signed pool request (the loan's amount, vendor, term and APR cap).
-     * @param poolSig The borrower's signature for the pool.
-     * @param paths One to MAX_PATHS paths whose amounts sum to `req.amount`.
-     */
-    function originate(
+    /// @dev Admit the certificate and originate the borrower's loan, atomically; the caller must be a concrete
+    ///      router entry that has done its own checks and holds the reentrancy lock.
+    function _originateLot(
         DecentralizedMicrocredit.BorrowAndDisburse calldata req,
         bytes calldata poolSig,
         Path[] calldata paths
-    ) external nonReentrant returns (uint256 loanId) {
+    ) internal returns (uint256 loanId) {
         address borrower = req.borrower;
         if (borrower == address(0) || borrower == address(this) || req.to == address(this)) {
             revert InvalidCertificate();
@@ -250,12 +254,12 @@ contract TransitiveStakeRouter is EIP712, ReentrancyGuard {
             if (
                 p.amount == 0 || root == address(0) || mid == address(0) || root == mid || root == borrower
                     || mid == borrower || root == address(this) || mid == address(this)
-                    || p.rootEdge.borrower != borrower || p.midEdge.from != mid || p.midEdge.to != borrower
-                    || p.midEdge.borrower != borrower
+                    || (p.rootEdge.borrower != address(0) && p.rootEdge.borrower != borrower) || p.midEdge.from != mid
+                    || p.midEdge.to != borrower || p.midEdge.borrower != borrower
             ) revert InvalidCertificate();
 
-            _useConsent(p.rootEdge, p.rootSig, p.amount, term);
-            _useConsent(p.midEdge, p.midSig, p.amount, term);
+            _useConsent(edgeKey(root, mid, address(0)), p.rootEdge, p.rootSig, p.amount, term);
+            _useConsent(edgeKey(mid, borrower, borrower), p.midEdge, p.midSig, p.amount, term);
 
             if (free[root] < p.amount) revert InsufficientFree();
             free[root] -= p.amount;
@@ -266,8 +270,7 @@ contract TransitiveStakeRouter is EIP712, ReentrancyGuard {
         }
     }
 
-    function _useConsent(Consent calldata c, bytes calldata sig, uint256 amount, uint256 term) internal {
-        bytes32 key = edgeKey(c.from, c.to, c.borrower);
+    function _useConsent(bytes32 key, Consent calldata c, bytes calldata sig, uint256 amount, uint256 term) internal {
         if (c.version != edgeVersion[key] || block.timestamp > c.expiry || term > c.maxTerm) revert InvalidConsent();
         if (!SignatureChecker.isValidSignatureNow(c.from, consentDigest(c), sig)) revert InvalidConsent();
         uint256 used = edgeUsed[key] + amount;
@@ -302,7 +305,7 @@ contract TransitiveStakeRouter is EIP712, ReentrancyGuard {
         uint256[] memory share = _attribute(paths, amount, loss);
         for (uint256 i = 0; i < paths.length; i++) {
             PathLot memory p = paths[i];
-            edgeUsed[edgeKey(p.root, p.mid, borrower)] -= p.amount;
+            edgeUsed[edgeKey(p.root, p.mid, address(0))] -= p.amount;
             edgeUsed[edgeKey(p.mid, borrower, borrower)] -= p.amount;
             locked[p.root] -= p.amount;
             free[p.root] += p.amount - share[i];
@@ -340,8 +343,10 @@ contract TransitiveStakeRouter is EIP712, ReentrancyGuard {
 
     // ───────────────────────────── views ─────────────────────────────
 
-    function edgeKey(address from, address to, address borrower) public pure returns (bytes32) {
-        return keccak256(abi.encode(from, to, borrower));
+    /// @notice Root edges use `edgeKey(root, mid, address(0))` (one bucket for the relationship); mid edges use
+    ///         `edgeKey(mid, borrower, borrower)`.
+    function edgeKey(address from, address to, address scope) public pure returns (bytes32) {
+        return keccak256(abi.encode(from, to, scope));
     }
 
     function consentDigest(Consent calldata c) public view returns (bytes32) {
@@ -357,5 +362,29 @@ contract TransitiveStakeRouter is EIP712, ReentrancyGuard {
     {
         Lot storage lot = _lots[borrower];
         return (lot.open, lot.loanId, lot.amount, lot.paths);
+    }
+}
+
+/**
+ * @notice The unbound two-hop router: anyone holding a borrower's signed pool request and the consents may
+ *         originate. It does not bind a loan to a customer's order; the bootstrap product is
+ *         `BootstrapOrderRouter`, which does. Kept as the order-free building block and for its tests.
+ */
+contract TransitiveStakeRouter is StakeRouterBase {
+    constructor(DecentralizedMicrocredit pool_) StakeRouterBase(pool_) EIP712("TransitiveStakeRouter", "2") { }
+
+    /**
+     * @notice Admit a certificate and originate the borrower's loan, atomically. Anyone may call; the
+     *         borrower and the signers of the consents need no ETH.
+     * @param req The borrower's signed pool request (the loan's amount, vendor, term and APR cap).
+     * @param poolSig The borrower's signature for the pool.
+     * @param paths One to MAX_PATHS paths whose amounts sum to `req.amount`.
+     */
+    function originate(
+        DecentralizedMicrocredit.BorrowAndDisburse calldata req,
+        bytes calldata poolSig,
+        Path[] calldata paths
+    ) external nonReentrant returns (uint256 loanId) {
+        return _originateLot(req, poolSig, paths);
     }
 }
