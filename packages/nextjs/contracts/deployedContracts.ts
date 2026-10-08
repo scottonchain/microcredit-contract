@@ -1866,6 +1866,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "managerOf",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "markDefaulted",
           inputs: [
             {
@@ -1977,6 +1996,25 @@ const deployedContracts = {
               name: "",
               type: "address",
               internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "principalRepaid",
+          inputs: [
+            {
+              name: "loanId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
             },
           ],
           stateMutability: "view",
@@ -2492,6 +2530,19 @@ const deployedContracts = {
               name: "threshold",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setManager",
+          inputs: [
+            {
+              name: "manager",
+              type: "address",
+              internalType: "address",
             },
           ],
           outputs: [],
@@ -3799,6 +3850,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "ManagerLocked",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "MustSendToBorrower",
           inputs: [],
         },
@@ -3815,6 +3871,11 @@ const deployedContracts = {
         {
           type: "error",
           name: "NotCancellableYet",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotManager",
           inputs: [],
         },
         {
@@ -6162,6 +6223,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "managerOf",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "markDefaulted",
           inputs: [
             {
@@ -6273,6 +6353,25 @@ const deployedContracts = {
               name: "",
               type: "address",
               internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "principalRepaid",
+          inputs: [
+            {
+              name: "loanId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
             },
           ],
           stateMutability: "view",
@@ -6788,6 +6887,19 @@ const deployedContracts = {
               name: "threshold",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setManager",
+          inputs: [
+            {
+              name: "manager",
+              type: "address",
+              internalType: "address",
             },
           ],
           outputs: [],
@@ -8095,6 +8207,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "ManagerLocked",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "MustSendToBorrower",
           inputs: [],
         },
@@ -8111,6 +8228,11 @@ const deployedContracts = {
         {
           type: "error",
           name: "NotCancellableYet",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotManager",
           inputs: [],
         },
         {

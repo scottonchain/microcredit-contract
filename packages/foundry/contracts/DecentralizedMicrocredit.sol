@@ -263,6 +263,7 @@ contract DecentralizedMicrocredit is EIP712 {
     mapping(address => uint256) public completedLoans; // per borrower, repaid in full
     mapping(address => uint256) public defaultedLoans; // per borrower; any default blocks borrowing
     mapping(address => uint256) private _outstandingPrincipal; // per borrower, across open loans
+    mapping(address => address) public managerOf; // per borrower: the only caller that may originate its loans
 
     // Meta-transactions
     mapping(address => uint256) public nonces;
@@ -373,6 +374,8 @@ contract DecentralizedMicrocredit is EIP712 {
     error InsufficientCredit();
     error BackingInUse();
     error StakeCommitted();
+    error NotManager();
+    error ManagerLocked();
     error InsufficientStake();
 
     // ───────────────────────────── setup & access ─────────────────────────────
@@ -753,6 +756,22 @@ contract DecentralizedMicrocredit is EIP712 {
      */
     function back(address borrower, uint256 amount) external {
         _setBacking(msg.sender, borrower, amount);
+    }
+
+    /**
+     * @notice Name the only caller that may originate the caller's loans (0 for none: the
+     *         borrower or any relayer, as before). Owned by the borrower and fixed while it owes
+     *         principal or holds backing, so a manager cannot be dropped under a live loan or live
+     *         backing; an adapter or router can then bind every origination path to its own rules.
+     */
+    function setManager(address manager) external {
+        require(_outstandingPrincipal[msg.sender] == 0 && _backings[msg.sender].length == 0, ManagerLocked());
+        managerOf[msg.sender] = manager;
+    }
+
+    /// @notice Principal of `loanId` repaid so far; with the loan's principal, what a default writes off.
+    function principalRepaid(uint256 loanId) external view returns (uint256) {
+        return loans[loanId].principalRepaid;
     }
 
     /// @notice Credit score in SCALE units: the admin override if set, otherwise the score
@@ -1226,6 +1245,8 @@ contract DecentralizedMicrocredit is EIP712 {
         require(amount > 0, ZeroAmount());
         require(term >= MIN_LOAN_TERM && term <= MAX_LOAN_TERM, InvalidTerm());
         require(defaultedLoans[borrower] == 0, BorrowerInDefault());
+        address manager = managerOf[borrower];
+        require(manager == address(0) || msg.sender == manager, NotManager());
         (uint256 limit, uint256 available) = getBorrowLimit(borrower);
         require(limit > 0, NoCredit());
         require(amount <= available, BorrowLimitExceeded());
