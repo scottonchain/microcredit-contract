@@ -37,7 +37,7 @@ what the code does and where it stops.
   admitted under; a root loses at most its path amounts; revocation, expiry and term caps bind new allocations.
 - **Conservation per root:** deposits less withdrawals less attributed losses equal `free + locked` (R2); the router
   holds exactly the free balances plus stray transfers (R1); `locked` and each edge's exposure are the sum of the open
-  paths (R3); an open lot's vault stakes the whole lot and has no unsecured backing, a closed lot leaves nothing (R4).
+  paths (R3); an open lot's vault stakes the whole lot and has no unsecured backing, a closed lot leaves nothing (R4). The pool's principal lent out equals the active lots' unpaid principal (R7).
 - **Codex's bypass regression** (`testCertifiedLoanRepaidDirectlyAtPoolCannotBeReopenedOnAnyOtherPath`): after a
   certified loan is repaid directly at the pool, `requestLoan`, `requestLoanMeta` by another relayer and
   `borrowAndDisburseMeta` by another caller all revert `NotManager`.

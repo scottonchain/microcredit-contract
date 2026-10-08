@@ -464,6 +464,16 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
         return _lots[b].loanId;
     }
 
+    /// @dev Principal the model says is still owed to the pool on active router loans: the managed pool exposure.
+    function expectedLentOut() external view returns (uint256 sum) {
+        for (uint256 i = 0; i < NB; i++) {
+            LotM storage lot = _lots[borrowers[i]];
+            if (!lot.open) continue;
+            (DecentralizedMicrocredit.LoanStatus status,,,,) = credit.getLoanTerms(lot.loanId);
+            if (status == DecentralizedMicrocredit.LoanStatus.Active) sum += lot.amount - lot.principalRepaid;
+        }
+    }
+
     function expectedLocked(address root) external view returns (uint256 sum) {
         for (uint256 i = 0; i < NB; i++) {
             LotM storage lot = _lots[borrowers[i]];

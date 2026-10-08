@@ -21,6 +21,8 @@ import { RouterHandler } from "./RouterHandler.sol";
  *          loan is active, so the pool's cover of a loan is the roots' USDC and nothing else;
  *      R5  lenders lose no principal beyond the pool's own rounding: every loan in this run is a router loan,
  *          so total assets never fall below the pool's deposit less the dust the pool leaves unslashed;
+ *      R7  the pool's principal lent out equals the active lots' unpaid principal (managed pool exposure equals
+ *          the router-recorded active principal);
  *      R6  the handler's own checks at every sync (loss attributed equals the unpaid principal, no root bears
  *          more than its own paths nor less than its pro rata floor, each root gets back what it put in less
  *          its share) and every refusal being one of the two documented ones.
@@ -139,6 +141,11 @@ contract TransitiveStakeRouterInvariantTest is MicrocreditTestBase {
         // every loan is a router loan, covered by the vault's stake alone: the only shortfall is the dust the
         // pool leaves unslashed when it splits a default pro rata among backers (at most backers - 1 units each)
         assertGe(credit.totalAssets() + handler.dust(), POOL, "every loan is covered by the roots' stake");
+    }
+
+    function invariant_R7_managedPoolExposureEqualsRouterRecordedActivePrincipal() public view {
+        // every loan is a router loan, so the pool's principal lent out is exactly the active lots' unpaid principal
+        assertEq(credit.totalLentOut(), handler.expectedLentOut(), "pool exposure equals the router's active principal");
     }
 
     function invariant_R6_handlerChecksHold() public view {
