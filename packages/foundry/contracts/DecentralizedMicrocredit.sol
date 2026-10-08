@@ -769,11 +769,6 @@ contract DecentralizedMicrocredit is EIP712 {
         managerOf[msg.sender] = manager;
     }
 
-    /// @notice Principal of `loanId` repaid so far; with the loan's principal, what a default writes off.
-    function principalRepaid(uint256 loanId) external view returns (uint256) {
-        return loans[loanId].principalRepaid;
-    }
-
     /// @notice Credit score in SCALE units: the admin override if set, otherwise the score
     ///         provider's (0 when there is none, or its scores are stale).
     function getCreditScore(address user) public view returns (uint256) {

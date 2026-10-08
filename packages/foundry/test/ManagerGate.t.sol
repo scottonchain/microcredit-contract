@@ -178,26 +178,21 @@ contract ManagerGateTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(borrower), 1e6);
     }
 
-    // ───────────── the repaid-principal view ─────────────
+    // ───────────── a managed borrower's default charges the backing it was originated against ─────────────
 
-    function testPrincipalRepaidTracksPartialRepaymentAndSurvivesDefault() public {
+    function testDefaultOfAManagedLoanChargesTheSponsorStakeByTheUnpaidPrincipal() public {
         _managedAndBacked(5e6);
         uint256 loanId = _viaManager(4e6);
-        assertEq(credit.principalRepaid(loanId), 0);
-
         usdc.mint(stranger, 1e6);
         vm.startPrank(stranger);
         usdc.approve(address(credit), 1e6);
         credit.repayLoan(loanId, 1e6); // inside the first day: all principal
         vm.stopPrank();
-        assertEq(credit.principalRepaid(loanId), 1e6);
 
         (,,,, uint256 dueAt) = credit.getLoanTerms(loanId);
         vm.warp(dueAt + credit.LATE_PERIOD() + 1);
         credit.markDefaulted(loanId);
-        assertEq(credit.principalRepaid(loanId), 1e6, "a default leaves the record: written off = principal - repaid");
-        (uint256 principal,,,,) = credit.getLoan(loanId);
-        assertEq(principal - credit.principalRepaid(loanId), 3e6);
-        assertEq(credit.stakeOf(sponsor), 2e6, "the sponsor's stake paid the 3 USDC loss");
+        assertEq(credit.stakeOf(sponsor), 2e6, "the sponsor's stake paid the 3 USDC unpaid principal");
+        assertEq(credit.defaultedLoans(borrower), 1);
     }
 }

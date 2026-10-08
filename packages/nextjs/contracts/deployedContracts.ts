@@ -2002,25 +2002,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "principalRepaid",
-          inputs: [
-            {
-              name: "loanId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "processWithdrawalQueue",
           inputs: [
             {
@@ -6353,25 +6334,6 @@ const deployedContracts = {
               name: "",
               type: "address",
               internalType: "address",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "principalRepaid",
-          inputs: [
-            {
-              name: "loanId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
             },
           ],
           stateMutability: "view",

@@ -6,7 +6,7 @@ fs_permissions = [{ access = "read-write", path = "./"}]
 solc_version = "0.8.33"
 via_ir = true
 optimizer = true
-optimizer_runs = 100
+optimizer_runs = 200
 # 2424: forge-std natspec deprecation (memory-safe-assembly); 4591: solc's ">256 warnings" note those trigger
 ignored_error_codes = [2424, 4591]
 
