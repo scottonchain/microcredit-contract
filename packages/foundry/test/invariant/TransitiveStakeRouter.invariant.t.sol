@@ -19,8 +19,8 @@ import { RouterHandler } from "./RouterHandler.sol";
  *          open paths over it, and a closed lot leaves no exposure and no stake in its vault;
  *      R4  an open lot's vault holds the whole lot as secured backing (and no unsecured backing) while its
  *          loan is active, so the pool's cover of a loan is the roots' USDC and nothing else;
- *      R5  lenders never lose principal: every loan in this run is a router loan, so total assets never fall
- *          below the pool's deposit;
+ *      R5  lenders lose no principal beyond the pool's own rounding: every loan in this run is a router loan,
+ *          so total assets never fall below the pool's deposit less the dust the pool leaves unslashed;
  *      R6  the handler's own checks at every sync (loss attributed equals the unpaid principal, no root bears
  *          more than its own paths nor less than its pro rata floor, each root gets back what it put in less
  *          its share) and every refusal being one of the two documented ones.
@@ -40,7 +40,7 @@ contract TransitiveStakeRouterInvariantTest is MicrocreditTestBase {
         router = new TransitiveStakeRouter(credit);
         handler = new RouterHandler(credit, usdc, router);
         targetContract(address(handler));
-        bytes4[] memory selectors = new bytes4[](8);
+        bytes4[] memory selectors = new bytes4[](11);
         selectors[0] = RouterHandler.deposit.selector;
         selectors[1] = RouterHandler.withdraw.selector;
         selectors[2] = RouterHandler.revoke.selector;
@@ -49,6 +49,9 @@ contract TransitiveStakeRouterInvariantTest is MicrocreditTestBase {
         selectors[5] = RouterHandler.warp.selector;
         selectors[6] = RouterHandler.defaultOne.selector;
         selectors[7] = RouterHandler.syncOne.selector;
+        selectors[8] = RouterHandler.thirdPartyBack.selector;
+        selectors[9] = RouterHandler.thirdPartyUnback.selector;
+        selectors[10] = RouterHandler.attemptDirect.selector;
         targetSelector(FuzzSelector({ addr: address(handler), selectors: selectors }));
     }
 
@@ -132,8 +135,10 @@ contract TransitiveStakeRouterInvariantTest is MicrocreditTestBase {
         }
     }
 
-    function invariant_R5_lendersNeverLosePrincipal() public view {
-        assertGe(credit.totalAssets(), POOL, "every loan is covered by the roots' stake");
+    function invariant_R5_lendersLosePrincipalOnlyToThePoolsRounding() public view {
+        // every loan is a router loan, covered by the vault's stake alone: the only shortfall is the dust the
+        // pool leaves unslashed when it splits a default pro rata among backers (at most backers - 1 units each)
+        assertGe(credit.totalAssets() + handler.dust(), POOL, "every loan is covered by the roots' stake");
     }
 
     function invariant_R6_handlerChecksHold() public view {
@@ -159,7 +164,15 @@ contract TransitiveStakeRouterInvariantTest is MicrocreditTestBase {
             " loss=",
             vm.toString(handler.totalLossAttributed()),
             " revocations=",
-            vm.toString(handler.revocations())
+            vm.toString(handler.revocations()),
+            " third_party_backings=",
+            vm.toString(handler.thirdPartyBackings()),
+            " shared_slash_defaults=",
+            vm.toString(handler.sharedSlashDefaults()),
+            " bypass_attempts=",
+            vm.toString(handler.bypassAttempts()),
+            " dust=",
+            vm.toString(handler.dust())
         );
         console.log(line);
         string memory statsFile = vm.envOr("INVARIANT_STATS_FILE", string(""));

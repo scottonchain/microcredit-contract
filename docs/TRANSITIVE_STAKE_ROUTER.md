@@ -54,6 +54,7 @@ what the code does and where it stops.
   and a borrower puts only their own USDC at risk: nothing is manufactured, but the "trust" is circular.
 - **A mid has no capital at risk.** The mid's consent bounds how much can be allocated through it; a bad vouch costs the
   roots, not the mid (reputation only). Mid capital as first loss is the next stage and needs its own proof.
+- **Consents of one version on one edge are interchangeable.** The limit applied is the one on the consent presented, and exposure is counted per edge across all of them, so a signer who wants to lower a limit must revoke (the version moves on), not sign a lower one.
 - **The submitter picks the paths** among the consents it holds. Every pick is inside every signer's consent. A signer
   who wants a single use sets the limit to that use and revokes after.
 - **The borrower chooses terms and vendor** inside the consents (term up to the consents' `maxTerm`, any recipient

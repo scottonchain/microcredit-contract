@@ -30,6 +30,8 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
 
     bytes32 internal constant EIP712_DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    bytes32 internal constant LOAN_REQUEST_TYPEHASH =
+        keccak256("LoanRequest(address borrower,uint256 amount,uint256 nonce,uint256 deadline)");
     bytes32 internal constant BORROW_AND_DISBURSE_TYPEHASH = keccak256(
         "BorrowAndDisburse(address borrower,uint256 amount,address to,uint256 repaymentPeriod,uint256 maxAprBps,uint256 nonce,uint256 deadline)"
     );
@@ -49,6 +51,7 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
         uint256 rate;
         uint256 repaid;
         uint256 principalRepaid;
+        uint256 expectedVaultLoss; // the vault's slash at default, from the pool's backing snapshot
         PathM[] paths;
     }
 
@@ -82,6 +85,11 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
     uint256 public multiPathLots;
     uint256 public totalLossAttributed;
     uint256 public revocations;
+    uint256 public dust; // pool rounding left unslashed at defaults: at most (backers - 1) units each
+    uint256 public thirdPartyBackings;
+    uint256 public bypassAttempts;
+    uint256 public sharedSlashDefaults;
+    address[] public thirdParties;
 
     constructor(DecentralizedMicrocredit credit_, MockUSDC usdc_, TransitiveStakeRouter router_) {
         credit = credit_;
@@ -103,6 +111,9 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
             uint256 k = uint256(keccak256(abi.encode("mid", i)));
             _midKeys.push(k);
             mids.push(vm.addr(k));
+        }
+        for (uint256 i = 0; i < 2; i++) {
+            thirdParties.push(address(uint160(0xB0B0 + i)));
         }
         for (uint256 i = 0; i < NB; i++) {
             uint256 k = uint256(keccak256(abi.encode("borrower", i)));
@@ -263,8 +274,26 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
         (DecentralizedMicrocredit.LoanStatus status,,,,) = credit.getLoanTerms(lot.loanId);
         if (status != DecentralizedMicrocredit.LoanStatus.Active) return;
         if (vm.getBlockTimestamp() <= lot.disbursedAt + lot.term + credit.LATE_PERIOD()) return;
+        // the pool charges secured backing pro rata, rounding each backer's share down: snapshot it first
+        DecentralizedMicrocredit.Backing[] memory edges = credit.getBackings(b);
+        uint256 totalSecured;
+        uint256 vaultSecured;
+        for (uint256 i = 0; i < edges.length; i++) {
+            totalSecured += edges[i].secured;
+            if (edges[i].backer == address(router.vaultOf(b))) vaultSecured = edges[i].secured;
+        }
+        uint256 unpaid = lot.amount - lot.principalRepaid;
+        uint256 fromStake = unpaid < totalSecured ? unpaid : totalSecured;
+        uint256 slashedTotal;
+        for (uint256 i = 0; i < edges.length; i++) {
+            slashedTotal += fromStake == 0 ? 0 : (fromStake * edges[i].secured) / totalSecured;
+        }
+        uint256 vaultLoss = fromStake == 0 ? 0 : (fromStake * vaultSecured) / totalSecured;
         try credit.markDefaulted(lot.loanId) {
             defaultedLots++;
+            lot.expectedVaultLoss = vaultLoss;
+            dust += unpaid - slashedTotal;
+            if (edges.length > 1) sharedSlashDefaults++;
             if (lot.principalRepaid != 0) partialRepayDefaults++;
         } catch {
             unexpectedReverts++;
@@ -289,6 +318,72 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
             address v = address(router.vaultOf(b));
             if (v != address(0)) usdc.mint(v, amount);
         }
+    }
+
+    /// @dev A third party stakes and backs a borrower alongside the vault: the slash is then shared pro rata.
+    function thirdPartyBack(uint256 seed, uint256 amount) external {
+        address tp = thirdParties[seed % 2];
+        address b = borrowers[(seed >> 8) % NB];
+        if (credit.defaultedLoans(b) != 0) return;
+        amount = bound(amount, 1e6, 8e6);
+        (uint256 secured, uint256 unsecured) = credit.getBacking(tp, b);
+        usdc.mint(tp, amount);
+        vm.startPrank(tp);
+        usdc.approve(address(credit), amount);
+        credit.stake(amount);
+        try credit.back(b, secured + unsecured + amount) {
+            thirdPartyBackings++;
+        } catch {
+            unexpectedReverts++;
+        }
+        vm.stopPrank();
+    }
+
+    function thirdPartyUnback(uint256 seed) external {
+        address tp = thirdParties[seed % 2];
+        address b = borrowers[(seed >> 8) % NB];
+        (uint256 secured, uint256 unsecured) = credit.getBacking(tp, b);
+        if (secured + unsecured == 0) return;
+        vm.prank(tp);
+        try credit.back(b, 0) { }
+        catch {
+            unexpectedReverts++; // the vault alone covers every router loan, so this must always succeed
+        }
+    }
+
+    /// @dev Every direct origination path for a managed borrower must refuse, whoever calls and in whatever state.
+    function attemptDirect(uint256 seed) external {
+        uint256 bi = seed % NB;
+        address b = borrowers[bi];
+        bypassAttempts++;
+        vm.prank(b);
+        try credit.requestLoan(1e6) {
+            violations++;
+        } catch { }
+
+        DecentralizedMicrocredit.LoanRequest memory lr = DecentralizedMicrocredit.LoanRequest({
+            borrower: b, amount: 1e6, nonce: credit.nonces(b), deadline: vm.getBlockTimestamp() + 1 hours
+        });
+        bytes memory lsig = _signLoanRequest(_borrowerKeys[bi], lr);
+        vm.prank(stranger);
+        try credit.requestLoanMeta(lr, lsig) {
+            violations++;
+        } catch { }
+
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = DecentralizedMicrocredit.BorrowAndDisburse({
+            borrower: b,
+            amount: 1e6,
+            to: vendor,
+            repaymentPeriod: 7 days,
+            maxAprBps: 933,
+            nonce: credit.nonces(b),
+            deadline: vm.getBlockTimestamp() + 1 hours
+        });
+        bytes memory sig = _signPool(_borrowerKeys[bi], req);
+        vm.prank(stranger);
+        try credit.borrowAndDisburseMeta(req, sig) {
+            violations++;
+        } catch { }
     }
 
     // ───────────── model ─────────────
@@ -316,8 +411,7 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
                 || status == DecentralizedMicrocredit.LoanStatus.Requested
         ) return;
 
-        uint256 expectedLoss =
-            status == DecentralizedMicrocredit.LoanStatus.Defaulted ? lot.amount - lot.principalRepaid : 0;
+        uint256 expectedLoss = status == DecentralizedMicrocredit.LoanStatus.Defaulted ? lot.expectedVaultLoss : 0;
         uint256[3] memory freeBefore;
         uint256[3] memory lossBefore;
         uint256[3] memory lotted; // path amounts per root
@@ -432,6 +526,26 @@ contract RouterHandler is CommonBase, StdCheats, StdUtils {
 
     function _signConsent(uint256 pk, TransitiveStakeRouter.Consent memory c) internal view returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, router.consentDigest(c));
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _signLoanRequest(uint256 pk, DecentralizedMicrocredit.LoanRequest memory req)
+        internal
+        view
+        returns (bytes memory)
+    {
+        bytes32 domain = keccak256(
+            abi.encode(
+                EIP712_DOMAIN_TYPEHASH,
+                keccak256("DecentralizedMicrocredit"),
+                keccak256("1"),
+                block.chainid,
+                address(credit)
+            )
+        );
+        bytes32 structHash =
+            keccak256(abi.encode(LOAN_REQUEST_TYPEHASH, req.borrower, req.amount, req.nonce, req.deadline));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, keccak256(abi.encodePacked("\x19\x01", domain, structHash)));
         return abi.encodePacked(r, s, v);
     }
 
