@@ -12,7 +12,8 @@ mkdir -p "$OUT/logs"
 RPC=https://sepolia.base.org
 ORACLE=0x000000000000000000000000000000000000dEaD
 SENDER=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-( cd packages/foundry && forge build >/dev/null && forge build --sizes ) > "$OUT/logs/build-sizes.txt" 2>&1
+# `forge build --sizes` exits non-zero because an invariant test handler (CreditHandler) is over 24,576 bytes; it is never deployed
+( cd packages/foundry && forge build >/dev/null && { forge build --sizes || true; } ) > "$OUT/logs/build-sizes.txt" 2>&1
 ( cd packages/foundry && forge --version && grep -E "solc_version|via_ir|optimizer|evm_version" foundry.toml ) > "$OUT/logs/toolchain.txt" 2>&1
 ( cd packages/foundry && forge test ) > "$OUT/logs/forge-test-local.txt" 2>&1 || true
 ( cd packages/foundry && BASE_SEPOLIA_RPC_URL=$RPC forge test --match-path 'test/fork/*Router*' ) > "$OUT/logs/forge-test-fork-routers.txt" 2>&1 || true
