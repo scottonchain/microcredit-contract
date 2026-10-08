@@ -178,6 +178,36 @@ contract ManagerGateTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(borrower), 1e6);
     }
 
+    function testSignatureMadeBeforeOptInCannotBeExecutedByAnyoneButTheManager() public {
+        // the borrower signs an advance while unmanaged, then names a manager and is backed
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(2e6);
+        bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
+        _managedAndBacked(5e6);
+        vm.prank(relayer);
+        vm.expectRevert(DecentralizedMicrocredit.NotManager.selector);
+        credit.borrowAndDisburseMeta(req, sig);
+        vm.prank(stranger);
+        vm.expectRevert(DecentralizedMicrocredit.NotManager.selector);
+        credit.borrowAndDisburseMeta(req, sig);
+        // only the manager can still use it, and it is the borrower's own signature
+        vm.prank(manager);
+        credit.borrowAndDisburseMeta(req, sig);
+        assertEq(usdc.balanceOf(vendor), 2e6);
+    }
+
+    function testManagerStaysLockedWhileALoanIsOnlyRequested() public {
+        _managedAndBacked(5e6);
+        DecentralizedMicrocredit.LoanRequest memory lr = DecentralizedMicrocredit.LoanRequest({
+            borrower: borrower, amount: 2e6, nonce: credit.nonces(borrower), deadline: _deadline()
+        });
+        bytes memory lsig = _signLoanRequest(borrowerPk, lr);
+        vm.prank(manager);
+        credit.requestLoanMeta(lr, lsig); // reserved, not disbursed
+        vm.prank(borrower);
+        vm.expectRevert(DecentralizedMicrocredit.ManagerLocked.selector);
+        credit.setManager(address(0));
+    }
+
     // ───────────── a managed borrower's default charges the backing it was originated against ─────────────
 
     function testDefaultOfAManagedLoanChargesTheSponsorStakeByTheUnpaidPrincipal() public {

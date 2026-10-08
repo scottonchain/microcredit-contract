@@ -754,6 +754,41 @@ contract TransitiveStakeRouterTest is MicrocreditTestBase {
         assertEq(router.edgeUsed(router.edgeKey(root1, mid1, borrower)), 2e6);
     }
 
+    function testDirectRepaymentBeforeSyncDoesNotFreeRootCapacityForAnotherBorrower() public {
+        _fund(root1, 5e6);
+        uint256 loanId = _originate(borrowerPk, borrower, 3e6, _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 3e6)));
+        _repayAll(stranger, loanId); // the pool has capacity again; the router has not synced
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower2, 3e6);
+        bytes memory sig = _signBorrowAndDisburse(borrower2Pk, req);
+        TransitiveStakeRouter.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower2, 3e6));
+        vm.expectRevert(TransitiveStakeRouter.InsufficientFree.selector);
+        router.originate(req, sig, ps); // only 2e6 is free until the first lot is synced
+        router.sync(borrower);
+        router.originate(req, sig, ps);
+        assertEq(router.locked(root1), 3e6, "aggregate reserved principal never exceeded the 5e6 allocation");
+    }
+
+    function testConsentDoesNotReplayOnAnotherRouterOrChain() public {
+        _fund(root1, 10e6);
+        TransitiveStakeRouter.Path[] memory ps = _one(_path(root1Pk, root1, mid1Pk, mid1, borrower, 2e6));
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = _req(borrower, 2e6);
+        bytes memory sig = _signBorrowAndDisburse(borrowerPk, req);
+
+        // another router (the borrower names it manager, so the manager check passes): consents signed for `router` fail
+        TransitiveStakeRouter other = new TransitiveStakeRouter(credit);
+        vm.prank(borrower);
+        credit.setManager(address(other));
+        vm.expectRevert(TransitiveStakeRouter.InvalidConsent.selector);
+        other.originate(req, sig, ps);
+
+        // the same router on another chain id: the consent domain changed
+        vm.prank(borrower);
+        credit.setManager(address(router));
+        vm.chainId(block.chainid + 1);
+        vm.expectRevert(TransitiveStakeRouter.InvalidConsent.selector);
+        router.originate(req, sig, ps);
+    }
+
     function testNonRouterCannotDriveTheVault() public {
         _simple(10e6, 4e6);
         StakeVault vault = router.vaultOf(borrower);
