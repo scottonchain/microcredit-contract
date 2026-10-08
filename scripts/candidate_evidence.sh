@@ -26,7 +26,7 @@ fork_deploy() {  # starts a fresh fork, deploys the candidate, prints "pool lens
   timeout 90 bash -c 'until curl -s -m 2 -X POST -H "content-type: application/json" --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_chainId\",\"params\":[]}" http://127.0.0.1:8546 | grep -q result; do sleep 1; done'
   local o; o=$(cd packages/foundry && BOOTSTRAP_ORACLE=$ORACLE forge script script/DeployBootstrapCandidate.s.sol --rpc-url http://127.0.0.1:8546 --broadcast --unlocked --sender $SENDER 2>&1)
   rm -rf packages/foundry/broadcast/DeployBootstrapCandidate.s.sol
-  echo "$o" | awk '/candidate pool/{p=$3} /candidate lens/{l=$3} /bootstrap order router/{r=$5} END{print p, l, r}'
+  echo "$o" | awk '/candidate pool/{p=$NF} /candidate lens/{l=$NF} /candidate bootstrap order router/{r=$NF} END{print p, l, r}'
 }
 read -r P L R < <(fork_deploy)
 python3 scripts/verify_candidate_deployment.py --rpc http://127.0.0.1:8546 --pool "$P" --lens "$L" --router "$R" --json > "$OUT/logs/verifier.json"
