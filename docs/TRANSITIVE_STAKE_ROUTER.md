@@ -63,6 +63,9 @@ what the code does and where it stops.
   `markDefaulted` (permissionless, `LATE_PERIOD` after due). The pool allows 32 backers per borrower: a griefer can fill
   them with 1 USDC backings of a managed borrower and block the vault's backing, and the borrower must then use
   another address (CI-31 note). A third-party backer on the same borrower shares the slash, so roots lose less.
+  Likewise a stranger can back a fresh address before it names its manager; the pool then refuses `setManager`
+  (`ManagerLocked`) until that backing is withdrawn, so the borrower uses another address. Both cost the griefer a
+  stake it can recover, and neither touches safety.
 - **Minimum.** A transitive loan is at least `MIN_BACKING` (1 USDC), the pool's minimum backing.
 - **One open loan per borrower**, one router per borrower (the manager), and the pool's relayer whitelist, if enabled,
   must name the router.
