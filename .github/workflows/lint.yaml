@@ -66,6 +66,9 @@ jobs:
 
       - name: Test the candidate deployment verifier
         run: python3 -m unittest discover -s scripts -p 'test_verify_candidate_deployment.py' -v
+
+      - name: Test the candidate rehearsal typed data against the contracts
+        run: python3 -m unittest discover -s scripts -p 'test_candidate_rehearsal.py' -v
       - name: Start Anvil, deploy contracts (& generate contracts typescript output)
         run: |
           yarn chain > anvil.log 2>&1 &
