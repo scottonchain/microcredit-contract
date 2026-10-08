@@ -1,0 +1,15 @@
+- funded roles by impersonating the USDC holder; aggregate of roles+vaults+pool+router before = 8500000 units
+- lender deposited 5 USDC to the candidate pool
+- the pool's immutable originator is the router: no worker names anything, and no other caller can originate for any borrower
+- two roots deposited 1 USDC each to the router
+- the router's admin named a credit officer (a fresh key) for policy version 1; before that the router had none and nothing could originate
+- customer funded order 1 (1 USDC advance to the vendor, price 1.5 USDC); worker signed the pool request and the acceptance; roots and mid signed consents
+- negative controls refused: direct requestLoan by the worker, borrowAndDisburseMeta by a stranger, a tampered vendor, a forged consent, the unbound `originate` entry
+- a funded, fully signed order with no officer approval is refused (NoApproval): the officer gate is separate from the roots' consents
+- an officer approval for less than the order amount is refused (ApprovalTooSmall): the officer can only refuse or approve the whole order
+- the officer approved the order for exactly its amount; a stranger recorded the signed approval
+- originateOrder by a stranger (tx 0xffe773114984b9c1ab3e2e3fff90c066f2df60944f2f7bf641a73b048698d5ed): loan 1 bound to order 1, vendor +1 USDC, pool lent out +1 USDC; roots locked 0.6 and 0.4 USDC; the customer's escrow stays apart
+- replay of the same order and signatures refused
+- customer settled: the 1 USDC debt was repaid first (loan closed), the worker received 500000 units, the roots' lot returned, escrow is zero
+- roots and lender withdrew everything; aggregate after = 8500000 units (before 8500000)
+REHEARSAL OK
