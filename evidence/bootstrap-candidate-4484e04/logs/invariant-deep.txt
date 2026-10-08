@@ -1,0 +1,24 @@
+Deep invariant campaigns: 512 runs of depth 150 each (76,800 calls per invariant), run at code head 0101b53 (the contracts and tests are byte-identical at 4484e04; later commits add only the evidence script).
+
+== BootstrapOrderRouterInvariantTest (O1 to O7)
+[PASS] invariant_O1_routerHoldsExactlyFreeRootsPlusEscrowPlusStrays() (runs: 512, calls: 76800, reverts: 0)
+[PASS] invariant_O2_escrowHeldIsTheOpenOrdersPrices() (runs: 512, calls: 76800, reverts: 0)
+[PASS] invariant_O3_eachRootConserves() (runs: 512, calls: 76800, reverts: 0)
+[PASS] invariant_O4_lockedFollowsTheOpenPaths() (runs: 512, calls: 76800, reverts: 0)
+[PASS] invariant_O5_sharedEdgeExposureIsTheSumAcrossWorkers() (runs: 512, calls: 76800, reverts: 0)
+[PASS] invariant_O6_poolExposureWithinTheLotsAndLendersLoseNothing() (runs: 512, calls: 76800, reverts: 0)
+[PASS] invariant_O7_everyCreatedUnitHasAKnownHolder() (runs: 512, calls: 76800, reverts: 0)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 80.62s (245.16s CPU time)
+
+== TransitiveStakeRouterInvariantTest (R1 to R7)
+[PASS] invariant_R1_routerHoldsExactlyTheFreeBalancesAndStrayFunds() (runs: 512, calls: 76800, reverts: 0)
+[PASS] invariant_R2_eachRootConserves() (runs: 512, calls: 76800, reverts: 0)
+[PASS] invariant_R3_lockedAndEdgeExposureFollowTheOpenPaths() (runs: 512, calls: 76800, reverts: 0)
+[PASS] invariant_R4_openLotsAreSecuredByTheVaultAndClosedOnesLeaveNothing() (runs: 512, calls: 76800, reverts: 0)
+[PASS] invariant_R5_lendersLosePrincipalOnlyToThePoolsRounding() (runs: 512, calls: 76800, reverts: 0)
+[PASS] invariant_R6_handlerChecksHold() (runs: 512, calls: 76800, reverts: 0)
+[PASS] invariant_R7_managedPoolExposureEqualsRouterRecordedActivePrincipal() (runs: 512, calls: 76800, reverts: 0)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 91.33s (344.25s CPU time)
+
+coverage summed over 3591 runs (order router): {'funded': 53759, 'originated': 8577, 'multipath': 22793, 'settled': 3639, 'refunded': 27941, 'defaulted': 3169}
+coverage summed over 3591 runs (unbound router): {'originations': 17135, 'refusals': 12993, 'repaid': 3665, 'defaulted': 6418, 'partial_repay_defaults': 1904, 'multipath': 8376, 'loss': 6899757222, 'revocations': 48985, 'third_party_backings': 43456, 'shared_slash_defaults': 3666, 'bypass_attempts': 48962, 'dust': 4072}

@@ -20,7 +20,7 @@ Evidence for one exact head is in `evidence/bootstrap-candidate-<head>/` (compil
 | --- | ---: | ---: | --- | --- |
 | `DecentralizedMicrocredit` | 24,538 | 38 | `cc979baa0d5e9c8f` | `f65f697ccfcbf964` |
 | `MicrocreditLens` | 3,287 | 21,289 | `36f7956df62569da` | `cea757c169ae1215` |
-| `BootstrapOrderRouter` | 16,748 | 7,828 | `0e50edf46df40f18` | `450c64afc05429c1` |
+| `BootstrapOrderRouter` | 16,748 | 7,828 | `b3b7a9d66446ddb7` | `450c64afc05429c1` |
 
 Solc 0.8.33, `via_ir`, optimizer 200 runs. The pool is byte-identical to the previous candidate (the repair touched the router only). Deploy gas for the three contracts: about 13.1 million (the script's own estimate; 0.000079 ETH at the 0.006 gwei `sepolia.base.org` quoted at about 17:15 UTC on 2026-10-08, the L1 data fee comes on top).
 
