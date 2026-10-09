@@ -1,13 +1,14 @@
 # Bootstrap candidate: exact-head evidence
 
 Tested revision (the code under test): `3efdb6f2ed93bfdd19e8fd7f0a379868ca2e81b3`. These logs are the original, unmodified output of one run of
-`scripts/candidate_evidence.sh` at that revision, made by Hermes (AI agent) and published at testbed repository commit 8f80978d14554737d88e96128a5f32fe2a492d62, evidence/pr28-clean-rerun-3efdb6f-hermes/ on branch hermes/pr28-repro-supplement-20261009. That run's own gate
-failed on the output format, not on a result (original `FAILED.txt`, sha256 `6f3b3d48fc6b453f836a00cf8e05209353a51c724b54607735d7ce5032e7bee6`, kept at that same testbed commit and, verbatim, evidence/bootstrap-candidate-3efdb6f-gate-reevaluation/original-FAILED.txt in this repository and not rewritten here).
+`scripts/candidate_evidence.sh` at that revision, made by Hermes (AI agent) and published at testbed repository commit 8f80978d14554737d88e96128a5f32fe2a492d62, evidence/pr28-clean-rerun-3efdb6f-hermes/ on branch hermes/pr28-repro-supplement-20261009. The script exited 1: its own
+gate failed on the output format, not on a result (original `FAILED.txt`, sha256 `6f3b3d48fc6b453f836a00cf8e05209353a51c724b54607735d7ce5032e7bee6`, kept at that same testbed commit and, verbatim, evidence/bootstrap-candidate-3efdb6f-gate-reevaluation/original-FAILED.txt in this repository and not rewritten here).
 The gate was repaired afterwards (parser revision `5d17e2c`), the published output was re-evaluated on a separate copy
 (re-evaluation revision `1803b40`, `evidence/bootstrap-candidate-3efdb6f-gate-reevaluation/`), and this packet was assembled
-from a separate copy of the published logs by `scripts/candidate_package_run.py` (packaging revision `335aca1`; this
-directory is added by the commit after it). The designated reviewer (Codex) chose this run as the evidence of record on contract PR 28 (comment 6077822639) and asked for this packaging over a separate copy; that decision unblocks packaging only.
-The original gate result is not backdated: it failed, and the repaired gate passes the same logs. Nothing here is a public-chain
+from a separate copy of the published logs by `scripts/candidate_package_run.py` (packaging revision `04264a8`; this
+directory is added by the commit after it). The designated reviewer (Codex) chose this run as the evidence of record on contract PR 28 (comment 6077822639) and asked for this packaging over a separate copy (testbed issue 15, comment 6077829237); that decision unblocks packaging only. An earlier packet at dbb8eda is superseded by this one: its README did not say the script exited 1 and gave a one-step reproduction.
+The original gate result is not backdated: the script's own run failed, and only the retrospective evaluation of the same logs with
+the repaired parser passes. Nothing here is a public-chain
 receipt: tests ran on a local EVM with synthetic time; fork runs and rehearsals ran on local Anvil forks of Base Sepolia with
 Circle's USDC, every fork pinned to Base Sepolia block 47881599 (hash `0xbdd034c324acf0d6095186f96a30c92b26cd86b947472b9a47de1ac5a909458c`).
 
@@ -60,11 +61,23 @@ Forge and Anvil versions are the ones recorded in the Toolchain block above. For
 - This packet is assembled for review. It is not an acceptance: full packet revalidation, overall acceptance and the public-chain HOLD remain with the designated reviewer, and no readiness is claimed.
 
 ## Reproduce
-To reproduce the run itself, check out the tested revision and run the script (needs forge, anvil, cast, python3 and https://sepolia.base.org):
+Reproducing takes two steps, because rerunning the tested revision still meets the old parser:
+
+1. Check out the tested revision and run the script (needs forge, anvil, cast, python3 and https://sepolia.base.org). With Forge 1.8 its own gate refuses the output at the deep-invariant step and the script exits 1; keep that output and its `FAILED.txt` as the run's original result.
 
 ```
 git checkout 3efdb6f2ed93bfdd19e8fd7f0a379868ca2e81b3
 scripts/candidate_evidence.sh
 ```
+
+2. Judge a copy of that output directory with the repaired gate, from a checkout of the parser revision (`5d17e2c`) or later, and package it (the header of `scripts/candidate_package_run.py` lists its arguments):
+
+```
+git checkout 5d17e2c
+python3 scripts/candidate_evidence_gate.py <a copy of the run's output directory>
+python3 scripts/candidate_package_run.py --src <the run's output directory> --out <a new directory> ...
+```
+
+Running the script itself from a head that carries the parser fix gives a passing packet in one step, but then the tested revision is that head, not `3efdb6f2ed93bfdd19e8fd7f0a379868ca2e81b3` (`packages/` is identical).
 
 To re-judge this packet, run `python3 scripts/candidate_evidence_gate.py` on a copy of this directory (the gate deletes `FAILED.txt` on success and writes it on failure, so never point it at the only copy), and `sha256sum -c SHA256SUMS` from this directory.
