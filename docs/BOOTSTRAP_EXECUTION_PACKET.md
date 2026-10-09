@@ -1,7 +1,10 @@
 # Bootstrap candidate: ordered execution packet (Base Sepolia)
 
 **Draft. Not authorization. Not accepted.** Codex's revalidation of this packet (contract PR 28, comment 6078698487) did not pass; this
-revision answers its five items and has not been revalidated again. Nothing here may be executed until all of the following hold,
+revision answers its five items and has not been revalidated again. Codex later closed items 1 to 4 (comment 6079584647). While Codex is
+down, by the operator's direction of 2026-10-09 ("Have Hermes take over for Codex while codex is down"), Hermes holds the reviewer seat; its
+revalidation (comment 6080276114: four clarifications A to D, applied here) is labelled "by h in Codex's absence", is not independent
+(Hermes reproduced the `3efdb6f` run and Claude wrote this packet) and is superseded by Codex's review on its return. Nothing here may be executed until all of the following hold,
 in writing:
 
 1. **The head to deploy is accepted.** Codex's written acceptance is of source head `2986e23` (review 5463615873). The evidence of
@@ -65,8 +68,10 @@ clean**, and their first public run is itself new evidence, not a repeat.
 
 ## Gates, in order (stop at the first that fails)
 
-1. **G0 head.** The head named in the opening (`3efdb6f` unless Codex names another with identical `packages/`) is checked out;
-   `git status` clean; `forge build` output sizes match `logs/build-sizes.txt` of the evidence packet.
+1. **G0 head.** The head named in the opening (`3efdb6f` unless the reviewer, Codex or Hermes in its absence, names another with identical `packages/`) is checked out;
+   `git status` clean; `forge build --sizes` rows for the three deployed contracts (pool, lens, router: 24,439 / 3,287 / 18,105 bytes) match
+   `logs/build-sizes.txt` of the evidence packet. That log ends with `Error: some contracts exceed the runtime size limit`; that line is
+   expected and is not a stop: the cause is the test-only `CreditHandler` (never deployed), and the deployed pool has a margin of 137 bytes.
 2. **G1 preflight.** `cast chain-id` = 84532; record block number and hash and UTC time; Circle test USDC at
    `0x036CbD53842c5426634e7929541eC2318f3dCF7e` has code and `decimals() = 6`; the funding ledger shows the 11 USDC and the
    ETH are unearmarked holdings; no loan is open for any role address.
@@ -76,8 +81,9 @@ clean**, and their first public run is itself new evidence, not a repeat.
    --json`: all three strict matches and every wiring check must pass, and the metadata-free masked-runtime hashes (`masked_nometa_sha256_*`) and the ABI sha256
    values must equal the evidence packet's `logs/verifier.json` (the full `masked_sha256_*` carries a compiler metadata hash that depends on the checkout path, so it differs between hosts); `pool.ORIGINATOR == router` and `router.officer == 0x0` are in the report. Anything
    else: stop, nothing was funded.
-4. **G3 officer** (not authorized until the operator's written decision on the scope item in the opening). The router's admin (the deployer) calls `R.setOfficer(officer, 1)`. Read back `R.officer()`, `R.policyVersion()
-   = 1` and `R.officerEpoch()`; record them. The officer key is not any of the other roles' keys.
+4. **G3 officer** (not authorized until the operator's written decision on the scope item in the opening). The router's admin (the deployer) calls `R.setOfficer(officer, 1)`. Read back `R.officer()` (the officer's address), `R.policyVersion() = 1` and `R.officerEpoch() = 2` (the epoch starts at 1 and each
+   `setOfficer` or `revokeOfficer` adds 1, so 2 after this call, and 3 after the `setOfficer(officer, 2)` of C3); record them and read
+   the epoch live whenever an approval is signed. The officer key is not any of the other roles' keys.
 
 ## Ordered calls (C1: customer accepts)
 
@@ -94,7 +100,9 @@ Amounts in USDC base units (6 decimals). `P` pool, `R` router, `U` token.
    `EdgeConsent(root, mid, scope 0, limit, 30 days, version 0, expiry)` and the mid signs `EdgeConsent(mid, worker, worker,
    ...)`, split 0.6 and 0.4 USDC.
 6. Negative controls by `eth_call`, before any officer approval is recorded (each must revert as noted): `P.requestLoan(1e6)` from the
-   worker (`NotManager`); `P.borrowAndDisburseMeta` from the submitter (`NotManager`); `R.originateOrder` with a changed vendor
+   worker (`NotManager`: the pause, amount, term and default checks come first and pass); `P.borrowAndDisburseMeta` from the
+   submitter carrying the worker's **valid pool signature, current nonce and deadline** (`NotManager`; with a bad signature, nonce or
+   deadline it reverts earlier, in `_verifyMeta`, and shows nothing about the originator); `R.originateOrder` with a changed vendor
    (`IntentMismatch`); **`R.originateOrder` with everything else signed and valid but no officer approval (`NoApproval`)**. The
    forged-consent control is not here: `originateOrder` reads the stored approval before it checks any root consent (router source,
    `originateOrder` then `_originateLot`), so without an approval it would revert `NoApproval` and show nothing about consents.
@@ -138,7 +146,9 @@ for both roots and the lot back in `free`. Cleanup as in step 9.
 ## C3 (optional, after a clean C1; run last): officer outage
 
 Fund a third order (the customer's fresh 1.5) and have the officer approve it; then the admin calls `R.setOfficer(officer, 2)`.
-Expect by `eth_call` that `R.originateOrder` for it reverts `NoApproval` (void under the new epoch and policy), that `R.approveOrder(a, sig)` with the
+Expect by `eth_call` that `R.originateOrder` for it, carrying the same valid request, worker signatures and consents as step 7 (the intent
+check and the worker's acceptance signature are read before the approval gate, so an invalid input would revert `IntentMismatch` or
+`InvalidConsent` first and show nothing about the epoch), reverts `NoApproval` (void under the new epoch and policy), that `R.approveOrder(a, sig)` with the
 officer's earlier approval and signature (signed under policy version 1 and the old epoch) also reverts `NoApproval`, and the customer's
 `R.refundOrder` works at once. Then run the single cleanup (step 9) **with the officer left at version 2**: the roots' and the
 lender's withdrawals succeeding in that state is the evidence that exits read no officer state. Not in the rehearsal (see above).
