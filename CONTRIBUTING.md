@@ -48,7 +48,7 @@ Contributions are made via Issues and Pull Requests (PRs). A few general guideli
 ## Development Setup
 
 ### Prerequisites
-- `git`, `node >=20.18.3`, `yarn`
+- `git`, `node >=22.18.0`, `yarn`
 - Foundry (`curl -L https://foundry.paradigm.xyz | bash`)
 
 ### Local Development

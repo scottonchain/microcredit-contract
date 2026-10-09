@@ -1,4 +1,5 @@
 import json, os, re, unittest
+from unittest.mock import patch
 import candidate_rehearsal as cr
 
 SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packages", "foundry", "contracts")
@@ -84,6 +85,27 @@ class WalletJsonTest(unittest.TestCase):
         for bad in ("[]", '{"data": []}', '{"data": [{"address": "0x1"}]}', "not json"):
             with self.assertRaises(Exception):
                 cr.new_wallet(bad)
+
+
+class RehearsalControlTest(unittest.TestCase):
+    def test_key_memory_is_isolated_between_rehearsals(self):
+        first, second = cr.Cast("unused"), cr.Cast("unused")
+        first.keys["address"] = "ephemeral value"
+        self.assertEqual(second.keys, {})
+
+    def test_only_an_evm_revert_counts_as_a_negative_control(self):
+        cast = cr.Cast("unused")
+        with patch.object(cast, "run", return_value="0x12345678"):
+            for error in (cr.RpcError("execution reverted", "0xabcdef00", 3), cr.RpcError("execution reverted", "0x", -32000)):
+                with patch("candidate_rehearsal.rpc", side_effect=error):
+                    bad, text = cast.call_reverts("pool", "operation()")
+                    self.assertTrue(bad)
+                    self.assertIn(error.data, text)
+            for error in (cr.RpcError("timeout"), cr.RpcError("rate limit", code=-32005), cr.RpcError("unknown account", code=-32000)):
+                with patch("candidate_rehearsal.rpc", side_effect=error), self.assertRaises(cr.RpcError):
+                    cast.call_reverts("pool", "operation()")
+            with patch("candidate_rehearsal.rpc", return_value="0x"):
+                self.assertEqual(cast.call_reverts("pool", "operation()"), (False, "0x"))
 
 
 if __name__ == "__main__":

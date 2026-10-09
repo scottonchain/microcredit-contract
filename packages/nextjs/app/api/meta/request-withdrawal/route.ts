@@ -1,25 +1,19 @@
+import { signature as parseSignature, typedRequest } from "~~/utils/relayerRequest";
 import { relay, relayerRoute, requireFields, txResponse } from "../relayer";
 
 /** Gasless withdrawal: queues a RequestWithdrawal signed by the lender and fills what it can. */
 export const POST = relayerRoute(async body => {
   requireFields(body, "chainId", "contractAddress", "req", "signature");
-  const { chainId, contractAddress, req, signature } = body;
+  const { chainId, contractAddress } = body;
+  const req = typedRequest("RequestWithdrawal", body.req);
+  const signature = parseSignature(body.signature);
 
   const result = await relay({
     chainId,
     contractAddress,
     functionName: "requestWithdrawalMeta",
     intent: { signer: req.lender, poolNonce: String(req.nonce) },
-    args: [
-      {
-        lender: req.lender,
-        amount: BigInt(req.amount),
-        to: req.to,
-        nonce: BigInt(req.nonce),
-        deadline: BigInt(req.deadline),
-      },
-      signature,
-    ],
+    args: [req, signature],
   });
 
   let queueId: string | null = null;

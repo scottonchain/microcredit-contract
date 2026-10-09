@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Fail-closed gate for the candidate evidence directory (run by candidate_evidence.sh before it writes README.md and SHA256SUMS).
 
-  candidate_evidence_gate.py EVIDENCE_DIR
+  candidate_evidence_gate.py EVIDENCE_DIR [--check]
+
+`--check` is read-only: use it on a published packet without changing its original FAILED.txt.
 
 Reads `logs/exit-codes.txt` (one `name rc` line per run) and the logs, and exits non-zero, writing `FAILED.txt`, unless every
 run exited 0 and its own summary line says what a pass says: no failed, no skipped fork test, no surviving mutant, both
 rehearsals OK, every script test OK, and a verifier report that is ok with every check true and the lens linked to the pool
 that was verified. A failed or partial run therefore cannot leave behind a complete-looking packet (Codex review 5462466632).
 """
-import json, os, re, sys
+import argparse, json, os, re, sys
 
 RUNS = ("forge-test-local", "forge-test-fork-routers", "invariant-deep", "mutants", "python-tests", "rehearsal-normal", "rehearsal-with-default")
 LENS_CHECK = "lens.credit == pool (the lens reads this pool)"
@@ -16,7 +18,7 @@ LENS_CHECK = "lens.credit == pool (the lens reads this pool)"
 
 def forge_totals(text):
     m = re.findall(r"(\d+) tests passed, (\d+) failed, (\d+) skipped", text)
-    return tuple(int(x) for x in m[-1]) if m else None
+    return tuple(int(x) for x in m[0]) if len(m) == 1 else None
 
 
 DEEP_SUITES = {"BootstrapOrderRouterInvariantTest": "O", "TransitiveStakeRouterInvariantTest": "R"}
@@ -138,7 +140,15 @@ def gate(out):
     codes = {}
     for line in (read("exit-codes.txt") or "").splitlines():
         parts = line.split()
-        if len(parts) == 2 and parts[1].lstrip("-").isdigit():
+        if not parts:
+            continue
+        if len(parts) != 2 or not re.fullmatch(r"-?\d+", parts[1]):
+            bad.append("exit-codes.txt: malformed exit-code record")
+        elif parts[0] in codes:
+            bad.append(f"exit-codes.txt: duplicate stage {parts[0]}")
+        elif parts[0] not in RUNS:
+            bad.append(f"exit-codes.txt: unexpected stage {parts[0]}")
+        else:
             codes[parts[0]] = int(parts[1])
     for name in RUNS:
         if name not in codes:
@@ -198,24 +208,33 @@ def gate(out):
         v = json.loads(read("verifier.json") or "")
     except ValueError:
         v = None
-    if not v:
-        bad.append("verifier.json: missing or not JSON")
+    if not isinstance(v, dict) or not v:
+        bad.append("verifier.json: missing or not a JSON object")
     else:
         if v.get("ok") is not True:
             bad.append("verifier: ok is not true")
-        checks = v.get("checks", {})
+        def object_field(name):
+            value = v.get(name, {})
+            if not isinstance(value, dict):
+                bad.append(f"verifier: {name} is not an object")
+                return {}
+            return value
+        checks = object_field("checks")
+        contracts = object_field("contracts")
+        wiring = object_field("wiring")
         if LENS_CHECK not in checks:
             bad.append("verifier: the lens.credit check is absent")
         for k, val in checks.items():
             if val is not True:
                 bad.append(f"verifier check false: {k}")
-        pool = v.get("contracts", {}).get("pool", {}).get("address", "")
-        lens = v.get("wiring", {}).get("lens.credit")
-        if not pool or not isinstance(lens, str) or lens.lower() != pool.lower():
+        pool_contract = contracts.get("pool", {})
+        pool = pool_contract.get("address", "") if isinstance(pool_contract, dict) else ""
+        lens = wiring.get("lens.credit")
+        if not isinstance(pool, str) or not re.fullmatch(r"0x[0-9a-fA-F]{40}", pool) or not isinstance(lens, str) or lens.lower() != pool.lower():
             bad.append(f"verifier: lens.credit {lens!r} is not the verified pool {pool!r}")
         for role in ("pool", "lens", "router"):
-            c = v.get("contracts", {}).get(role)
-            if not c or c.get("match_strict") is not True:
+            c = contracts.get(role)
+            if not isinstance(c, dict) or c.get("match_strict") is not True:
                 bad.append(f"verifier: {role} is not a strict build match")
             elif not re.fullmatch(r"[0-9a-f]{64}", str(c.get("masked_nometa_sha256_build", ""))) or \
                     c.get("masked_nometa_sha256_build") != c.get("masked_nometa_sha256_onchain"):
@@ -232,16 +251,21 @@ def gate(out):
     return bad
 
 
-def main():
-    out = sys.argv[1]
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("out")
+    ap.add_argument("--check", action="store_true", help="report the gate result without changing any file")
+    args = ap.parse_args(argv)
+    out = args.out
     bad = gate(out)
     path = os.path.join(out, "FAILED.txt")
     if bad:
-        with open(path, "w") as f:
-            f.write("The evidence run did not pass; no README.md or SHA256SUMS was written.\n" + "\n".join("- " + b for b in bad) + "\n")
+        if not args.check:
+            with open(path, "w") as f:
+                f.write("The evidence run did not pass; no README.md or SHA256SUMS was written.\n" + "\n".join("- " + b for b in bad) + "\n")
         print("EVIDENCE GATE FAILED:\n" + "\n".join("- " + b for b in bad), file=sys.stderr)
         return 1
-    if os.path.exists(path):
+    if not args.check and os.path.exists(path):
         os.remove(path)
     print("evidence gate: all runs passed")
     return 0

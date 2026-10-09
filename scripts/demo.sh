@@ -5,9 +5,13 @@
 #   yarn demo --manual              # fresh deploy, leave servers running for manual use
 #   yarn demo --reuse               # reload previous chain state, run Playwright automation
 #   yarn demo --manual --reuse      # reload previous state, leave servers running
-set -e
+set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ "${MICROCREDIT_DEMO_ROOT:-}" != "$REPO" ]]; then
+  # A canonical command path lets restart verify the recorded supervisor before signalling it.
+  exec env MICROCREDIT_DEMO_ROOT="$REPO" bash "$REPO/scripts/demo.sh" "$@"
+fi
 cd "$REPO"
 mkdir -p "$REPO/logs"
 
@@ -18,7 +22,7 @@ if ! command -v node >/dev/null 2>&1; then
   for _win_node_dir in \
     "/c/Program Files/nodejs" \
     "/mnt/c/Program Files/nodejs" \
-    "$APPDATA/../Local/Programs/nodejs" \
+    "${APPDATA:-}/../Local/Programs/nodejs" \
     "$HOME/AppData/Local/Programs/nodejs"; do
     if [[ -x "$_win_node_dir/node" || -x "$_win_node_dir/node.exe" ]]; then
       export PATH="$_win_node_dir:$PATH"
@@ -82,13 +86,22 @@ CHAIN_PID="" NEXT_PID=""
 
 # ── Cleanup on exit / Ctrl-C ─────────────────────────────────────────────────
 cleanup() {
+  local status=$?
+  trap - EXIT
   echo ""
   echo "Stopping servers…"
   [[ -n "$CHAIN_PID" ]] && kill "$CHAIN_PID" 2>/dev/null || true
   [[ -n "$NEXT_PID"  ]] && kill "$NEXT_PID"  2>/dev/null || true
-  exit 0
+  [[ -n "$CHAIN_PID" ]] && wait "$CHAIN_PID" 2>/dev/null || true
+  [[ -n "$NEXT_PID"  ]] && wait "$NEXT_PID"  2>/dev/null || true
+  if [[ -f "$REPO/logs/demo.pid" && "$(cat "$REPO/logs/demo.pid")" == "$$" ]]; then
+    rm -f "$REPO/logs/demo.pid"
+  fi
+  exit "$status"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 echo ""
 echo "╔══════════════════════════════════════════════╗"
@@ -103,31 +116,52 @@ for _arg in "$@"; do
   case "$_arg" in
     --reuse)  REUSE=true ;;
     --manual) MANUAL=true ;;
+    *) echo "Unknown demo argument: $_arg" >&2; exit 1 ;;
   esac
 done
 unset _arg
 
 # ── Chain state ──────────────────────────────────────────────────────────────
+STATE_FILE="${ANVIL_STATE_FILE:-$REPO/chain-state-demo.json}"
+[[ "$STATE_FILE" = /* ]] || STATE_FILE="$REPO/$STATE_FILE"
 if [[ "$REUSE" == "true" ]]; then
-  echo "♻  Reusing existing chain state (chain-state-demo.json)…"
+  echo "♻  Reusing existing chain state ($STATE_FILE)…"
   echo ""
-else
-  rm -f chain-state-demo.json
 fi
 
-# ── Kill anything already on these ports ──────────────────────────────────────
+# ── Refuse occupied ports; unrelated servers do not belong to this demo ──────
 for port in $CHAIN_PORT $NEXT_PORT; do
-  pid=$(lsof -ti "tcp:$port" 2>/dev/null || true)
-  if [[ -n "$pid" ]]; then
-    echo "  Killing existing process on port $port (PID $pid)"
-    kill "$pid" 2>/dev/null || true
-    sleep 0.5
+  if node -e 'const s=require("net").connect(Number(process.argv[1]),"127.0.0.1");
+    s.setTimeout(1000); s.on("connect",()=>{s.destroy();process.exit(0)});
+    s.on("error",()=>process.exit(1)); s.on("timeout",()=>{s.destroy();process.exit(1)});' "$port"; then
+    echo "Port $port is already in use. Stop that server before starting the demo." >&2
+    exit 1
   fi
 done
+echo "$$" > "$REPO/logs/demo.pid"
+
+# ── Re-install deps when running in WSL (node_modules was built on Windows) ───
+# Yarn Berry refuses to run workspace commands if the lockfile/node_modules
+# don't match the current platform. Run "yarn install" once in WSL to fix this.
+# The sentinel file records the last platform so we only reinstall when needed.
+_platform_sentinel="$REPO/.yarn/.platform-install"
+_current_platform="$(uname -s)-$(uname -m)"
+_last_platform="$(cat "$_platform_sentinel" 2>/dev/null || true)"
+if [[ "$_current_platform" != "$_last_platform" ]]; then
+  echo "▶ Running yarn install for platform '$_current_platform'…"
+  echo "  (This is a one-time step when switching between Windows and WSL)"
+  yarn install 2>&1 | tee "$REPO/logs/install-demo.log" | tail -5
+  mkdir -p "$(dirname "$_platform_sentinel")"
+  echo "$_current_platform" > "$_platform_sentinel"
+  echo "  ✓ Dependencies ready"
+  echo ""
+fi
+unset _platform_sentinel _current_platform _last_platform
 
 # ── Start Anvil ───────────────────────────────────────────────────────────────
 echo "▶ Starting local Anvil chain…"
-ANVIL_STATE_FILE="./chain-state-demo.json" yarn chain >"$REPO/logs/anvil-demo.log" 2>&1 &
+[[ "$REUSE" == "true" ]] || rm -f "$STATE_FILE"
+ANVIL_STATE_FILE="$STATE_FILE" bash "$REPO/scripts/start-anvil.sh" >"$REPO/logs/anvil-demo.log" 2>&1 &
 CHAIN_PID=$!
 
 echo -n "  Waiting for port $CHAIN_PORT"
@@ -156,33 +190,15 @@ echo " ✓"
 # OpenZeppelin is a git submodule; forge-std is vendored inside it.
 if [[ ! -f "$REPO/lib/openzeppelin-contracts/lib/forge-std/src/Script.sol" ]]; then
   echo "  Initializing git submodules…"
-  git -C "$REPO" submodule update --init --recursive >/dev/null 2>&1 && \
-    echo "  ✓ Solidity libraries ready" || \
-    echo "  ⚠ submodule init failed — deploy may fail"
+  git -C "$REPO" submodule update --init --recursive
+  echo "  ✓ Solidity libraries ready"
 fi
 
 # ── Deploy contracts ──────────────────────────────────────────────────────────
 echo ""
 echo "▶ Deploying contracts…"
-yarn deploy 2>&1 | grep -E "deployed|USDC|Error|error" || true
+yarn deploy 2>&1 | tee "$REPO/logs/deploy-demo.log" | tail -20
 echo "  ✓ Contracts deployed"
-
-# ── Re-install deps when running in WSL (node_modules was built on Windows) ───
-# Yarn Berry refuses to run workspace commands if the lockfile/node_modules
-# don't match the current platform. Run "yarn install" once in WSL to fix this.
-# The sentinel file records the last platform so we only reinstall when needed.
-_platform_sentinel="$REPO/.yarn/.platform-install"
-_current_platform="$(uname -s)-$(uname -m)"
-_last_platform="$(cat "$_platform_sentinel" 2>/dev/null || true)"
-if [[ "$_current_platform" != "$_last_platform" ]]; then
-  echo "▶ Running yarn install for platform '$_current_platform'…"
-  echo "  (This is a one-time step when switching between Windows and WSL)"
-  yarn install 2>&1 | grep -E "YN0000|error|Error" | grep -v "peer" | tail -5 || true
-  echo "$_current_platform" > "$_platform_sentinel"
-  echo "  ✓ Dependencies ready"
-  echo ""
-fi
-unset _platform_sentinel _current_platform _last_platform
 
 # ── Start Next.js ─────────────────────────────────────────────────────────────
 echo ""
@@ -201,13 +217,13 @@ _next_bin="$REPO/node_modules/next/dist/bin/next"
 [[ ! -f "$_next_bin" ]] && _next_bin="$REPO/packages/nextjs/node_modules/next/dist/bin/next"
 # Demo wallet mode presents the MetaMask connector the personas are injected through;
 # without it local dev auto-connects a random burner wallet instead.
-(cd "$REPO/packages/nextjs" && NEXT_PUBLIC_DEMO_WALLET=true node "$_next_bin" dev) >"$REPO/logs/nextjs-demo.log" 2>&1 &
+(cd "$REPO/packages/nextjs" && NEXT_PUBLIC_DEMO_WALLET=true exec node "$_next_bin" dev) >"$REPO/logs/nextjs-demo.log" 2>&1 &
 unset _next_bin
 NEXT_PID=$!
 
 echo -n "  Waiting for port $NEXT_PORT"
 _wait=0
-until [[ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$NEXT_PORT" 2>/dev/null)" =~ ^[1-5][0-9][0-9]$ ]]; do
+until [[ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$NEXT_PORT" 2>/dev/null)" =~ ^[23][0-9][0-9]$ ]]; do
   if ! kill -0 "$NEXT_PID" 2>/dev/null; then
     echo ""
     echo "ERROR: Next.js process exited unexpectedly. Last log lines:"
@@ -256,7 +272,7 @@ else
   " 2>/dev/null || true)
   if [[ -z "$_pw_chromium" || ! -f "$_pw_chromium" ]]; then
     echo "  Downloading Chromium browser…"
-    npx playwright install chromium --with-deps 2>&1 | tail -3 || true
+    npx playwright install chromium --with-deps 2>&1 | tail -3
   elif grep -qi microsoft /proc/version 2>/dev/null; then
     echo "  Verifying Chromium system dependencies…"
     sudo -n npx playwright install-deps chromium 2>&1 | tail -3 || true

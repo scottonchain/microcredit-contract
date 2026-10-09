@@ -21,6 +21,7 @@ time jump (labelled as time travel; not possible on a public chain): the whole l
 lenders lose no principal.
 """
 import argparse, json, subprocess, sys
+from rpc_client import RpcError, rpc
 
 USDC_DEFAULT = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
 USDC_SOURCE_DEFAULT = "0x73872B8fB7F1771C67911f03edc75aBdc9514973"  # the live pool holds test USDC on Base Sepolia
@@ -73,11 +74,15 @@ def approval_typed(chain_id, router, m):
 class Cast:
     def __init__(self, rpc):
         self.rpc = rpc
+        self.keys = {}  # address -> throwaway key, isolated to this rehearsal and never written to disk
 
     def run(self, *args):
         p = subprocess.run(["cast", *args], capture_output=True, text=True)
         if p.returncode != 0:
-            raise RuntimeError(f"cast {' '.join(args[:3])}...: {p.stderr.strip()[:400]}")
+            error = p.stderr.strip()
+            for key in self.keys.values():
+                error = error.replace(key, "[redacted]")
+            raise RuntimeError(f"cast {' '.join(args[:3])}...: {error[:400]}")
         return p.stdout.strip()
 
     def call(self, to, sig, *a, frm=None):
@@ -85,11 +90,16 @@ class Cast:
         return self.run("call", "--rpc-url", self.rpc, *extra, to, sig, *a).split(" ")[0]
 
     def call_reverts(self, to, sig, *a, frm=None):
-        extra = ["--from", frm] if frm else []
-        p = subprocess.run(["cast", "call", "--rpc-url", self.rpc, *extra, to, sig, *a], capture_output=True, text=True)
-        return p.returncode != 0, (p.stderr + p.stdout)
-
-    keys = {}  # address (lowercase) -> throwaway private key, in memory only
+        tx = {"to": to, "data": self.run("calldata", sig, *a)}
+        if frm:
+            tx["from"] = frm
+        try:
+            return False, rpc(self.rpc, "eth_call", [tx, "latest"])
+        except RpcError as error:
+            # A timeout, invalid command or rate limit is not a successful negative control.
+            if error.code != 3 and not (error.code in (-32000, -32015) and "revert" in str(error).lower()):
+                raise
+            return True, str(error) + " " + json.dumps(error.data)
 
     def send(self, frm, to, sig, *a):
         key = self.keys.get(frm.lower())
@@ -130,14 +140,21 @@ UNBOUND = f"originate({REQ_T},bytes,{PATH_T}[])"  # the unbound router's entry: 
 def new_wallet(out):
     """`cast wallet new --json` prints a bare list in Foundry 1.5 and {"schema_version", "success", "data": [...]} in 1.8
     (Hermes's reproduction, testbed issue 15 comment 6071727539). Accept both."""
-    d = json.loads(out)
+    try:
+        d = json.loads(out)
+    except (ValueError, TypeError):
+        raise ValueError("cast returned an invalid wallet response") from None
     if isinstance(d, dict):
         d = d.get("data", d)
-    w = d[0] if isinstance(d, list) else d
+    w = d[0] if isinstance(d, list) and d else d
+    if not isinstance(w, dict) or not all(isinstance(w.get(k), str) for k in ("address", "private_key")):
+        raise ValueError("cast returned an invalid wallet response")
     return {"address": w["address"], "private_key": w["private_key"]}
 
 
 def run(a):
+    if not __debug__:
+        raise RuntimeError("The rehearsal requires Python assertions; do not use -O or PYTHONOPTIMIZE.")
     c = Cast(a.rpc)
     chain = int(c.run("chain-id", "--rpc-url", a.rpc))
     names = ["deployer", "lender", "worker", "root1", "root2", "mid", "vendor", "customer", "submitter", "worker2", "officer"]
@@ -145,7 +162,7 @@ def run(a):
     for n in names:
         w = new_wallet(c.run("wallet", "new", "--json"))
         roles[n] = w["address"]
-        Cast.keys[w["address"].lower()] = w["private_key"]
+        c.keys[w["address"].lower()] = w["private_key"]
         c.run("rpc", "--rpc-url", a.rpc, "anvil_setBalance", w["address"], "0xDE0B6B3A7640000")
     L, W, R1, R2, M, V, C, S, W2, O = (roles[k] for k in ("lender", "worker", "root1", "root2", "mid", "vendor", "customer", "submitter", "worker2", "officer"))
     pool, router, usdc = a.pool, a.router, a.usdc
@@ -245,12 +262,9 @@ def run(a):
     tampered = dict(req, to=S)
     bad, out = c.call_reverts(router, ORIG, str(id_a), tup(POOL_FIELDS, tampered), pool_sig, accept_sig, paths_arg(paths), frm=S)
     assert bad and c.selector("IntentMismatch()") in out, out
-    forged_paths = [(p, re, rs[:-4] + ("0000" if not rs.endswith("0000") else "1111"), me, ms) for p, re, rs, me, ms in paths]
-    bad, _ = c.call_reverts(router, ORIG, str(id_a), tup(POOL_FIELDS, req), pool_sig, accept_sig, paths_arg(forged_paths), frm=S)
-    assert bad, "a forged consent must fail"
     bad, _ = c.call_reverts(router, UNBOUND, tup(POOL_FIELDS, req), pool_sig, paths_arg(paths), frm=S)
     assert bad, "the unbound router entry must not exist here"
-    step("negative controls refused: direct requestLoan by the worker, borrowAndDisburseMeta by a stranger, a tampered vendor, a forged consent, the unbound `originate` entry")
+    step("negative controls refused: direct requestLoan by the worker, borrowAndDisburseMeta by a stranger, a tampered vendor, the unbound `originate` entry")
     bad, out = c.call_reverts(router, ORIG, str(id_a), tup(POOL_FIELDS, req), pool_sig, accept_sig, paths_arg(paths), frm=S)
     assert bad and c.selector("NoApproval()") in out, out
     step("a funded, fully signed order with no officer approval is refused (NoApproval): the officer gate is separate from the roots' consents")
@@ -263,6 +277,12 @@ def run(a):
     record(ok_, ok_sig)
     step("the officer approved the order for exactly its amount; a stranger recorded the signed approval")
 
+    # Exercise signature verification after its prerequisites pass. Before approval this would merely hit NoApproval.
+    forged_paths = [(p, re, rs[:-4] + ("0000" if not rs.endswith("0000") else "1111"), me, ms) for p, re, rs, me, ms in paths]
+    bad, out = c.call_reverts(router, ORIG, str(id_a), tup(POOL_FIELDS, req), pool_sig, accept_sig, paths_arg(forged_paths), frm=S)
+    assert bad and c.selector("InvalidConsent()") in out, out
+    step("with a live officer approval, a forged root consent is refused specifically by InvalidConsent")
+
     # 5 originate by a stranger
     v0, l0 = bal(V), int(c.call(pool, "totalLentOut()(uint256)"))
     h = c.send(S, router, ORIG, str(id_a), tup(POOL_FIELDS, req), pool_sig, accept_sig, paths_arg(paths))
@@ -272,8 +292,8 @@ def run(a):
     assert bal(V) - v0 == amount and int(c.call(pool, "totalLentOut()(uint256)")) - l0 == amount
     assert int(c.call(router, "locked(address)(uint256)", R1)) == 600_000 and int(c.call(router, "locked(address)(uint256)", R2)) == 400_000
     step(f"originateOrder by a stranger (tx {h}): loan {loan_a} bound to order {id_a}, vendor +1 USDC, pool lent out +1 USDC; roots locked 0.6 and 0.4 USDC; the customer's escrow stays apart")
-    bad, _ = c.call_reverts(router, ORIG, str(id_a), tup(POOL_FIELDS, req), pool_sig, accept_sig, paths_arg(paths), frm=S)
-    assert bad
+    bad, out = c.call_reverts(router, ORIG, str(id_a), tup(POOL_FIELDS, req), pool_sig, accept_sig, paths_arg(paths), frm=S)
+    assert bad and c.selector("InvalidOrder()") in out, out
     step("replay of the same order and signatures refused")
 
     # 6 settle: debt first, then the worker; the lot returns

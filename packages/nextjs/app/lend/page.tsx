@@ -6,8 +6,9 @@ import type { NextPage } from "next";
 import { maxUint256 } from "viem";
 import { useAccount, usePublicClient, useSignTypedData } from "wagmi";
 import { toast } from "react-hot-toast";
+import { parsePositiveCents, formatUsdcDecimal } from "~~/utils/amounts";
 import { formatUSDC, getCreditScoreColor } from "~~/utils/format";
-import { relayerErrorMessage } from "~~/utils/contractErrors";
+import { readRelayerResponse } from "~~/utils/relayerResponse";
 import { BanknotesIcon, PlusIcon, EyeIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
@@ -36,26 +37,6 @@ const LendPage: NextPage = () => {
   const [withdrawAll, setWithdrawAll] = useState(false);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Helper function to safely parse deposit amount to BigInt (snap to cent)
-  const parseDepositAmount = (amount: string): bigint | null => {
-    if (!amount || amount.trim() === "") return null;
-    const parsed = parseFloat(amount);
-    if (isNaN(parsed) || parsed <= 0) return null;
-    const micros = BigInt(Math.floor(parsed * 1e6));
-    return roundDownToCent(micros);
-  };
-
-  // Helper function to safely parse withdraw amount to BigInt (snap to cent)
-  const parseWithdrawAmount = (amount: string): bigint | null => {
-    if (!amount || amount.trim() === "") return null;
-    const parsed = parseFloat(amount);
-    if (isNaN(parsed) || parsed <= 0) return null;
-    const micros = BigInt(Math.floor(parsed * 1e6));
-    return roundDownToCent(micros);
-  };
-
-  // Attestation cache removed
 
   // Contract hooks
   const { writeContractAsync } = useScaffoldWriteContract({
@@ -178,7 +159,7 @@ const LendPage: NextPage = () => {
     }
     if (!depositAmount || !connectedAddress || !usdcAddress) return;
     
-    const amountInt = parseDepositAmount(depositAmount);
+    const amountInt = parsePositiveCents(depositAmount);
     if (!amountInt) {
       setErrorMessage("Please enter a valid deposit amount greater than 0.");
       return;
@@ -254,8 +235,7 @@ const LendPage: NextPage = () => {
         }),
       });
 
-      if (!resp.ok) throw new Error(await relayerErrorMessage(resp));
-      const j = await resp.json();
+      const j = await readRelayerResponse(resp);
       console.log("Deposit meta result:", j);
 
       // Refresh state
@@ -278,7 +258,7 @@ const LendPage: NextPage = () => {
 
   const handleWithdraw = async () => {
     if (!withdrawAmount || !connectedAddress) return;
-    const amountInt = withdrawAll ? maxUint256 : parseWithdrawAmount(withdrawAmount);
+    const amountInt = withdrawAll ? maxUint256 : parsePositiveCents(withdrawAmount);
     if (!amountInt) {
       setErrorMessage("Please enter a valid withdrawal amount greater than 0.");
       return;
@@ -329,8 +309,7 @@ const LendPage: NextPage = () => {
           signature: sig,
         }),
       });
-      if (!resp.ok) throw new Error(await relayerErrorMessage(resp));
-      const j = await resp.json();
+      const j = await readRelayerResponse(resp);
       console.log("Withdrawal request meta result:", j);
 
       await Promise.all([refetchPoolInfo(), refetchLenderPosition(), refetchUsdcBalance()]);
@@ -519,9 +498,9 @@ const LendPage: NextPage = () => {
                   !connectedAddress || 
                   isLoading || 
                   (() => {
-                    const parsedAmount = parseDepositAmount(depositAmount);
+                    const parsedAmount = parsePositiveCents(depositAmount);
                     if (!parsedAmount) return true;
-                    return Number(parsedAmount) / 1e6 > Number(usdcBalance) / 1e6;
+                    return parsedAmount > usdcBalance;
                   })()
                 }
                 className="bg-info hover:brightness-90 disabled:bg-base-300 disabled:text-muted text-info-content font-bold py-3 px-6 rounded-lg transition-colors"
@@ -532,9 +511,9 @@ const LendPage: NextPage = () => {
 
             {/* Add a warning message below the deposit input/button if the user does not have enough balance */}
             {(() => {
-              const parsedAmount = parseDepositAmount(depositAmount);
+              const parsedAmount = parsePositiveCents(depositAmount);
               if (!parsedAmount) return null;
-              if (Number(parsedAmount) / 1e6 > Number(usdcBalance) / 1e6) {
+              if (parsedAmount > usdcBalance) {
                 return <div className="text-error text-sm mt-1">Insufficient USDC balance.</div>;
               }
               return null;
@@ -579,10 +558,10 @@ const LendPage: NextPage = () => {
                     disabled={maxWithdrawable === 0n}
                     onClick={() => {
                       if (maxWithdrawable !== undefined && maxWithdrawable < lenderBalance) {
-                        setWithdrawAmount((Number(roundDownToCent(maxWithdrawable)) / 1e6).toFixed(2));
+                        setWithdrawAmount(formatUsdcDecimal(roundDownToCent(maxWithdrawable)));
                         setWithdrawAll(false);
                       } else {
-                        setWithdrawAmount((Number(lenderBalance) / 1e6).toFixed(2));
+                        setWithdrawAmount(formatUsdcDecimal(roundDownToCent(lenderBalance)));
                         setWithdrawAll(true);
                       }
                     }}
@@ -595,9 +574,9 @@ const LendPage: NextPage = () => {
                     disabled={(() => {
                       if (!withdrawAmount || !connectedAddress || withdrawLoading) return true;
                       if (withdrawAll) return false;
-                      const parsedAmount = parseWithdrawAmount(withdrawAmount);
+                      const parsedAmount = parsePositiveCents(withdrawAmount);
                       if (!parsedAmount) return true;
-                      return Number(parsedAmount) / 1e6 > Number(lenderBalance) / 1e6;
+                      return parsedAmount > lenderBalance;
                     })()}
                     className="bg-error hover:brightness-90 disabled:bg-base-300 disabled:text-muted text-error-content font-bold py-3 px-6 rounded-lg transition-colors"
                   >

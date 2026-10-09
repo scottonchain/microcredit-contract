@@ -11,7 +11,8 @@ rehearsal ran on a stale chain. Here `start` refuses a port that already answers
 fails if the child exits or logs that the address is in use; `stop` ends exactly the recorded process and waits for the port
 to free. Standard library only.
 """
-import argparse, json, os, signal, socket, subprocess, sys, time, urllib.request
+import argparse, os, re, signal, socket, subprocess, sys, time
+from rpc_client import RpcError, rpc
 
 
 class ForkError(RuntimeError):
@@ -25,29 +26,24 @@ def port_open(port, host="127.0.0.1"):
 
 
 def chain_id_probe(port):
-    body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []}).encode()
     try:
-        req = urllib.request.Request(f"http://127.0.0.1:{port}", body, {"content-type": "application/json"})
-        with urllib.request.urlopen(req, timeout=2) as r:
-            return "result" in json.load(r)
-    except Exception:
+        return int(rpc(f"http://127.0.0.1:{port}", "eth_chainId", [], timeout=2), 16) == 84532
+    except (RpcError, ValueError, TypeError):
         return False
 
 
-def rpc(url, method, params):
-    body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
-    req = urllib.request.Request(url, body, {"content-type": "application/json", "user-agent": "candidate-fork/1"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        out = json.load(r)
-    if "error" in out:
-        raise ForkError(f"{method}: {out['error']}")
-    return out["result"]
-
-
 def pinned_block(url, back=3):
+    if back < 0:
+        raise ForkError("--back must be nonnegative")
     head = int(rpc(url, "eth_blockNumber", []), 16)
     n = head - back
+    if n < 0:
+        raise ForkError("the requested lookback precedes genesis")
     blk = rpc(url, "eth_getBlockByNumber", [hex(n), False])
+    if not isinstance(blk, dict) or not re.fullmatch(r"0x[0-9a-fA-F]{64}", str(blk.get("hash", ""))):
+        raise ForkError(f"block {n} is unavailable or has no valid hash")
+    if int(blk.get("number", "-1"), 16) != n:
+        raise ForkError(f"the endpoint returned a different block instead of {n}")
     return n, blk["hash"]
 
 
@@ -151,7 +147,7 @@ def main():
             print(start(argv, a.port, a.log, a.pidfile))
         else:
             stop(a.pidfile, a.port)
-    except ForkError as e:
+    except (ForkError, RpcError, ValueError, OSError) as e:
         print(f"candidate_fork: {e}", file=sys.stderr)
         return 1
     return 0

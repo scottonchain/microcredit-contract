@@ -55,38 +55,7 @@ export async function readPermitDomain(
   throw new Error(`Could not match the permit domain of ${name} at ${token}; a permit signed now would be rejected.`);
 }
 
-export const TYPES = {
-  BorrowAndDisburse: [
-    { name: "borrower", type: "address" },
-    { name: "amount", type: "uint256" },
-    { name: "to", type: "address" },
-    { name: "repaymentPeriod", type: "uint256" },
-    { name: "maxAprBps", type: "uint256" },
-    { name: "nonce", type: "uint256" },
-    { name: "deadline", type: "uint256" },
-  ],
-  RequestWithdrawal: [
-    { name: "lender", type: "address" },
-    { name: "amount", type: "uint256" },
-    { name: "to", type: "address" },
-    { name: "nonce", type: "uint256" },
-    { name: "deadline", type: "uint256" },
-  ],
-  BackRequest: [
-    { name: "backer", type: "address" },
-    { name: "borrower", type: "address" },
-    { name: "amount", type: "uint256" },
-    { name: "nonce", type: "uint256" },
-    { name: "deadline", type: "uint256" },
-  ],
-  Permit: [
-    { name: "owner", type: "address" },
-    { name: "spender", type: "address" },
-    { name: "value", type: "uint256" },
-    { name: "nonce", type: "uint256" },
-    { name: "deadline", type: "uint256" },
-  ],
-} as const;
+export { TYPES } from "./metaTypes";
 
 export type BackRequest = {
   backer: `0x${string}`;
@@ -105,4 +74,4 @@ export const splitSignature = (sig: `0x${string}`) => {
   return { v, r, s } as const;
 };
 
-export const roundDownToCent = (amount: bigint) => (amount / 10_000n) * 10_000n; // 0.01 USDC
+export { roundDownToCent } from "./amounts";

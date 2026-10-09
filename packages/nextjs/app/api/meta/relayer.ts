@@ -1,3 +1,6 @@
+import { IntentFlights } from "~~/utils/relayerConcurrency";
+import { RelayerError, permitArg, relayerRpcUrl, requestBody } from "~~/utils/relayerRequest";
+export { RelayerError, requireFields } from "~~/utils/relayerRequest";
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import {
@@ -31,7 +34,6 @@ import {
 } from "~~/utils/relayerJournal";
 import { FileStore } from "~~/utils/relayerJournalStore";
 import {
-  BroadcastRejected,
   BroadcastUnconfirmed,
   JournalWriteFailed,
   messageOf,
@@ -46,15 +48,6 @@ import {
  */
 
 const LOCAL_CHAIN_ID = 31337;
-
-export class RelayerError extends Error {
-  constructor(
-    message: string,
-    readonly status = 500,
-  ) {
-    super(message);
-  }
-}
 
 export type PermitPayload = { value: string; deadline: string; v: number; r: Hex; s: Hex };
 
@@ -102,13 +95,8 @@ function serialized<T>(send: () => Promise<T>): Promise<T> {
   return result;
 }
 
-function getRpcUrl(chainId: number): string {
-  if (chainId === LOCAL_CHAIN_ID) return process.env.LOCAL_RPC_URL || "http://localhost:8545";
-  return process.env.RPC_URL || "http://localhost:8545";
-}
-
 async function getRelayer(chainId: number) {
-  const rpcUrl = getRpcUrl(chainId);
+  const rpcUrl = relayerRpcUrl(chainId, process.env);
   const chain = defineChain({
     id: chainId,
     name: `chain-${chainId}`,
@@ -116,6 +104,8 @@ async function getRelayer(chainId: number) {
     rpcUrls: { default: { http: [rpcUrl] } },
   });
   const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
+
+  if (await publicClient.getChainId() !== chainId) throw new RelayerError("The relayer RPC is on the wrong chain", 503);
 
   let account: Account | Address;
   const pk = process.env.RELAYER_PRIVATE_KEY as Hex | undefined;
@@ -148,16 +138,21 @@ function decodeEvents(abi: Abi, contractAddress: Address, receipt: TransactionRe
 }
 
 // ---- durable journal (utils/relayerJournal.ts; off unless RELAYER_JOURNAL_PATH is set) ----------------------------------
-let journalState: { path: string; store: FileStore; journal: Journal } | undefined;
-const recoveredChains = new Set<number>();
+let journalState: {
+  path: string;
+  store: FileStore;
+  journal: Journal;
+  recovered: Set<string>;
+  recovering: Map<string, Promise<void>>;
+} | undefined;
+const flights = new IntentFlights<RelayResult>();
 
 function journalFor() {
   const path = process.env.RELAYER_JOURNAL_PATH;
   if (!path) return undefined;
   if (!journalState || journalState.path !== path) {
     const store = new FileStore(path);
-    journalState = { path, store, journal: Journal.replay(store.readLines()) };
-    recoveredChains.clear();
+    journalState = { path, store, journal: Journal.replay(store.readLines()), recovered: new Set(), recovering: new Map() };
   }
   return journalState;
 }
@@ -188,38 +183,58 @@ function chainReads(publicClient: any, pool: Address, abi: Abi): ChainReads {
   };
 }
 
-/** Settles what the chain can settle for this chain's open entries, once per process and chain. Errors do not block relaying. */
-async function recoverOnce(state: NonNullable<ReturnType<typeof journalFor>>, chainId: number, reads: ChainReads) {
-  if (recoveredChains.has(chainId)) return;
-  try {
+/** Share initial recovery for a deployment. Failed reads stay open; a failed durable write blocks relaying. */
+async function recoverOnce(state: NonNullable<ReturnType<typeof journalFor>>, chainId: number, pool: Address, reads: ChainReads) {
+  const deploymentKey = `${chainId}:${pool.toLowerCase()}`;
+  if (state.recovered.has(deploymentKey)) return;
+  const active = state.recovering.get(deploymentKey);
+  if (active) return active;
+  const pending = Promise.resolve().then(async () => {
     let readFailures = 0;
     const done = await recover(
       state.journal,
       reads,
       new Date().toISOString(),
-      e => e.key.chainId === chainId,
+      e => e.key.chainId === chainId && e.key.pool.toLowerCase() === pool.toLowerCase() && !flights.has(keyId(e.key)),
       (_e, err) => {
         readFailures += 1;
         console.error("[relayer] journal read failed; the entry stays open:", messageOf(err));
       },
+      entry => state.store.append(entry),
     );
-    for (const r of done) state.store.append(r.next);
-    if (readFailures === 0) recoveredChains.add(chainId); // otherwise try again on the next request
+    if (readFailures === 0) state.recovered.add(deploymentKey); // otherwise try again on the next request
     if (done.length)
       console.log(`[relayer] journal recovery settled ${done.length} open intent(s) on chain ${chainId}`);
-  } catch (e: any) {
-    console.error("[relayer] journal recovery failed, will retry on the next request:", e?.message ?? e);
+  }).catch((e: unknown) => {
+    console.error("[relayer] journal recovery failed, will retry on the next request:", messageOf(e));
+    throw new RelayerError("The relayer journal is unavailable; the request was not sent", 503);
+  });
+  state.recovering.set(deploymentKey, pending);
+  try {
+    await pending;
+  } finally {
+    state.recovering.delete(deploymentKey);
   }
 }
 
 /** Submits `functionName(args)` to the contract from the relayer and waits for it to be mined. */
-export async function relay(params: {
+export type RelayParams = {
   chainId: number;
   contractAddress: Address;
   functionName: string;
   args: readonly unknown[];
   intent?: RelayIntent;
-}): Promise<RelayResult> {
+};
+
+export function relay(params: RelayParams): Promise<RelayResult> {
+  if (!params.intent) return relayRequest(params);
+  const digest = digestOf(params.functionName, params.args);
+  const key = keyId({ chainId: params.chainId, pool: params.contractAddress, signer: params.intent.signer,
+    kind: params.intent.poolNonce === undefined ? "permit" : "pool", nonce: params.intent.poolNonce ?? digest });
+  return flights.run(key, digest, () => relayRequest(params), () => new RelayerError("A different request with this nonce is already in flight", 409));
+}
+
+async function relayRequest(params: RelayParams): Promise<RelayResult> {
   const { chainId, functionName, args } = params;
   const { address: contractAddress, abi } = resolveDeployment(chainId, params.contractAddress);
   const { publicClient, walletClient, address } = await getRelayer(chainId);
@@ -241,7 +256,7 @@ export async function relay(params: {
   let entry: Entry | undefined;
   if (state && params.intent) {
     const reads = chainReads(publicClient, contractAddress, abi);
-    await recoverOnce(state, chainId, reads);
+    await recoverOnce(state, chainId, contractAddress, reads);
     const digest = digestOf(functionName, args);
     key = {
       chainId,
@@ -259,11 +274,13 @@ export async function relay(params: {
         new Date().toISOString(),
         e => keyId(e.key) === keyId(key!),
         (_e, err) => console.error("[relayer] journal read failed; the entry stays as it is:", messageOf(err)),
+        entry => state.store.append(entry),
       );
-      for (const r of done) state.store.append(r.next);
       if (done.length) d = decide(state.journal, key, digest, functionName, new Date().toISOString(), localSigner);
     }
     if (d.action === "answer") {
+      if (d.entry.digest !== digest)
+        throw new RelayerError("A different signed request already uses this nonce", 409);
       if (d.answer.status === 200 && d.entry.hash) {
         const receipt = await publicClient.getTransactionReceipt({ hash: d.entry.hash as Hex });
         return {
@@ -354,11 +371,6 @@ export async function relay(params: {
       } catch (e) {
         if (e instanceof JournalWriteFailed)
           throw new RelayerError("The relayer journal is unavailable; the request was not sent", 503);
-        if (e instanceof BroadcastRejected)
-          throw new RelayerError(
-            "The relayer's account nonce moved before the transaction could be sent; nothing was sent. Try again.",
-            503,
-          );
         if (e instanceof BroadcastUnconfirmed) {
           throw new RelayerError(
             `Submitted but not yet confirmed (transaction ${e.hash}). Send the same request again: the identical transaction is rebroadcast, never a second one.`,
@@ -404,23 +416,11 @@ export function findEvent(result: RelayResult, eventName: string) {
   return result.events.find(event => event.eventName === eventName);
 }
 
-export function toPermitArg(permit: PermitPayload) {
-  return {
-    value: BigInt(permit.value),
-    deadline: BigInt(permit.deadline),
-    v: Number(permit.v),
-    r: permit.r,
-    s: permit.s,
-  };
-}
-
-export function requireFields(body: Record<string, unknown>, ...fields: string[]) {
-  if (fields.some(field => !body[field])) throw new RelayerError("Missing parameters", 400);
-}
+export const toPermitArg = permitArg;
 
 /** The account that signed a relayer request, whichever route it is for. */
 function signerOf(body: Record<string, any>): string | undefined {
-  const signer = body.req?.borrower ?? body.req?.backer ?? body.req?.lender ?? body.borrower ?? body.lender;
+  const signer = body.req?.backer ?? body.req?.lender ?? body.req?.borrower ?? body.borrower ?? body.lender;
   return typeof signer === "string" ? signer : undefined;
 }
 
@@ -435,7 +435,9 @@ function clientIp(req: NextRequest): string {
 export function relayerRoute(handler: (body: Record<string, any>) => Promise<Record<string, unknown>>) {
   return async (req: NextRequest) => {
     try {
-      const body = await req.json();
+      let json: unknown;
+      try { json = await req.json(); } catch { throw new RelayerError("Invalid JSON body", 400); }
+      const body = requestBody(json);
       if (rateLimited(clientIp(req), signerOf(body))) {
         throw new RelayerError("Too many requests. Please wait a minute and try again.", 429);
       }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only check that deployed bytecode is the reviewed build (standard library; uses curl for the RPC).
+"""Read-only check that deployed bytecode is the reviewed build (standard library).
 
   verify_candidate_deployment.py --rpc URL --pool 0x.. --lens 0x.. --router 0x.. [--out packages/foundry/out] [--json]
 
@@ -9,7 +9,8 @@ a match ignoring the trailing CBOR metadata (source paths/compiler hash can diff
 EIP-170, and the immutable values found. Then it reads the wiring through getters: token and pool links, rates, owner.
 Exit 0 only if every contract matches at least without metadata and every wiring check holds.
 """
-import argparse, hashlib, json, os, subprocess, sys
+import argparse, hashlib, json, os, re, sys
+from rpc_client import rpc
 
 CONTRACTS = {  # role -> (artifact path under out/, name)
     "pool": ("DecentralizedMicrocredit.sol", "DecentralizedMicrocredit"),
@@ -19,18 +20,8 @@ CONTRACTS = {  # role -> (artifact path under out/, name)
 USDC_BASE_SEPOLIA = "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
 
 
-def rpc(url, method, params):
-    body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
-    out = subprocess.run(["curl", "-s", "-m", "30", "-X", "POST", "-H", "content-type: application/json", "--data", body, url],
-                         capture_output=True, text=True).stdout
-    r = json.loads(out)
-    if "error" in r:
-        raise RuntimeError(f"{method}: {r['error']}")
-    return r["result"]
-
-
-def call(url, to, selector, args=""):
-    return rpc(url, "eth_call", [{"to": to, "data": selector + args}, "latest"])
+def call(url, to, selector, args="", block="latest"):
+    return rpc(url, "eth_call", [{"to": to, "data": selector + args}, block])
 
 
 def mask(code, refs):
@@ -71,7 +62,9 @@ def portable(code):
 
 
 def addr_word(h):
-    return "0x" + h[-40:]
+    if not isinstance(h, str) or not re.fullmatch(r"0x0{24}[0-9a-fA-F]{40}", h):
+        raise ValueError("an address getter returned no complete, canonical ABI address word")
+    return "0x" + h[-40:].lower()
 
 ZERO = "0x" + "0" * 40
 
@@ -102,7 +95,7 @@ def wiring_checks(w, chain_id, pool, router):
     def same(x, y):
         return isinstance(x, str) and isinstance(y, str) and x.lower() == y.lower() and x.lower() != ZERO
     return {
-        "pool.usdc == Circle Base Sepolia USDC (chain 84532 only)": chain_id != 84532 or w.get("pool.usdc") == USDC_BASE_SEPOLIA,
+        "pool.usdc == Circle Base Sepolia USDC (chain 84532 only)": chain_id != 84532 or same(w.get("pool.usdc"), USDC_BASE_SEPOLIA),
         "router.pool == pool": same(w.get("router.pool"), pool),
         "pool.ORIGINATOR == router (the pool admits no other originator, for any borrower)": same(w.get("pool.ORIGINATOR"), router),
         "router.token == pool.usdc": same(w.get("router.token"), w.get("pool.usdc")),
@@ -120,11 +113,13 @@ def main():
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
     report, ok = {"rpc_chain_id": int(rpc(a.rpc, "eth_chainId", []), 16), "contracts": {}, "wiring": {}}, True
+    block = rpc(a.rpc, "eth_blockNumber", [])
+    report["rpc_block_number"] = int(block, 16)
     sel = {}
     for role, (file, name) in CONTRACTS.items():
         art = json.load(open(os.path.join(a.out, file, f"{name}.json")))
         sel[role] = art["methodIdentifiers"]
-        onchain = bytes.fromhex(rpc(a.rpc, "eth_getCode", [getattr(a, role), "latest"])[2:])
+        onchain = bytes.fromhex(rpc(a.rpc, "eth_getCode", [getattr(a, role), block])[2:])
         built = bytes.fromhex(art["deployedBytecode"]["object"][2:])
         refs = art["deployedBytecode"]["immutableReferences"]
         m_on, m_built = mask(onchain, refs), mask(built, refs)
@@ -146,7 +141,7 @@ def main():
         ok &= nometa and len(onchain) <= 24576
 
     def get(role, fn, args=""):
-        return call(a.rpc, getattr(a, role), "0x" + sel[role][fn], args)
+        return call(a.rpc, getattr(a, role), "0x" + sel[role][fn], args, block=block)
 
     w = report["wiring"]
     w.update(read_wiring(get, sel))

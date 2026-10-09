@@ -70,6 +70,17 @@ class GateTest(unittest.TestCase):
         codes = "".join(f"{n} 0\n" for n in g.RUNS if n != "rehearsal-normal")
         self.assertTrue(any("rehearsal-normal: no exit code" in b for b in g.gate(self.packet({"exit-codes.txt": codes}))))
 
+    def test_duplicate_or_malformed_exit_codes_cannot_hide_a_failure(self):
+        for extra in ("mutants 0\n", "mutants ---1\n", "unexpected 0\n", "bad record with extras\n"):
+            codes = GOOD["exit-codes.txt"].replace("mutants 0", "mutants 1") + extra
+            problems = g.gate(self.packet({"exit-codes.txt": codes}))
+            self.assertTrue(any("mutants: exited 1" in p for p in problems))
+            self.assertTrue(any("exit-codes.txt:" in p for p in problems))
+
+    def test_two_forge_summaries_are_not_one_run(self):
+        text = "4 tests passed, 1 failed, 0 skipped\n4 tests passed, 0 failed, 0 skipped\n"
+        self.assertTrue(g.gate(self.packet({"forge-test-local.txt": text})))
+
     def test_failed_or_skipped_tests_fail(self):
         for name, text, word in (
             ("forge-test-local.txt", "329 tests passed, 1 failed, 14 skipped", "1 failed"),
@@ -188,6 +199,25 @@ class GateTest(unittest.TestCase):
         gone = verifier()
         del gone["contracts"]["pool"]["masked_nometa_sha256_build"]
         self.assertTrue(any("metadata-free" in b for b in g.gate(self.packet(ver=gone))))
+
+    def test_malformed_verifier_shapes_return_problems_instead_of_crashing(self):
+        for value in (True, [1], "ok"):
+            self.assertTrue(g.gate(self.packet(ver=value)))
+        for field in ("contracts", "checks", "wiring"):
+            self.assertTrue(g.gate(self.packet(ver=verifier(**{field: None}))))
+        self.assertTrue(g.gate(self.packet(ver=verifier(contracts={"pool": 1}))))
+
+    def test_read_only_check_preserves_the_original_gate_record(self):
+        d = self.packet()
+        path = os.path.join(d, "FAILED.txt")
+        with open(path, "w") as f:
+            f.write("original outcome\n")
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(g.main([d, "--check"]), 0)
+            self.write(d, "mutants.txt", "failed")
+            self.assertEqual(g.main([d, "--check"]), 1)
+        with open(path) as f:
+            self.assertEqual(f.read(), "original outcome\n")
 
     def test_the_pinned_fork_block_must_be_recorded(self):
         for text in ("", "41234567\n", "0 0x" + "ab" * 32, "41234567 nothex"):

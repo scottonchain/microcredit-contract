@@ -5,8 +5,6 @@ on:
     branches:
       - main
   pull_request:
-    branches:
-      - main
 
 jobs:
   ci:
@@ -15,7 +13,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        node: [lts/*]
+        node: [22]
 
     steps:
       - name: Checkout
@@ -60,27 +58,20 @@ jobs:
       - name: Run Forge tests
         run: yarn foundry:test
 
-      - name: Test the two-hop conservation check script
-        run: python3 -m unittest scripts/test_two_hop_check.py -v
+      - name: Test all maintained verification scripts
+        run: yarn test:scripts
 
+      - name: Test the Foundry CLI helpers
+        run: yarn test:cli
 
-      - name: Test the candidate deployment verifier
-        run: python3 -m unittest discover -s scripts -p 'test_verify_candidate_deployment.py' -v
+      - name: Install model dependencies
+        run: python3 -m pip install -r analysis/requirements.txt
 
-      - name: Test the candidate rehearsal typed data against the contracts
-        run: python3 -m unittest discover -s scripts -p 'test_candidate_rehearsal.py' -v
+      - name: Test all four model suites
+        run: yarn test:models
 
-      - name: Test the evidence gate (both Forge output forms, per suite and per named invariant)
-        run: python3 -m unittest discover -s scripts -p 'test_candidate_evidence_gate.py' -v
-
-      - name: Test the fork helper
-        run: python3 -m unittest discover -s scripts -p 'test_candidate_fork.py' -v
-
-      - name: Test the deep-invariant script (restores the annotations, passes the exit code on)
-        run: python3 -m unittest discover -s scripts -p 'test_candidate_deep_invariants.py' -v
-
-      - name: Test the packaging tool for a run made elsewhere
-        run: python3 -m unittest discover -s scripts -p 'test_candidate_package_run.py' -v
+      - name: Test application utilities and relayer recovery
+        run: yarn next:test
 
       - name: Start Anvil, deploy contracts (& generate contracts typescript output)
         run: |
@@ -103,3 +94,6 @@ jobs:
 
       - name: Build nextjs
         run: yarn next:build
+
+      - name: Check the static Base Sepolia export
+        run: yarn workspace @se-2/nextjs build:static

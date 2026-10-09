@@ -160,6 +160,11 @@ class IdentityRegistry:
         self.by_address: dict[str, str] = {}
 
     def bind(self, identity_id: str, tier: str, address: str) -> None:
+        previous = self.by_address.get(address)
+        if previous is not None and previous != identity_id:
+            raise ValueError("an address cannot be rebound to a different identity")
+        if identity_id in self.identities and self.identities[identity_id].tier != tier:
+            raise ValueError("an existing identity cannot silently change tier")
         ident = self.identities.setdefault(identity_id, Identity(identity_id, tier))
         if address not in ident.addresses:
             ident.addresses.append(address)

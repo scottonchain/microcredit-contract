@@ -258,3 +258,128 @@ test("email-9: a failed nonce read for a hash-less entry does not abandon it", a
   );
   assert.equal(j.get(key(12))!.state, "intent");
 });
+
+test("appending after a torn tail preserves the next submitted hash on disk", () => {
+  const s = new FileStore(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "journal-tail-")), "journal.jsonl"));
+  const j = new Journal();
+  const k = key(95);
+  j.begin(k, "torn", "backMeta", T);
+  s.append(j.get(k)!);
+  fs.appendFileSync(s.path, '{"v":1,"unfinished":');
+  s.append(j.submitted(k, "0xabc", T));
+  const restored = Journal.replay(s.readLines()).get(k)!;
+  assert.equal(restored.state, "submitted");
+  assert.equal(restored.hash, "0xabc");
+});
+
+test("a complete last record without a newline is retained before the next append", () => {
+  const s = new FileStore(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "journal-tail-")), "journal.jsonl"));
+  const j = new Journal();
+  const k = key(96);
+  j.begin(k, "newline", "backMeta", T);
+  fs.writeFileSync(s.path, JSON.stringify(j.get(k)));
+  s.append(j.submitted(k, "0xdef", T));
+  assert.equal(s.readLines().length, 2);
+  assert.equal(Journal.replay(s.readLines()).get(k)!.hash, "0xdef");
+});
+
+test("replay fails closed on corrupt history instead of skipping a potentially submitted request", () => {
+  const j = new Journal();
+  j.begin(key(97), "history", "backMeta", T);
+  const entry = JSON.stringify(j.get(key(97)));
+  assert.throws(() => Journal.replay([entry, "{broken", entry]), /corrupt record/);
+  assert.throws(() => Journal.replay([entry, JSON.stringify({ v: 1, state: "mined", key: {} })]), /invalid record/);
+  assert.throws(() => Journal.replay([entry, JSON.stringify({ ...j.get(key(97)), v: 99 })]), /invalid record/);
+});
+
+test("a newline-terminated corrupt last record is rejected, while a torn tail may be ignored", t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "journal-corrupt-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const s = new FileStore(path.join(dir, "journal.jsonl"));
+  const j = new Journal();
+  s.append(j.begin(key(98), "last-record", "backMeta", T).entry);
+  fs.appendFileSync(s.path, "{broken}\n");
+  assert.throws(() => Journal.replay(s.readLines()), /corrupt record/);
+});
+
+test("recovery rechecks whether a request became active while its nonce read was pending", async () => {
+  const j = new Journal();
+  const entry = j.begin(key(99), "active", "backMeta", T).entry;
+  let active = false;
+  let resolve!: (nonce: bigint) => void;
+  const pending = recover(j, {
+    receipt: async () => undefined,
+    poolNonce: () => new Promise<bigint>(done => { resolve = done; }),
+  }, T, () => !active);
+  active = true;
+  resolve(0n);
+  assert.deepEqual(await pending, []);
+  assert.equal(j.get(key(99)), entry);
+});
+
+test("a stale nonce or receipt read cannot settle a replacement intent", async () => {
+  for (const hashed of [false, true]) {
+    const j = new Journal();
+    const k = key(100);
+    j.begin(k, "old", "backMeta", T);
+    if (hashed) j.submitted(k, "0xold", T);
+    let resolve!: () => void;
+    const pending = recover(j, {
+      receipt: () => new Promise(done => { resolve = () => done({ status: "success" }); }),
+      poolNonce: () => new Promise(done => { resolve = () => done(0n); }),
+    }, T);
+    j.settle(k, "abandoned", "another recovery settled the old attempt", T);
+    const replacement = j.begin(k, "replacement", "backMeta", T).entry;
+    resolve();
+    assert.deepEqual(await pending, []);
+    assert.equal(j.get(k), replacement);
+  }
+});
+
+test("recovery persists each transition before another request can reopen the same key", async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "journal-recovery-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const s = new FileStore(path.join(dir, "journal.jsonl"));
+  const j = new Journal();
+  const aliceKey = key(101, ALICE);
+  const bobKey = key(101, BOB);
+  s.append(j.begin(aliceKey, "old", "backMeta", T).entry);
+  s.append(j.begin(bobKey, "other", "backMeta", T).entry);
+  await recover(j, {
+    receipt: async () => undefined,
+    poolNonce: async signer => {
+      if (signer === BOB) {
+        assert.equal(Journal.replay(s.readLines()).get(aliceKey)!.state, "abandoned");
+        s.append(j.begin(aliceKey, "replacement", "backMeta", T).entry);
+      }
+      return 0n;
+    },
+  }, T, () => true, undefined, entry => s.append(entry));
+  const restarted = Journal.replay(s.readLines());
+  assert.equal(restarted.get(aliceKey)!.state, "intent");
+  assert.equal(restarted.get(aliceKey)!.digest, "replacement");
+  assert.equal(restarted.get(bobKey)!.state, "abandoned");
+});
+
+test("failed recovery persistence leaves the original in-memory entry open", async () => {
+  const j = new Journal();
+  const entry = j.begin(key(102), "durable", "backMeta", T).entry;
+  await assert.rejects(recover(j, reads({}), T, () => true, undefined, () => {
+    throw new Error("disk full");
+  }), /disk full/);
+  assert.equal(j.get(key(102)), entry);
+});
+
+test("a failed newline write cannot truncate a valid complete final record", t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "journal-io-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const s = new FileStore(path.join(dir, "journal.jsonl"));
+  const j = new Journal();
+  const k = key(103);
+  j.begin(k, "io", "backMeta", T);
+  const original = JSON.stringify(j.get(k));
+  fs.writeFileSync(s.path, original);
+  t.mock.method(fs, "writeSync", () => { throw new Error("disk full"); });
+  assert.throws(() => s.append(j.submitted(k, "0xhash", T)), /disk full/);
+  assert.equal(fs.readFileSync(s.path, "utf8"), original);
+});

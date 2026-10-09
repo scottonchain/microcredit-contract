@@ -8,6 +8,7 @@ import { ICreditUsage, OracleScoreProvider } from "../../contracts/OracleScorePr
 import { BootstrapOrderRouter } from "../../contracts/BootstrapOrderRouter.sol";
 import { StakeRouterBase } from "../../contracts/TransitiveStakeRouter.sol";
 import { BootstrapOrderRouterTest } from "../BootstrapOrderRouter.t.sol";
+import { BaseSepoliaFork } from "../utils/BaseSepoliaFork.sol";
 
 /// @dev The blacklist functions of Circle's FiatToken (v2.2) used below.
 interface IFiatTokenBlacklistOrder {
@@ -29,7 +30,7 @@ contract BootstrapOrderRouterForkTest is BootstrapOrderRouterTest {
     function setUp() public override {
         string memory rpc = vm.envOr("BASE_SEPOLIA_RPC_URL", string(""));
         vm.skip(bytes(rpc).length == 0, "set BASE_SEPOLIA_RPC_URL to run fork tests");
-        vm.createSelectFork(rpc);
+        BaseSepoliaFork.select(rpc);
         super.setUp();
     }
 

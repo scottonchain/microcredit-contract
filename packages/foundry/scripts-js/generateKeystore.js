@@ -1,90 +1,42 @@
-import { spawnSync, spawn } from "child_process";
-import readline from "readline";
+import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
+import {
+  prompt,
+  runCast,
+  validateKeystoreName,
+  walletFromJson,
+} from "./keystores.js";
 
-async function createKeystore() {
-  // Create readline interface
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
+export async function createKeystore() {
+  const name = validateKeystoreName(
+    await prompt("\nEnter name for new keystore: ")
+  );
+  const generated = spawnSync("cast", ["wallet", "new", "--json"], {
+    encoding: "utf-8",
   });
-
-  try {
-    // Generate a new wallet
-    console.log("\n🔑 Generating new wallet...");
-    const newWalletResult = spawnSync("cast", ["wallet", "new"], {
-      encoding: "utf-8",
-    });
-
-    if (newWalletResult.error || newWalletResult.status !== 0) {
-      console.error(
-        "\n❌ Error generating new wallet:",
-        newWalletResult.stderr || newWalletResult.error
-      );
-      process.exit(1);
-    }
-
-    const privateKey = newWalletResult.stdout
-      .split("\n")
-      .find((line) => line.includes("Private key:"))
-      ?.split(":")[1]
-      ?.trim();
-
-    if (!privateKey) {
-      console.error("\n❌ Could not extract private key from output");
-      process.exit(1);
-    }
-
-    const keystoreName = await new Promise((resolve) => {
-      rl.question("\nEnter name for new keystore: ", resolve);
-    });
-
-    // Close readline before spawning process with inherited stdio
-    rl.close();
-
-    return new Promise((resolve, reject) => {
-      const importProcess = spawn(
-        "cast",
-        ["wallet", "import", keystoreName, "--private-key", privateKey],
-        {
-          stdio: "inherit",
-        }
-      );
-
-      importProcess.on("close", (code) => {
-        if (code === 0) {
-          console.log(
-            "\n💰 Fund the address and re-run the deploy command to use this keystore."
-          );
-          console.log(
-            `\nTIP: Use \`yarn account\` and select \`${keystoreName}\` keystore to check if the address is funded.`
-          );
-          process.exit(0);
-        } else {
-          console.error("\n❌ Error importing keystore");
-          reject(new Error("Import failed"));
-        }
-      });
-    });
-  } catch (error) {
-    console.error("\n❌ Error creating keystore:", error);
-    process.exit(1);
-  } finally {
-    // Ensure readline is closed
-    if (rl) rl.close();
+  if (generated.error || generated.status !== 0) {
+    // Wallet output can contain key material; never include it in an error.
+    throw new Error(
+      "Could not generate a wallet; install Foundry and check PATH."
+    );
   }
+  const wallet = walletFromJson(generated.stdout);
+  await runCast([
+    "wallet",
+    "import",
+    name,
+    "--private-key",
+    wallet.private_key,
+  ]);
+  console.log(
+    "\nKeystore created. Fund its address and rerun deploy; yarn account checks its balance."
+  );
+  return name;
 }
 
-// Run the function if this script is called directly
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  createKeystore()
-    .then((keystoreName) => {
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error(error);
-      process.exit(1);
-    });
+  createKeystore().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
 }
-
-export { createKeystore };

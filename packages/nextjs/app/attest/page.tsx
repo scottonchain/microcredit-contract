@@ -10,8 +10,9 @@ import { useAddressDisplayName } from "~~/hooks/useAddressDisplayName";
 import { useUsdcWrite } from "~~/hooks/useUsdc";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
-import { relayerErrorMessage } from "~~/utils/contractErrors";
+import { readRelayerResponse } from "~~/utils/relayerResponse";
 import { getParsedError } from "~~/utils/scaffold-eth";
+import { parseUsdc } from "~~/utils/amounts";
 import { formatUSDC } from "~~/utils/format";
 import { BackRequest, MICRO_DOMAIN, TYPES } from "~~/utils/eip712";
 import { BASE_PATH, CHAIN_ID, MICROCREDIT_ABI, MICROCREDIT_ADDRESS, RELAYER_ENABLED } from "~~/utils/microcredit";
@@ -27,13 +28,6 @@ export default function BackPage() {
     </Suspense>
   );
 }
-
-/** Parses a USDC amount typed by the user into 6-decimal units; null when invalid. */
-const parseUsdc = (value: string): bigint | null => {
-  const parsed = Number(value);
-  if (!value.trim() || Number.isNaN(parsed) || parsed < 0) return null;
-  return BigInt(Math.round(parsed * 1e6));
-};
 
 function BackForm() {
   const searchParams = useSearchParams();
@@ -195,8 +189,7 @@ function BackForm() {
           signature,
         }),
       });
-      if (!resp.ok) throw new Error(await relayerErrorMessage(resp));
-      const result = await resp.json();
+      const result = await readRelayerResponse(resp);
       await refreshCredit();
       setSubmitted({ borrower, amount, txHash: result?.txHash });
       toast.success("Backing recorded", { position: "top-center" });

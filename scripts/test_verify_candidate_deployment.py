@@ -83,6 +83,16 @@ class WiringTest(unittest.TestCase):
     def test_a_correctly_wired_candidate_passes_every_check(self):
         self.assertTrue(all(self.checks(good_wiring()).values()))
 
+    def test_empty_truncated_or_noncanonical_address_getters_fail(self):
+        for result in ("0x", "0x1234", "0x" + "1" * 64, "0x" + "z" * 64, None):
+            with self.subTest(result=result), self.assertRaises(ValueError):
+                v.addr_word(result)
+
+    def test_circle_address_comparison_is_case_insensitive(self):
+        w = good_wiring()
+        w["pool.usdc"] = w["router.token"] = v.USDC_BASE_SEPOLIA.upper().replace("0X", "0x")
+        self.assertTrue(all(self.checks(w, 84532).values()))
+
     def test_a_lens_wired_to_another_pool_is_rejected(self):
         w = good_wiring()
         w["lens.credit"] = OTHER

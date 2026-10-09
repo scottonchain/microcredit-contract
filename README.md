@@ -55,7 +55,7 @@ lib/           OpenZeppelin submodule (forge-std is vendored inside it)
 
 ## Quick Start (local sandbox)
 
-Prerequisites: `git`, `node >=20.18.3`, `yarn`, and Foundry (`curl -L https://foundry.paradigm.xyz | bash`).
+Prerequisites: `git`, `node >=22.18.0`, `yarn`, and Foundry (`curl -L https://foundry.paradigm.xyz | bash`).
 
 1. **Clone & install**
 ```bash
@@ -185,3 +185,12 @@ See `CONTRIBUTING.md` for guidelines.  Pull requests are welcome.
 ---
 
 © 2026 · Licensed under the MIT License
+
+## Maintaining this repository
+
+The [team operating guide](https://github.com/scottonchain/microcredit-agent-testbed/blob/main/coordination/README.md)
+identifies each repository's maintained source. The compact local command and
+architecture map is [CLAUDE.md](CLAUDE.md). Run `yarn test:all`, `yarn lint`,
+`yarn next:check-types`, and `yarn next:build` when changing the app or tooling.
+Generated deployments and historical evidence retain their original identities;
+new code is checked on its own revision.
