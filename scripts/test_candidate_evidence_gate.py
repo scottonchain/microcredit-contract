@@ -6,7 +6,11 @@ GOOD = {
     "exit-codes.txt": "".join(f"{n} 0\n" for n in g.RUNS),
     "forge-test-local.txt": "Ran 30 test suites in 18s: 329 tests passed, 0 failed, 14 skipped (343 total tests)\n",
     "forge-test-fork-routers.txt": "Ran 2 test suites in 20s: 78 tests passed, 0 failed, 0 skipped (78 total tests)\n",
-    "invariant-deep.txt": "Ran 2 test suites in 7s: 14 tests passed, 0 failed, 0 skipped (14 total tests)\n",
+    "invariant-deep.txt": "== patch applied ==\n+/// forge-config: default.invariant.runs = 512\n+/// forge-config: default.invariant.depth = 150\n"
+                          "+/// forge-config: default.invariant.runs = 512\n+/// forge-config: default.invariant.depth = 150\n"
+                          + "".join(f"[PASS] invariant_{n}() (runs: 512, calls: 76800, reverts: 0)\n" for n in range(14))
+                          + "Ran 2 test suites in 120s: 14 tests passed, 0 failed, 0 skipped (14 total tests)\n",
+    "tree-status.txt": "",
     "mutants.txt": "pool originator gate inverted: KILLED by 114 test(s)\n18 mutants, 0 survived or did not compile\n",
     "python-tests.txt": "..........\n----------------------------------------------------------------------\nRan 55 tests in 0.1s\n\nOK\n",
     "rehearsal-normal.txt": "- replay refused\nREHEARSAL OK\n",
@@ -60,6 +64,24 @@ class GateTest(unittest.TestCase):
             ("forge-test-local.txt", "no summary at all", "no 'N tests passed"),
         ):
             self.assertTrue(any(word in b for b in g.gate(self.packet({name: text}))), (name, word))
+
+    def test_the_deep_campaign_is_judged_by_what_ran_not_by_what_was_requested(self):
+        # Codex, PR 28 comment 6074015618: the environment variables were overridden by inline annotations; 64 runs / 5120 calls
+        base = GOOD["invariant-deep.txt"]
+        env_only = "".join(f"[PASS] invariant_{n}() (runs: 64, calls: 5120, reverts: 0)\n" for n in range(14))
+        cases = {
+            "env variables only, no patch recorded": ("Ran 2 test suites: 14 tests passed, 0 failed, 0 skipped\n" + env_only, "no patch"),
+            "patch asks 512x150 but 64 runs happened": (base.split("[PASS]")[0] + env_only + "14 tests passed, 0 failed, 0 skipped\n", "not all at runs"),
+            "calls below runs times depth": (base.replace("calls: 76800", "calls: 5120"), "not all at runs"),
+            "too few invariants": (base.replace("[PASS] invariant_13", "[SKIP] invariant_13"), "13 PASS lines"),
+            "shallow request": (base.replace("runs = 512", "runs = 64"), "below 512"),
+        }
+        for label, (text, word) in cases.items():
+            self.assertTrue(any(word in b for b in g.gate(self.packet({"invariant-deep.txt": text}))), label)
+
+    def test_a_dirty_tree_after_the_runs_fails(self):
+        self.assertTrue(any("tree-status" in b for b in g.gate(self.packet({"tree-status.txt": " M packages/foundry/test/x.sol\n"}))))
+        self.assertTrue(any("tree-status" in b for b in g.gate(self.packet({"tree-status.txt": None}))))
 
     def test_local_skips_are_allowed_because_the_fork_suites_are_gated_off(self):
         self.assertEqual(g.gate(self.packet({"forge-test-local.txt": "329 tests passed, 0 failed, 14 skipped"})), [])

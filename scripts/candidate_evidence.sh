@@ -25,8 +25,11 @@ run() {  # run NAME LOGFILE COMMAND...
 ( cd packages/foundry && forge --version && grep -E "solc_version|via_ir|optimizer|evm_version" foundry.toml ) > "$OUT/logs/toolchain.txt" 2>&1
 run forge-test-local forge-test-local.txt bash -c 'cd packages/foundry && forge test'
 run forge-test-fork-routers forge-test-fork-routers.txt bash -c "cd packages/foundry && BASE_SEPOLIA_RPC_URL=$RPC forge test --match-path 'test/fork/*Router*'"
-run invariant-deep invariant-deep.txt bash -c "cd packages/foundry && FOUNDRY_INVARIANT_RUNS=512 FOUNDRY_INVARIANT_DEPTH=150 forge test --match-path 'test/invariant/*Router*'"
+# The suites' inline forge-config annotations override FOUNDRY_INVARIANT_*, so the deep run patches them for its own duration
+# (scripts/candidate_deep_invariants.sh prints the patch and restores the files); the gate checks the observed runs and calls.
+run invariant-deep invariant-deep.txt scripts/candidate_deep_invariants.sh
 run mutants mutants.txt python3 scripts/candidate_mutants.py
+git status --porcelain --untracked-files=no -- packages scripts docs/*.md CLAUDE.md > "$OUT/logs/tree-status.txt"  # the deep run and the mutants must leave every tracked file as it was (forge may add an untracked foundry.lock)
 run python-tests python-tests.txt bash -c 'cd scripts && python3 -m unittest test_verify_candidate_deployment test_candidate_evidence_gate test_candidate_fork test_candidate_rehearsal test_two_hop_check'
 # One Base Sepolia block is pinned for the whole run, so both rehearsals start from identical state. Each fork is started and
 # stopped by scripts/candidate_fork.py, which tracks the child's pid, refuses a port that already answers and fails if the
@@ -65,6 +68,8 @@ def last(path, pat):
     t = open(path).read()
     return re.findall(pat, t)[-1] if re.findall(pat, t) else "n/a"
 local = last(f"{out}/logs/forge-test-local.txt", r"Ran \d+ test suites[^\n]*")
+deep = re.findall(r"\[PASS\] invariant_\w+\([^)]*\) \(runs: (\d+), calls: (\d+)", open(f"{out}/logs/invariant-deep.txt").read())
+deep_txt = f"{len(deep)} invariants, each observed at runs: {deep[0][0]}, calls: {deep[0][1]}" if deep and len(set(deep)) == 1 else "see the log"
 fork = last(f"{out}/logs/forge-test-fork-routers.txt", r"Ran \d+ test suites[^\n]*")
 tool = open(f"{out}/logs/toolchain.txt").read().strip()
 fblock, fhash = open(f"{out}/logs/fork-block.txt").read().split()
@@ -95,7 +100,7 @@ zeroed on both sides) and every wiring check held, including `lens.credit == poo
 - Local suite (`logs/forge-test-local.txt`): {local}
 - Router fork suites against Circle's USDC (`logs/forge-test-fork-routers.txt`): {fork}
 - Script tests (`logs/python-tests.txt`): verifier, rehearsal typed-data drift, two-hop check.
-- Deep invariant campaigns (512 runs of depth 150, both router suites) are recorded in `logs/invariant-deep.txt`.
+- Deep invariant campaigns, both router suites ({deep_txt}; read from the log, not from the request: the suites' inline annotations override the environment variables, so `scripts/candidate_deep_invariants.sh` patches them for the run and restores them): `logs/invariant-deep.txt`.
 - Mutation check (`scripts/candidate_mutants.py`, one planted bug at a time, each must fail the suite): `logs/mutants.txt`.
 - Rehearsals with `cast` on a fresh fork: `logs/rehearsal-normal.txt`, `logs/rehearsal-with-default.txt`.
 

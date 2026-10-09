@@ -53,6 +53,22 @@ def gate(out):
         if skipped and not allow_skipped:
             bad.append(f"{name}: {skipped} skipped (a fork or invariant test that did not run is not evidence)")
 
+    # The deep campaigns: what was asked is in the patch printed at the top of the log, what ran is in the PASS lines. Both
+    # router suites carry inline annotations that override the environment, so the request alone proves nothing.
+    deep = read("invariant-deep.txt") or ""
+    want_runs = re.findall(r"^\+/// forge-config: default\.invariant\.runs = (\d+)\s*$", deep, re.M)
+    want_depth = re.findall(r"^\+/// forge-config: default\.invariant\.depth = (\d+)\s*$", deep, re.M)
+    seen = re.findall(r"^\[PASS\] invariant_\w+\([^)]*\) \(runs: (\d+), calls: (\d+)", deep, re.M)
+    if len(set(want_runs)) != 1 or len(set(want_depth)) != 1 or len(want_runs) < 2:
+        bad.append("invariant-deep: no patch of the inline runs and depth annotations recorded in the log")
+    elif int(want_runs[0]) < 512 or int(want_depth[0]) < 150:
+        bad.append(f"invariant-deep: requested {want_runs[0]} runs of depth {want_depth[0]}, below 512 of 150")
+    elif len(seen) < 14 or any(int(r) != int(want_runs[0]) or int(c) != int(want_runs[0]) * int(want_depth[0]) for r, c in seen):
+        bad.append(f"invariant-deep: {len(seen)} PASS lines, not all at runs {want_runs[0]} and calls {int(want_runs[0]) * int(want_depth[0])}")
+    ts = read("tree-status.txt")
+    if ts is None or ts.strip():
+        bad.append("tree-status.txt: missing or not empty (the tree must be clean after the deep run and the mutants)")
+
     lines = [x for x in (read("mutants.txt") or "").splitlines() if x.strip()]
     m = re.fullmatch(r"(\d+) mutants, 0 survived or did not compile", lines[-1].strip()) if lines else None
     if not m or int(m.group(1)) == 0:
