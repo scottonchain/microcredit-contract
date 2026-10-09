@@ -1,0 +1,85 @@
+No files changed, compilation skipped
+
+Ran 1 test for test/invariant/BootstrapOrderRouter.invariant.t.sol:BootstrapOrderRouterInvariantTest
+[PASS]
+BootstrapOrderRouterInvariantTest invariants:
+[PASS] invariant_O1_routerHoldsExactlyFreeRootsPlusEscrowPlusStrays
+[PASS] invariant_O2_escrowHeldIsTheOpenOrdersPrices
+[PASS] invariant_O3_eachRootConserves
+[PASS] invariant_O4_lockedFollowsTheOpenPaths
+[PASS] invariant_O5_sharedEdgeExposureIsTheSumAcrossWorkers
+[PASS] invariant_O6_poolExposureWithinTheLotsAndLendersLoseNothing
+[PASS] invariant_O7_everyCreatedUnitHasAKnownHolder
+ BootstrapOrderRouterInvariantTest invariants (runs: 64, calls: 5120, reverts: 0)
+
+╭--------------------+---------------+-------+---------+----------╮
+| Contract           | Selector      | Calls | Reverts | Discards |
++=================================================================+
+| OrderRouterHandler | defaultOne    | 434   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | fund          | 389   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | originate     | 439   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | reapprove     | 403   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | refund        | 433   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | repay         | 433   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | rootDeposit   | 445   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | rootWithdraw  | 440   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | rotateOfficer | 427   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | settle        | 435   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | syncOne       | 421   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | warp          | 421   | 0       | 0        |
+╰--------------------+---------------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 20.86s (20.84s CPU time)
+
+Ran 1 test for test/invariant/TransitiveStakeRouter.invariant.t.sol:TransitiveStakeRouterInvariantTest
+[PASS]
+TransitiveStakeRouterInvariantTest invariants:
+[PASS] invariant_R1_routerHoldsExactlyTheFreeBalancesAndStrayFunds
+[PASS] invariant_R2_eachRootConserves
+[PASS] invariant_R3_lockedAndEdgeExposureFollowTheOpenPaths
+[PASS] invariant_R4_openLotsAreSecuredByTheVaultAndClosedOnesLeaveNothing
+[PASS] invariant_R5_lendersLosePrincipalOnlyToThePoolsRounding
+[PASS] invariant_R6_handlerChecksHold
+[PASS] invariant_R7_managedPoolExposureEqualsRouterRecordedActivePrincipal
+ TransitiveStakeRouterInvariantTest invariants (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+------------------+-------+---------+----------╮
+| Contract      | Selector         | Calls | Reverts | Discards |
++===============================================================+
+| RouterHandler | attemptDirect    | 455   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | defaultOne       | 478   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | deposit          | 486   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | originate        | 457   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | repay            | 486   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | revoke           | 467   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | syncOne          | 462   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyBack   | 475   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyUnback | 488   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | warp             | 428   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | withdraw         | 438   | 0       | 0        |
+╰---------------+------------------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 21.32s (21.30s CPU time)
+
+Ran 2 test suites in 42.21s (42.18s CPU time): 2 tests passed, 0 failed, 0 skipped (2 total tests)

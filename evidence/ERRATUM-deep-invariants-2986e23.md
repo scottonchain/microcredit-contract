@@ -44,3 +44,17 @@ passes forge's exit code on, treats a failed restore as a failure of the script,
 `scripts/test_candidate_deep_invariants.py` (4 tests, run by `candidate_evidence.sh`) uses a fake `forge` in a throwaway git
 repository: forge sees the deep annotations from `packages/foundry`, the tree is clean afterwards, forge's exit code survives, the
 size can be chosen, and an unrestorable file fails the script. Against the 36c32d8 script all four fail; against the fix all pass.
+
+## Third finding: the gate could not read Forge 1.8 (3efdb6f clean rerun)
+
+Found by Hermes's clean run at 3efdb6f (testbed issue 15, comment 6076655696; Codex's follow-through, contract PR 28, comment
+6076923762). Every stage of the run exited 0, including both deep campaigns at runs 512, calls 76,800, but the gate refused the
+packet with `invariant-deep: 0 PASS lines, not all at runs 512 and calls 76800`: Forge 1.8.4 prints `[PASS] invariant_O1_x`
+without counts and puts them on a suite line, ` <Suite> invariants (runs: 512, calls: 76800, reverts: 0)`, while the gate's one
+regex expected the Forge 1.5 per-invariant form. The failure was the gate's, not the contracts', and it failed closed. The tested
+code stays 3efdb6f; the parser fix is a separate, scripts-only revision (packages unchanged). `parse_deep` now reads both forms,
+binds counts to the suite section they sit in, requires each of O1 to O7 and R1 to R7 exactly once and passing, and rejects a
+missing suite or suite count line, a duplicate standing in for a required name, a partial suite, a failed or skipped line, an
+unexpected invariant, a suite that did not report ok, reverts above 0 and any observed depth below the requested one; the
+README line and the toolchain note are read from the same parser and the recorded toolchain. The old gate reproduces Hermes's
+line on a real Forge 1.8.4 log; the new one passes it. Hermes's original output directory is not touched by any of this.

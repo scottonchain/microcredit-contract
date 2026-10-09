@@ -1,15 +1,29 @@
 import contextlib, io, json, os, tempfile, unittest
 import candidate_evidence_gate as g
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def fixture(*parts):
+    with open(os.path.join(HERE, *parts)) as f:
+        return f.read()
+
+
+# Real logs of the two router invariant suites. Forge 1.8.4 (Hermes, PR 28 supplement for 2986e23) ran them at the suites' own
+# 64 x 80 and prints each campaign as one test with the counts on a suite line; Forge 1.5.1 (the 512 x 150 run stored under
+# evidence/) prints one line per invariant. FORGE18_DEEP is the 1.8.4 log with only its counts rewritten to 512 x 150, because
+# no 1.8 log of a 512 x 150 run was in hand when the parser was written; the clean-rerun log replaces it as a fixture.
+PATCH = "== patch applied ==\n" + "+/// forge-config: default.invariant.runs = 512\n+/// forge-config: default.invariant.depth = 150\n" * 2
+FORGE18_REAL = fixture("fixtures", "forge184-invariant-deep-2986e23-hermes.txt")
+FORGE18_DEEP = PATCH + FORGE18_REAL.replace("runs: 64, calls: 5120", "runs: 512, calls: 76800")
+FORGE15_DEEP = PATCH + fixture("..", "evidence", "deep-invariants-512x150-00a04e7.txt")
+
 POOL = "0x" + "11" * 20
 GOOD = {
     "exit-codes.txt": "".join(f"{n} 0\n" for n in g.RUNS),
     "forge-test-local.txt": "Ran 30 test suites in 18s: 329 tests passed, 0 failed, 14 skipped (343 total tests)\n",
     "forge-test-fork-routers.txt": "Ran 2 test suites in 20s: 78 tests passed, 0 failed, 0 skipped (78 total tests)\n",
-    "invariant-deep.txt": "== patch applied ==\n+/// forge-config: default.invariant.runs = 512\n+/// forge-config: default.invariant.depth = 150\n"
-                          "+/// forge-config: default.invariant.runs = 512\n+/// forge-config: default.invariant.depth = 150\n"
-                          + "".join(f"[PASS] invariant_{n}() (runs: 512, calls: 76800, reverts: 0)\n" for n in range(14))
-                          + "Ran 2 test suites in 120s: 14 tests passed, 0 failed, 0 skipped (14 total tests)\n",
+    "invariant-deep.txt": FORGE18_DEEP,
     "tree-status.txt": "",
     "mutants.txt": "pool originator gate inverted: KILLED by 114 test(s)\n18 mutants, 0 survived or did not compile\n",
     "python-tests.txt": "..........\n----------------------------------------------------------------------\nRan 55 tests in 0.1s\n\nOK\n",
@@ -65,19 +79,70 @@ class GateTest(unittest.TestCase):
         ):
             self.assertTrue(any(word in b for b in g.gate(self.packet({name: text}))), (name, word))
 
+    def deep(self, text):
+        return [b for b in g.gate(self.packet({"invariant-deep.txt": text})) if b.startswith("invariant-deep")]
+
+    def test_both_real_forge_output_forms_pass_and_the_readme_line_comes_from_the_same_parser(self):
+        for label, text, tail in (("forge 1.8", FORGE18_DEEP, "reverts: 0"), ("forge 1.5", FORGE15_DEEP, "reverts: 0")):
+            self.assertEqual(self.deep(text), [], label)
+            line = g.deep_summary(text)
+            self.assertIn("14 distinct invariants (O1 to O7, R1 to R7) in 2 suites", line, label)
+            self.assertIn("runs: 512, calls: 76800", line, label)
+        self.assertEqual(g.deep_summary("nothing parseable"), "see the log")
+
     def test_the_deep_campaign_is_judged_by_what_ran_not_by_what_was_requested(self):
         # Codex, PR 28 comment 6074015618: the environment variables were overridden by inline annotations; 64 runs / 5120 calls
-        base = GOOD["invariant-deep.txt"]
-        env_only = "".join(f"[PASS] invariant_{n}() (runs: 64, calls: 5120, reverts: 0)\n" for n in range(14))
-        cases = {
-            "env variables only, no patch recorded": ("Ran 2 test suites: 14 tests passed, 0 failed, 0 skipped\n" + env_only, "no patch"),
-            "patch asks 512x150 but 64 runs happened": (base.split("[PASS]")[0] + env_only + "14 tests passed, 0 failed, 0 skipped\n", "not all at runs"),
-            "calls below runs times depth": (base.replace("calls: 76800", "calls: 5120"), "not all at runs"),
-            "too few invariants": (base.replace("[PASS] invariant_13", "[SKIP] invariant_13"), "13 PASS lines"),
-            "shallow request": (base.replace("runs = 512", "runs = 64"), "below 512"),
-        }
-        for label, (text, word) in cases.items():
-            self.assertTrue(any(word in b for b in g.gate(self.packet({"invariant-deep.txt": text}))), label)
+        for label, text, word in (
+            ("env variables only, no patch recorded", FORGE18_REAL, "no patch"),
+            ("patch asks 512x150 but the real 64x80 log ran", PATCH + FORGE18_REAL, "observed runs/calls/reverts (64, 5120, 0)"),
+            ("calls below runs times depth", FORGE18_DEEP.replace("calls: 76800", "calls: 5120"), "(512, 5120, 0)"),
+            ("shallow request", FORGE18_DEEP.replace("runs = 512", "runs = 64"), "below 512"),
+            ("reverts under fail-on-revert", FORGE18_DEEP.replace("calls: 76800, reverts: 0", "calls: 76800, reverts: 3", 1), "(512, 76800, 3)"),
+        ):
+            self.assertTrue(any(word in b for b in self.deep(text)), (label, self.deep(text)))
+
+    def test_forge_18_counts_must_exist_and_belong_to_their_own_suite(self):
+        first = "BootstrapOrderRouterInvariantTest invariants (runs: 512, calls: 76800, reverts: 0)"
+        second = "TransitiveStakeRouterInvariantTest invariants (runs: 512, calls: 76800, reverts: 0)"
+        self.assertIn(first, FORGE18_DEEP)
+        no_counts = FORGE18_DEEP.replace(first, "").replace(second, "")
+        swapped = FORGE18_DEEP.replace(first, "TransitiveStakeRouterInvariantTest invariants (runs: 512, calls: 76800, reverts: 0)", 1)
+        for label, text, word in (
+            ("no suite count line at all", no_counts, "no observed runs and calls"),
+            ("one suite's count line missing", FORGE18_DEEP.replace(second, ""), "TransitiveStakeRouterInvariantTest R1 has no observed"),
+            ("a count line naming the other suite", swapped, "counts for TransitiveStakeRouterInvariantTest inside the BootstrapOrderRouterInvariantTest"),
+        ):
+            self.assertTrue(any(word in b for b in self.deep(text)), (label, self.deep(text)))
+
+    def test_a_count_of_arbitrary_pass_lines_is_not_enough(self):
+        fourteen = PATCH + "".join(f"[PASS] invariant_{n}() (runs: 512, calls: 76800, reverts: 0)\n" for n in range(14)) + \
+            "Ran 2 test suites in 120s: 14 tests passed, 0 failed, 0 skipped (14 total tests)\n"
+        out = self.deep(fourteen)
+        self.assertTrue(any("suite BootstrapOrderRouterInvariantTest is missing" in b for b in out), out)
+        self.assertTrue(any("suite TransitiveStakeRouterInvariantTest is missing" in b for b in out), out)
+
+    def test_every_named_invariant_must_appear_exactly_once_and_pass_in_either_form(self):
+        for form, base in (("1.8", FORGE18_DEEP), ("1.5", FORGE15_DEEP)):
+            o1 = [l for l in base.splitlines() if "invariant_O1_" in l and l.startswith("[PASS]")][0]
+            o7 = [l for l in base.splitlines() if "invariant_O7_" in l and l.startswith("[PASS]")][0]
+            r3 = [l for l in base.splitlines() if "invariant_R3_" in l and l.startswith("[PASS]")][0]
+            cases = {
+                "a duplicate replacing a required name": (base.replace(o7, o1), ("has 2 results for O1", "has 0 results for O7")),
+                "a partial suite": (base.replace(o7 + "\n", ""), ("has 0 results for O7",)),
+                "a failed invariant": (base.replace(r3, r3.replace("[PASS]", "[FAIL: assertion failed]", 1)), ("failed or skipped lines",)),
+                "a skipped invariant": (base.replace(r3, r3.replace("[PASS]", "[SKIP]", 1)), ("failed or skipped lines",)),
+                "an unexpected extra invariant": (base.replace(o7, o7 + "\n" + o7.replace("invariant_O7_", "invariant_O8_")), ("unexpected invariant O8",)),
+                "a suite that did not report ok": (base.replace("Suite result: ok.", "Suite result: FAILED.", 1), ("no 'Suite result: ok'",)),
+            }
+            for label, (text, words) in cases.items():
+                out = self.deep(text)
+                for word in words:
+                    self.assertTrue(any(word in b for b in out), (form, label, word, out))
+
+    def test_a_missing_suite_or_a_log_with_only_one_suite_fails(self):
+        half = FORGE18_DEEP.split("Ran 1 test for test/invariant/TransitiveStakeRouter")[0]
+        out = self.deep(half + "Ran 1 test suites in 20s: 1 tests passed, 0 failed, 0 skipped (1 total tests)\n")
+        self.assertTrue(any("suite TransitiveStakeRouterInvariantTest is missing" in b for b in out), out)
 
     def test_a_dirty_tree_after_the_runs_fails(self):
         self.assertTrue(any("tree-status" in b for b in g.gate(self.packet({"tree-status.txt": " M packages/foundry/test/x.sol\n"}))))

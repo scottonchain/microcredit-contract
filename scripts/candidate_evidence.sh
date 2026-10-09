@@ -68,8 +68,9 @@ def last(path, pat):
     t = open(path).read()
     return re.findall(pat, t)[-1] if re.findall(pat, t) else "n/a"
 local = last(f"{out}/logs/forge-test-local.txt", r"Ran \d+ test suites[^\n]*")
-deep = re.findall(r"\[PASS\] invariant_\w+\([^)]*\) \(runs: (\d+), calls: (\d+)", open(f"{out}/logs/invariant-deep.txt").read())
-deep_txt = f"{len(deep)} invariants, each observed at runs: {deep[0][0]}, calls: {deep[0][1]}" if deep and len(set(deep)) == 1 else "see the log"
+sys.path.insert(0, "scripts")
+import candidate_evidence_gate as gate  # the README line comes from the parser that the gate just passed, not from a second regex
+deep_txt = gate.deep_summary(open(f"{out}/logs/invariant-deep.txt").read())
 fork = last(f"{out}/logs/forge-test-fork-routers.txt", r"Ran \d+ test suites[^\n]*")
 tool = open(f"{out}/logs/toolchain.txt").read().strip()
 fblock, fhash = open(f"{out}/logs/fork-block.txt").read().split()
@@ -104,7 +105,7 @@ zeroed on both sides) and every wiring check held, including `lens.credit == poo
 - Mutation check (`scripts/candidate_mutants.py`, one planted bug at a time, each must fail the suite): `logs/mutants.txt`.
 - Rehearsals with `cast` on a fresh fork: `logs/rehearsal-normal.txt`, `logs/rehearsal-with-default.txt`.
 
-Local Forge here is 1.5.1; CI uses 1.8.5, which counts each invariant campaign as one test, so counts differ by tool version.
+Forge and Anvil versions are the ones recorded in the Toolchain block above. Forge 1.5 reports every invariant as its own test and prints the counts on that line; Forge 1.8 reports each invariant campaign as one test and prints the counts on a suite line, so test totals differ by tool version (`scripts/candidate_evidence_gate.py` reads both forms).
 
 ## Reproduce
 

@@ -19,6 +19,112 @@ def forge_totals(text):
     return tuple(int(x) for x in m[-1]) if m else None
 
 
+DEEP_SUITES = {"BootstrapOrderRouterInvariantTest": "O", "TransitiveStakeRouterInvariantTest": "R"}
+DEEP_COUNT = 7  # each suite carries invariants <letter>1 to <letter>7, each exactly once
+RAN_SUITE = re.compile(r"^Ran (\d+) tests? for (\S+):(\w+)\s*$")
+RAN_ANY = re.compile(r"^Ran \d+ test")
+INV_LINE = re.compile(r"^\[(PASS|FAIL|SKIP)[^\]]*\]\s+invariant_([A-Za-z])(\d+)_\w*?(?:\(\))?(?:\s+\(runs: (\d+), calls: (\d+), reverts: (\d+)\))?\s*$")
+SUITE_COUNTS = re.compile(r"^\s*(\w+) invariants \(runs: (\d+), calls: (\d+), reverts: (\d+)\)\s*$")
+SUITE_RESULT = re.compile(r"^Suite result: (\w+)\. (\d+) passed; (\d+) failed; (\d+) skipped")
+
+
+def parse_deep(text):
+    """Read a `forge test` log of the two router invariant suites in either real output form and return (suites, problems).
+
+    Forge 1.5 prints one line per invariant, `[PASS] invariant_O1_x() (runs: R, calls: C, reverts: V)`. Forge 1.8 prints each
+    campaign as one test: a bare `[PASS]`, the invariants as `[PASS] invariant_O1_x` without counts, and one suite line
+    ` <Suite> invariants (runs: R, calls: C, reverts: V)` that holds the counts of every invariant in it. Counts are bound to the
+    suite whose `Ran N test(s) for <file>:<Suite>` section they appear in; nothing is read across suites.
+    suites maps a suite name to {"ids": {n: [record, ...]}, "counts": (runs, calls, reverts) | None, "result": (...) | None,
+    "bad": [lines]}; each record is (status, own counts | None)."""
+    suites, problems, cur = {}, [], None
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        m = RAN_SUITE.match(line)
+        if m:
+            cur = m.group(3)
+            if cur in suites:
+                problems.append(f"invariant-deep: suite {cur} appears twice")
+            suites.setdefault(cur, {"ids": {}, "counts": None, "result": None, "bad": []})
+            continue
+        if RAN_ANY.match(line):
+            cur = None  # the closing `Ran N test suites` summary
+            continue
+        if re.match(r"^\[(FAIL|SKIP)", line):
+            if cur is None:
+                problems.append(f"invariant-deep: a failed or skipped line outside any suite: {line[:80]}")
+            else:
+                suites[cur]["bad"].append(line[:80])
+            continue
+        if cur is None:
+            continue
+        m = INV_LINE.match(line)
+        if m:
+            n = int(m.group(3))
+            own = tuple(int(x) for x in m.group(4, 5, 6)) if m.group(4) else None
+            suites[cur]["ids"].setdefault((m.group(2).upper(), n), []).append((m.group(1), own))
+            continue
+        m = SUITE_COUNTS.match(line)
+        if m:
+            if m.group(1) != cur:
+                problems.append(f"invariant-deep: counts for {m.group(1)} inside the {cur} section")
+            elif suites[cur]["counts"] is not None:
+                problems.append(f"invariant-deep: {cur} has two suite count lines")
+            else:
+                suites[cur]["counts"] = tuple(int(x) for x in m.group(2, 3, 4))
+            continue
+        m = SUITE_RESULT.match(line)
+        if m:
+            suites[cur]["result"] = (m.group(1), int(m.group(2)), int(m.group(3)), int(m.group(4)))
+    return suites, problems
+
+
+def deep_problems(text, runs, depth):
+    """Problems with the deep log judged against the requested size; empty means both suites passed every invariant at that size."""
+    suites, bad = parse_deep(text)
+    for name, letter in DEEP_SUITES.items():
+        s = suites.get(name)
+        if s is None:
+            bad.append(f"invariant-deep: suite {name} is missing")
+            continue
+        if s["bad"]:
+            bad.append(f"invariant-deep: {name} has failed or skipped lines: {s['bad'][0]}")
+        if not s["result"] or s["result"][0] != "ok" or s["result"][2] or s["result"][3] or not s["result"][1]:
+            bad.append(f"invariant-deep: {name} has no 'Suite result: ok' with 0 failed and 0 skipped")
+        want = {(letter, n) for n in range(1, DEEP_COUNT + 1)}
+        for key in sorted(want):
+            recs = s["ids"].get(key, [])
+            if len(recs) != 1:
+                bad.append(f"invariant-deep: {name} has {len(recs)} results for {key[0]}{key[1]}, not exactly one")
+                continue
+            status, own = recs[0]
+            if status != "PASS":
+                bad.append(f"invariant-deep: {name} {key[0]}{key[1]} is {status}")
+            seen = own or s["counts"]
+            if own and s["counts"] and own != s["counts"]:
+                bad.append(f"invariant-deep: {name} {key[0]}{key[1]} counts {own} differ from the suite line {s['counts']}")
+            elif seen is None:
+                bad.append(f"invariant-deep: {name} {key[0]}{key[1]} has no observed runs and calls")
+            elif seen != (runs, runs * depth, 0):
+                bad.append(f"invariant-deep: {name} {key[0]}{key[1]} observed runs/calls/reverts {seen}, "
+                           f"not ({runs}, {runs * depth}, 0)")
+        for key in sorted(set(s["ids"]) - want):
+            bad.append(f"invariant-deep: {name} has an unexpected invariant {key[0]}{key[1]}")
+    for name in sorted(set(suites) - set(DEEP_SUITES)):
+        bad.append(f"invariant-deep: unexpected suite {name}")
+    return bad
+
+
+def deep_summary(text):
+    """One line for the README, read from the log by the same parser; 'see the log' when the log does not parse clean."""
+    suites, bad = parse_deep(text)
+    seen = {suites[n]["counts"] or next(iter(r[0][1] for r in suites[n]["ids"].values() if r and r[0][1]), None) for n in DEEP_SUITES if n in suites}
+    if bad or len(seen) != 1 or None in seen or len(suites) != len(DEEP_SUITES):
+        return "see the log"
+    runs, calls, reverts = seen.pop()
+    return f"{DEEP_COUNT * len(DEEP_SUITES)} distinct invariants (O1 to O7, R1 to R7) in {len(DEEP_SUITES)} suites, each observed at runs: {runs}, calls: {calls}, reverts: {reverts}"
+
+
 def gate(out):
     """Return a list of problems; empty means the packet may be completed."""
     bad = []
@@ -53,18 +159,18 @@ def gate(out):
         if skipped and not allow_skipped:
             bad.append(f"{name}: {skipped} skipped (a fork or invariant test that did not run is not evidence)")
 
-    # The deep campaigns: what was asked is in the patch printed at the top of the log, what ran is in the PASS lines. Both
-    # router suites carry inline annotations that override the environment, so the request alone proves nothing.
+    # The deep campaigns: what was asked is in the patch printed at the top of the log, what ran is in the suite sections of the
+    # log (either Forge output form, see parse_deep). Both router suites carry inline annotations that override the environment,
+    # so the request alone proves nothing.
     deep = read("invariant-deep.txt") or ""
     want_runs = re.findall(r"^\+/// forge-config: default\.invariant\.runs = (\d+)\s*$", deep, re.M)
     want_depth = re.findall(r"^\+/// forge-config: default\.invariant\.depth = (\d+)\s*$", deep, re.M)
-    seen = re.findall(r"^\[PASS\] invariant_\w+\([^)]*\) \(runs: (\d+), calls: (\d+)", deep, re.M)
     if len(set(want_runs)) != 1 or len(set(want_depth)) != 1 or len(want_runs) < 2:
         bad.append("invariant-deep: no patch of the inline runs and depth annotations recorded in the log")
     elif int(want_runs[0]) < 512 or int(want_depth[0]) < 150:
         bad.append(f"invariant-deep: requested {want_runs[0]} runs of depth {want_depth[0]}, below 512 of 150")
-    elif len(seen) < 14 or any(int(r) != int(want_runs[0]) or int(c) != int(want_runs[0]) * int(want_depth[0]) for r, c in seen):
-        bad.append(f"invariant-deep: {len(seen)} PASS lines, not all at runs {want_runs[0]} and calls {int(want_runs[0]) * int(want_depth[0])}")
+    else:
+        bad.extend(deep_problems(deep, int(want_runs[0]), int(want_depth[0])))
     ts = read("tree-status.txt")
     if ts is None or ts.strip():
         bad.append("tree-status.txt: missing or not empty (the tree must be clean after the deep run and the mutants)")
