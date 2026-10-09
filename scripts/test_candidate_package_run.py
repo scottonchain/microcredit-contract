@@ -7,6 +7,11 @@ import test_candidate_evidence_gate as tg
 REV = "3" * 40
 
 
+def read(path):
+    with open(path) as f:
+        return f.read()
+
+
 def sha(path):
     with open(path, "rb") as f:
         return hashlib.sha256(f.read()).hexdigest()
@@ -52,14 +57,14 @@ class PackageRunTest(unittest.TestCase):
     def test_the_packet_names_whose_run_it_is_keeps_the_limits_and_checksums_verify(self):
         a = self.args()
         n = pk.package(a)
-        md = open(os.path.join(a.out, "README.md")).read()
-        for needle in (REV, "Hermes (AI agent)", "5d17e2c", "1803b40", "abcdef1", "failed on the output format", "not backdated",
+        md = read(os.path.join(a.out, "README.md"))
+        for needle in (REV, "Hermes (AI agent)", "5d17e2c", "1803b40", "abcdef1", "The script exited 1", "failed on the output format", "only the retrospective evaluation", "Reproducing takes two steps", "git checkout 5d17e2c", "still meets the old parser",
                        "One host, one run", "skipped tests", "no readiness is claimed", "sha256 `" + sha(self.failed) + "`",
                        "41234567", "14 distinct invariants", "git checkout " + REV):
             self.assertIn(needle, md, needle)
         self.assertNotIn("was produced by `scripts/candidate_evidence.sh` from a clean checkout", md)
         self.assertFalse(os.path.exists(os.path.join(a.out, "FAILED.txt")))
-        sums = open(os.path.join(a.out, "SHA256SUMS")).read().splitlines()
+        sums = read(os.path.join(a.out, "SHA256SUMS")).splitlines()
         self.assertEqual(len(sums), n)
         for line in sums:
             digest, rel = line.split("  ")

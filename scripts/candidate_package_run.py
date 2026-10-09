@@ -59,13 +59,14 @@ def intro_text(a):
     failed = f", sha256 `{a.failed_sha}`" if a.failed_sha else ""
     return (
         f"Tested revision (the code under test): `@HEAD@`. These logs are the original, unmodified output of one run of\n"
-        f"`scripts/candidate_evidence.sh` at that revision, made by {a.run_by} and published at {a.input_ref}. That run's own gate\n"
-        f"failed on the output format, not on a result (original `FAILED.txt`{failed}, kept at {a.failed_ref} and not rewritten here).\n"
+        f"`scripts/candidate_evidence.sh` at that revision, made by {a.run_by} and published at {a.input_ref}. The script exited 1: its own\n"
+        f"gate failed on the output format, not on a result (original `FAILED.txt`{failed}, kept at {a.failed_ref} and not rewritten here).\n"
         f"The gate was repaired afterwards (parser revision `{a.parser_rev}`), the published output was re-evaluated on a separate copy\n"
         f"(re-evaluation revision `{a.reeval_rev}`, `evidence/bootstrap-candidate-3efdb6f-gate-reevaluation/`), and this packet was assembled\n"
         f"from a separate copy of the published logs by `scripts/candidate_package_run.py` (packaging revision `{a.packaging_rev}`; this\n"
         f"directory is added by the commit after it). {a.selection}\n"
-        f"The original gate result is not backdated: it failed, and the repaired gate passes the same logs. Nothing here is a public-chain\n"
+        f"The original gate result is not backdated: the script's own run failed, and only the retrospective evaluation of the same logs with\n"
+        f"the repaired parser passes. Nothing here is a public-chain\n"
         f"receipt: tests ran on a local EVM with synthetic time; fork runs and rehearsals ran on local Anvil forks of Base Sepolia with\n"
         f"Circle's USDC, every fork pinned to Base Sepolia block @FBLOCK@ (hash `@FHASH@`)."
     )
@@ -78,12 +79,25 @@ LIMITS = """## Limits of this packet
 - Local EVM and local forks only: no public-chain receipt, no audit, no outside reproduction.
 - This packet is assembled for review. It is not an acceptance: full packet revalidation, overall acceptance and the public-chain HOLD remain with the designated reviewer, and no readiness is claimed."""
 
-REPRODUCE = """To reproduce the run itself, check out the tested revision and run the script (needs forge, anvil, cast, python3 and https://sepolia.base.org):
+def reproduce_text(a):
+    return f"""Reproducing takes two steps, because rerunning the tested revision still meets the old parser:
+
+1. Check out the tested revision and run the script (needs forge, anvil, cast, python3 and https://sepolia.base.org). With Forge 1.8 its own gate refuses the output at the deep-invariant step and the script exits 1; keep that output and its `FAILED.txt` as the run's original result.
 
 ```
 git checkout @HEAD@
 scripts/candidate_evidence.sh
 ```
+
+2. Judge a copy of that output directory with the repaired gate, from a checkout of the parser revision (`{a.parser_rev}`) or later, and package it (the header of `scripts/candidate_package_run.py` lists its arguments):
+
+```
+git checkout {a.parser_rev}
+python3 scripts/candidate_evidence_gate.py <a copy of the run's output directory>
+python3 scripts/candidate_package_run.py --src <the run's output directory> --out <a new directory> ...
+```
+
+Running the script itself from a head that carries the parser fix gives a passing packet in one step, but then the tested revision is that head, not `@HEAD@` (`packages/` is identical).
 
 To re-judge this packet, run `python3 scripts/candidate_evidence_gate.py` on a copy of this directory (the gate deletes `FAILED.txt` on success and writes it on failure, so never point it at the only copy), and `sha256sum -c SHA256SUMS` from this directory."""
 
@@ -102,7 +116,7 @@ def package(a):
         problems = gate.gate(a.out)
         if problems:
             raise PackageError("the gate refused the copied logs:\n" + "\n".join("- " + p for p in problems))
-        md = readme.render(a.out, a.tested_head, intro=intro_text(a), limits=LIMITS, reproduce=REPRODUCE)
+        md = readme.render(a.out, a.tested_head, intro=intro_text(a), limits=LIMITS, reproduce=reproduce_text(a))
     except Exception:
         shutil.rmtree(a.out, ignore_errors=True)  # no partial packet, no README, no checksums
         raise
