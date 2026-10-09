@@ -127,13 +127,23 @@ FUND = f"fund({INTENT_T},uint256,uint256,uint256)"
 UNBOUND = f"originate({REQ_T},bytes,{PATH_T}[])"  # the unbound router's entry: it must not exist on the bootstrap router
 
 
+def new_wallet(out):
+    """`cast wallet new --json` prints a bare list in Foundry 1.5 and {"schema_version", "success", "data": [...]} in 1.8
+    (Hermes's reproduction, testbed issue 15 comment 6071727539). Accept both."""
+    d = json.loads(out)
+    if isinstance(d, dict):
+        d = d.get("data", d)
+    w = d[0] if isinstance(d, list) else d
+    return {"address": w["address"], "private_key": w["private_key"]}
+
+
 def run(a):
     c = Cast(a.rpc)
     chain = int(c.run("chain-id", "--rpc-url", a.rpc))
     names = ["deployer", "lender", "worker", "root1", "root2", "mid", "vendor", "customer", "submitter", "worker2", "officer"]
     roles = {}
     for n in names:
-        w = json.loads(c.run("wallet", "new", "--json"))[0]
+        w = new_wallet(c.run("wallet", "new", "--json"))
         roles[n] = w["address"]
         Cast.keys[w["address"].lower()] = w["private_key"]
         c.run("rpc", "--rpc-url", a.rpc, "anvil_setBalance", w["address"], "0xDE0B6B3A7640000")

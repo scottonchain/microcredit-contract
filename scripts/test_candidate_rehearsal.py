@@ -1,4 +1,4 @@
-import os, re, unittest
+import json, os, re, unittest
 import candidate_rehearsal as cr
 
 SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packages", "foundry", "contracts")
@@ -64,6 +64,26 @@ class RehearsalTypedDataTest(unittest.TestCase):
         self.assertEqual(td["primaryType"], "EdgeConsent")
         self.assertEqual(td["message"]["limit"], "5")
         self.assertEqual([f["name"] for f in td["types"]["EdgeConsent"]], [n for n, _ in cr.CONSENT_FIELDS])
+
+
+class WalletJsonTest(unittest.TestCase):
+    """Foundry 1.5 prints a bare list, 1.8 wraps it; both must work (Hermes's reproduction on 1.8.4)."""
+
+    ADDR, KEY = "0x" + "ab" * 20, "0x" + "cd" * 32
+
+    def test_bare_list_from_foundry_1_5(self):
+        out = json.dumps([{"address": self.ADDR, "private_key": self.KEY}])
+        self.assertEqual(cr.new_wallet(out), {"address": self.ADDR, "private_key": self.KEY})
+
+    def test_wrapped_data_from_foundry_1_8(self):
+        out = json.dumps({"schema_version": "0.1", "success": True, "data": [{"address": self.ADDR, "private_key": self.KEY, "x": 1}]})
+        self.assertEqual(cr.new_wallet(out), {"address": self.ADDR, "private_key": self.KEY})
+
+    def test_a_single_object_is_accepted_and_garbage_fails_closed(self):
+        self.assertEqual(cr.new_wallet(json.dumps({"address": self.ADDR, "private_key": self.KEY}))["address"], self.ADDR)
+        for bad in ("[]", '{"data": []}', '{"data": [{"address": "0x1"}]}', "not json"):
+            with self.assertRaises(Exception):
+                cr.new_wallet(bad)
 
 
 if __name__ == "__main__":
