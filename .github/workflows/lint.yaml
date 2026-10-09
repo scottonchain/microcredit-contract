@@ -69,6 +69,19 @@ jobs:
 
       - name: Test the candidate rehearsal typed data against the contracts
         run: python3 -m unittest discover -s scripts -p 'test_candidate_rehearsal.py' -v
+
+      - name: Test the evidence gate (both Forge output forms, per suite and per named invariant)
+        run: python3 -m unittest discover -s scripts -p 'test_candidate_evidence_gate.py' -v
+
+      - name: Test the fork helper
+        run: python3 -m unittest discover -s scripts -p 'test_candidate_fork.py' -v
+
+      - name: Test the deep-invariant script (restores the annotations, passes the exit code on)
+        run: python3 -m unittest discover -s scripts -p 'test_candidate_deep_invariants.py' -v
+
+      - name: Test the packaging tool for a run made elsewhere
+        run: python3 -m unittest discover -s scripts -p 'test_candidate_package_run.py' -v
+
       - name: Start Anvil, deploy contracts (& generate contracts typescript output)
         run: |
           yarn chain > anvil.log 2>&1 &
