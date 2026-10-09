@@ -89,7 +89,7 @@ git checkout @HEAD@
 scripts/candidate_evidence.sh
 ```
 
-2. Judge a copy of that output directory with the repaired gate and package it, from a checkout of the **packaging revision** (`{a.packaging_rev}`), which is the first revision that contains `scripts/candidate_package_run.py` (the parser revision `{a.parser_rev}` does not). The gate file there is byte-identical to the one at the parser revision (sha256 `{a.parser_gate_sha256}`, checked when this packet was assembled). The header of `scripts/candidate_package_run.py` lists its arguments:
+2. Judge a copy of that output directory with the repaired gate and package it, from a checkout of the **packaging revision** (`{a.packaging_rev}`), which contains `scripts/candidate_package_run.py` (the parser revision `{a.parser_rev}` does not). The gate file there is byte-identical to the one at the parser revision (sha256 `{a.parser_gate_sha256}`, checked when this packet was assembled). The header of `scripts/candidate_package_run.py` lists its arguments:
 
 ```
 git checkout {a.packaging_rev}

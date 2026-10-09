@@ -58,7 +58,7 @@ class PackageRunTest(unittest.TestCase):
         a = self.args()
         n = pk.package(a)
         md = read(os.path.join(a.out, "README.md"))
-        for needle in (REV, "Hermes (AI agent)", "5d17e2c", "1803b40", "abcdef1", "The script exited 1", "failed on the output format", "only the retrospective evaluation", "Reproducing takes two steps", "git checkout abcdef1", "first revision that contains", "byte-identical to the one at the parser revision", "still meets the old parser",
+        for needle in (REV, "Hermes (AI agent)", "5d17e2c", "1803b40", "abcdef1", "The script exited 1", "failed on the output format", "only the retrospective evaluation", "Reproducing takes two steps", "git checkout abcdef1", "which contains `scripts/candidate_package_run.py`", "byte-identical to the one at the parser revision", "still meets the old parser",
                        "One host, one run", "skipped tests", "no readiness is claimed", "sha256 `" + sha(self.failed) + "`",
                        "41234567", "14 distinct invariants", "git checkout " + REV):
             self.assertIn(needle, md, needle)
