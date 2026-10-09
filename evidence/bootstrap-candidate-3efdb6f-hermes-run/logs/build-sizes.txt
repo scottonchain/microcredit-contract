@@ -1,0 +1,742 @@
+warning[missing-zero-check]: address parameter is used in a state write or value transfer without a zero-address check
+    ╭▸ contracts/BootstrapOrderRouter.sol:143:25
+    │
+143 │     function setOfficer(address newOfficer, uint256 newPolicyVersion) external onlyOfficerAdmin {
+    │                         ━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-zero-check
+
+warning[missing-zero-check]: address parameter is used in a state write or value transfer without a zero-address check
+    ╭▸ contracts/BootstrapOrderRouter.sol:162:30
+    │
+162 │     function setOfficerAdmin(address newAdmin) external onlyOfficerAdmin {
+    │                              ━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-zero-check
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/BootstrapOrderRouter.sol:184:56
+    │
+184 │                 || a.policyVersion != policyVersion || a.expiry <= block.timestamp || a.maxAmount == 0
+    │                                                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/BootstrapOrderRouter.sol:188:9
+    │
+188 │         emit OrderApproved(a.orderId, a.maxAmount, a.expiry);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/BootstrapOrderRouter.sol:218:92
+    │
+218 │                 || i.amount == 0 || price == 0 || maxDebt < i.amount || maxDebt > price || settleBy <= block.timestamp
+    │                                                                                            ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/BootstrapOrderRouter.sol:219:20
+    │
+219 │                 || i.deadline <= block.timestamp
+    │                    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[incorrect-strict-equality]: dangerous strict equality check on an externally-influenced value
+    ╭▸ contracts/BootstrapOrderRouter.sol:227:13
+    │
+227 │         if (token.balanceOf(address(this)) - beforeBalance != price) revert WrongFunding();
+    │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/incorrect-strict-equality
+
+warning[reentrancy-no-eth]: external call can be reentered before `_lots` is updated
+    ╭▸ contracts/TransitiveStakeRouter.sol:302:37
+    │
+302 │         uint256 returned = Math.min(vaultOf[borrower].release(borrower), amount);
+    │                                     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-no-eth
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/BootstrapOrderRouter.sol:262:40
+    │
+262 │         if (o.state != State.Funded || block.timestamp > o.settleBy || block.timestamp > i.deadline) {
+    │                                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/BootstrapOrderRouter.sol:262:72
+    │
+262 │         if (o.state != State.Funded || block.timestamp > o.settleBy || block.timestamp > i.deadline) {
+    │                                                                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/BootstrapOrderRouter.sol:275:24
+    │
+275 │                     || ap.expiry < block.timestamp
+    │                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/TransitiveStakeRouter.sol:314:32
+    │
+314 │             if (share[i] != 0) emit RootLoss(p.root, borrower, loanId, share[i]);
+    │                                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/TransitiveStakeRouter.sol:319:9
+    │
+319 │         emit Released(borrower, loanId, returned, loss);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/TransitiveStakeRouter.sol:241:9
+    │
+241 │         emit Allocated(borrower, loanId, total, paths.length);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/BootstrapOrderRouter.sol:286:9
+    │
+286 │         emit Originated(id, loanId);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-no-eth]: external call can be reentered before `_status` is updated
+    ╭▸ contracts/BootstrapOrderRouter.sol:305:13
+    │
+305 │             pool.repayLoan(o.loanId, debt);
+    │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-no-eth
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/BootstrapOrderRouter.sol:294:39
+    │
+294 │         if (o.state != State.Bound || block.timestamp > o.settleBy) revert InvalidOrder();
+    │                                       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/BootstrapOrderRouter.sol:312:9
+    │
+312 │         emit Settled(id, debt, o.price - debt);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[unused-return]: return value of an external call is not used
+    ╭▸ contracts/BootstrapOrderRouter.sol:295:60
+    │
+295 │         (DecentralizedMicrocredit.LoanStatus status,,,,) = pool.getLoanTerms(o.loanId);
+    │                                                            ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/unused-return
+
+warning[unused-return]: return value of an external call is not used
+    ╭▸ contracts/BootstrapOrderRouter.sol:308:30
+    │
+308 │         (,,,, bool active) = pool.getLoan(o.loanId);
+    │                              ━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/unused-return
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/BootstrapOrderRouter.sol:323:38
+    │
+323 │         if (msg.sender != o.payer && block.timestamp <= o.settleBy) revert Unauthorized();
+    │                                      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[missing-events-access-control]: `owner` is changed without an event but is used for access control
+    ╭▸ contracts/DecentralizedMicrocredit.sol:435:9
+    │
+435 │         owner = msg.sender;
+    │         ━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[missing-events-access-control]: `pendingOwner` is changed without an event but is used for access control
+    ╭▸ contracts/DecentralizedMicrocredit.sol:436:9
+    │
+436 │         pendingOwner = address(0);
+    │         ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[missing-events-access-control]: `guardian` is changed without an event but is used for access control
+    ╭▸ contracts/DecentralizedMicrocredit.sol:440:9
+    │
+440 │         guardian = newGuardian;
+    │         ━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[missing-events-access-control]: `firstLossReserve` is changed without an event but is used for access control
+    ╭▸ contracts/DecentralizedMicrocredit.sol:538:9
+    │
+538 │         firstLossReserve -= amount;
+    │         ━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[missing-events-access-control]: `totalQueuedShares` is changed without an event but is used for access control
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1510:13
+     │
+1510 │             totalQueuedShares -= burn;
+     │             ━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[missing-events-access-control]: `totalShares` is changed without an event but is used for access control
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1186:9
+     │
+1186 │         totalShares -= shares;
+     │         ━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[missing-events-access-control]: `lenderCash` is changed without an event but is used for access control
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1187:9
+     │
+1187 │         lenderCash -= assets;
+     │         ━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[missing-zero-check]: address parameter is used in a state write or value transfer without a zero-address check
+    ╭▸ contracts/DecentralizedMicrocredit.sol:391:9
+    │
+391 │         address _originator
+    │         ━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-zero-check
+
+warning[missing-zero-check]: address parameter is used in a state write or value transfer without a zero-address check
+    ╭▸ contracts/DecentralizedMicrocredit.sol:427:32
+    │
+427 │     function transferOwnership(address newOwner) external onlyOwner {
+    │                                ━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-zero-check
+
+warning[missing-zero-check]: address parameter is used in a state write or value transfer without a zero-address check
+    ╭▸ contracts/DecentralizedMicrocredit.sol:439:26
+    │
+439 │     function setGuardian(address newGuardian) external onlyOwner {
+    │                          ━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-zero-check
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/DecentralizedMicrocredit.sol:539:9
+    │
+539 │         emit ReserveReleased(amount);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1191:13
+     │
+1191 │             emit PayoutHeld(to, assets);
+     │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1193:9
+     │
+1193 │         emit Withdrawn(lender, to, assets, shares);
+     │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1513:13
+     │
+1513 │             emit MetaWithdrawalFilled(withdrawalHead, pay);
+     │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/DecentralizedMicrocredit.sol:624:44
+    │
+624 │             msg.sender == loan.borrower || block.timestamp > loan.requestedAt + RESERVATION_TTL, NotCancellableYet()
+    │                                            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/DecentralizedMicrocredit.sol:645:17
+    │
+645 │         require(block.timestamp > loan.disbursedAt + loan.term, NotOverdue());
+    │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/DecentralizedMicrocredit.sol:669:17
+    │
+669 │         require(block.timestamp > loan.disbursedAt + loan.term + LATE_PERIOD, NotYetDefaultable());
+    │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/DecentralizedMicrocredit.sol:683:9
+    │
+683 │         emit LoanDefaulted(loan.borrower, loanId, writtenOff, slashed + fromReserve);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/DecentralizedMicrocredit.sol:699:9
+    │
+699 │         emit LoanRepaid(loan.borrower, loanId, paid);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1336:13
+     │
+1336 │             emit RepaymentApplied(loanId, interest, principal, fee);
+     │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/DecentralizedMicrocredit.sol:731:9
+    │
+731 │         emit LoanRepaid(borrower, loanId, paid);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1279:9
+     │
+1279 │         emit LoanRequested(borrower, loanId, amount, effrRate + riskPremium);
+     │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/DecentralizedMicrocredit.sol:842:9
+    │
+842 │         emit MetaLoanRequested(req.borrower, req.amount, loanId);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1296:9
+     │
+1296 │         emit LoanDisbursed(loan.borrower, loanId, to, principal);
+     │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/DecentralizedMicrocredit.sol:856:9
+    │
+856 │         emit MetaLoanDisbursed(req.borrower, req.loanId, principal);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/DecentralizedMicrocredit.sol:886:9
+    │
+886 │         emit MetaLoanCreated(req.borrower, loanId, req.amount, currentApr, req.repaymentPeriod);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/DecentralizedMicrocredit.sol:887:9
+    │
+887 │         emit MetaLoanDisbursed(req.borrower, loanId, req.amount);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/DecentralizedMicrocredit.sol:923:9
+    │
+923 │         emit MetaLoanRepaid(req.borrower, req.loanId, out);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1176:9
+     │
+1176 │         emit Deposited(lender, assets, shares);
+     │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/DecentralizedMicrocredit.sol:950:9
+    │
+950 │         emit MetaDeposit(req.lender, req.amount, req.receiver, shares);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/DecentralizedMicrocredit.sol:963:9
+    │
+963 │         emit MetaDeposit(lender, permit.value, lender, shares);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/DecentralizedMicrocredit.sol:988:9
+    │
+988 │         emit MetaWithdrawalRequested(req.lender, queueId, assets, req.to);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1471:9
+     │
+1471 │         emit Backed(backer, borrower, edge.secured, edge.unsecured);
+     │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1137:17
+     │
+1137 │         require(block.timestamp <= deadline, SignatureExpired());
+     │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[arbitrary-send-erc20]: `transferFrom` uses an arbitrary `from`; require it to equal `msg.sender` or `address(this)`
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1156:9
+     │
+1156 │         usdc.safeTransferFrom(from, address(this), amount);
+     │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/arbitrary-send-erc20
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1397:45
+     │
+1397 │             if (slashed > 0 || charged > 0) emit BackerCharged(backer, loanId, slashed, charged);
+     │                                             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[calls-loop]: external call inside a loop
+    ╭▸ contracts/DecentralizedMicrocredit.sol:774:25
+    │
+774 │         return Math.min(scoreProvider.creditScore(user), SCALE);
+    │                         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/calls-loop
+
+warning[divide-before-multiply]: division before multiplication may lose precision
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1426:16
+     │
+1426 │         return (((loan.principal * loan.interestRate) / BASIS_POINTS) * elapsed) / SECONDS_PER_YEAR;
+     │                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/divide-before-multiply
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+     ╭▸ contracts/DecentralizedMicrocredit.sol:1425:13
+     │
+1425 │         if (elapsed < GRACE_PERIOD) return 0;
+     │             ━━━━━━━━━━━━━━━━━━━━━━
+     │
+     ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[divide-before-multiply]: division before multiplication may lose precision
+   ╭▸ contracts/MicrocreditLens.sol:29:16
+   │
+29 │         return (grossBp * (bps - credit.protocolFeeBps() - credit.reserveBps())) / bps;
+   │                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/divide-before-multiply
+
+warning[divide-before-multiply]: division before multiplication may lose precision
+   ╭▸ contracts/MicrocreditLens.sol:95:16
+   │
+95 │         return ((credit.getCurrentOutstandingAmount(loanId) + CENT - 1) / CENT) * CENT;
+   │                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/divide-before-multiply
+
+warning[missing-zero-check]: address parameter is used in a state write or value transfer without a zero-address check
+   ╭▸ contracts/OracleScoreProvider.sol:85:39
+   │
+85 │     constructor(address initialOwner, address initialReporter, uint256 initialMaxScoreAge, uint256 initialMaxTotalScore)
+   │                                       ━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/missing-zero-check
+
+warning[calls-loop]: external call inside a loop
+    ╭▸ contracts/OracleScoreProvider.sol:123:34
+    │
+123 │             if (held <= score || lending.activeLoanCount(user) != 0 || lending.creditCommitted(user) != 0) continue;
+    │                                  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/calls-loop
+
+warning[calls-loop]: external call inside a loop
+    ╭▸ contracts/OracleScoreProvider.sol:123:72
+    │
+123 │             if (held <= score || lending.activeLoanCount(user) != 0 || lending.creditCommitted(user) != 0) continue;
+    │                                                                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/calls-loop
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/OracleScoreProvider.sol:139:37
+    │
+139 │         return lastReportAt != 0 && block.timestamp <= lastReportAt + maxScoreAge;
+    │                                     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[missing-zero-check]: address parameter is used in a state write or value transfer without a zero-address check
+    ╭▸ contracts/OracleScoreProvider.sol:159:27
+    │
+159 │     function setForwarder(address newForwarder, address workflowOwner, bytes32 workflowId) external onlyOwner {
+    │                           ━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-zero-check
+
+warning[missing-zero-check]: address parameter is used in a state write or value transfer without a zero-address check
+    ╭▸ contracts/OracleScoreProvider.sol:159:49
+    │
+159 │     function setForwarder(address newForwarder, address workflowOwner, bytes32 workflowId) external onlyOwner {
+    │                                                 ━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-zero-check
+
+warning[missing-zero-check]: address parameter is used in a state write or value transfer without a zero-address check
+    ╭▸ contracts/OracleScoreProvider.sol:166:26
+    │
+166 │     function setReporter(address newReporter) external onlyOwner {
+    │                          ━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-zero-check
+
+warning[require-revert-in-loop]: `require` or `revert` inside a loop
+    ╭▸ contracts/OracleScoreProvider.sol:200:36
+    │
+200 │             if (scores[i] > SCALE) revert ScoreTooHigh();
+    │                                    ━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/require-revert-in-loop
+
+warning[incorrect-strict-equality]: dangerous strict equality check on an externally-influenced value
+    ╭▸ contracts/TransitiveStakeRouter.sol:171:13
+    │
+171 │         if (token.balanceOf(address(this)) - beforeBalance != amount) revert WrongFunding();
+    │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/incorrect-strict-equality
+
+warning[unused-return]: return value of an external call is not used
+    ╭▸ contracts/TransitiveStakeRouter.sol:238:62
+    │
+238 │         (uint256 principal,, address debtor,, bool active) = pool.getLoan(loanId);
+    │                                                              ━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/unused-return
+
+warning[require-revert-in-loop]: `require` or `revert` inside a loop
+    ╭▸ contracts/TransitiveStakeRouter.sol:260:15
+    │
+260 │             ) revert InvalidCertificate();
+    │               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/require-revert-in-loop
+
+warning[require-revert-in-loop]: `require` or `revert` inside a loop
+    ╭▸ contracts/TransitiveStakeRouter.sol:275:94
+    │
+275 │         if (c.version != edgeVersion[key] || block.timestamp > c.expiry || term > c.maxTerm) revert InvalidConsent();
+    │                                                                                              ━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/require-revert-in-loop
+
+warning[require-revert-in-loop]: `require` or `revert` inside a loop
+    ╭▸ contracts/TransitiveStakeRouter.sol:276:83
+    │
+276 │         if (!SignatureChecker.isValidSignatureNow(c.from, consentDigest(c), sig)) revert InvalidConsent();
+    │                                                                                   ━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/require-revert-in-loop
+
+warning[require-revert-in-loop]: `require` or `revert` inside a loop
+    ╭▸ contracts/TransitiveStakeRouter.sol:278:29
+    │
+278 │         if (used > c.limit) revert LimitExceeded();
+    │                             ━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/require-revert-in-loop
+
+warning[require-revert-in-loop]: `require` or `revert` inside a loop
+    ╭▸ contracts/TransitiveStakeRouter.sol:265:40
+    │
+265 │             if (free[root] < p.amount) revert InsufficientFree();
+    │                                        ━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/require-revert-in-loop
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/TransitiveStakeRouter.sol:275:46
+    │
+275 │         if (c.version != edgeVersion[key] || block.timestamp > c.expiry || term > c.maxTerm) revert InvalidConsent();
+    │                                              ━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[unused-return]: return value of an external call is not used
+    ╭▸ contracts/TransitiveStakeRouter.sol:294:60
+    │
+294 │         (DecentralizedMicrocredit.LoanStatus status,,,,) = pool.getLoanTerms(lot.loanId);
+    │                                                            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/unused-return
+
+warning[uninitialized-local]: local variable is read before being initialized
+    ╭▸ contracts/TransitiveStakeRouter.sol:334:13
+    │
+334 │             assigned += share[i];
+    │             ━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/uninitialized-local
+
+warning[environment-read-across-mutation]: `block.timestamp` may be reused across `vm.warp`
+    ╭▸ test/DeployProduction.t.sol:278:17
+    │
+278 │         vm.warp(block.timestamp + delay - 1);
+    │         ────────━━━━━━━━━━━━━━━───────────── `vm.warp` changes this environment here
+    │
+    ├ help: capture it with `vm.getBlockTimestamp()` instead
+    ╰ help: https://getfoundry.sh/forge/linting/environment-read-across-mutation
+
+warning[environment-read-across-mutation]: `block.timestamp` may be reused across `vm.warp`
+   ╭▸ test/HermesPR16.t.sol:87:17
+   │
+87 │         vm.warp(block.timestamp + 10 days);
+   │         ────────━━━━━━━━━━━━━━━─────────── `vm.warp` changes this environment here
+   │
+   ├ help: capture it with `vm.getBlockTimestamp()` instead
+   ╰ help: https://getfoundry.sh/forge/linting/environment-read-across-mutation
+
+warning[environment-read-across-mutation]: `block.timestamp` may be reused across `vm.warp`
+    ╭▸ test/HermesPR16.t.sol:244:21
+    │
+244 │             vm.warp(block.timestamp + 365 days);
+    │             ────────━━━━━━━━━━━━━━━──────────── `vm.warp` changes this environment here
+    │
+    ├ help: capture it with `vm.getBlockTimestamp()` instead
+    ╰ help: https://getfoundry.sh/forge/linting/environment-read-across-mutation
+
+warning[environment-read-across-mutation]: `block.timestamp` may be reused across `vm.warp`
+    ╭▸ test/TransitiveStakeRouter.t.sol:133:21
+    │
+133 │             expiry: block.timestamp + 30 days
+    │                     ━━━━━━━━━━━━━━━
+    ‡
+210 │         vm.warp(dueAt + credit.LATE_PERIOD() + 1);
+    │         ───────────────────────────────────────── `vm.warp` changes this environment here
+    │
+    ├ help: capture it with `vm.getBlockTimestamp()` instead
+    ╰ help: https://getfoundry.sh/forge/linting/environment-read-across-mutation
+
+warning[environment-read-across-mutation]: `block.timestamp` may be reused across `vm.warp`
+   ╭▸ test/fork/HermesCI21.t.sol:99:21
+   │
+99 │             vm.warp(block.timestamp + 365 days);
+   │             ────────━━━━━━━━━━━━━━━──────────── `vm.warp` changes this environment here
+   │
+   ├ help: capture it with `vm.getBlockTimestamp()` instead
+   ╰ help: https://getfoundry.sh/forge/linting/environment-read-across-mutation
+
+warning[environment-read-across-mutation]: `block.timestamp` may be reused across `vm.warp`
+   ╭▸ test/fork/HermesCI21.t.sol:76:21
+   │
+76 │             vm.warp(block.timestamp + 365 days);
+   │             ────────━━━━━━━━━━━━━━━──────────── `vm.warp` changes this environment here
+   │
+   ├ help: capture it with `vm.getBlockTimestamp()` instead
+   ╰ help: https://getfoundry.sh/forge/linting/environment-read-across-mutation
+
+No files changed, compilation skipped
+
+╭--------------------------+------------------+-------------------+--------------------+---------------------╮
+| Contract                 | Runtime Size (B) | Initcode Size (B) | Runtime Margin (B) | Initcode Margin (B) |
++============================================================================================================+
+| AlwaysReverts            | 116              | 140               | 24,460             | 49,012              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| AttributionHarness       | 11,811           | 13,323            | 12,765             | 35,829              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| BlacklistableUSDC        | 3,609            | 5,458             | 20,967             | 43,694              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| BootstrapOrderRouter     | 18,105           | 19,735            | 6,471              | 29,417              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| CreditHandler            | 38,002           | 40,921            | -13,426            | 8,231               |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| DecentralizedMicrocredit | 24,439           | 25,852            | 137                | 23,300              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| EighteenDecimalToken     | 1,543            | 2,356             | 23,033             | 46,796              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| MicrocreditLens          | 3,287            | 3,473             | 21,289             | 45,679              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| MockUSDC                 | 3,237            | 5,086             | 21,339             | 44,066              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| OracleScoreProvider      | 4,916            | 5,401             | 19,660             | 43,751              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| OrderRouterHandler       | 19,410           | 21,506            | 5,166              | 27,646              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| RouterHandler            | 21,639           | 23,734            | 2,937              | 25,418              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| SmartRoot                | 284              | 310               | 24,292             | 48,842              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| StakeVault               | 1,763            | 1,981             | 22,813             | 47,171              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| SwallowingBatch          | 594              | 620               | 23,982             | 48,532              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| TimelockController       | 5,450            | 6,755             | 19,126             | 42,397              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| TransitiveStakeRouter    | 11,539           | 13,051            | 13,037             | 36,101              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| UsageStub                | 299              | 325               | 24,277             | 48,827              |
+|--------------------------+------------------+-------------------+--------------------+---------------------|
+| Wrapper                  | 378              | 404               | 24,198             | 48,748              |
+╰--------------------------+------------------+-------------------+--------------------+---------------------╯
+
+Error: some contracts exceed the runtime size limit (EIP-170: 24576 bytes)

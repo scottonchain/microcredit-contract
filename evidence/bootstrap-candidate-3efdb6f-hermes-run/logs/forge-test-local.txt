@@ -1,0 +1,548 @@
+No files changed, compilation skipped
+
+Ran 10 tests for test/AdvanceFacts.t.sol:AdvanceFactsTest
+[PASS] testAdvanceNearACentStaysOpenUntilItsPrincipalIsRepaid() (gas: 1025107)
+[PASS] testBorrowAndDisburseMetaCanPayAThirdPartyDirectly() (gas: 611174)
+[PASS] testDailyCyclesOfSubCentInterestRepaidAtPrincipalEarnNoDues() (gas: 6966947)
+[PASS] testInterestAppearsInFullAtTheEndOfTheFirstDay() (gas: 611942)
+[PASS] testOneUsdcDefaultUnsecuredBurnsCreditStakeRecoversCash() (gas: 2283727)
+[PASS] testPoolLogsDoNotRecordWhoRepaid() (gas: 851267)
+[PASS] testRepaymentInsideTheFirstDayPaysNothingAndEarnsNothing() (gas: 884489)
+[PASS] testShortSmallAdvanceIsClosedByRepayingItsPrincipalOnly() (gas: 1689678)
+[PASS] testSubCentLoansRepaidWithOneUnitStayOpenAndUseTheLimit() (gas: 6553074)
+[PASS] testThirtyDayOneUsdcAdvanceIsClosedByItsPrincipal() (gas: 870391)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 16.01ms (11.78ms CPU time)
+
+Ran 3 tests for test/fork/BaseSepoliaUsdc.t.sol:BaseSepoliaUsdcForkTest
+[SKIP: set BASE_SEPOLIA_RPC_URL to run fork tests] testBlacklistedQueueRecipientDoesNotBlockRepayments() (gas: 0)
+[SKIP: set BASE_SEPOLIA_RPC_URL to run fork tests] testPermitDepositBorrowAndPermitRepay() (gas: 0)
+[SKIP: set BASE_SEPOLIA_RPC_URL to run fork tests] testUsdcPermitDomainIsUsdcVersion2() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 3 skipped; finished in 1.21ms (126.01µs CPU time)
+
+Ran 1 test for test/invariant/BootstrapOrderRouter.invariant.t.sol:BootstrapOrderRouterInvariantTest
+[PASS]
+BootstrapOrderRouterInvariantTest invariants:
+[PASS] invariant_O1_routerHoldsExactlyFreeRootsPlusEscrowPlusStrays
+[PASS] invariant_O2_escrowHeldIsTheOpenOrdersPrices
+[PASS] invariant_O3_eachRootConserves
+[PASS] invariant_O4_lockedFollowsTheOpenPaths
+[PASS] invariant_O5_sharedEdgeExposureIsTheSumAcrossWorkers
+[PASS] invariant_O6_poolExposureWithinTheLotsAndLendersLoseNothing
+[PASS] invariant_O7_everyCreatedUnitHasAKnownHolder
+ BootstrapOrderRouterInvariantTest invariants (runs: 64, calls: 5120, reverts: 0)
+
+╭--------------------+---------------+-------+---------+----------╮
+| Contract           | Selector      | Calls | Reverts | Discards |
++=================================================================+
+| OrderRouterHandler | defaultOne    | 425   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | fund          | 390   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | originate     | 446   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | reapprove     | 442   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | refund        | 442   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | repay         | 406   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | rootDeposit   | 412   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | rootWithdraw  | 410   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | rotateOfficer | 432   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | settle        | 409   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | syncOne       | 474   | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | warp          | 432   | 0       | 0        |
+╰--------------------+---------------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 15.03s (15.02s CPU time)
+
+Ran 36 tests for test/BootstrapOrderRouter.t.sol:BootstrapOrderRouterTest
+[PASS] testASecondOrderWaitsForTheFirstLotAndNeverAttachesTheFirstLoan() (gas: 5098602)
+[PASS] testAThirdPartyCuresTheLoanBeforeSettlementAndNothingIsReleasedTwice() (gas: 3682678)
+[PASS] testAValidApprovalNeverCreatesCapacity() (gas: 915594)
+[PASS] testAWorkerAcceptanceOfAnotherJobIsRejected() (gas: 1462336)
+[PASS] testAnApprovalBelowTheAmountCannotOriginate() (gas: 786971)
+[PASS] testAnApprovalForOneOrderCannotBeUsedForAnother() (gas: 1019070)
+[PASS] testAnOutageStopsNewAdmissionsOnlyAndLeavesEveryExitWorking() (gas: 4313136)
+[PASS] testComposedFlowFundedOrderTwoHopStakeVendorPaymentDebtFirstSettlementAndFullExit() (gas: 3763849)
+[PASS] testDefaultAfterPartialRepaymentChargesOnlyTheUnpaidPrincipal() (gas: 3673060)
+[PASS] testDefaultedLoanCannotBeSettled() (gas: 3412350)
+[PASS] testEscrowIsNeverCountedAsBacking() (gas: 1047030)
+[PASS] testExpiredOrderRefundsOnlyTheOriginalPayer() (gas: 740860)
+[PASS] testFuzzEverySettledUnitIsConserved(uint256,uint256) (runs: 256, μ: 3889396, ~: 3889671)
+[PASS] testGrantedCreditDoesNotLetAWorkerSkipTheOfficer() (gas: 740179)
+[PASS] testLateInterestAboveTheCapNeverReleasesWorkerMoney() (gas: 2673423)
+[PASS] testNoApprovalNoOrigination() (gas: 2770797)
+[PASS] testNoBorrowerCanBeOriginatedOutsideTheRouterWhateverSupportsIt() (gas: 896164)
+[PASS] testNoLoanCanExistBeforeTheOrderSoNoneCanBeBoundToIt() (gas: 209149)
+[PASS] testOnlyTheAdminOrTheOfficerCanChangeTheOfficer() (gas: 117096)
+[PASS] testPartialRepaymentByAnyoneReducesWhatSettleRepays() (gas: 3638419)
+[PASS] testRefundThenBroadcastTheSignedAdvanceFails() (gas: 1003787)
+[PASS] testRejectionThenDefaultChargesTheRootsExactlyAndLeavesLendersWhole() (gas: 3534970)
+[PASS] testRelayerWhitelistMustNameTheRouter() (gas: 4013923)
+[PASS] testReplayAndDuplicateExecutionAreRejected() (gas: 3110864)
+[PASS] testRevokingTheGraphDefeatsAValidApprovalWithoutTouchingIt() (gas: 983112)
+[PASS] testRootsCannotWithdrawEscrowAndRefundsCannotTouchRootFunds() (gas: 1094182)
+[PASS] testRotatingOrRevokingTheOfficerVoidsUnusedApprovalsAndMovesNoMoney() (gas: 3713906)
+[PASS] testRotationWithTheSamePolicyStillVoidsOldApprovals() (gas: 2974053)
+[PASS] testRouterRefusesAPoolThatDoesNotNameItAsOriginator() (gas: 12850)
+[PASS] testRouterStartsWithoutAnOfficerAndFailsClosed() (gas: 746584)
+[PASS] testSevenDaySettlementPaysInterestAndLeavesTheProtectedReserve() (gas: 3471438)
+[PASS] testSignaturesDoNotReplayOnAnotherRouterOrChain() (gas: 1581837)
+[PASS] testTheRouterHasNoUnboundOriginationEntry() (gas: 417066)
+[PASS] testTheSameRootToMidBudgetBindsTwoWorkersOrders() (gas: 5365140)
+[PASS] testUnauthorizedSettlementCannotReleaseFunds() (gas: 2624825)
+[PASS] testWrongVendorAmountTermAprNonceDeadlineWorkerAreEachRejected() (gas: 5035411)
+Suite result: ok. 36 passed; 0 failed; 0 skipped; finished in 919.56ms (915.25ms CPU time)
+
+Ran 1 test for test/fork/BootstrapOrderRouterFork.t.sol:BootstrapOrderRouterForkTest
+[SKIP: skipped: set BASE_SEPOLIA_RPC_URL to run fork tests] setUp() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 1 skipped; finished in 1.97ms (0.00ns CPU time)
+
+Ran 9 tests for test/BootstrapReadiness.t.sol:BootstrapReadinessTest
+[PASS] testCancelledReservationReturnsCapacityWithoutPayingVendor() (gas: 927528)
+[PASS] testOneRootCannotDoubleAllocateItsStakeOrExitWhileLoansRemain() (gas: 1995600)
+[PASS] testPartialSubCentPrincipalCannotEscapeTheLoanOrBacking() (gas: 1398883)
+[PASS] testReceivedBackingIsNotAnImplementedTransitiveRoute() (gas: 282346)
+[PASS] testRejectedOrderUsesSponsorStakeWithoutCustomerOrOperatorCure() (gas: 1097493)
+[PASS] testSecondSettlementCannotPullCustomerFundsAgain() (gas: 1308392)
+[PASS] testSevenDayCustomerPaymentFundsInterestAndLeavesProtectedReserve() (gas: 1373808)
+[PASS] testSignedVendorCannotBeSubstitutedAndOriginationCannotReplay() (gas: 772589)
+[PASS] testZeroGrantZeroEthBorrowerPaysVendorAndCompletesFirstDayCycle() (gas: 1292081)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 8.23ms (5.93ms CPU time)
+
+Ran 8 tests for test/ColdStartFacts.t.sol:ColdStartFactsTest
+[PASS] testAfterTheBackingIsWithdrawnTheBorrowerKeepsOnlyItsDues() (gas: 1595210)
+[PASS] testAnIssuedLineIsCreditAtOnce() (gas: 709443)
+[PASS] testBackingReceivedCannotBePassedOn() (gas: 752962)
+[PASS] testOneThirtyDayCycleIsNotEnoughToBackAnyone() (gas: 1658896)
+[PASS] testRepaymentEarnsTheBorrowerItsDuesAndTheStakerNothing() (gas: 1513125)
+[PASS] testStakeBacksAFreshBorrowerAsSecuredBacking() (gas: 607522)
+[PASS] testStakeGivesTheStakerNoLimitOfItsOwn() (gas: 353899)
+[PASS] testThreeCyclesReachTheSmallestBacking() (gas: 3419256)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 5.50ms (3.93ms CPU time)
+
+Ran 1 test for test/invariant/CreditConservation.invariant.t.sol:CreditConservationInvariantTest
+[PASS]
+CreditConservationInvariantTest invariants:
+[PASS] invariant_I1_capacityBound
+[PASS] invariant_I1b_lostCreditBacksNobody
+[PASS] invariant_I2_lossBound
+[PASS] invariant_I3_sybilIndependence
+[PASS] invariant_I4_sybilsCommitNothingTheyDidNotPay
+[PASS] invariant_I5_solvency
+[PASS] invariant_I6_lenderClaims
+[PASS] invariant_I7_impairment
+[PASS] invariant_I8_honestLendersPayOnlyForIssuedLines
+[PASS] invariant_I9_noPrincipalForgiven
+[PASS] invariant_Q_perAccountCreditBudget
+[PASS] invariant_creditLedgers
+[PASS] invariant_handlerHealth
+[PASS] invariant_poolLedgers
+ CreditConservationInvariantTest invariants (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 246   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 252   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 225   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 236   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 235   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 279   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 220   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 239   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 240   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 242   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 235   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 260   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 272   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 275   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 238   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 238   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 236   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 238   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 240   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 223   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 251   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 57.64s (57.63s CPU time)
+
+Ran 13 tests for test/DecentralizedMicrocredit.t.sol:DecentralizedMicrocreditTest
+[PASS] testDepositFunds() (gas: 121557)
+[PASS] testInterestRateIsPlatformRate() (gas: 493386)
+[PASS] testLenderCannotWithdrawMoreThanAvailablePoolFunds() (gas: 986367)
+[PASS] testLenderPartialWithdrawals() (gas: 426053)
+[PASS] testLenderWithdrawsSuccessfully() (gas: 340581)
+[PASS] testMaxLoanAmountEnforced() (gas: 543963)
+[PASS] testRepayLoan() (gas: 789286)
+[PASS] testRepayReducesTotalLentOut() (gas: 958301)
+[PASS] testRequestLoan() (gas: 493629)
+[PASS] testReservedLiquidityEnforced() (gas: 812746)
+[PASS] testSetEffrRateUpdatesRate() (gas: 82381)
+[PASS] testUtilizationCapEnforced() (gas: 949859)
+[PASS] testUtilizationCapLeavesUnreservedFundsWithdrawable() (gas: 715748)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 4.93ms (3.28ms CPU time)
+
+Ran 3 tests for test/DeployProduction.t.sol:DeployProductionTest
+[PASS] test_HandoverNeedsTheTimelockAndLocksOutTheDeployer() (gas: 9189887)
+[PASS] test_RejectsUnsafeConfig() (gas: 391716)
+[PASS] test_RunFromEnvironment() (gas: 19287729)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 11.47ms (9.30ms CPU time)
+
+Ran 2 tests for test/DeployTestnet.t.sol:DeployTestnetTest
+[PASS] testDeploysWiredForPersonaTesting() (gas: 17523498)
+[PASS] testRefusesMainnets() (gas: 9647916)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.93ms (1.48ms CPU time)
+
+Ran 2 tests for test/fork/HermesA7.t.sol:HermesA7ForkTest
+[SKIP: set LIVE_RPC_URL, LIVE_POOL, LIVE_LENA] testA7LargeLenderSeedFarmOnLivePool() (gas: 0)
+[SKIP: set LIVE_RPC_URL, LIVE_POOL, LIVE_LENA] testA7LenderDominatesPool() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 2 skipped; finished in 239.31µs (38.02µs CPU time)
+
+Ran 2 tests for test/fork/HermesCI21.t.sol:HermesCI21ForkTest
+[SKIP: set LIVE_RPC_URL, LIVE_POOL, LIVE_LENA] testCI21ReserveExhaustedDominantLender() (gas: 0)
+[SKIP: set LIVE_RPC_URL, LIVE_POOL, LIVE_LENA] testCI21ReserveExhaustedHalfPool() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 2 skipped; finished in 257.72µs (27.56µs CPU time)
+
+Ran 1 test for test/fork/HermesGasCalls.t.sol:HermesGasCallsForkTest
+[SKIP: set LIVE_RPC_URL and LIVE_POOL] testGasPerCall() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 1 skipped; finished in 135.11µs (14.60µs CPU time)
+
+Ran 9 tests for test/HermesPR16.t.sol:HermesPR16Test
+[PASS] testBackerRepayingOneLoanFreesNoMoreThanItPaid() (gas: 4939082)
+[PASS] testBoughtHistoryGroupExcessVsPassiveLender() (gas: 5910648)
+[PASS] testFrontRunRepayRevertsBorrowerAndPullsNothing() (gas: 1069841)
+[PASS] testNoOneCanRepayADefaultedLoan() (gas: 810223)
+[PASS] testOneWeiRepaymentsDoNotChangeImpairmentOrDefaultLoss() (gas: 5714801)
+[PASS] testPermitAndMetaRevertCleanlyWhenAStrangerClosedTheLoan() (gas: 997811)
+[PASS] testPermitPathsAfterAStrangersPartialRepayment() (gas: 1075234)
+[PASS] testRepayLoanMetaAfterAStrangersPartialRepayment() (gas: 1103776)
+[PASS] testStrangerCanTriggerSubCentForgivenessOnly() (gas: 1462128)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 12.54ms (10.45ms CPU time)
+
+Ran 2 tests for test/fork/HermesPermitWindow.t.sol:HermesPermitWindowForkTest
+[SKIP: set LIVE_RPC_URL and LIVE_POOL] testPermitExpiresInsideGraceWindowRepayReverts() (gas: 0)
+[SKIP: set LIVE_RPC_URL and LIVE_POOL] testPermitOutlivesGraceWindowRelayerRepays() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 2 skipped; finished in 166.79µs (26.98µs CPU time)
+
+Ran 2 tests for test/fork/LiveDeployment.t.sol:LiveDeploymentForkTest
+[SKIP: set LIVE_RPC_URL and the LIVE_* addresses to run] testStakedRingDefaultIsPaidByTheStake() (gas: 0)
+[SKIP: set LIVE_RPC_URL and the LIVE_* addresses to run] testUnsecuredDefaultBurnsTheBackersCredit() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 2 skipped; finished in 161.45µs (24.85µs CPU time)
+
+Ran 28 tests for test/LoanAccounting.t.sol:LoanAccountingTest
+[PASS] testAdminChangesEmitEvents() (gas: 168361)
+[PASS] testAdminSettersAreOwnerOnly() (gas: 549215)
+[PASS] testAnyoneCanRepayForTheBorrower() (gas: 1040266)
+[PASS] testDisplayNames() (gas: 101484)
+[PASS] testFundingPoolApyScalesWithUtilisation() (gas: 692569)
+[PASS] testGuardianPausesNewLendingOnly() (gas: 1455874)
+[PASS] testKycVerificationIsOracleOnly() (gas: 133082)
+[PASS] testLimitSettersValidateBounds() (gas: 197659)
+[PASS] testLoanCannotBeDisbursedTwice() (gas: 1067546)
+[PASS] testNoInterestDuringGracePeriod() (gas: 587340)
+[PASS] testOutstandingRoundedUpToTheCent() (gas: 611885)
+[PASS] testOwnershipTransferNeedsAcceptance() (gas: 197799)
+[PASS] testPartialRepaymentReducesOutstanding() (gas: 824501)
+[PASS] testPartialRepaymentsThenPayoffCloseLoan() (gas: 1107949)
+[PASS] testPoolInfoExcludesReservedFunds() (gas: 490975)
+[PASS] testPreviewLoanTermsUnderOneWeekIsOnePayment() (gas: 27213)
+[PASS] testPreviewLoanTermsUsesPlatformRate() (gas: 27869)
+[PASS] testRepayLoanInFullClosesLoan() (gas: 856151)
+[PASS] testRepayLoanNeverPullsMoreThanOwed() (gas: 841324)
+[PASS] testRepayWithPermitCentRoundedPayoffClosesLoan() (gas: 922029)
+[PASS] testRepayWithPermitPartialReducesOutstanding() (gas: 818793)
+[PASS] testRepayWithPermitRepaysAllWithinGracePeriod() (gas: 806002)
+[PASS] testRepayWithPermitStalePermitClosesWhenShortfallIsInterest() (gas: 901257)
+[PASS] testRequestLoanEnforcesLiquidityBuffer() (gas: 587175)
+[PASS] testRequestLoanRequiresCredit() (gas: 62775)
+[PASS] testScoreOverrideTakesPrecedenceOverProvider() (gas: 412924)
+[PASS] testSimpleInterestAccruesFromOrigination() (gas: 610881)
+[PASS] testUndisbursedLoanCannotBeRepaid() (gas: 579781)
+Suite result: ok. 28 passed; 0 failed; 0 skipped; finished in 9.04ms (7.28ms CPU time)
+
+Ran 27 tests for test/LoanLifecycle.t.sol:LoanLifecycleTest
+[PASS] testAnyoneCanCancelAStaleReservation() (gas: 560230)
+[PASS] testAnyoneCanFundTheReserveAndItAbsorbsLossesFirst() (gas: 1266394)
+[PASS] testBackerCanCureAnOverdueLoanBeforeItDefaults() (gas: 1141990)
+[PASS] testBackerSlotsCannotBeFilledForFree() (gas: 4613912)
+[PASS] testBackersPerBorrowerAreBounded() (gas: 12516266)
+[PASS] testBorrowAndDisburseRejectsTermsOutOfRange() (gas: 176783)
+[PASS] testBorrowAndDisburseUsesSignedTerm() (gas: 586342)
+[PASS] testBorrowerCanCancelUndisbursedLoan() (gas: 584978)
+[PASS] testChargesArePaidProRata() (gas: 1212672)
+[PASS] testClosedLoansCannotDefaultOrBeRepaid() (gas: 1509795)
+[PASS] testDefaultKeepsBackingForTheBorrowersOtherOpenLoans() (gas: 1332972)
+[PASS] testDefaultSlashesSecuredBackingIntoThePool() (gas: 906164)
+[PASS] testDefaulterGetsNoNewMoneyOrBacking() (gas: 1433864)
+[PASS] testDisbursedLoanCannotBeCancelled() (gas: 612056)
+[PASS] testForgivenSubCentCannotBrickThePool() (gas: 1469625)
+[PASS] testInterestAccruesFromDisbursementNotRequest() (gas: 621521)
+[PASS] testLoanCannotDefaultBeforeLatePeriodEnds() (gas: 780901)
+[PASS] testOnlyCapitalBeyondDuesIsReleased() (gas: 1243624)
+[PASS] testPartialRepaymentReducesTheCharge() (gas: 972244)
+[PASS] testPrincipalShortfallKeepsTheLoanOpen() (gas: 1035885)
+[PASS] testRequestLoanUsesDefaultTerm() (gas: 606130)
+[PASS] testReserveAbsorbsProvisionsBeforeTheSharePrice() (gas: 1410407)
+[PASS] testReservePaysUncoveredLossBeforeLenders() (gas: 2011586)
+[PASS] testReserveSettersAreBoundedAndOwnerOnly() (gas: 178676)
+[PASS] testReserveTakesItsShareOfInterest() (gas: 1094484)
+[PASS] testStakeIsChargedBeforeCredit() (gas: 1067714)
+[PASS] testUnsecuredBackingBurnsTheBackersCredit() (gas: 1099545)
+Suite result: ok. 27 passed; 0 failed; 0 skipped; finished in 37.62ms (35.42ms CPU time)
+
+Ran 35 tests for test/MetaTransactionFlows.t.sol:MetaTransactionFlowsTest
+[PASS] testBackMetaMovesCreditFromTheBacker() (gas: 476226)
+[PASS] testBackMetaRejectsSelfBackingAndMoreThanTheBackerHas() (gas: 352063)
+[PASS] testBackMetaUpdatesTheAmount() (gas: 495846)
+[PASS] testBorrowAndDisburseCountsExistingLoans() (gas: 664298)
+[PASS] testBorrowAndDisburseCreatesAndDisbursesLoan() (gas: 632857)
+[PASS] testBorrowAndDisburseEnforcesLiquidityBuffer() (gas: 235121)
+[PASS] testBorrowAndDisburseEnforcesScoreLimit() (gas: 109190)
+[PASS] testBorrowAndDisburseLoansAreEnumerated() (gas: 625522)
+[PASS] testBorrowAndDisburseRevertsWhenAprAboveTolerance() (gas: 88068)
+[PASS] testDepositPermitOnlyMetaCountsLenderOnce() (gas: 508956)
+[PASS] testDepositPermitOnlySurvivesFrontRunPermit() (gas: 359346)
+[PASS] testDepositWithPermitMeta() (gas: 410066)
+[PASS] testDepositWithPermitMetaCreditsSignedReceiver() (gas: 389572)
+[PASS] testDepositWithPermitMetaRejectsShortPermit() (gas: 201512)
+[PASS] testDirectDepositFillsWithdrawalQueue() (gas: 1598524)
+[PASS] testDirectWithdrawalCannotJumpTheQueue() (gas: 1771244)
+[PASS] testInvalidPermitWithoutAllowanceStillReverts() (gas: 146605)
+[PASS] testLifecycleEvents() (gas: 1070905)
+[PASS] testLiquidityOwedToQueueIsNotLent() (gas: 4167574)
+[PASS] testLiquidityOwedToQueueIsNotWithdrawn() (gas: 6347631)
+[PASS] testPartialFillThenDirectWithdrawalKeepsQueueOrder() (gas: 1660901)
+[PASS] testQueueFillIsBoundedPerCall() (gas: 3885090)
+[PASS] testQueuedFundsCannotBeQueuedOrWithdrawnTwice() (gas: 1405981)
+[PASS] testRefusedQueuePayoutIsHeldAndDoesNotBlockRepayments() (gas: 3174007)
+[PASS] testRepayLoanMetaAfterPartialRepaymentPullsRemainder() (gas: 1014779)
+[PASS] testRepayLoanMetaPullsASubCentBalance() (gas: 856924)
+[PASS] testRepayLoanMetaRepayAllPullsCurrentOutstanding() (gas: 921949)
+[PASS] testRepayLoanMetaSurvivesFrontRunPermit() (gas: 893369)
+[PASS] testRepayLoanMetaToleratesOneCentDrift() (gas: 981743)
+[PASS] testRepayWithPermitSurvivesFrontRunPermit() (gas: 862251)
+[PASS] testRepaymentFillsWithdrawalQueue() (gas: 1575214)
+[PASS] testStrayTransferIsNotPoolLiquidity() (gas: 1372504)
+[PASS] testWithdrawalFillsImmediatelyWhenLiquid() (gas: 603679)
+[PASS] testWithdrawalQueuesUntilDepositsRestoreLiquidity() (gas: 1946230)
+[PASS] testWithdrawalRequestRejectsMoreThanDeposited() (gas: 361502)
+Suite result: ok. 35 passed; 0 failed; 0 skipped; finished in 39.83ms (37.71ms CPU time)
+
+Ran 9 tests for test/MetaTransactions.t.sol:MetaTransactionsTest
+[PASS] testCannotRedirectDisbursement() (gas: 561686)
+[PASS] testExpiredDeadline() (gas: 44428)
+[PASS] testGaslessBorrowing() (gas: 675389)
+[PASS] testGaslessRepaymentWithPermit() (gas: 929497)
+[PASS] testInvalidNonce() (gas: 66757)
+[PASS] testInvalidSignature() (gas: 73805)
+[PASS] testNonceIncrementingPreventsReplay() (gas: 536356)
+[PASS] testRelayerWhitelist() (gas: 626221)
+[PASS] testScoreGatingAppliesToMetaRequests() (gas: 94345)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 4.49ms (3.19ms CPU time)
+
+Ran 18 tests for test/OracleScoreProvider.t.sol:OracleScoreProviderTest
+[PASS] testAdminIsOwnerOnly() (gas: 113240)
+[PASS] testBudgetStaysHeldWhileALineMayBeInUse() (gas: 1158136)
+[PASS] testEpochsMustIncrease() (gas: 342040)
+[PASS] testForwarderDeliversReportsFromThePinnedWorkflow() (gas: 363460)
+[PASS] testLoweringTheBudgetStillAcceptsReductions() (gas: 890239)
+[PASS] testMaxScoreAgeIsBounded() (gas: 106737)
+[PASS] testNoScoresBeforeTheFirstReport() (gas: 22157)
+[PASS] testOnReportRejectsOtherSendersAndWorkflows() (gas: 270748)
+[PASS] testOneReportCanRaiseScoresOnlySoFar() (gas: 881804)
+[PASS] testOnlyTheReporterPublishes() (gas: 97163)
+[PASS] testOwnershipTransferNeedsAcceptance() (gas: 114060)
+[PASS] testReleaseNeedsTheLendingPool() (gas: 212113)
+[PASS] testReporterPublishesScores() (gas: 460129)
+[PASS] testReportsAreValidated() (gas: 564780)
+[PASS] testReportsCannotIssueBeyondTheBudget() (gas: 736460)
+[PASS] testScoresGoStaleUntilTheNextHeartbeat() (gas: 351638)
+[PASS] testSupportsInterfaces() (gas: 27611)
+[PASS] testUnpinnedForwarderAcceptsAnyWorkflow() (gas: 320974)
+Suite result: ok. 18 passed; 0 failed; 0 skipped; finished in 5.70ms (4.55ms CPU time)
+
+Ran 8 tests for test/OriginatorGate.t.sol:OriginatorGateTest
+[PASS] testAnOpenPoolIsUnchanged() (gas: 984983)
+[PASS] testDefaultOfAnOriginatedLoanChargesTheSponsorStakeByTheUnpaidPrincipal() (gas: 1456441)
+[PASS] testDirectRepaymentFreesCapacityOnlyForTheOriginator() (gas: 2072567)
+[PASS] testNothingSupportingABorrowerOpensAnotherDoor() (gas: 2109602)
+[PASS] testSignatureMadeEarlierCanOnlyBeExecutedByTheOriginator() (gas: 1202644)
+[PASS] testTheOriginatorIsFixedAtConstructionAndThereIsNoWayToChangeIt() (gas: 136374)
+[PASS] testTheOriginatorOriginatesAndPaysTheVendor() (gas: 1103624)
+[PASS] testTheOriginatorStillNeedsCredit() (gas: 118747)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 9.37ms (7.19ms CPU time)
+
+Ran 6 tests for test/RelayerRetry.t.sol:RelayerRetryTest
+[PASS] testCalldataCarriesSignedRequest() (gas: 1096051)
+[PASS] testFreshSignatureAfterLandedRepayRevertsAndPullsNothing() (gas: 999351)
+[PASS] testReceiptDoesNotBindSignedIntent() (gas: 887151)
+[PASS] testReplaySameSignedRequestPullsOnce() (gas: 946634)
+[PASS] testUnknownOutcomeRecoveryReadsNonce() (gas: 920232)
+[PASS] testWrappedBatchHidesRequestFromTopLevelSelector() (gas: 1114541)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 24.54ms (23.17ms CPU time)
+
+Ran 5 tests for test/RelayerRetryBatch.t.sol:RelayerRetryBatchTest
+[PASS] testEnvelopeOrderDoesNotChangeTheConsumedNonceRange() (gas: 920780)
+[PASS] testEnvelopeSucceedsWhileWrappedIntentDidNotLand() (gas: 729121)
+[PASS] testNonceRangeNamesWhichWrappedIntentLanded() (gas: 930035)
+[PASS] testTwoSignersEachRangeNamesItsOwnLandedIntent() (gas: 1788097)
+[PASS] testTwoSignersOnlyTheLandedSignersNonceMoves() (gas: 1603105)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 6.49ms (5.05ms CPU time)
+
+Ran 19 tests for test/ShareAccounting.t.sol:ShareAccountingTest
+[PASS] testClosedLoansReadZeroOutstanding() (gas: 1225767)
+[PASS] testFundingPoolApyIsNetOfFee() (gas: 1034254)
+[PASS] testImpairmentIsReleasedAsTheBorrowerRepays() (gas: 1605914)
+[PASS] testImpairmentStopsAnExitAheadOfAKnownLoss() (gas: 1577809)
+[PASS] testInterestIsSharedProRata() (gas: 1493993)
+[PASS] testLastLenderCanWithdrawEverything() (gas: 1312615)
+[PASS] testLateDepositorDoesNotCaptureEarlierInterest() (gas: 1517188)
+[PASS] testLenderPrincipalTracksCostBasis() (gas: 1417066)
+[PASS] testLensShowsUtilisationAndRealisedReturn() (gas: 1933030)
+[PASS] testMaxWithdrawableIsWhatWithdrawFundsPays() (gas: 1514866)
+[PASS] testPartialRepaymentPaysInterestFirst() (gas: 1408798)
+[PASS] testProtocolFeeAdminIsOwnerOnlyAndBounded() (gas: 1393433)
+[PASS] testProtocolFeeTakesShareOfInterestOnly() (gas: 1428826)
+[PASS] testProtocolFeesAreNotLentOrWithdrawn() (gas: 1418863)
+[PASS] testQueuedSharesKeepEarningUntilPaid() (gas: 1668533)
+[PASS] testRepaidInterestAccruesToLender() (gas: 1228752)
+[PASS] testSecuredBackingIsNotProvisioned() (gas: 1720367)
+[PASS] testStrayTransferDoesNotMoveSharePrice() (gas: 747153)
+[PASS] testWithdrawalsMayDrawOnTheBufferButLoansMayNot() (gas: 1151339)
+Suite result: ok. 19 passed; 0 failed; 0 skipped; finished in 9.99ms (8.45ms CPU time)
+
+Ran 18 tests for test/SybilResistance.t.sol:SybilResistanceTest
+[PASS] testAttackerWhoIsAlsoALenderCannotFarmDues() (gas: 2529082)
+[PASS] testBackingCannotBeCutBelowWhatTheBorrowerOwes() (gas: 1073489)
+[PASS] testBackingMovesCreditItDoesNotCopyIt() (gas: 760639)
+[PASS] testCommittedStakeCannotBeWithdrawn() (gas: 673703)
+[PASS] testCompromisedOracleCannotRotateItsBudget() (gas: 1487965)
+[PASS] testDefaulterLosesTheCreditItGaveOthers() (gas: 1016372)
+[PASS] testDuesCanBackOthers() (gas: 1672179)
+[PASS] testDuesPaidByAThirdPartyAreLockedInTheReserve() (gas: 2181709)
+[PASS] testHistoryEarnsOnlyTheDuesItPaid() (gas: 2299574)
+[PASS] testLostCreditStopsBackingOthers() (gas: 671864)
+[PASS] testOwnLoansReduceWhatYouCanBack() (gas: 846333)
+[PASS] testReceivedBackingCannotBePassedOn() (gas: 524731)
+[PASS] testRecycledSeedBuildsHistoryThatEarnsNoCredit() (gas: 12980295)
+[PASS] testRingCannotMultiplyOneMembersCredit() (gas: 1601578)
+[PASS] testRingOfFreshAccountsCannotBackOrBorrow() (gas: 2075294)
+[PASS] testStakeIsNotPoolLiquidity() (gas: 240807)
+[PASS] testStakedRingBorrowsNoMoreThanItsStakeAndLendersLoseNothing() (gas: 3472741)
+[PASS] testUnstakeRejectsMoreThanStaked() (gas: 219874)
+Suite result: ok. 18 passed; 0 failed; 0 skipped; finished in 17.84ms (15.99ms CPU time)
+
+Ran 1 test for test/invariant/TransitiveStakeRouter.invariant.t.sol:TransitiveStakeRouterInvariantTest
+[PASS]
+TransitiveStakeRouterInvariantTest invariants:
+[PASS] invariant_R1_routerHoldsExactlyTheFreeBalancesAndStrayFunds
+[PASS] invariant_R2_eachRootConserves
+[PASS] invariant_R3_lockedAndEdgeExposureFollowTheOpenPaths
+[PASS] invariant_R4_openLotsAreSecuredByTheVaultAndClosedOnesLeaveNothing
+[PASS] invariant_R5_lendersLosePrincipalOnlyToThePoolsRounding
+[PASS] invariant_R6_handlerChecksHold
+[PASS] invariant_R7_managedPoolExposureEqualsRouterRecordedActivePrincipal
+ TransitiveStakeRouterInvariantTest invariants (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+------------------+-------+---------+----------╮
+| Contract      | Selector         | Calls | Reverts | Discards |
++===============================================================+
+| RouterHandler | attemptDirect    | 444   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | defaultOne       | 478   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | deposit          | 467   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | originate        | 441   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | repay            | 509   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | revoke           | 468   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | syncOne          | 467   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyBack   | 438   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyUnback | 458   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | warp             | 505   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | withdraw         | 445   | 0       | 0        |
+╰---------------+------------------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 18.11s (18.10s CPU time)
+
+Ran 38 tests for test/TransitiveStakeRouter.t.sol:TransitiveStakeRouterTest
+[PASS] testAHigherLimitConsentOfTheSameVersionStaysUsableUntilTheRootRevokes() (gas: 1970962)
+[PASS] testALotBelowTheMinimumBackingIsRefusedByThePool() (gas: 1127763)
+[PASS] testASignedPoolRequestCannotBeReplayed() (gas: 2553982)
+[PASS] testAThirdPartyBackerShareTheSlashSoTheRootsLoseLess() (gas: 2609405)
+[PASS] testAnOwnerGrantedLineOrOrdinaryBackingDoesNotOpenAnotherDoor() (gas: 650892)
+[PASS] testCertifiedLoanRepaidDirectlyAtPoolCannotBeReopenedOnAnyOtherPath() (gas: 2579208)
+[PASS] testConsentDoesNotReplayOnAnotherRouterOrChain() (gas: 6046856)
+[PASS] testConsentExpiryVersionSignerLimitAndTermAreEnforced() (gas: 888330)
+[PASS] testConsentLimitBoundaryIsExact() (gas: 1938132)
+[PASS] testDefaultNeverTouchesLendersPrincipalWhenTheLotCoversTheLoan() (gas: 2177142)
+[PASS] testDefaultedBorrowerCannotBorrowAgainThroughTheRouter() (gas: 2735749)
+[PASS] testDepositRefusesAFeeOnTransferShortfallAndZero() (gas: 63003)
+[PASS] testDirectRepaymentBeforeSyncDoesNotFreeRootCapacityForAnotherBorrower() (gas: 3989063)
+[PASS] testDonationToTheVaultCannotHideALossNorBreakTheLedger() (gas: 2225234)
+[PASS] testExactScopeNamesOneBorrowerAndWildcardNamesAny() (gas: 3451289)
+[PASS] testFuzzAttributionSumsToTheLossAndNeverExceedsAPath(uint96,uint96,uint96,uint96,uint8,uint256) (runs: 256, μ: 5693573, ~: 5692374)
+[PASS] testMidEdgeMustStartAtTheMidAndEndAtTheBorrower() (gas: 498982)
+[PASS] testNonRouterCannotDriveTheVault() (gas: 1920811)
+[PASS] testOneRootTwoBorrowersCannotOverdrawItsFreeBalance() (gas: 3505301)
+[PASS] testOnlyOneOpenLotPerBorrower() (gas: 1985530)
+[PASS] testPartialRepaymentThenDefaultChargesTheUnpaidPrincipalToTheRootsProRata() (gas: 2924657)
+[PASS] testPathCountAndAmountsAreChecked() (gas: 938183)
+[PASS] testRelayerWhitelistMustNameTheRouter() (gas: 3084019)
+[PASS] testRepeatedRootEdgeInOneCertificateCountsTwiceAgainstTheLimit() (gas: 575256)
+[PASS] testRevokedConsentCannotBeUsedAndLiveExposureIsUnaffected() (gas: 3487405)
+[PASS] testRevokingTheRootEdgeInvalidatesEveryBorrowersConsentButAMidRevocationIsLocal() (gas: 3658784)
+[PASS] testRootCannotBeItsOwnMidNorTheBorrowerNorTheRouter() (gas: 771450)
+[PASS] testRootCannotWithdrawALockedLotUntilItIsSynced() (gas: 2547960)
+[PASS] testRootToMidCapIsSharedAcrossBorrowers() (gas: 4010059)
+[PASS] testRouterRefusesAPoolThatNamesSomeoneElseAsOriginator() (gas: 12264828)
+[PASS] testSecondCycleOnTheSameConsentsWithinTheLimit() (gas: 2933353)
+[PASS] testSharedMidEdgeLimitBindsAcrossRoots() (gas: 2545625)
+[PASS] testSmartWalletRootSignsThroughErc1271() (gas: 2064953)
+[PASS] testStrayUsdcInTheRouterOrVaultDoesNotChangeAccounting() (gas: 2513996)
+[PASS] testSyncDoesNothingWhileTheLoanIsOpen() (gas: 1970943)
+[PASS] testTheOriginatorIsFixedAndThereIsNoManagerSetter() (gas: 98457)
+[PASS] testTwoHopLoanIsBackedByTheRootsStakeAndReleasedOnRepayment() (gas: 2640212)
+[PASS] testTwoRootsAndTwoMidsSplitOneLot() (gas: 2663955)
+Suite result: ok. 38 passed; 0 failed; 0 skipped; finished in 308.51ms (305.47ms CPU time)
+
+Ran 1 test for test/fork/TransitiveStakeRouterFork.t.sol:TransitiveStakeRouterForkTest
+[SKIP: skipped: set BASE_SEPOLIA_RPC_URL to run fork tests] setUp() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 1 skipped; finished in 1.50ms (0.00ns CPU time)
+
+Ran 30 test suites in 92.30s (92.24s CPU time): 304 tests passed, 0 failed, 14 skipped (318 total tests)

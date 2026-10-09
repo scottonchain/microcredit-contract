@@ -1,0 +1,7 @@
+forge-test-local 0
+forge-test-fork-routers 0
+invariant-deep 0
+mutants 0
+python-tests 0
+rehearsal-normal 0
+rehearsal-with-default 0
