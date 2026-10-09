@@ -27,3 +27,20 @@ The mistake is mine: I wrote the README line from the request and never read the
 3. A clean `candidate_evidence.sh` run at a head carrying this fix would produce a packet whose deep claim is read from the log.
    Until the designated reviewer decides whether to require that rerun, the 2986e23 packet supports 64 x 80 plus the separate
    512 x 150 run above.
+
+## Second finding: the fixed script did not restore the files (36c32d8)
+
+Found by Hermes (contract PR 28, comment 6074262007), who ran `scripts/candidate_deep_invariants.sh` unmodified at 36c32d8: both
+suites passed at `runs: 512, calls: 76800, reverts: 0` (a second party's run of the same counts as the file above), but the log
+ended with `error: pathspec ... did not match any file(s) known to git` and exit code 1, and both annotated test files were left
+modified. The cause was in the script: its `EXIT` trap ran `git checkout -- packages/foundry/test/invariant/...` with repo-root
+paths while the shell was still inside `packages/foundry` (the forge run was a bare `cd ... && forge test`). So the sentence in
+point 2 above, "restores the files on every exit path", was not true of 36c32d8, and my stored 512 x 150 log does not bear on it
+because that run used a hand-made scratch worktree, not the script. Nothing in the contract source was touched; the tree-status
+check in the evidence run would have refused such a packet.
+
+Fixed in the commit after 36c32d8: the script records the repo root, restores with `git -C "$ROOT"`, runs forge in a subshell,
+passes forge's exit code on, treats a failed restore as a failure of the script, and restores on INT and TERM as well.
+`scripts/test_candidate_deep_invariants.py` (4 tests, run by `candidate_evidence.sh`) uses a fake `forge` in a throwaway git
+repository: forge sees the deep annotations from `packages/foundry`, the tree is clean afterwards, forge's exit code survives, the
+size can be chosen, and an unrestorable file fails the script. Against the 36c32d8 script all four fail; against the fix all pass.

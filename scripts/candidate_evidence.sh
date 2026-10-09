@@ -30,7 +30,7 @@ run forge-test-fork-routers forge-test-fork-routers.txt bash -c "cd packages/fou
 run invariant-deep invariant-deep.txt scripts/candidate_deep_invariants.sh
 run mutants mutants.txt python3 scripts/candidate_mutants.py
 git status --porcelain --untracked-files=no -- packages scripts docs/*.md CLAUDE.md > "$OUT/logs/tree-status.txt"  # the deep run and the mutants must leave every tracked file as it was (forge may add an untracked foundry.lock)
-run python-tests python-tests.txt bash -c 'cd scripts && python3 -m unittest test_verify_candidate_deployment test_candidate_evidence_gate test_candidate_fork test_candidate_rehearsal test_two_hop_check'
+run python-tests python-tests.txt bash -c 'cd scripts && python3 -m unittest test_verify_candidate_deployment test_candidate_evidence_gate test_candidate_fork test_candidate_deep_invariants test_candidate_rehearsal test_two_hop_check'
 # One Base Sepolia block is pinned for the whole run, so both rehearsals start from identical state. Each fork is started and
 # stopped by scripts/candidate_fork.py, which tracks the child's pid, refuses a port that already answers and fails if the
 # child exits or cannot bind; nothing here uses pkill (Codex review 5463115207: a restart race let the second rehearsal run

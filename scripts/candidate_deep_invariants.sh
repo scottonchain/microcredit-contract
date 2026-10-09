@@ -8,13 +8,23 @@
 # annotations for this run only, prints the patch (so the log records exactly what was run), and restores the files on
 # every exit path. packages/ is unchanged afterwards; the evidence gate checks the observed runs and calls, not the request.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
 RUNS=${DEEP_RUNS:-512}; DEPTH=${DEEP_DEPTH:-150}
 FILES=(packages/foundry/test/invariant/BootstrapOrderRouter.invariant.t.sol packages/foundry/test/invariant/TransitiveStakeRouter.invariant.t.sol)
-restore() { git checkout -q -- "${FILES[@]}"; }
+# The files are restored with git -C "$ROOT": the forge run below happens in packages/foundry, where these repo-root paths do not
+# exist (Hermes found the annotations left patched, on 36c32d8). A restore that fails fails the script.
+restore() {
+  git -C "$ROOT" checkout -q -- "${FILES[@]}" || {
+    echo "candidate_deep_invariants: could not restore the annotations; run: git checkout -- ${FILES[*]}" >&2
+    exit 1
+  }
+}
 trap restore EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 sed -i -E "s#^(/// forge-config: default\.invariant\.runs = ).*#\1${RUNS}#; s#^(/// forge-config: default\.invariant\.depth = ).*#\1${DEPTH}#" "${FILES[@]}"
 echo "== patch applied for this run only (restored on exit) =="
 git diff -- "${FILES[@]}"
 echo "== forge test =="
-cd packages/foundry && forge test --match-path 'test/invariant/*Router*'
+(cd packages/foundry && forge test --match-path 'test/invariant/*Router*')
