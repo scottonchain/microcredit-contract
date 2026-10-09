@@ -97,7 +97,7 @@ python3 scripts/candidate_evidence_gate.py <a copy of the run's output directory
 python3 scripts/candidate_package_run.py --src <the run's output directory> --out <a new directory> ...
 ```
 
-Running the script itself from a head that carries the parser fix gives a passing packet in one step, but then the tested revision is that head, not `@HEAD@` (`packages/` is identical).
+Running the script itself from a head that carries the parser fix is expected to give a passing packet in one step (the repaired gate is tested on this run's real Forge 1.8 log; the whole script has not been rerun end to end with Forge 1.8 at such a head), but then the tested revision is that head, not `@HEAD@` (`packages/` is identical).
 
 To re-judge this packet, run `python3 scripts/candidate_evidence_gate.py` on a copy of this directory (the gate deletes `FAILED.txt` on success and writes it on failure, so never point it at the only copy), and `sha256sum -c SHA256SUMS` from this directory."""
 
