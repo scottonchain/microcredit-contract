@@ -9,13 +9,13 @@ def fixture(*parts):
         return f.read()
 
 
-# Real logs of the two router invariant suites. Forge 1.8.4 (Hermes, PR 28 supplement for 2986e23) ran them at the suites' own
-# 64 x 80 and prints each campaign as one test with the counts on a suite line; Forge 1.5.1 (the 512 x 150 run stored under
-# evidence/) prints one line per invariant. FORGE18_DEEP is the 1.8.4 log with only its counts rewritten to 512 x 150, because
-# no 1.8 log of a 512 x 150 run was in hand when the parser was written; the clean-rerun log replaces it as a fixture.
+# Real logs of the two router invariant suites. Forge 1.8.4 (Hermes) prints each campaign as one test with the counts on a suite
+# line: FORGE18_DEEP is its unmodified deep run at 3efdb6f (512 x 150, the log the first gate could not read) and FORGE18_REAL its
+# earlier run at the suites' own 64 x 80 (2986e23 supplement). Forge 1.5.1 prints one line per invariant: FORGE15_DEEP is the
+# stored 512 x 150 run under evidence/, behind a patch header like the one candidate_deep_invariants.sh prints.
 PATCH = "== patch applied ==\n" + "+/// forge-config: default.invariant.runs = 512\n+/// forge-config: default.invariant.depth = 150\n" * 2
 FORGE18_REAL = fixture("fixtures", "forge184-invariant-deep-2986e23-hermes.txt")
-FORGE18_DEEP = PATCH + FORGE18_REAL.replace("runs: 64, calls: 5120", "runs: 512, calls: 76800")
+FORGE18_DEEP = fixture("fixtures", "forge184-invariant-deep-512x150-3efdb6f-hermes.txt")
 FORGE15_DEEP = PATCH + fixture("..", "evidence", "deep-invariants-512x150-00a04e7.txt")
 
 POOL = "0x" + "11" * 20

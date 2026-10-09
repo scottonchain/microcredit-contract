@@ -1,0 +1,3 @@
+evidence gate: all runs passed
+exit 0
+deep_summary: 14 distinct invariants (O1 to O7, R1 to R7) in 2 suites, each observed at runs: 512, calls: 76800, reverts: 0

@@ -1,0 +1,119 @@
+== patch applied for this run only (restored on exit) ==
+diff --git a/packages/foundry/test/invariant/BootstrapOrderRouter.invariant.t.sol b/packages/foundry/test/invariant/BootstrapOrderRouter.invariant.t.sol
+index 7d5fbaa..87c8a92 100644
+--- a/packages/foundry/test/invariant/BootstrapOrderRouter.invariant.t.sol
++++ b/packages/foundry/test/invariant/BootstrapOrderRouter.invariant.t.sol
+@@ -23,8 +23,8 @@ import { OrderRouterHandler } from "./OrderRouterHandler.sol";
+  *          the only backer, so a default is covered in full by the roots' stake;
+  *      O7  every base unit the handler created sits with a known holder.
+  */
+-/// forge-config: default.invariant.runs = 64
+-/// forge-config: default.invariant.depth = 80
++/// forge-config: default.invariant.runs = 512
++/// forge-config: default.invariant.depth = 150
+ /// forge-config: default.invariant.fail-on-revert = true
+ contract BootstrapOrderRouterInvariantTest is MicrocreditTestBase {
+     uint256 internal constant POOL = 10_000e6;
+diff --git a/packages/foundry/test/invariant/TransitiveStakeRouter.invariant.t.sol b/packages/foundry/test/invariant/TransitiveStakeRouter.invariant.t.sol
+index 4b1807e..1e9161b 100644
+--- a/packages/foundry/test/invariant/TransitiveStakeRouter.invariant.t.sol
++++ b/packages/foundry/test/invariant/TransitiveStakeRouter.invariant.t.sol
+@@ -27,8 +27,8 @@ import { RouterHandler } from "./RouterHandler.sol";
+  *          more than its own paths nor less than its pro rata floor, each root gets back what it put in less
+  *          its share) and every refusal being one of the two documented ones.
+  */
+-/// forge-config: default.invariant.runs = 64
+-/// forge-config: default.invariant.depth = 80
++/// forge-config: default.invariant.runs = 512
++/// forge-config: default.invariant.depth = 150
+ /// forge-config: default.invariant.fail-on-revert = true
+ contract TransitiveStakeRouterInvariantTest is MicrocreditTestBase {
+     uint256 internal constant POOL = 10_000e6;
+== forge test ==
+Compiling 2 files with Solc 0.8.33
+Solc 0.8.33 finished in 17.97s
+Compiler run successful!
+
+Ran 1 test for test/invariant/BootstrapOrderRouter.invariant.t.sol:BootstrapOrderRouterInvariantTest
+[PASS]
+BootstrapOrderRouterInvariantTest invariants:
+[PASS] invariant_O1_routerHoldsExactlyFreeRootsPlusEscrowPlusStrays
+[PASS] invariant_O2_escrowHeldIsTheOpenOrdersPrices
+[PASS] invariant_O3_eachRootConserves
+[PASS] invariant_O4_lockedFollowsTheOpenPaths
+[PASS] invariant_O5_sharedEdgeExposureIsTheSumAcrossWorkers
+[PASS] invariant_O6_poolExposureWithinTheLotsAndLendersLoseNothing
+[PASS] invariant_O7_everyCreatedUnitHasAKnownHolder
+ BootstrapOrderRouterInvariantTest invariants (runs: 512, calls: 76800, reverts: 0)
+
+╭--------------------+---------------+-------+---------+----------╮
+| Contract           | Selector      | Calls | Reverts | Discards |
++=================================================================+
+| OrderRouterHandler | defaultOne    | 6453  | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | fund          | 6473  | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | originate     | 6485  | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | reapprove     | 6291  | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | refund        | 6457  | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | repay         | 6318  | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | rootDeposit   | 6317  | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | rootWithdraw  | 6413  | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | rotateOfficer | 6513  | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | settle        | 6518  | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | syncOne       | 6262  | 0       | 0        |
+|--------------------+---------------+-------+---------+----------|
+| OrderRouterHandler | warp          | 6300  | 0       | 0        |
+╰--------------------+---------------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 236.22s (236.21s CPU time)
+
+Ran 1 test for test/invariant/TransitiveStakeRouter.invariant.t.sol:TransitiveStakeRouterInvariantTest
+[PASS]
+TransitiveStakeRouterInvariantTest invariants:
+[PASS] invariant_R1_routerHoldsExactlyTheFreeBalancesAndStrayFunds
+[PASS] invariant_R2_eachRootConserves
+[PASS] invariant_R3_lockedAndEdgeExposureFollowTheOpenPaths
+[PASS] invariant_R4_openLotsAreSecuredByTheVaultAndClosedOnesLeaveNothing
+[PASS] invariant_R5_lendersLosePrincipalOnlyToThePoolsRounding
+[PASS] invariant_R6_handlerChecksHold
+[PASS] invariant_R7_managedPoolExposureEqualsRouterRecordedActivePrincipal
+ TransitiveStakeRouterInvariantTest invariants (runs: 512, calls: 76800, reverts: 0)
+
+╭---------------+------------------+-------+---------+----------╮
+| Contract      | Selector         | Calls | Reverts | Discards |
++===============================================================+
+| RouterHandler | attemptDirect    | 6781  | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | defaultOne       | 7110  | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | deposit          | 6906  | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | originate        | 7084  | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | repay            | 6915  | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | revoke           | 7049  | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | syncOne          | 7003  | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyBack   | 7026  | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyUnback | 6970  | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | warp             | 7052  | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | withdraw         | 6904  | 0       | 0        |
+╰---------------+------------------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 285.27s (285.26s CPU time)
+
+Ran 2 test suites in 521.55s (521.49s CPU time): 2 tests passed, 0 failed, 0 skipped (2 total tests)
