@@ -5,8 +5,8 @@ Tested revision (the code under test): `3efdb6f2ed93bfdd19e8fd7f0a379868ca2e81b3
 gate failed on the output format, not on a result (original `FAILED.txt`, sha256 `6f3b3d48fc6b453f836a00cf8e05209353a51c724b54607735d7ce5032e7bee6`, kept at that same testbed commit and, verbatim, evidence/bootstrap-candidate-3efdb6f-gate-reevaluation/original-FAILED.txt in this repository and not rewritten here).
 The gate was repaired afterwards (parser revision `5d17e2c`), the published output was re-evaluated on a separate copy
 (re-evaluation revision `1803b40`, `evidence/bootstrap-candidate-3efdb6f-gate-reevaluation/`), and this packet was assembled
-from a separate copy of the published logs by `scripts/candidate_package_run.py` (packaging revision `04264a8`; this
-directory is added by the commit after it). The designated reviewer (Codex) chose this run as the evidence of record on contract PR 28 (comment 6077822639) and asked for this packaging over a separate copy (testbed issue 15, comment 6077829237); that decision unblocks packaging only. An earlier packet at dbb8eda is superseded by this one: its README did not say the script exited 1 and gave a one-step reproduction.
+from a separate copy of the published logs by `scripts/candidate_package_run.py` (packaging revision `e403b65`; this
+directory is added by the commit after it). The designated reviewer (Codex) chose this run as the evidence of record on contract PR 28 (comment 6077822639) and asked for this packaging over a separate copy (testbed issue 15, comment 6077829237); that decision unblocks packaging only. Earlier packets at dbb8eda and 92cf19f are superseded by this one: the first did not say the script exited 1 and gave a one-step reproduction; the second sent the reader to a revision that does not contain the packaging tool (Codex's revalidation, PR 28 comment 6078698487, item 1).
 The original gate result is not backdated: the script's own run failed, and only the retrospective evaluation of the same logs with
 the repaired parser passes. Nothing here is a public-chain
 receipt: tests ran on a local EVM with synthetic time; fork runs and rehearsals ran on local Anvil forks of Base Sepolia with
@@ -70,14 +70,14 @@ git checkout 3efdb6f2ed93bfdd19e8fd7f0a379868ca2e81b3
 scripts/candidate_evidence.sh
 ```
 
-2. Judge a copy of that output directory with the repaired gate, from a checkout of the parser revision (`5d17e2c`) or later, and package it (the header of `scripts/candidate_package_run.py` lists its arguments):
+2. Judge a copy of that output directory with the repaired gate and package it, from a checkout of the **packaging revision** (`e403b65`), which contains `scripts/candidate_package_run.py` (the parser revision `5d17e2c` does not). The gate file there is byte-identical to the one at the parser revision (sha256 `28ab333532816a882638ee0c46784249987b9866a80f890788dbe33007a98c65`, checked when this packet was assembled). The header of `scripts/candidate_package_run.py` lists its arguments:
 
 ```
-git checkout 5d17e2c
+git checkout e403b65
 python3 scripts/candidate_evidence_gate.py <a copy of the run's output directory>
 python3 scripts/candidate_package_run.py --src <the run's output directory> --out <a new directory> ...
 ```
 
-Running the script itself from a head that carries the parser fix gives a passing packet in one step, but then the tested revision is that head, not `3efdb6f2ed93bfdd19e8fd7f0a379868ca2e81b3` (`packages/` is identical).
+Running the script itself from a head that carries the parser fix is expected to give a passing packet in one step (the repaired gate is tested on this run's real Forge 1.8 log; the whole script has not been rerun end to end with Forge 1.8 at such a head), but then the tested revision is that head, not `3efdb6f2ed93bfdd19e8fd7f0a379868ca2e81b3` (`packages/` is identical).
 
 To re-judge this packet, run `python3 scripts/candidate_evidence_gate.py` on a copy of this directory (the gate deletes `FAILED.txt` on success and writes it on failure, so never point it at the only copy), and `sha256sum -c SHA256SUMS` from this directory.
