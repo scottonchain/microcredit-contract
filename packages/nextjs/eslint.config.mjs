@@ -6,6 +6,7 @@ const compat = new FlatCompat({
 })
 
 const eslintConfig = [
+  { ignores: ['.next/**', 'out/**', 'node_modules/**', '.static-build-lock/**'] },
   ...compat.config({
     extends: ['next'],
     rules: {

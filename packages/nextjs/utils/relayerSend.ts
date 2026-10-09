@@ -42,17 +42,6 @@ export class BroadcastUnconfirmed extends Error {
   }
 }
 
-/** The node refused the bytes in a way that proves they can never land (the account nonce was already consumed). */
-export class BroadcastRejected extends Error {
-  readonly hash: string;
-  constructor(hash: string, cause: unknown) {
-    super(`Transaction ${hash} was rejected by the node and cannot land: ${messageOf(cause)}`);
-    this.name = "BroadcastRejected";
-    this.hash = hash;
-    this.cause = cause;
-  }
-}
-
 type ErrorLike = { shortMessage?: string; details?: string; message?: string } | undefined;
 
 /** Text for people and logs: the short message and details only, never the full viem message (it carries the RPC URL and the request body). */
@@ -72,13 +61,14 @@ const classifiable = (e: unknown) => {
 export const isAlreadyKnown = (e: unknown) =>
   /already known|known transaction|already imported|already exists/i.test(classifiable(e));
 
-/** The relayer account's nonce was already used: no transaction at that nonce can land any more. */
+/** The account nonce was consumed; the original transaction may already have mined. */
 export const isNonceTooLow = (e: unknown) => /nonce too low|nonce is too low/i.test(classifiable(e));
 
 /**
  * First send of an intent. Returns the hash once the bytes were broadcast (or the node already held them). Throws
- * `JournalWriteFailed` (nothing sent), `BroadcastRejected` (a nonce that was already consumed: nothing can land, the intent is
- * abandoned and a fresh attempt may follow) or `BroadcastUnconfirmed` (unknown: the entry stays `submitted`).
+ * `JournalWriteFailed` (nothing sent) or `BroadcastUnconfirmed` (unknown: the entry stays `submitted`). Even the first
+ * broadcast call may contain transport retries: a lost successful response followed by "nonce too low" cannot prove
+ * the transaction did not land. Only its receipt can settle a journaled hash.
  */
 export async function sendHashFirst(
   journal: Journal,
@@ -98,18 +88,6 @@ export async function sendHashFirst(
     await deps.broadcast(raw);
   } catch (e) {
     if (isAlreadyKnown(e)) return hash;
-    if (isNonceTooLow(e)) {
-      // Freshly signed under the serialized queue: a consumed nonce means something else took it, never this transaction.
-      deps.append(
-        journal.settle(
-          key,
-          "abandoned",
-          "the relayer account nonce was already consumed: this transaction cannot land",
-          now(),
-        ),
-      );
-      throw new BroadcastRejected(hash, e);
-    }
     throw new BroadcastUnconfirmed(hash, e);
   }
   return hash;

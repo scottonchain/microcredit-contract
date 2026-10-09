@@ -1,0 +1,967 @@
+Cloning into '/tmp/evwt/lib/openzeppelin-contracts'...
+remote: Enumerating objects: 58630, done.        
+remote: Counting objects:   0% (1/989)        remote: Counting objects:   1% (10/989)        remote: Counting objects:   2% (20/989)        remote: Counting objects:   3% (30/989)        remote: Counting objects:   4% (40/989)        remote: Counting objects:   5% (50/989)        remote: Counting objects:   6% (60/989)        remote: Counting objects:   7% (70/989)        remote: Counting objects:   8% (80/989)        remote: Counting objects:   9% (90/989)        remote: Counting objects:  10% (99/989)        remote: Counting objects:  11% (109/989)        remote: Counting objects:  12% (119/989)        remote: Counting objects:  13% (129/989)        remote: Counting objects:  14% (139/989)        remote: Counting objects:  15% (149/989)        remote: Counting objects:  16% (159/989)        remote: Counting objects:  17% (169/989)        remote: Counting objects:  18% (179/989)        remote: Counting objects:  19% (188/989)        remote: Counting objects:  20% (198/989)        remote: Counting objects:  21% (208/989)        remote: Counting objects:  22% (218/989)        remote: Counting objects:  23% (228/989)        remote: Counting objects:  24% (238/989)        remote: Counting objects:  25% (248/989)        remote: Counting objects:  26% (258/989)        remote: Counting objects:  27% (268/989)        remote: Counting objects:  28% (277/989)        remote: Counting objects:  29% (287/989)        remote: Counting objects:  30% (297/989)        remote: Counting objects:  31% (307/989)        remote: Counting objects:  32% (317/989)        remote: Counting objects:  33% (327/989)        remote: Counting objects:  34% (337/989)        remote: Counting objects:  35% (347/989)        remote: Counting objects:  36% (357/989)        remote: Counting objects:  37% (366/989)        remote: Counting objects:  38% (376/989)        remote: Counting objects:  39% (386/989)        remote: Counting objects:  40% (396/989)        remote: Counting objects:  41% (406/989)        remote: Counting objects:  42% (416/989)        remote: Counting objects:  43% (426/989)        remote: Counting objects:  44% (436/989)        remote: Counting objects:  45% (446/989)        remote: Counting objects:  46% (455/989)        remote: Counting objects:  47% (465/989)        remote: Counting objects:  48% (475/989)        remote: Counting objects:  49% (485/989)        remote: Counting objects:  50% (495/989)        remote: Counting objects:  51% (505/989)        remote: Counting objects:  52% (515/989)        remote: Counting objects:  53% (525/989)        remote: Counting objects:  54% (535/989)        remote: Counting objects:  55% (544/989)        remote: Counting objects:  56% (554/989)        remote: Counting objects:  57% (564/989)        remote: Counting objects:  58% (574/989)        remote: Counting objects:  59% (584/989)        remote: Counting objects:  60% (594/989)        remote: Counting objects:  61% (604/989)        remote: Counting objects:  62% (614/989)        remote: Counting objects:  63% (624/989)        remote: Counting objects:  64% (633/989)        remote: Counting objects:  65% (643/989)        remote: Counting objects:  66% (653/989)        remote: Counting objects:  67% (663/989)        remote: Counting objects:  68% (673/989)        remote: Counting objects:  69% (683/989)        remote: Counting objects:  70% (693/989)        remote: Counting objects:  71% (703/989)        remote: Counting objects:  72% (713/989)        remote: Counting objects:  73% (722/989)        remote: Counting objects:  74% (732/989)        remote: Counting objects:  75% (742/989)        remote: Counting objects:  76% (752/989)        remote: Counting objects:  77% (762/989)        remote: Counting objects:  78% (772/989)        remote: Counting objects:  79% (782/989)        remote: Counting objects:  80% (792/989)        remote: Counting objects:  81% (802/989)        remote: Counting objects:  82% (811/989)        remote: Counting objects:  83% (821/989)        remote: Counting objects:  84% (831/989)        remote: Counting objects:  85% (841/989)        remote: Counting objects:  86% (851/989)        remote: Counting objects:  87% (861/989)        remote: Counting objects:  88% (871/989)        remote: Counting objects:  89% (881/989)        remote: Counting objects:  90% (891/989)        remote: Counting objects:  91% (900/989)        remote: Counting objects:  92% (910/989)        remote: Counting objects:  93% (920/989)        remote: Counting objects:  94% (930/989)        remote: Counting objects:  95% (940/989)        remote: Counting objects:  96% (950/989)        remote: Counting objects:  97% (960/989)        remote: Counting objects:  98% (970/989)        remote: Counting objects:  99% (980/989)        remote: Counting objects: 100% (989/989)        remote: Counting objects: 100% (989/989), done.        
+remote: Compressing objects:   0% (1/659)        remote: Compressing objects:   1% (7/659)        remote: Compressing objects:   2% (14/659)        remote: Compressing objects:   3% (20/659)        remote: Compressing objects:   4% (27/659)        remote: Compressing objects:   5% (33/659)        remote: Compressing objects:   6% (40/659)        remote: Compressing objects:   7% (47/659)        remote: Compressing objects:   8% (53/659)        remote: Compressing objects:   9% (60/659)        remote: Compressing objects:  10% (66/659)        remote: Compressing objects:  11% (73/659)        remote: Compressing objects:  12% (80/659)        remote: Compressing objects:  13% (86/659)        remote: Compressing objects:  14% (93/659)        remote: Compressing objects:  15% (99/659)        remote: Compressing objects:  16% (106/659)        remote: Compressing objects:  17% (113/659)        remote: Compressing objects:  18% (119/659)        remote: Compressing objects:  19% (126/659)        remote: Compressing objects:  20% (132/659)        remote: Compressing objects:  21% (139/659)        remote: Compressing objects:  22% (145/659)        remote: Compressing objects:  23% (152/659)        remote: Compressing objects:  24% (159/659)        remote: Compressing objects:  25% (165/659)        remote: Compressing objects:  26% (172/659)        remote: Compressing objects:  27% (178/659)        remote: Compressing objects:  28% (185/659)        remote: Compressing objects:  29% (192/659)        remote: Compressing objects:  30% (198/659)        remote: Compressing objects:  31% (205/659)        remote: Compressing objects:  32% (211/659)        remote: Compressing objects:  33% (218/659)        remote: Compressing objects:  34% (225/659)        remote: Compressing objects:  35% (231/659)        remote: Compressing objects:  36% (238/659)        remote: Compressing objects:  37% (244/659)        remote: Compressing objects:  38% (251/659)        remote: Compressing objects:  39% (258/659)        remote: Compressing objects:  40% (264/659)        remote: Compressing objects:  41% (271/659)        remote: Compressing objects:  42% (277/659)        remote: Compressing objects:  43% (284/659)        remote: Compressing objects:  44% (290/659)        remote: Compressing objects:  45% (297/659)        remote: Compressing objects:  46% (304/659)        remote: Compressing objects:  47% (310/659)        remote: Compressing objects:  48% (317/659)        remote: Compressing objects:  49% (323/659)        remote: Compressing objects:  50% (330/659)        remote: Compressing objects:  51% (337/659)        remote: Compressing objects:  52% (343/659)        remote: Compressing objects:  53% (350/659)        remote: Compressing objects:  54% (356/659)        remote: Compressing objects:  55% (363/659)        remote: Compressing objects:  56% (370/659)        remote: Compressing objects:  57% (376/659)        remote: Compressing objects:  58% (383/659)        remote: Compressing objects:  59% (389/659)        remote: Compressing objects:  60% (396/659)        remote: Compressing objects:  61% (402/659)        remote: Compressing objects:  62% (409/659)        remote: Compressing objects:  63% (416/659)        remote: Compressing objects:  64% (422/659)        remote: Compressing objects:  65% (429/659)        remote: Compressing objects:  66% (435/659)        remote: Compressing objects:  67% (442/659)        remote: Compressing objects:  68% (449/659)        remote: Compressing objects:  69% (455/659)        remote: Compressing objects:  70% (462/659)        remote: Compressing objects:  71% (468/659)        remote: Compressing objects:  72% (475/659)        remote: Compressing objects:  73% (482/659)        remote: Compressing objects:  74% (488/659)        remote: Compressing objects:  75% (495/659)        remote: Compressing objects:  76% (501/659)        remote: Compressing objects:  77% (508/659)        remote: Compressing objects:  78% (515/659)        remote: Compressing objects:  79% (521/659)        remote: Compressing objects:  80% (528/659)        remote: Compressing objects:  81% (534/659)        remote: Compressing objects:  82% (541/659)        remote: Compressing objects:  83% (547/659)        remote: Compressing objects:  84% (554/659)        remote: Compressing objects:  85% (561/659)        remote: Compressing objects:  86% (567/659)        remote: Compressing objects:  87% (574/659)        remote: Compressing objects:  88% (580/659)        remote: Compressing objects:  89% (587/659)        remote: Compressing objects:  90% (594/659)        remote: Compressing objects:  91% (600/659)        remote: Compressing objects:  92% (607/659)        remote: Compressing objects:  93% (613/659)        remote: Compressing objects:  94% (620/659)        remote: Compressing objects:  95% (627/659)        remote: Compressing objects:  96% (633/659)        remote: Compressing objects:  97% (640/659)        remote: Compressing objects:  98% (646/659)        remote: Compressing objects:  99% (653/659)        remote: Compressing objects: 100% (659/659)        remote: Compressing objects: 100% (659/659), done.        
+Receiving objects:   0% (1/58630)Receiving objects:   1% (587/58630)Receiving objects:   2% (1173/58630)Receiving objects:   3% (1759/58630)Receiving objects:   4% (2346/58630)Receiving objects:   5% (2932/58630)Receiving objects:   6% (3518/58630)Receiving objects:   7% (4105/58630)Receiving objects:   8% (4691/58630)Receiving objects:   9% (5277/58630)Receiving objects:  10% (5863/58630)Receiving objects:  11% (6450/58630)Receiving objects:  12% (7036/58630)Receiving objects:  13% (7622/58630)Receiving objects:  14% (8209/58630)Receiving objects:  15% (8795/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  16% (9381/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  17% (9968/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  18% (10554/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  19% (11140/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  20% (11726/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  21% (12313/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  22% (12899/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  23% (13485/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  24% (14072/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  25% (14658/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  26% (15244/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  27% (15831/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  28% (16417/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  29% (17003/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  30% (17589/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  31% (18176/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  32% (18762/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  33% (19348/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  34% (19935/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  35% (20521/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  36% (21107/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  37% (21694/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  38% (22280/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  39% (22866/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  40% (23452/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  41% (24039/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  42% (24625/58630), 10.45 MiB | 20.88 MiB/sReceiving objects:  42% (24801/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  43% (25211/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  44% (25798/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  45% (26384/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  46% (26970/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  47% (27557/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  48% (28143/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  49% (28729/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  50% (29315/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  51% (29902/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  52% (30488/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  53% (31074/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  54% (31661/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  55% (32247/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  56% (32833/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  57% (33420/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  58% (34006/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  59% (34592/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  60% (35178/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  61% (35765/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  62% (36351/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  63% (36937/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  64% (37524/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  65% (38110/58630), 23.23 MiB | 23.04 MiB/sReceiving objects:  66% (38696/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  67% (39283/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  68% (39869/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  69% (40455/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  70% (41041/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  71% (41628/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  72% (42214/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  73% (42800/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  74% (43387/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  75% (43973/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  76% (44559/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  77% (45146/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  78% (45732/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  79% (46318/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  80% (46904/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  81% (47491/58630), 35.99 MiB | 23.87 MiB/sReceiving objects:  81% (47710/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  82% (48077/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  83% (48663/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  84% (49250/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  85% (49836/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  86% (50422/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  87% (51009/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  88% (51595/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  89% (52181/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  90% (52767/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  91% (53354/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  92% (53940/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  93% (54526/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  94% (55113/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  95% (55699/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  96% (56285/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  97% (56872/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  98% (57458/58630), 48.56 MiB | 24.15 MiB/sReceiving objects:  99% (58044/58630), 48.56 MiB | 24.15 MiB/sremote: Total 58630 (delta 637), reused 330 (delta 330), pack-reused 57641 (from 3)        
+Receiving objects: 100% (58630/58630), 48.56 MiB | 24.15 MiB/sReceiving objects: 100% (58630/58630), 52.48 MiB | 24.18 MiB/s, done.
+Resolving deltas:   0% (0/37430)Resolving deltas:   1% (375/37430)Resolving deltas:   2% (749/37430)Resolving deltas:   3% (1123/37430)Resolving deltas:   4% (1498/37430)Resolving deltas:   5% (1872/37430)Resolving deltas:   6% (2246/37430)Resolving deltas:   7% (2621/37430)Resolving deltas:   8% (2995/37430)Resolving deltas:   9% (3369/37430)Resolving deltas:  10% (3743/37430)Resolving deltas:  11% (4118/37430)Resolving deltas:  12% (4492/37430)Resolving deltas:  13% (4866/37430)Resolving deltas:  14% (5241/37430)Resolving deltas:  15% (5615/37430)Resolving deltas:  16% (5989/37430)Resolving deltas:  17% (6365/37430)Resolving deltas:  18% (6738/37430)Resolving deltas:  19% (7112/37430)Resolving deltas:  20% (7486/37430)Resolving deltas:  21% (7861/37430)Resolving deltas:  22% (8235/37430)Resolving deltas:  23% (8609/37430)Resolving deltas:  24% (8984/37430)Resolving deltas:  25% (9358/37430)Resolving deltas:  26% (9732/37430)Resolving deltas:  27% (10107/37430)Resolving deltas:  28% (10481/37430)Resolving deltas:  29% (10856/37430)Resolving deltas:  30% (11229/37430)Resolving deltas:  31% (11604/37430)Resolving deltas:  32% (11978/37430)Resolving deltas:  33% (12352/37430)Resolving deltas:  34% (12727/37430)Resolving deltas:  35% (13101/37430)Resolving deltas:  36% (13475/37430)Resolving deltas:  37% (13851/37430)Resolving deltas:  38% (14224/37430)Resolving deltas:  39% (14599/37430)Resolving deltas:  40% (14972/37430)Resolving deltas:  41% (15347/37430)Resolving deltas:  42% (15721/37430)Resolving deltas:  43% (16095/37430)Resolving deltas:  44% (16471/37430)Resolving deltas:  45% (16844/37430)Resolving deltas:  46% (17218/37430)Resolving deltas:  47% (17593/37430)Resolving deltas:  48% (17967/37430)Resolving deltas:  49% (18341/37430)Resolving deltas:  50% (18715/37430)Resolving deltas:  51% (19090/37430)Resolving deltas:  52% (19464/37430)Resolving deltas:  53% (19838/37430)Resolving deltas:  54% (20213/37430)Resolving deltas:  55% (20587/37430)Resolving deltas:  56% (20961/37430)Resolving deltas:  57% (21336/37430)Resolving deltas:  58% (21710/37430)Resolving deltas:  59% (22084/37430)Resolving deltas:  60% (22458/37430)Resolving deltas:  61% (22833/37430)Resolving deltas:  62% (23207/37430)Resolving deltas:  63% (23581/37430)Resolving deltas:  64% (23956/37430)Resolving deltas:  65% (24330/37430)Resolving deltas:  66% (24704/37430)Resolving deltas:  67% (25079/37430)Resolving deltas:  68% (25453/37430)Resolving deltas:  69% (25827/37430)Resolving deltas:  70% (26201/37430)Resolving deltas:  71% (26576/37430)Resolving deltas:  72% (26950/37430)Resolving deltas:  73% (27324/37430)Resolving deltas:  74% (27699/37430)Resolving deltas:  75% (28073/37430)Resolving deltas:  76% (28447/37430)Resolving deltas:  77% (28822/37430)Resolving deltas:  78% (29196/37430)Resolving deltas:  79% (29570/37430)Resolving deltas:  80% (29946/37430)Resolving deltas:  81% (30319/37430)Resolving deltas:  82% (30694/37430)Resolving deltas:  83% (31067/37430)Resolving deltas:  84% (31442/37430)Resolving deltas:  85% (31816/37430)Resolving deltas:  86% (32190/37430)Resolving deltas:  87% (32565/37430)Resolving deltas:  88% (32940/37430)Resolving deltas:  89% (33313/37430)Resolving deltas:  90% (33687/37430)Resolving deltas:  91% (34063/37430)Resolving deltas:  92% (34436/37430)Resolving deltas:  93% (34810/37430)Resolving deltas:  94% (35185/37430)Resolving deltas:  95% (35559/37430)Resolving deltas:  96% (35933/37430)Resolving deltas:  97% (36308/37430)Resolving deltas:  98% (36682/37430)Resolving deltas:  99% (37056/37430)Resolving deltas:  99% (37188/37430)Resolving deltas: 100% (37430/37430)Resolving deltas: 100% (37430/37430), done.
+Submodule 'lib/erc4626-tests' (https://github.com/a16z/erc4626-tests.git) registered for path '../../lib/openzeppelin-contracts/lib/erc4626-tests'
+Submodule 'lib/forge-std' (https://github.com/foundry-rs/forge-std) registered for path '../../lib/openzeppelin-contracts/lib/forge-std'
+Submodule 'lib/halmos-cheatcodes' (https://github.com/a16z/halmos-cheatcodes) registered for path '../../lib/openzeppelin-contracts/lib/halmos-cheatcodes'
+Cloning into '/tmp/evwt/lib/openzeppelin-contracts/lib/erc4626-tests'...
+remote: Enumerating objects: 32, done.        
+remote: Counting objects:   3% (1/26)        remote: Counting objects:   7% (2/26)        remote: Counting objects:  11% (3/26)        remote: Counting objects:  15% (4/26)        remote: Counting objects:  19% (5/26)        remote: Counting objects:  23% (6/26)        remote: Counting objects:  26% (7/26)        remote: Counting objects:  30% (8/26)        remote: Counting objects:  34% (9/26)        remote: Counting objects:  38% (10/26)        remote: Counting objects:  42% (11/26)        remote: Counting objects:  46% (12/26)        remote: Counting objects:  50% (13/26)        remote: Counting objects:  53% (14/26)        remote: Counting objects:  57% (15/26)        remote: Counting objects:  61% (16/26)        remote: Counting objects:  65% (17/26)        remote: Counting objects:  69% (18/26)        remote: Counting objects:  73% (19/26)        remote: Counting objects:  76% (20/26)        remote: Counting objects:  80% (21/26)        remote: Counting objects:  84% (22/26)        remote: Counting objects:  88% (23/26)        remote: Counting objects:  92% (24/26)        remote: Counting objects:  96% (25/26)        remote: Counting objects: 100% (26/26)        remote: Counting objects: 100% (26/26), done.        
+remote: Compressing objects:   5% (1/20)        remote: Compressing objects:  10% (2/20)        remote: Compressing objects:  15% (3/20)        remote: Compressing objects:  20% (4/20)        remote: Compressing objects:  25% (5/20)        remote: Compressing objects:  30% (6/20)        remote: Compressing objects:  35% (7/20)        remote: Compressing objects:  40% (8/20)        remote: Compressing objects:  45% (9/20)        remote: Compressing objects:  50% (10/20)        remote: Compressing objects:  55% (11/20)        remote: Compressing objects:  60% (12/20)        remote: Compressing objects:  65% (13/20)        remote: Compressing objects:  70% (14/20)        remote: Compressing objects:  75% (15/20)        remote: Compressing objects:  80% (16/20)        remote: Compressing objects:  85% (17/20)        remote: Compressing objects:  90% (18/20)        remote: Compressing objects:  95% (19/20)        remote: Compressing objects: 100% (20/20)        remote: Compressing objects: 100% (20/20), done.        
+Receiving objects:   3% (1/32)remote: Total 32 (delta 15), reused 9 (delta 4), pack-reused 6 (from 1)        
+Receiving objects:   6% (2/32)Receiving objects:   9% (3/32)Receiving objects:  12% (4/32)Receiving objects:  15% (5/32)Receiving objects:  18% (6/32)Receiving objects:  21% (7/32)Receiving objects:  25% (8/32)Receiving objects:  28% (9/32)Receiving objects:  31% (10/32)Receiving objects:  34% (11/32)Receiving objects:  37% (12/32)Receiving objects:  40% (13/32)Receiving objects:  43% (14/32)Receiving objects:  46% (15/32)Receiving objects:  50% (16/32)Receiving objects:  53% (17/32)Receiving objects:  56% (18/32)Receiving objects:  59% (19/32)Receiving objects:  62% (20/32)Receiving objects:  65% (21/32)Receiving objects:  68% (22/32)Receiving objects:  71% (23/32)Receiving objects:  75% (24/32)Receiving objects:  78% (25/32)Receiving objects:  81% (26/32)Receiving objects:  84% (27/32)Receiving objects:  87% (28/32)Receiving objects:  90% (29/32)Receiving objects:  93% (30/32)Receiving objects:  96% (31/32)Receiving objects: 100% (32/32)Receiving objects: 100% (32/32), 29.84 KiB | 1.66 MiB/s, done.
+Resolving deltas:   0% (0/15)Resolving deltas:   6% (1/15)Resolving deltas:  13% (2/15)Resolving deltas:  20% (3/15)Resolving deltas:  26% (4/15)Resolving deltas:  33% (5/15)Resolving deltas:  40% (6/15)Resolving deltas:  46% (7/15)Resolving deltas:  60% (9/15)Resolving deltas:  66% (10/15)Resolving deltas:  73% (11/15)Resolving deltas:  80% (12/15)Resolving deltas:  86% (13/15)Resolving deltas:  93% (14/15)Resolving deltas: 100% (15/15)Resolving deltas: 100% (15/15), done.
+Cloning into '/tmp/evwt/lib/openzeppelin-contracts/lib/forge-std'...
+remote: Enumerating objects: 3250, done.        
+remote: Counting objects:   0% (1/473)        remote: Counting objects:   1% (5/473)        remote: Counting objects:   2% (10/473)        remote: Counting objects:   3% (15/473)        remote: Counting objects:   4% (19/473)        remote: Counting objects:   5% (24/473)        remote: Counting objects:   6% (29/473)        remote: Counting objects:   7% (34/473)        remote: Counting objects:   8% (38/473)        remote: Counting objects:   9% (43/473)        remote: Counting objects:  10% (48/473)        remote: Counting objects:  11% (53/473)        remote: Counting objects:  12% (57/473)        remote: Counting objects:  13% (62/473)        remote: Counting objects:  14% (67/473)        remote: Counting objects:  15% (71/473)        remote: Counting objects:  16% (76/473)        remote: Counting objects:  17% (81/473)        remote: Counting objects:  18% (86/473)        remote: Counting objects:  19% (90/473)        remote: Counting objects:  20% (95/473)        remote: Counting objects:  21% (100/473)        remote: Counting objects:  22% (105/473)        remote: Counting objects:  23% (109/473)        remote: Counting objects:  24% (114/473)        remote: Counting objects:  25% (119/473)        remote: Counting objects:  26% (123/473)        remote: Counting objects:  27% (128/473)        remote: Counting objects:  28% (133/473)        remote: Counting objects:  29% (138/473)        remote: Counting objects:  30% (142/473)        remote: Counting objects:  31% (147/473)        remote: Counting objects:  32% (152/473)        remote: Counting objects:  33% (157/473)        remote: Counting objects:  34% (161/473)        remote: Counting objects:  35% (166/473)        remote: Counting objects:  36% (171/473)        remote: Counting objects:  37% (176/473)        remote: Counting objects:  38% (180/473)        remote: Counting objects:  39% (185/473)        remote: Counting objects:  40% (190/473)        remote: Counting objects:  41% (194/473)        remote: Counting objects:  42% (199/473)        remote: Counting objects:  43% (204/473)        remote: Counting objects:  44% (209/473)        remote: Counting objects:  45% (213/473)        remote: Counting objects:  46% (218/473)        remote: Counting objects:  47% (223/473)        remote: Counting objects:  48% (228/473)        remote: Counting objects:  49% (232/473)        remote: Counting objects:  50% (237/473)        remote: Counting objects:  51% (242/473)        remote: Counting objects:  52% (246/473)        remote: Counting objects:  53% (251/473)        remote: Counting objects:  54% (256/473)        remote: Counting objects:  55% (261/473)        remote: Counting objects:  56% (265/473)        remote: Counting objects:  57% (270/473)        remote: Counting objects:  58% (275/473)        remote: Counting objects:  59% (280/473)        remote: Counting objects:  60% (284/473)        remote: Counting objects:  61% (289/473)        remote: Counting objects:  62% (294/473)        remote: Counting objects:  63% (298/473)        remote: Counting objects:  64% (303/473)        remote: Counting objects:  65% (308/473)        remote: Counting objects:  66% (313/473)        remote: Counting objects:  67% (317/473)        remote: Counting objects:  68% (322/473)        remote: Counting objects:  69% (327/473)        remote: Counting objects:  70% (332/473)        remote: Counting objects:  71% (336/473)        remote: Counting objects:  72% (341/473)        remote: Counting objects:  73% (346/473)        remote: Counting objects:  74% (351/473)        remote: Counting objects:  75% (355/473)        remote: Counting objects:  76% (360/473)        remote: Counting objects:  77% (365/473)        remote: Counting objects:  78% (369/473)        remote: Counting objects:  79% (374/473)        remote: Counting objects:  80% (379/473)        remote: Counting objects:  81% (384/473)        remote: Counting objects:  82% (388/473)        remote: Counting objects:  83% (393/473)        remote: Counting objects:  84% (398/473)        remote: Counting objects:  85% (403/473)        remote: Counting objects:  86% (407/473)        remote: Counting objects:  87% (412/473)        remote: Counting objects:  88% (417/473)        remote: Counting objects:  89% (421/473)        remote: Counting objects:  90% (426/473)        remote: Counting objects:  91% (431/473)        remote: Counting objects:  92% (436/473)        remote: Counting objects:  93% (440/473)        remote: Counting objects:  94% (445/473)        remote: Counting objects:  95% (450/473)        remote: Counting objects:  96% (455/473)        remote: Counting objects:  97% (459/473)        remote: Counting objects:  98% (464/473)        remote: Counting objects:  99% (469/473)        remote: Counting objects: 100% (473/473)        remote: Counting objects: 100% (473/473), done.        
+remote: Compressing objects:   0% (1/211)        remote: Compressing objects:   1% (3/211)        remote: Compressing objects:   2% (5/211)        remote: Compressing objects:   3% (7/211)        remote: Compressing objects:   4% (9/211)        remote: Compressing objects:   5% (11/211)        remote: Compressing objects:   6% (13/211)        remote: Compressing objects:   7% (15/211)        remote: Compressing objects:   8% (17/211)        remote: Compressing objects:   9% (19/211)        remote: Compressing objects:  10% (22/211)        remote: Compressing objects:  11% (24/211)        remote: Compressing objects:  12% (26/211)        remote: Compressing objects:  13% (28/211)        remote: Compressing objects:  14% (30/211)        remote: Compressing objects:  15% (32/211)        remote: Compressing objects:  16% (34/211)        remote: Compressing objects:  17% (36/211)        remote: Compressing objects:  18% (38/211)        remote: Compressing objects:  19% (41/211)        remote: Compressing objects:  20% (43/211)        remote: Compressing objects:  21% (45/211)        remote: Compressing objects:  22% (47/211)        remote: Compressing objects:  23% (49/211)        remote: Compressing objects:  24% (51/211)        remote: Compressing objects:  25% (53/211)        remote: Compressing objects:  26% (55/211)        remote: Compressing objects:  27% (57/211)        remote: Compressing objects:  28% (60/211)        remote: Compressing objects:  29% (62/211)        remote: Compressing objects:  30% (64/211)        remote: Compressing objects:  31% (66/211)        remote: Compressing objects:  32% (68/211)        remote: Compressing objects:  33% (70/211)        remote: Compressing objects:  34% (72/211)        remote: Compressing objects:  35% (74/211)        remote: Compressing objects:  36% (76/211)        remote: Compressing objects:  37% (79/211)        remote: Compressing objects:  38% (81/211)        remote: Compressing objects:  39% (83/211)        remote: Compressing objects:  40% (85/211)        remote: Compressing objects:  41% (87/211)        remote: Compressing objects:  42% (89/211)        remote: Compressing objects:  43% (91/211)        remote: Compressing objects:  44% (93/211)        remote: Compressing objects:  45% (95/211)        remote: Compressing objects:  46% (98/211)        remote: Compressing objects:  47% (100/211)        remote: Compressing objects:  48% (102/211)        remote: Compressing objects:  49% (104/211)        remote: Compressing objects:  50% (106/211)        remote: Compressing objects:  51% (108/211)        remote: Compressing objects:  52% (110/211)        remote: Compressing objects:  53% (112/211)        remote: Compressing objects:  54% (114/211)        remote: Compressing objects:  55% (117/211)        remote: Compressing objects:  56% (119/211)        remote: Compressing objects:  57% (121/211)        remote: Compressing objects:  58% (123/211)        remote: Compressing objects:  59% (125/211)        remote: Compressing objects:  60% (127/211)        remote: Compressing objects:  61% (129/211)        remote: Compressing objects:  62% (131/211)        remote: Compressing objects:  63% (133/211)        remote: Compressing objects:  64% (136/211)        remote: Compressing objects:  65% (138/211)        remote: Compressing objects:  66% (140/211)        remote: Compressing objects:  67% (142/211)        remote: Compressing objects:  68% (144/211)        remote: Compressing objects:  69% (146/211)        remote: Compressing objects:  70% (148/211)        remote: Compressing objects:  71% (150/211)        remote: Compressing objects:  72% (152/211)        remote: Compressing objects:  73% (155/211)        remote: Compressing objects:  74% (157/211)        remote: Compressing objects:  75% (159/211)        remote: Compressing objects:  76% (161/211)        remote: Compressing objects:  77% (163/211)        remote: Compressing objects:  78% (165/211)        remote: Compressing objects:  79% (167/211)        remote: Compressing objects:  80% (169/211)        remote: Compressing objects:  81% (171/211)        remote: Compressing objects:  82% (174/211)        remote: Compressing objects:  83% (176/211)        remote: Compressing objects:  84% (178/211)        remote: Compressing objects:  85% (180/211)        remote: Compressing objects:  86% (182/211)        remote: Compressing objects:  87% (184/211)        remote: Compressing objects:  88% (186/211)        remote: Compressing objects:  89% (188/211)        remote: Compressing objects:  90% (190/211)        remote: Compressing objects:  91% (193/211)        remote: Compressing objects:  92% (195/211)        remote: Compressing objects:  93% (197/211)        remote: Compressing objects:  94% (199/211)        remote: Compressing objects:  95% (201/211)        remote: Compressing objects:  96% (203/211)        remote: Compressing objects:  97% (205/211)        remote: Compressing objects:  98% (207/211)        remote: Compressing objects:  99% (209/211)        remote: Compressing objects: 100% (211/211)        remote: Compressing objects: 100% (211/211), done.        
+Receiving objects:   0% (1/3250)Receiving objects:   1% (33/3250)Receiving objects:   2% (65/3250)Receiving objects:   3% (98/3250)Receiving objects:   4% (130/3250)Receiving objects:   5% (163/3250)Receiving objects:   6% (195/3250)Receiving objects:   7% (228/3250)Receiving objects:   8% (260/3250)Receiving objects:   9% (293/3250)Receiving objects:  10% (325/3250)Receiving objects:  11% (358/3250)Receiving objects:  12% (390/3250)Receiving objects:  13% (423/3250)Receiving objects:  14% (455/3250)Receiving objects:  15% (488/3250)Receiving objects:  16% (520/3250)Receiving objects:  17% (553/3250)Receiving objects:  18% (585/3250)Receiving objects:  19% (618/3250)Receiving objects:  20% (650/3250)Receiving objects:  21% (683/3250)Receiving objects:  22% (715/3250)Receiving objects:  23% (748/3250)Receiving objects:  24% (780/3250)Receiving objects:  25% (813/3250)Receiving objects:  26% (845/3250)Receiving objects:  27% (878/3250)Receiving objects:  28% (910/3250)Receiving objects:  29% (943/3250)Receiving objects:  30% (975/3250)Receiving objects:  31% (1008/3250)Receiving objects:  32% (1040/3250)Receiving objects:  33% (1073/3250)Receiving objects:  34% (1105/3250)Receiving objects:  35% (1138/3250)Receiving objects:  36% (1170/3250)Receiving objects:  37% (1203/3250)Receiving objects:  38% (1235/3250)Receiving objects:  39% (1268/3250)Receiving objects:  40% (1300/3250)Receiving objects:  41% (1333/3250)Receiving objects:  42% (1365/3250)Receiving objects:  43% (1398/3250)Receiving objects:  44% (1430/3250)Receiving objects:  45% (1463/3250)Receiving objects:  46% (1495/3250)Receiving objects:  47% (1528/3250)Receiving objects:  48% (1560/3250)Receiving objects:  49% (1593/3250)Receiving objects:  50% (1625/3250)Receiving objects:  51% (1658/3250)Receiving objects:  52% (1690/3250)Receiving objects:  53% (1723/3250)Receiving objects:  54% (1755/3250)Receiving objects:  55% (1788/3250)Receiving objects:  56% (1820/3250)Receiving objects:  57% (1853/3250)Receiving objects:  58% (1885/3250)Receiving objects:  59% (1918/3250)Receiving objects:  60% (1950/3250)Receiving objects:  61% (1983/3250)Receiving objects:  62% (2015/3250)Receiving objects:  63% (2048/3250)Receiving objects:  64% (2080/3250)Receiving objects:  65% (2113/3250)Receiving objects:  66% (2145/3250)Receiving objects:  67% (2178/3250)Receiving objects:  68% (2210/3250)Receiving objects:  69% (2243/3250)Receiving objects:  70% (2275/3250)Receiving objects:  71% (2308/3250)Receiving objects:  72% (2340/3250)Receiving objects:  73% (2373/3250)Receiving objects:  74% (2405/3250)Receiving objects:  75% (2438/3250)Receiving objects:  76% (2470/3250)Receiving objects:  77% (2503/3250)Receiving objects:  78% (2535/3250)Receiving objects:  79% (2568/3250)Receiving objects:  80% (2600/3250)Receiving objects:  81% (2633/3250)Receiving objects:  82% (2665/3250)Receiving objects:  83% (2698/3250)Receiving objects:  84% (2730/3250)Receiving objects:  85% (2763/3250)Receiving objects:  86% (2795/3250)Receiving objects:  87% (2828/3250)Receiving objects:  88% (2860/3250)Receiving objects:  89% (2893/3250)Receiving objects:  90% (2925/3250)Receiving objects:  91% (2958/3250)Receiving objects:  92% (2990/3250)Receiving objects:  93% (3023/3250)Receiving objects:  94% (3055/3250)Receiving objects:  95% (3088/3250)Receiving objects:  96% (3120/3250)remote: Total 3250 (delta 420), reused 262 (delta 262), pack-reused 2777 (from 4)        
+Receiving objects:  97% (3153/3250)Receiving objects:  98% (3185/3250)Receiving objects:  99% (3218/3250)Receiving objects: 100% (3250/3250)Receiving objects: 100% (3250/3250), 1.29 MiB | 13.34 MiB/s, done.
+Resolving deltas:   0% (0/2178)Resolving deltas:   1% (22/2178)Resolving deltas:   2% (44/2178)Resolving deltas:   3% (66/2178)Resolving deltas:   4% (88/2178)Resolving deltas:   5% (109/2178)Resolving deltas:   6% (131/2178)Resolving deltas:   7% (153/2178)Resolving deltas:   8% (175/2178)Resolving deltas:   9% (197/2178)Resolving deltas:  10% (218/2178)Resolving deltas:  11% (240/2178)Resolving deltas:  12% (262/2178)Resolving deltas:  13% (284/2178)Resolving deltas:  14% (305/2178)Resolving deltas:  15% (327/2178)Resolving deltas:  16% (349/2178)Resolving deltas:  17% (371/2178)Resolving deltas:  18% (393/2178)Resolving deltas:  19% (414/2178)Resolving deltas:  20% (436/2178)Resolving deltas:  21% (458/2178)Resolving deltas:  22% (480/2178)Resolving deltas:  23% (501/2178)Resolving deltas:  24% (523/2178)Resolving deltas:  25% (545/2178)Resolving deltas:  26% (567/2178)Resolving deltas:  27% (590/2178)Resolving deltas:  28% (610/2178)Resolving deltas:  29% (632/2178)Resolving deltas:  30% (654/2178)Resolving deltas:  31% (676/2178)Resolving deltas:  32% (697/2178)Resolving deltas:  33% (719/2178)Resolving deltas:  34% (741/2178)Resolving deltas:  35% (763/2178)Resolving deltas:  36% (785/2178)Resolving deltas:  37% (806/2178)Resolving deltas:  38% (828/2178)Resolving deltas:  39% (850/2178)Resolving deltas:  40% (872/2178)Resolving deltas:  41% (893/2178)Resolving deltas:  42% (915/2178)Resolving deltas:  43% (937/2178)Resolving deltas:  44% (959/2178)Resolving deltas:  45% (981/2178)Resolving deltas:  46% (1002/2178)Resolving deltas:  47% (1024/2178)Resolving deltas:  48% (1046/2178)Resolving deltas:  49% (1069/2178)Resolving deltas:  50% (1089/2178)Resolving deltas:  51% (1111/2178)Resolving deltas:  52% (1133/2178)Resolving deltas:  53% (1155/2178)Resolving deltas:  54% (1177/2178)Resolving deltas:  55% (1198/2178)Resolving deltas:  56% (1220/2178)Resolving deltas:  57% (1242/2178)Resolving deltas:  58% (1264/2178)Resolving deltas:  59% (1286/2178)Resolving deltas:  60% (1307/2178)Resolving deltas:  61% (1329/2178)Resolving deltas:  62% (1351/2178)Resolving deltas:  63% (1373/2178)Resolving deltas:  64% (1394/2178)Resolving deltas:  65% (1417/2178)Resolving deltas:  66% (1438/2178)Resolving deltas:  67% (1460/2178)Resolving deltas:  68% (1482/2178)Resolving deltas:  69% (1504/2178)Resolving deltas:  70% (1526/2178)Resolving deltas:  71% (1547/2178)Resolving deltas:  72% (1569/2178)Resolving deltas:  73% (1590/2178)Resolving deltas:  74% (1612/2178)Resolving deltas:  75% (1634/2178)Resolving deltas:  76% (1656/2178)Resolving deltas:  77% (1678/2178)Resolving deltas:  78% (1699/2178)Resolving deltas:  79% (1721/2178)Resolving deltas:  80% (1743/2178)Resolving deltas:  81% (1765/2178)Resolving deltas:  82% (1786/2178)Resolving deltas:  83% (1808/2178)Resolving deltas:  84% (1830/2178)Resolving deltas:  85% (1852/2178)Resolving deltas:  86% (1874/2178)Resolving deltas:  87% (1895/2178)Resolving deltas:  88% (1917/2178)Resolving deltas:  89% (1939/2178)Resolving deltas:  90% (1962/2178)Resolving deltas:  91% (1982/2178)Resolving deltas:  92% (2004/2178)Resolving deltas:  93% (2026/2178)Resolving deltas:  94% (2048/2178)Resolving deltas:  95% (2070/2178)Resolving deltas:  96% (2091/2178)Resolving deltas:  97% (2113/2178)Resolving deltas:  98% (2135/2178)Resolving deltas:  99% (2157/2178)Resolving deltas: 100% (2178/2178)Resolving deltas: 100% (2178/2178), done.
+Cloning into '/tmp/evwt/lib/openzeppelin-contracts/lib/halmos-cheatcodes'...
+remote: Enumerating objects: 47, done.        
+remote: Counting objects:   2% (1/47)        remote: Counting objects:   4% (2/47)        remote: Counting objects:   6% (3/47)        remote: Counting objects:   8% (4/47)        remote: Counting objects:  10% (5/47)        remote: Counting objects:  12% (6/47)        remote: Counting objects:  14% (7/47)        remote: Counting objects:  17% (8/47)        remote: Counting objects:  19% (9/47)        remote: Counting objects:  21% (10/47)        remote: Counting objects:  23% (11/47)        remote: Counting objects:  25% (12/47)        remote: Counting objects:  27% (13/47)        remote: Counting objects:  29% (14/47)        remote: Counting objects:  31% (15/47)        remote: Counting objects:  34% (16/47)        remote: Counting objects:  36% (17/47)        remote: Counting objects:  38% (18/47)        remote: Counting objects:  40% (19/47)        remote: Counting objects:  42% (20/47)        remote: Counting objects:  44% (21/47)        remote: Counting objects:  46% (22/47)        remote: Counting objects:  48% (23/47)        remote: Counting objects:  51% (24/47)        remote: Counting objects:  53% (25/47)        remote: Counting objects:  55% (26/47)        remote: Counting objects:  57% (27/47)        remote: Counting objects:  59% (28/47)        remote: Counting objects:  61% (29/47)        remote: Counting objects:  63% (30/47)        remote: Counting objects:  65% (31/47)        remote: Counting objects:  68% (32/47)        remote: Counting objects:  70% (33/47)        remote: Counting objects:  72% (34/47)        remote: Counting objects:  74% (35/47)        remote: Counting objects:  76% (36/47)        remote: Counting objects:  78% (37/47)        remote: Counting objects:  80% (38/47)        remote: Counting objects:  82% (39/47)        remote: Counting objects:  85% (40/47)        remote: Counting objects:  87% (41/47)        remote: Counting objects:  89% (42/47)        remote: Counting objects:  91% (43/47)        remote: Counting objects:  93% (44/47)        remote: Counting objects:  95% (45/47)        remote: Counting objects:  97% (46/47)        remote: Counting objects: 100% (47/47)        remote: Counting objects: 100% (47/47), done.        
+remote: Compressing objects:   2% (1/37)        remote: Compressing objects:   5% (2/37)        remote: Compressing objects:   8% (3/37)        remote: Compressing objects:  10% (4/37)        remote: Compressing objects:  13% (5/37)        remote: Compressing objects:  16% (6/37)        remote: Compressing objects:  18% (7/37)        remote: Compressing objects:  21% (8/37)        remote: Compressing objects:  24% (9/37)        remote: Compressing objects:  27% (10/37)        remote: Compressing objects:  29% (11/37)        remote: Compressing objects:  32% (12/37)        remote: Compressing objects:  35% (13/37)        remote: Compressing objects:  37% (14/37)        remote: Compressing objects:  40% (15/37)        remote: Compressing objects:  43% (16/37)        remote: Compressing objects:  45% (17/37)        remote: Compressing objects:  48% (18/37)        remote: Compressing objects:  51% (19/37)        remote: Compressing objects:  54% (20/37)        remote: Compressing objects:  56% (21/37)        remote: Compressing objects:  59% (22/37)        remote: Compressing objects:  62% (23/37)        remote: Compressing objects:  64% (24/37)        remote: Compressing objects:  67% (25/37)        remote: Compressing objects:  70% (26/37)        remote: Compressing objects:  72% (27/37)        remote: Compressing objects:  75% (28/37)        remote: Compressing objects:  78% (29/37)        remote: Compressing objects:  81% (30/37)        remote: Compressing objects:  83% (31/37)        remote: Compressing objects:  86% (32/37)        remote: Compressing objects:  89% (33/37)        remote: Compressing objects:  91% (34/37)        remote: Compressing objects:  94% (35/37)        remote: Compressing objects:  97% (36/37)        remote: Compressing objects: 100% (37/37)        remote: Compressing objects: 100% (37/37), done.        
+remote: Total 47 (delta 19), reused 25 (delta 10), pack-reused 0 (from 0)        
+Receiving objects:   2% (1/47)Receiving objects:   4% (2/47)Receiving objects:   6% (3/47)Receiving objects:   8% (4/47)Receiving objects:  10% (5/47)Receiving objects:  12% (6/47)Receiving objects:  14% (7/47)Receiving objects:  17% (8/47)Receiving objects:  19% (9/47)Receiving objects:  21% (10/47)Receiving objects:  23% (11/47)Receiving objects:  25% (12/47)Receiving objects:  27% (13/47)Receiving objects:  29% (14/47)Receiving objects:  31% (15/47)Receiving objects:  34% (16/47)Receiving objects:  36% (17/47)Receiving objects:  38% (18/47)Receiving objects:  40% (19/47)Receiving objects:  42% (20/47)Receiving objects:  44% (21/47)Receiving objects:  46% (22/47)Receiving objects:  48% (23/47)Receiving objects:  51% (24/47)Receiving objects:  53% (25/47)Receiving objects:  55% (26/47)Receiving objects:  57% (27/47)Receiving objects:  59% (28/47)Receiving objects:  61% (29/47)Receiving objects:  63% (30/47)Receiving objects:  65% (31/47)Receiving objects:  68% (32/47)Receiving objects:  70% (33/47)Receiving objects:  72% (34/47)Receiving objects:  74% (35/47)Receiving objects:  76% (36/47)Receiving objects:  78% (37/47)Receiving objects:  80% (38/47)Receiving objects:  82% (39/47)Receiving objects:  85% (40/47)Receiving objects:  87% (41/47)Receiving objects:  89% (42/47)Receiving objects:  91% (43/47)Receiving objects:  93% (44/47)Receiving objects:  95% (45/47)Receiving objects:  97% (46/47)Receiving objects: 100% (47/47)Receiving objects: 100% (47/47), 24.40 KiB | 24.40 MiB/s, done.
+Resolving deltas:   0% (0/19)Resolving deltas:   5% (1/19)Resolving deltas:  10% (2/19)Resolving deltas:  15% (3/19)Resolving deltas:  26% (5/19)Resolving deltas:  31% (6/19)Resolving deltas:  36% (7/19)Resolving deltas:  42% (8/19)Resolving deltas:  47% (9/19)Resolving deltas:  52% (10/19)Resolving deltas:  57% (11/19)Resolving deltas:  63% (12/19)Resolving deltas:  68% (13/19)Resolving deltas:  73% (14/19)Resolving deltas:  78% (15/19)Resolving deltas:  84% (16/19)Resolving deltas:  89% (17/19)Resolving deltas:  94% (18/19)Resolving deltas: 100% (19/19)Resolving deltas: 100% (19/19), done.
+note[unaliased-plain-import]: use named imports '{A, B}' or alias 'import ".." as X'
+ --> contracts/MockUSDC.sol:4:8
+  |
+4 | import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unaliased-plain-import
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> contracts/MicrocreditLens.sol:17:47
+   |
+17 |     DecentralizedMicrocredit public immutable credit;
+   |                                               ^^^^^^ help: consider using: `CREDIT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unaliased-plain-import]: use named imports '{A, B}' or alias 'import ".." as X'
+ --> contracts/MockUSDC.sol:5:8
+  |
+5 | import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unaliased-plain-import
+
+note[mixed-case-function]: function names should use mixedCase
+  --> contracts/MicrocreditLens.sol:26:14
+   |
+26 |     function getFundingPoolAPY() external view returns (uint256) {
+   |              ^^^^^^^^^^^^^^^^^ help: consider using: `getFundingPoolApy`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+note[unused-import]: unused imports should be removed
+ --> test/fork/TransitiveStakeRouterFork.t.sol:8:27
+  |
+8 | import { StakeRouterBase, TransitiveStakeRouter } from "../../contracts/TransitiveStakeRouter.sol";
+  |                           ^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+warning[divide-before-multiply]: multiplication should occur before division to avoid loss of precision
+  --> contracts/MicrocreditLens.sol:95:16
+   |
+95 |         return ((credit.getCurrentOutstandingAmount(loanId) + CENT - 1) / CENT) * CENT;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#divide-before-multiply
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+  --> test/OracleScoreProvider.t.sol:61:45
+   |
+61 |         return abi.encodePacked(workflowId, bytes10("scores"), owner_, bytes2(0));
+   |                                             ^^^^^^^^^^^^^^^^^
+   |
+   = note: consider disabling this lint if you're certain the cast is safe
+           
+           // casting to 'bytes10' is safe because [explain why]
+           // forge-lint: disable-next-line(unsafe-typecast)
+           
+           
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+   --> contracts/DecentralizedMicrocredit.sol:187:29
+    |
+187 |     IERC20 public immutable usdc;
+    |                             ^^^^ help: consider using: `USDC`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+   --> contracts/DecentralizedMicrocredit.sol:249:37
+    |
+249 |     mapping(address => bool) public isKYCVerified;
+    |                                     ^^^^^^^^^^^^^ help: consider using: `isKycVerified`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[mixed-case-function]: function names should use mixedCase
+   --> contracts/DecentralizedMicrocredit.sol:569:14
+    |
+569 |     function markKYCVerified(address user) external onlyOracle {
+    |              ^^^^^^^^^^^^^^^ help: consider using: `markKycVerified`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/HermesPR16.t.sol:215:18
+    |
+215 |         assertLe(int256(lena0) - int256(lena1), int256(dues), "honest lender loses at most the dues");
+    |                  ^^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'int256' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+warning[divide-before-multiply]: multiplication should occur before division to avoid loss of precision
+    --> contracts/DecentralizedMicrocredit.sol:1426:17
+     |
+1426 |         return (((loan.principal * loan.interestRate) / BASIS_POINTS) * elapsed) / SECONDS_PER_YEAR;
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: https://book.getfoundry.sh/reference/forge/forge-lint#divide-before-multiply
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/BootstrapReadiness.t.sol:77:9
+   |
+77 |         usdc.transfer(borrower, ORDER_PRICE - debt);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/HermesPR16.t.sol:215:34
+    |
+215 |         assertLe(int256(lena0) - int256(lena1), int256(dues), "honest lender loses at most the dues");
+    |                                  ^^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'int256' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/HermesPR16.t.sol:215:49
+    |
+215 |         assertLe(int256(lena0) - int256(lena1), int256(dues), "honest lender loses at most the dues");
+    |                                                 ^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'int256' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/RelayerRetry.t.sol:181:13
+    |
+181 |             bytes4(outer) != DecentralizedMicrocredit.repayLoanMeta.selector, "top-level selector is the wrapper's"
+    |             ^^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'bytes4' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[unwrapped-modifier-logic]: wrap modifier logic to reduce code size
+   --> contracts/DecentralizedMicrocredit.sol:405:5
+    |
+405 | /     modifier onlyOwner() {
+406 | |         require(msg.sender == owner, NotOwner());
+407 | |         _;
+408 | |     }
+    | |_____^
+    |
+help: wrap modifier logic to reduce code size
+    |
+405 ~     modifier onlyOwner() {
+406 +         _onlyOwner();
+407 +         _;
+408 +     }
+409 + 
+410 +     function _onlyOwner() internal {
+411 +         require(msg.sender == owner, NotOwner());
+412 +     }
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unwrapped-modifier-logic
+
+note[unwrapped-modifier-logic]: wrap modifier logic to reduce code size
+   --> contracts/DecentralizedMicrocredit.sol:410:5
+    |
+410 | /     modifier onlyOracle() {
+411 | |         require(msg.sender == oracle, NotOracle());
+412 | |         _;
+413 | |     }
+    | |_____^
+    |
+help: wrap modifier logic to reduce code size
+    |
+410 ~     modifier onlyOracle() {
+411 +         _onlyOracle();
+412 +         _;
+413 +     }
+414 + 
+415 +     function _onlyOracle() internal {
+416 +         require(msg.sender == oracle, NotOracle());
+417 +     }
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unwrapped-modifier-logic
+
+note[unwrapped-modifier-logic]: wrap modifier logic to reduce code size
+   --> contracts/DecentralizedMicrocredit.sol:416:5
+    |
+416 | /     modifier onlyAllowedRelayer() {
+417 | |         if (relayerWhitelistEnabled) {
+418 | |             require(relayerWhitelist[msg.sender], UnauthorizedRelayer());
+...   |
+421 | |     }
+    | |_____^
+    |
+help: wrap modifier logic to reduce code size
+    |
+416 ~     modifier onlyAllowedRelayer() {
+417 +         _onlyAllowedRelayer();
+418 +         _;
+419 +     }
+420 + 
+421 +     function _onlyAllowedRelayer() internal {
+422 +         if (relayerWhitelistEnabled) {
+423 +             require(relayerWhitelist[msg.sender], UnauthorizedRelayer());
+424 +         }
+425 +     }
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unwrapped-modifier-logic
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:71:12
+   |
+71 |         vm.setEnv("ADMIN", vm.toString(admin));
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:72:12
+   |
+72 |         vm.setEnv("EFFR_BPS", "433");
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:76:12
+   |
+76 |         vm.setEnv("USDC_ADDRESS", vm.toString(address(usdc)));
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:77:12
+   |
+77 |         vm.setEnv("ADMIN", "");
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:81:12
+   |
+81 |         vm.setEnv("ADMIN", vm.toString(admin));
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/OrderRouterHandler.sol:33:47
+   |
+33 |     DecentralizedMicrocredit public immutable credit;
+   |                                               ^^^^^^ help: consider using: `CREDIT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/OrderRouterHandler.sol:34:31
+   |
+34 |     MockUSDC public immutable usdc;
+   |                               ^^^^ help: consider using: `USDC`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/OrderRouterHandler.sol:35:43
+   |
+35 |     BootstrapOrderRouter public immutable router;
+   |                                           ^^^^^^ help: consider using: `ROUTER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/OrderRouterHandler.sol:36:30
+   |
+36 |     address public immutable stranger = address(0x57A4);
+   |                              ^^^^^^^^ help: consider using: `STRANGER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/OrderRouterHandler.sol:37:30
+   |
+37 |     address public immutable vendor = address(0x7E4D);
+   |                              ^^^^^^ help: consider using: `VENDOR`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unwrapped-modifier-logic]: wrap modifier logic to reduce code size
+   --> contracts/BootstrapOrderRouter.sol:136:5
+    |
+136 | /     modifier onlyOfficerAdmin() {
+137 | |         if (msg.sender != officerAdmin) revert NotOfficerAdmin();
+138 | |         _;
+139 | |     }
+    | |_____^
+    |
+help: wrap modifier logic to reduce code size
+    |
+136 ~     modifier onlyOfficerAdmin() {
+137 +         _onlyOfficerAdmin();
+138 +         _;
+139 +     }
+140 + 
+141 +     function _onlyOfficerAdmin() internal {
+142 +         if (msg.sender != officerAdmin) revert NotOfficerAdmin();
+143 +     }
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unwrapped-modifier-logic
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:82:12
+   |
+82 |         vm.setEnv("USDC_ADDRESS", vm.toString(address(new EighteenDecimalToken())));
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+  --> test/invariant/OrderRouterHandler.sol:89:36
+   |
+89 |             customers.push(address(uint160(0xC057 + i)));
+   |                                    ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: consider disabling this lint if you're certain the cast is safe
+           
+           // casting to 'uint160' is safe because [explain why]
+           // forge-lint: disable-next-line(unsafe-typecast)
+           
+           
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[named-struct-fields]: prefer initializing structs with named fields
+   --> contracts/BootstrapOrderRouter.sol:187:32
+    |
+187 |         approvals[a.orderId] = Approval(a.maxAmount, a.expiry, a.policyVersion, a.officerEpoch);
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using named fields: `Approval({ maxAmount: a.maxAmount, expiry: a.expiry, policyVersion: a.policyVersion, officerEpoch: a.officerEpoch })`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#named-struct-fields
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:85:12
+   |
+85 |         vm.setEnv("USDC_ADDRESS", vm.toString(address(usdc)));
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:87:12
+   |
+87 |         vm.setEnv("EFFR_BPS", "");
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:90:12
+   |
+90 |         vm.setEnv("EFFR_BPS", "433");
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:93:12
+   |
+93 |         vm.setEnv("RISK_PREMIUM_BPS", "8OO");
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:99:12
+   |
+99 |         vm.setEnv("RISK_PREMIUM_BPS", "");
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:106:12
+    |
+106 |         vm.setEnv("TIMELOCK_DELAY", "259200");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:107:12
+    |
+107 |         vm.setEnv("RISK_PREMIUM_BPS", "1400");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:108:12
+    |
+108 |         vm.setEnv("MAX_LOAN", "50e6");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/invariant/BootstrapOrderRouter.invariant.t.sol:151:46
+    |
+151 |         if (bytes(statsFile).length != 0) vm.writeLine(statsFile, line);
+    |                                              ^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:109:12
+    |
+109 |         vm.setEnv("RESERVE_BPS", "7500");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[asm-keccak256]: use of inefficient hashing mechanism; consider using inline assembly
+   --> contracts/BootstrapOrderRouter.sol:192:16
+    |
+192 |           return keccak256(
+    |  ________________^
+193 | |             abi.encode(
+194 | |                 INTENT_TYPEHASH,
+195 | |                 address(pool),
+...   |
+206 | |         );
+    | |_________^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#asm-keccak256
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/TransitiveStakeRouter.t.sol:934:64
+    |
+934 |             paths[i] = StakeRouterBase.PathLot({ root: address(uint160(i + 1)), mid: address(0xBEEF), amount: amt });
+    |                                                                ^^^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'uint160' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[named-struct-fields]: prefer initializing structs with named fields
+   --> contracts/BootstrapOrderRouter.sol:223:22
+    |
+223 |         orders[id] = Order(msg.sender, price, maxDebt, settleBy, h, 0, State.Funded);
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using named fields: `Order({ payer: msg.sender, price: price, maxDebt: maxDebt, settleBy: settleBy, intentHash: h, loanId: 0, state: State.Funded })`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#named-struct-fields
+
+note[unused-import]: unused imports should be removed
+ --> test/invariant/BootstrapOrderRouter.invariant.t.sol:6:10
+  |
+6 | import { StakeRouterBase } from "../../contracts/TransitiveStakeRouter.sol";
+  |          ^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:110:12
+    |
+110 |         vm.setEnv("PROTOCOL_FEE_BPS", "500");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:111:12
+    |
+111 |         vm.setEnv("ISSUANCE_BUDGET_LINES", "40");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:112:12
+    |
+112 |         vm.setEnv("MAX_INCREASE_PER_REPORT_LINES", "10");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:113:12
+    |
+113 |         vm.setEnv("MAX_SCORE_AGE", "86400");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:114:12
+    |
+114 |         vm.setEnv("CRE_FORWARDER", vm.toString(forwarder));
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:115:12
+    |
+115 |         vm.setEnv("CRE_WORKFLOW_OWNER", vm.toString(workflowOwner));
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:116:12
+    |
+116 |         vm.setEnv("CRE_WORKFLOW_ID", vm.toString(WORKFLOW_ID));
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:117:12
+    |
+117 |         vm.setEnv("RELAYER", vm.toString(relayer));
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> contracts/TransitiveStakeRouter.sol:22:47
+   |
+22 |     DecentralizedMicrocredit public immutable pool;
+   |                                               ^^^^ help: consider using: `POOL`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> contracts/TransitiveStakeRouter.sol:23:29
+   |
+23 |     IERC20 public immutable token;
+   |                             ^^^^^ help: consider using: `TOKEN`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/invariant/CreditConservation.invariant.t.sol:505:46
+    |
+505 |         if (bytes(statsFile).length != 0) vm.writeLine(statsFile, line);
+    |                                              ^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> contracts/TransitiveStakeRouter.sol:24:30
+   |
+24 |     address public immutable router;
+   |                              ^^^^^^ help: consider using: `ROUTER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:337:16
+    |
+337 |             vm.setEnv(envVars[i], "");
+    |                ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+   --> contracts/TransitiveStakeRouter.sol:118:47
+    |
+118 |     DecentralizedMicrocredit public immutable pool;
+    |                                               ^^^^ help: consider using: `POOL`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+   --> contracts/TransitiveStakeRouter.sol:119:29
+    |
+119 |     IERC20 public immutable token;
+    |                             ^^^^^ help: consider using: `TOKEN`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/invariant/TransitiveStakeRouter.invariant.t.sol:185:46
+    |
+185 |         if (bytes(statsFile).length != 0) vm.writeLine(statsFile, line);
+    |                                              ^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unused-import]: unused imports should be removed
+ --> test/invariant/TransitiveStakeRouter.invariant.t.sol:6:10
+  |
+6 | import { StakeRouterBase, StakeVault, TransitiveStakeRouter } from "../../contracts/TransitiveStakeRouter.sol";
+  |          ^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/RouterHandler.sol:58:47
+   |
+58 |     DecentralizedMicrocredit public immutable credit;
+   |                                               ^^^^^^ help: consider using: `CREDIT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/RouterHandler.sol:59:31
+   |
+59 |     MockUSDC public immutable usdc;
+   |                               ^^^^ help: consider using: `USDC`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/RouterHandler.sol:60:44
+   |
+60 |     TransitiveStakeRouter public immutable router;
+   |                                            ^^^^^^ help: consider using: `ROUTER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/RouterHandler.sol:61:30
+   |
+61 |     address public immutable stranger = address(0x57A4);
+   |                              ^^^^^^^^ help: consider using: `STRANGER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/RouterHandler.sol:62:30
+   |
+62 |     address public immutable vendor = address(0x7E4D);
+   |                              ^^^^^^ help: consider using: `VENDOR`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[divide-before-multiply]: multiplication should occur before division to avoid loss of precision
+   --> test/invariant/RouterHandler.sol:389:43
+    |
+389 |             elapsed < GRACE_PERIOD ? 0 : (((lot.amount * lot.rate) / BASIS_POINTS) * elapsed) / SECONDS_PER_YEAR;
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#divide-before-multiply
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/invariant/RouterHandler.sol:116:39
+    |
+116 |             thirdParties.push(address(uint160(0xB0B0 + i)));
+    |                                       ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'uint160' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/invariant/RouterHandler.sol:233:26
+    |
+233 |             bytes4 sel = bytes4(err);
+    |                          ^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'bytes4' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[asm-keccak256]: use of inefficient hashing mechanism; consider using inline assembly
+   --> contracts/TransitiveStakeRouter.sol:350:16
+    |
+350 |         return keccak256(abi.encode(from, to, scope));
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#asm-keccak256
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:84:47
+   |
+84 |     DecentralizedMicrocredit public immutable credit;
+   |                                               ^^^^^^ help: consider using: `CREDIT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:85:31
+   |
+85 |     MockUSDC public immutable usdc;
+   |                               ^^^^ help: consider using: `USDC`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:86:30
+   |
+86 |     address public immutable owner;
+   |                              ^^^^^ help: consider using: `OWNER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:87:30
+   |
+87 |     address public immutable poolLender;
+   |                              ^^^^^^^^^^ help: consider using: `POOL_LENDER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> script/Deploy.s.sol:127:39
+    |
+127 |             string memory config = vm.readFile(configPath);
+    |                                       ^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:88:30
+   |
+88 |     address public immutable lender;
+   |                              ^^^^^^ help: consider using: `LENDER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:89:32
+   |
+89 |     uint256 internal immutable lenderKey;
+   |                                ^^^^^^^^^ help: consider using: `LENDER_KEY`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:90:30
+   |
+90 |     address public immutable feeRecipient;
+   |                              ^^^^^^^^^^^^ help: consider using: `FEE_RECIPIENT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:91:30
+   |
+91 |     address public immutable funder;
+   |                              ^^^^^^ help: consider using: `FUNDER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:92:30
+   |
+92 |     uint256 public immutable feeBps;
+   |                              ^^^^^^ help: consider using: `FEE_BPS`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unaliased-plain-import]: use named imports '{A, B}' or alias 'import ".." as X'
+ --> script/UpdateOracle.s.sol:4:8
+  |
+4 | import "forge-std/Script.sol";
+  |        ^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unaliased-plain-import
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:93:30
+   |
+93 |     uint256 public immutable reserveBps;
+   |                              ^^^^^^^^^^ help: consider using: `RESERVE_BPS`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unaliased-plain-import]: use named imports '{A, B}' or alias 'import ".." as X'
+ --> script/UpdateOracle.s.sol:5:8
+  |
+5 | import "../contracts/DecentralizedMicrocredit.sol";
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unaliased-plain-import
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> script/UpdateOracle.s.sol:10:43
+   |
+10 |         string memory deploymentJson = vm.readFile("deployment.json");
+   |                                           ^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unaliased-plain-import]: use named imports '{A, B}' or alias 'import ".." as X'
+ --> script/VerifyAll.s.sol:4:8
+  |
+4 | import "forge-std/Script.sol";
+  |        ^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unaliased-plain-import
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> script/VerifyAll.s.sol:18:36
+   |
+18 |         string memory content = vm.readFile(path);
+   |                                    ^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+warning[divide-before-multiply]: multiplication should occur before division to avoid loss of precision
+   --> test/invariant/CreditHandler.sol:713:17
+    |
+713 |         return (((m.principal * m.rate) / BASIS_POINTS) * elapsed) / SECONDS_PER_YEAR;
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#divide-before-multiply
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> script/VerifyAll.s.sol:77:31
+   |
+77 |         compiledBytecode = vm.readFile(path);
+   |                               ^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/invariant/CreditHandler.sol:994:48
+    |
+994 |         bytes4 selector = reason.length >= 4 ? bytes4(reason) : bytes4(0);
+    |                                                ^^^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'bytes4' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+No files changed, compilation skipped
+
+╭---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------╮
+| Contract                                                                  | Runtime Size (B) | Initcode Size (B) | Runtime Margin (B) | Initcode Margin (B) |
++=============================================================================================================================================================+
+| Address                                                                   | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| AlwaysReverts                                                             | 116              | 140               | 24,460             | 49,012              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| AttributionHarness                                                        | 11,811           | 13,323            | 12,765             | 35,829              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| BlacklistableUSDC                                                         | 3,609            | 5,458             | 20,967             | 43,694              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| BootstrapOrderRouter                                                      | 18,105           | 19,735            | 6,471              | 29,417              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Bytes                                                                     | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| CreditHandler                                                             | 38,002           | 40,921            | -13,426            | 8,231               |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| DecentralizedMicrocredit                                                  | 24,439           | 25,852            | 137                | 23,300              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| ECDSA                                                                     | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| EighteenDecimalToken                                                      | 1,543            | 2,356             | 23,033             | 46,796              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Errors                                                                    | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Math (../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol)     | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Math (/tmp/evwt/lib/openzeppelin-contracts/contracts/utils/math/Math.sol) | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| MessageHashUtils                                                          | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| MicrocreditLens                                                           | 3,287            | 3,473             | 21,289             | 45,679              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| MockUSDC                                                                  | 3,237            | 5,086             | 21,339             | 44,066              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| OracleScoreProvider                                                       | 4,916            | 5,401             | 19,660             | 43,751              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| OrderRouterHandler                                                        | 19,410           | 21,506            | 5,166              | 27,646              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Panic                                                                     | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| RouterHandler                                                             | 21,639           | 23,734            | 2,937              | 25,418              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| SafeCast                                                                  | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| SafeERC20                                                                 | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| ShortStrings                                                              | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| SignatureChecker                                                          | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| SignedMath                                                                | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| SmartRoot                                                                 | 284              | 310               | 24,292             | 48,842              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| StakeVault                                                                | 1,763            | 1,981             | 22,813             | 47,171              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| StorageSlot                                                               | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Strings                                                                   | 57               | 85                | 24,519             | 49,067              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| SwallowingBatch                                                           | 594              | 620               | 23,982             | 48,532              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| TimelockController                                                        | 5,450            | 6,755             | 19,126             | 42,397              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| TransitiveStakeRouter                                                     | 11,539           | 13,051            | 13,037             | 36,101              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| UsageStub                                                                 | 299              | 325               | 24,277             | 48,827              |
+|---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Wrapper                                                                   | 378              | 404               | 24,198             | 48,748              |
+╰---------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------╯
+
+Error: some contracts exceed the runtime size limit (EIP-170: 24576 bytes)

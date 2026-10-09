@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Produce the exact-head evidence directory for the bootstrap candidate: toolchain, sizes, hashes, complete test and
+# rehearsal logs, checksums. Run from a clean checkout of the head to be reviewed:
+#   scripts/candidate_evidence.sh [outdir]      (default evidence/bootstrap-candidate-<short head>)
+# Needs forge, anvil, cast, python3 and network access to https://sepolia.base.org (fork tests and rehearsals).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+HEAD_SHA=$(git rev-parse HEAD); SHORT=$(git rev-parse --short=7 HEAD)
+OUT=${1:-evidence/bootstrap-candidate-$SHORT}
+test -z "$(git status --porcelain -- packages scripts docs/*.md CLAUDE.md)" || { echo "tree is not clean"; exit 1; }
+# Published runs are immutable. A rerun must name a new directory, even when the tested head is unchanged.
+mkdir -p "$(dirname "$OUT")"
+mkdir "$OUT" || { echo "output already exists; choose a new evidence directory: $OUT" >&2; exit 1; }
+mkdir "$OUT/logs"
+RPC=https://sepolia.base.org
+ORACLE=0x000000000000000000000000000000000000dEaD
+SENDER=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+# Every run records its exit code and its log; nothing is swallowed. scripts/candidate_evidence_gate.py then refuses to let
+# a packet exist unless every run exited 0 and its own summary line says it passed (Codex review 5462466632).
+RC="$OUT/logs/exit-codes.txt"; : > "$RC"
+run() {  # run NAME LOGFILE COMMAND...
+  local name=$1 log=$2 rc=0; shift 2
+  "$@" > "$OUT/logs/$log" 2>&1 || rc=$?
+  echo "$name $rc" >> "$RC"
+}
+# `forge build --sizes` exits non-zero because an invariant test handler (CreditHandler) is over 24,576 bytes; it is never deployed
+( cd packages/foundry && forge build >/dev/null && { forge build --sizes || true; } ) > "$OUT/logs/build-sizes.txt" 2>&1
+( cd packages/foundry && forge --version && grep -E "solc_version|via_ir|optimizer|evm_version" foundry.toml ) > "$OUT/logs/toolchain.txt" 2>&1
+read -r BLOCK BLOCKHASH < <(python3 scripts/candidate_fork.py block --rpc "$RPC")
+echo "$BLOCK $BLOCKHASH" > "$OUT/logs/fork-block.txt"
+run forge-test-local forge-test-local.txt bash -c 'cd packages/foundry && forge test'
+run forge-test-fork-routers forge-test-fork-routers.txt env BASE_SEPOLIA_RPC_URL="$RPC" BASE_SEPOLIA_FORK_BLOCK="$BLOCK" bash -c "cd packages/foundry && forge test --match-path 'test/fork/*Router*'"
+# The suites' inline forge-config annotations override FOUNDRY_INVARIANT_*, so the deep run patches them for its own duration
+# (scripts/candidate_deep_invariants.sh prints the patch and restores the files); the gate checks the observed runs and calls.
+run invariant-deep invariant-deep.txt scripts/candidate_deep_invariants.sh
+run mutants mutants.txt python3 scripts/candidate_mutants.py
+git status --porcelain --untracked-files=no -- packages scripts docs/*.md CLAUDE.md > "$OUT/logs/tree-status.txt"  # the deep run and the mutants must leave every tracked file as it was (forge may add an untracked foundry.lock)
+run python-tests python-tests.txt python3 -m unittest discover -s scripts -p 'test_*.py'
+# One Base Sepolia block is pinned for the whole run, so both rehearsals start from identical state. Each fork is started and
+# stopped by scripts/candidate_fork.py, which tracks the child's pid, refuses a port that already answers and fails if the
+# child exits or cannot bind; nothing here uses pkill (Codex review 5463115207: a restart race let the second rehearsal run
+# on the first, used fork).
+PORT=8546; FORKDIR=$(mktemp -d); PIDFILE="$FORKDIR/anvil.pid"; FORKLOG="$FORKDIR/anvil.log"
+trap 'python3 scripts/candidate_fork.py stop --pidfile "$PIDFILE" --port $PORT || true; rm -rf "$FORKDIR"' EXIT
+anvil --version >> "$OUT/logs/toolchain.txt" 2>&1
+fresh_fork() {  # stops the previous fork, starts a fresh one at the pinned block, deploys the candidate; sets P L R
+  python3 scripts/candidate_fork.py stop --pidfile "$PIDFILE" --port $PORT
+  python3 scripts/candidate_fork.py start --rpc $RPC --block "$BLOCK" --port $PORT --log "$FORKLOG" --pidfile "$PIDFILE" > /dev/null
+  local o line; o=$(cd packages/foundry && BOOTSTRAP_ORACLE=$ORACLE FOUNDRY_BROADCAST="$FORKDIR/broadcast" forge script script/DeployBootstrapCandidate.s.sol --rpc-url http://127.0.0.1:$PORT --broadcast --unlocked --sender $SENDER 2>&1) || { echo "$o" >&2; exit 1; }
+  line=$(echo "$o" | awk '/candidate pool/{p=$NF} /candidate lens/{l=$NF} /candidate bootstrap order router/{r=$NF} END{print p, l, r}')
+  [[ $(wc -w <<<"$line") -eq 3 ]] || { echo "deploy did not print three addresses: $line" >&2; exit 1; }
+  for a in $line; do [[ $a =~ ^0x[0-9a-fA-F]{40}$ ]] || { echo "deploy did not print three addresses: $line" >&2; exit 1; }; done
+  read -r P L R <<<"$line"
+}
+fresh_fork
+python3 scripts/verify_candidate_deployment.py --rpc http://127.0.0.1:$PORT --pool "$P" --lens "$L" --router "$R" --json > "$OUT/logs/verifier.json"
+run rehearsal-normal rehearsal-normal.txt python3 scripts/candidate_rehearsal.py run --rpc http://127.0.0.1:$PORT --pool "$P" --router "$R"
+fresh_fork
+run rehearsal-with-default rehearsal-with-default.txt python3 scripts/candidate_rehearsal.py run --rpc http://127.0.0.1:$PORT --pool "$P" --router "$R" --with-default
+python3 scripts/candidate_fork.py stop --pidfile "$PIDFILE" --port $PORT
+python3 scripts/candidate_evidence_gate.py "$OUT" || { echo "the evidence run did not pass; see $OUT/FAILED.txt and the logs"; exit 1; }
+python3 scripts/candidate_evidence_readme.py "$OUT" "$HEAD_SHA"
+( cd "$OUT" && find . -type f ! -name SHA256SUMS | sort | xargs sha256sum > SHA256SUMS )
+echo "evidence written to $OUT"

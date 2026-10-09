@@ -1,5 +1,5 @@
+import { address, permitArg, uint } from "~~/utils/relayerRequest";
 import {
-  type PermitPayload,
   RelayerError,
   findEvent,
   relay,
@@ -17,8 +17,11 @@ export const POST = relayerRoute(async body => {
     throw new RelayerError("RepayRequest/meta signature is not allowed; use permit-only", 400);
   }
   requireFields(body, "chainId", "contractAddress", "borrower", "loanId", "amount", "permit");
-  const { chainId, contractAddress, borrower, loanId, amount } = body;
-  const permit = body.permit as PermitPayload;
+  const { chainId, contractAddress } = body;
+  const borrower = address(body.borrower, "borrower");
+  const loanId = uint(body.loanId, "loanId");
+  const amount = uint(body.amount, "amount");
+  const permit = permitArg(body.permit);
 
   const result = await relay({
     chainId,
@@ -27,11 +30,11 @@ export const POST = relayerRoute(async body => {
     functionName: "repayWithPermit",
     args: [
       borrower,
-      BigInt(loanId),
-      BigInt(amount),
-      BigInt(permit.value),
-      BigInt(permit.deadline),
-      Number(permit.v),
+      loanId,
+      amount,
+      permit.value,
+      permit.deadline,
+      permit.v,
       permit.r,
       permit.s,
     ],

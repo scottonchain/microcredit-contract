@@ -1,0 +1,1487 @@
+No files changed, compilation skipped
+
+Ran 2 tests for test/DeployTestnet.t.sol:DeployTestnetTest
+[PASS] testDeploysWiredForPersonaTesting() (gas: 16724928)
+[PASS] testRefusesMainnets() (gas: 8891102)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 8.01ms (5.28ms CPU time)
+
+Ran 2 tests for test/fork/HermesA7.t.sol:HermesA7ForkTest
+[SKIP: set LIVE_RPC_URL, LIVE_POOL, LIVE_LENA] testA7LargeLenderSeedFarmOnLivePool() (gas: 0)
+[SKIP: set LIVE_RPC_URL, LIVE_POOL, LIVE_LENA] testA7LenderDominatesPool() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 2 skipped; finished in 229.80µs (30.08µs CPU time)
+
+Ran 2 tests for test/fork/HermesCI21.t.sol:HermesCI21ForkTest
+[SKIP: set LIVE_RPC_URL, LIVE_POOL, LIVE_LENA] testCI21ReserveExhaustedDominantLender() (gas: 0)
+[SKIP: set LIVE_RPC_URL, LIVE_POOL, LIVE_LENA] testCI21ReserveExhaustedHalfPool() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 2 skipped; finished in 189.13µs (18.58µs CPU time)
+
+Ran 1 test for test/fork/HermesGasCalls.t.sol:HermesGasCallsForkTest
+[SKIP: set LIVE_RPC_URL and LIVE_POOL] testGasPerCall() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 1 skipped; finished in 107.40µs (10.37µs CPU time)
+
+Ran 8 tests for test/ColdStartFacts.t.sol:ColdStartFactsTest
+[PASS] testAfterTheBackingIsWithdrawnTheBorrowerKeepsOnlyItsDues() (gas: 902518)
+[PASS] testAnIssuedLineIsCreditAtOnce() (gas: 526771)
+[PASS] testBackingReceivedCannotBePassedOn() (gas: 537494)
+[PASS] testOneThirtyDayCycleIsNotEnoughToBackAnyone() (gas: 1086403)
+[PASS] testRepaymentEarnsTheBorrowerItsDuesAndTheStakerNothing() (gas: 944924)
+[PASS] testStakeBacksAFreshBorrowerAsSecuredBacking() (gas: 387046)
+[PASS] testStakeGivesTheStakerNoLimitOfItsOwn() (gas: 147682)
+[PASS] testThreeCyclesReachTheSmallestBacking() (gas: 1765227)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 9.30ms (3.60ms CPU time)
+
+Ran 9 tests for test/HermesPR16.t.sol:HermesPR16Test
+[PASS] testBackerRepayingOneLoanFreesNoMoreThanItPaid() (gas: 2520373)
+[PASS] testBoughtHistoryGroupExcessVsPassiveLender() (gas: 3244000)
+[PASS] testFrontRunRepayRevertsBorrowerAndPullsNothing() (gas: 673398)
+[PASS] testNoOneCanRepayADefaultedLoan() (gas: 534610)
+[PASS] testOneWeiRepaymentsDoNotChangeImpairmentOrDefaultLoss() (gas: 2106473)
+[PASS] testPermitAndMetaRevertCleanlyWhenAStrangerClosedTheLoan() (gas: 617199)
+[PASS] testPermitPathsAfterAStrangersPartialRepayment() (gas: 632225)
+[PASS] testRepayLoanMetaAfterAStrangersPartialRepayment() (gas: 679509)
+[PASS] testStrangerCanTriggerSubCentForgivenessOnly() (gas: 989367)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 11.55ms (6.49ms CPU time)
+
+Ran 2 tests for test/fork/HermesPermitWindow.t.sol:HermesPermitWindowForkTest
+[SKIP: set LIVE_RPC_URL and LIVE_POOL] testPermitExpiresInsideGraceWindowRepayReverts() (gas: 0)
+[SKIP: set LIVE_RPC_URL and LIVE_POOL] testPermitOutlivesGraceWindowRelayerRepays() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 2 skipped; finished in 173.07µs (28.98µs CPU time)
+
+Ran 13 tests for test/DecentralizedMicrocredit.t.sol:DecentralizedMicrocreditTest
+[PASS] testDepositFunds() (gas: 71817)
+[PASS] testInterestRateIsPlatformRate() (gas: 450818)
+[PASS] testLenderCannotWithdrawMoreThanAvailablePoolFunds() (gas: 5846214)
+[PASS] testLenderPartialWithdrawals() (gas: 190485)
+[PASS] testLenderWithdrawsSuccessfully() (gas: 180793)
+[PASS] testMaxLoanAmountEnforced() (gas: 456391)
+[PASS] testRepayLoan() (gas: 544172)
+[PASS] testRepayReducesTotalLentOut() (gas: 584618)
+[PASS] testRequestLoan() (gas: 451083)
+[PASS] testReservedLiquidityEnforced() (gas: 553860)
+[PASS] testSetEffrRateUpdatesRate() (gas: 45709)
+[PASS] testUtilizationCapEnforced() (gas: 709618)
+[PASS] testUtilizationCapLeavesUnreservedFundsWithdrawable() (gas: 521787)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 3.04ms (1.85ms CPU time)
+
+Ran 2 tests for test/fork/LiveDeployment.t.sol:LiveDeploymentForkTest
+[SKIP: set LIVE_RPC_URL and the LIVE_* addresses to run] testStakedRingDefaultIsPaidByTheStake() (gas: 0)
+[SKIP: set LIVE_RPC_URL and the LIVE_* addresses to run] testUnsecuredDefaultBurnsTheBackersCredit() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 2 skipped; finished in 204.89µs (67.48µs CPU time)
+
+Ran 10 tests for test/AdvanceFacts.t.sol:AdvanceFactsTest
+[PASS] testAdvanceNearACentStaysOpenUntilItsPrincipalIsRepaid() (gas: 549258)
+[PASS] testBorrowAndDisburseMetaCanPayAThirdPartyDirectly() (gas: 550563)
+[PASS] testDailyCyclesOfSubCentInterestRepaidAtPrincipalEarnNoDues() (gas: 3588361)
+[PASS] testInterestAppearsInFullAtTheEndOfTheFirstDay() (gas: 505541)
+[PASS] testOneUsdcDefaultUnsecuredBurnsCreditStakeRecoversCash() (gas: 1352058)
+[PASS] testPoolLogsDoNotRecordWhoRepaid() (gas: 565796)
+[PASS] testRepaymentInsideTheFirstDayPaysNothingAndEarnsNothing() (gas: 534372)
+[PASS] testShortSmallAdvanceIsClosedByRepayingItsPrincipalOnly() (gas: 929455)
+[PASS] testSubCentLoansRepaidWithOneUnitStayOpenAndUseTheLimit() (gas: 3310110)
+[PASS] testThirtyDayOneUsdcAdvanceIsClosedByItsPrincipal() (gas: 533216)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 14.92ms (9.56ms CPU time)
+
+Ran 3 tests for test/fork/BaseSepoliaUsdc.t.sol:BaseSepoliaUsdcForkTest
+[SKIP: set BASE_SEPOLIA_RPC_URL to run fork tests] testBlacklistedQueueRecipientDoesNotBlockRepayments() (gas: 0)
+[SKIP: set BASE_SEPOLIA_RPC_URL to run fork tests] testPermitDepositBorrowAndPermitRepay() (gas: 0)
+[SKIP: set BASE_SEPOLIA_RPC_URL to run fork tests] testUsdcPermitDomainIsUsdcVersion2() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 3 skipped; finished in 714.82µs (34.72µs CPU time)
+
+Ran 28 tests for test/LoanAccounting.t.sol:LoanAccountingTest
+[PASS] testAdminChangesEmitEvents() (gas: 77033)
+[PASS] testAdminSettersAreOwnerOnly() (gas: 146411)
+[PASS] testAnyoneCanRepayForTheBorrower() (gas: 663947)
+[PASS] testDisplayNames() (gas: 49118)
+[PASS] testFundingPoolApyScalesWithUtilisation() (gas: 549024)
+[PASS] testGuardianPausesNewLendingOnly() (gas: 884716)
+[PASS] testKycVerificationIsOracleOnly() (gas: 51906)
+[PASS] testLimitSettersValidateBounds() (gas: 49427)
+[PASS] testLoanCannotBeDisbursedTwice() (gas: 877286)
+[PASS] testNoInterestDuringGracePeriod() (gas: 497879)
+[PASS] testOutstandingRoundedUpToTheCent() (gas: 507972)
+[PASS] testOwnershipTransferNeedsAcceptance() (gas: 52942)
+[PASS] testPartialRepaymentReducesOutstanding() (gas: 583294)
+[PASS] testPartialRepaymentsThenPayoffCloseLoan() (gas: 571878)
+[PASS] testPoolInfoExcludesReservedFunds() (gas: 453084)
+[PASS] testPreviewLoanTermsUnderOneWeekIsOnePayment() (gas: 27281)
+[PASS] testPreviewLoanTermsUsesPlatformRate() (gas: 27949)
+[PASS] testRepayLoanInFullClosesLoan() (gas: 532536)
+[PASS] testRepayLoanNeverPullsMoreThanOwed() (gas: 561797)
+[PASS] testRepayWithPermitCentRoundedPayoffClosesLoan() (gas: 618820)
+[PASS] testRepayWithPermitPartialReducesOutstanding() (gas: 614272)
+[PASS] testRepayWithPermitRepaysAllWithinGracePeriod() (gas: 548893)
+[PASS] testRepayWithPermitStalePermitClosesWhenShortfallIsInterest() (gas: 575984)
+[PASS] testRequestLoanEnforcesLiquidityBuffer() (gas: 496743)
+[PASS] testRequestLoanRequiresCredit() (gas: 43770)
+[PASS] testScoreOverrideTakesPrecedenceOverProvider() (gas: 255324)
+[PASS] testSimpleInterestAccruesFromOrigination() (gas: 502444)
+[PASS] testUndisbursedLoanCannotBeRepaid() (gas: 494298)
+Suite result: ok. 28 passed; 0 failed; 0 skipped; finished in 6.62ms (4.82ms CPU time)
+
+Ran 3 tests for test/DeployProduction.t.sol:DeployProductionTest
+[PASS] test_HandoverNeedsTheTimelockAndLocksOutTheDeployer() (gas: 8692339)
+[PASS] test_RejectsUnsafeConfig() (gas: 170124)
+[PASS] test_RunFromEnvironment() (gas: 18227580)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 17.96ms (27.80ms CPU time)
+
+Ran 1 test for test/fork/BootstrapOrderRouterFork.t.sol:BootstrapOrderRouterForkTest
+[SKIP: skipped: set BASE_SEPOLIA_RPC_URL to run fork tests] setUp() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 1 skipped; finished in 1.52ms (0.00ns CPU time)
+
+Ran 27 tests for test/LoanLifecycle.t.sol:LoanLifecycleTest
+[PASS] testAnyoneCanCancelAStaleReservation() (gas: 403312)
+[PASS] testAnyoneCanFundTheReserveAndItAbsorbsLossesFirst() (gas: 745632)
+[PASS] testBackerCanCureAnOverdueLoanBeforeItDefaults() (gas: 630316)
+[PASS] testBackerSlotsCannotBeFilledForFree() (gas: 3359852)
+[PASS] testBackersPerBorrowerAreBounded() (gas: 6798436)
+[PASS] testBorrowAndDisburseRejectsTermsOutOfRange() (gas: 102833)
+[PASS] testBorrowAndDisburseUsesSignedTerm() (gas: 547515)
+[PASS] testBorrowerCanCancelUndisbursedLoan() (gas: 407151)
+[PASS] testChargesArePaidProRata() (gas: 702336)
+[PASS] testClosedLoansCannotDefaultOrBeRepaid() (gas: 849481)
+[PASS] testDefaultKeepsBackingForTheBorrowersOtherOpenLoans() (gas: 768885)
+[PASS] testDefaultSlashesSecuredBackingIntoThePool() (gas: 550525)
+[PASS] testDefaulterGetsNoNewMoneyOrBacking() (gas: 879472)
+[PASS] testDisbursedLoanCannotBeCancelled() (gas: 509807)
+[PASS] testForgivenSubCentCannotBrickThePool() (gas: 777390)
+[PASS] testInterestAccruesFromDisbursementNotRequest() (gas: 514976)
+[PASS] testLoanCannotDefaultBeforeLatePeriodEnds() (gas: 507892)
+[PASS] testOnlyCapitalBeyondDuesIsReleased() (gas: 685557)
+[PASS] testPartialRepaymentReducesTheCharge() (gas: 591479)
+[PASS] testPrincipalShortfallKeepsTheLoanOpen() (gas: 579584)
+[PASS] testRequestLoanUsesDefaultTerm() (gas: 511585)
+[PASS] testReserveAbsorbsProvisionsBeforeTheSharePrice() (gas: 783421)
+[PASS] testReservePaysUncoveredLossBeforeLenders() (gas: 1242367)
+[PASS] testReserveSettersAreBoundedAndOwnerOnly() (gas: 66232)
+[PASS] testReserveTakesItsShareOfInterest() (gas: 706855)
+[PASS] testStakeIsChargedBeforeCredit() (gas: 693986)
+[PASS] testUnsecuredBackingBurnsTheBackersCredit() (gas: 725824)
+Suite result: ok. 27 passed; 0 failed; 0 skipped; finished in 17.95ms (16.53ms CPU time)
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/BootstrapOrderRouterInvariantTest/invariant_O1_routerHoldsExactlyFreeRootsPlusEscrowPlusStrays" file was ignored because test contract bytecode has changed.
+
+Ran 9 tests for test/BootstrapReadiness.t.sol:BootstrapReadinessTest
+[PASS] testCancelledReservationReturnsCapacityWithoutPayingVendor() (gas: 527207)
+[PASS] testOneRootCannotDoubleAllocateItsStakeOrExitWhileLoansRemain() (gas: 1169390)
+[PASS] testPartialSubCentPrincipalCannotEscapeTheLoanOrBacking() (gas: 739741)
+[PASS] testReceivedBackingIsNotAnImplementedTransitiveRoute() (gas: 241250)
+[PASS] testRejectedOrderUsesSponsorStakeWithoutCustomerOrOperatorCure() (gas: 646632)
+[PASS] testSecondSettlementCannotPullCustomerFundsAgain() (gas: 754909)
+[PASS] testSevenDayCustomerPaymentFundsInterestAndLeavesProtectedReserve() (gas: 828015)
+[PASS] testSignedVendorCannotBeSubstitutedAndOriginationCannotReplay() (gas: 620978)
+[PASS] testZeroGrantZeroEthBorrowerPaysVendorAndCompletesFirstDayCycle() (gas: 740640)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 4.88ms (3.50ms CPU time)
+
+Ran 12 tests for test/ManagerGate.t.sol:ManagerGateTest
+[PASS] testDefaultOfAManagedLoanChargesTheSponsorStakeByTheUnpaidPrincipal() (gas: 919327)
+[PASS] testDirectRepaymentFreesCapacityOnlyForTheManager() (gas: 1274967)
+[PASS] testManagedBorrowerCannotRequestDirectly() (gas: 391078)
+[PASS] testManagedBorrowerCannotUseAnotherRelayerForBorrowAndDisburse() (gas: 474781)
+[PASS] testManagedBorrowerCannotUseAnotherRelayerForRequestMeta() (gas: 428149)
+[PASS] testManagerCannotBeChosenOnceBackingExists() (gas: 363562)
+[PASS] testManagerCannotChangeWhileBackingOrPrincipalIsLive() (gas: 907358)
+[PASS] testManagerOriginatesAndPaysTheVendor() (gas: 902402)
+[PASS] testManagerStaysLockedWhileALoanIsOnlyRequested() (gas: 839422)
+[PASS] testNoManagerByDefaultAndOneCanBeSetOnAFreshAccount() (gas: 48091)
+[PASS] testSignatureMadeBeforeOptInCannotBeExecutedByAnyoneButTheManager() (gas: 973239)
+[PASS] testUnmanagedBorrowerIsUnchanged() (gas: 828635)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 6.71ms (5.12ms CPU time)
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/BootstrapOrderRouterInvariantTest/invariant_O2_escrowHeldIsTheOpenOrdersPrices" file was ignored because test contract bytecode has changed.
+
+Ran 35 tests for test/MetaTransactionFlows.t.sol:MetaTransactionFlowsTest
+[PASS] testBackMetaMovesCreditFromTheBacker() (gas: 358548)
+[PASS] testBackMetaRejectsSelfBackingAndMoreThanTheBackerHas() (gas: 304699)
+[PASS] testBackMetaUpdatesTheAmount() (gas: 362090)
+[PASS] testBorrowAndDisburseCountsExistingLoans() (gas: 555308)
+[PASS] testBorrowAndDisburseCreatesAndDisbursesLoan() (gas: 558064)
+[PASS] testBorrowAndDisburseEnforcesLiquidityBuffer() (gas: 130252)
+[PASS] testBorrowAndDisburseEnforcesScoreLimit() (gas: 80851)
+[PASS] testBorrowAndDisburseLoansAreEnumerated() (gas: 551207)
+[PASS] testBorrowAndDisburseRevertsWhenAprAboveTolerance() (gas: 57576)
+[PASS] testDepositPermitOnlyMetaCountsLenderOnce() (gas: 255484)
+[PASS] testDepositPermitOnlySurvivesFrontRunPermit() (gas: 214458)
+[PASS] testDepositWithPermitMeta() (gas: 260456)
+[PASS] testDepositWithPermitMetaCreditsSignedReceiver() (gas: 253918)
+[PASS] testDepositWithPermitMetaRejectsShortPermit() (gas: 143246)
+[PASS] testDirectDepositFillsWithdrawalQueue() (gas: 938305)
+[PASS] testDirectWithdrawalCannotJumpTheQueue() (gas: 992345)
+[PASS] testInvalidPermitWithoutAllowanceStillReverts() (gas: 88597)
+[PASS] testLifecycleEvents() (gas: 902074)
+[PASS] testLiquidityOwedToQueueIsNotLent() (gas: 2145007)
+[PASS] testLiquidityOwedToQueueIsNotWithdrawn() (gas: 3055249)
+[PASS] testPartialFillThenDirectWithdrawalKeepsQueueOrder() (gas: 1051006)
+[PASS] testQueueFillIsBoundedPerCall() (gas: 1933168)
+[PASS] testQueuedFundsCannotBeQueuedOrWithdrawnTwice() (gas: 914240)
+[PASS] testRefusedQueuePayoutIsHeldAndDoesNotBlockRepayments() (gas: 1849928)
+[PASS] testRepayLoanMetaAfterPartialRepaymentPullsRemainder() (gas: 627778)
+[PASS] testRepayLoanMetaPullsASubCentBalance() (gas: 575137)
+[PASS] testRepayLoanMetaRepayAllPullsCurrentOutstanding() (gas: 624986)
+[PASS] testRepayLoanMetaSurvivesFrontRunPermit() (gas: 608770)
+[PASS] testRepayLoanMetaToleratesOneCentDrift() (gas: 606128)
+[PASS] testRepayWithPermitSurvivesFrontRunPermit() (gas: 597200)
+[PASS] testRepaymentFillsWithdrawalQueue() (gas: 900319)
+[PASS] testStrayTransferIsNotPoolLiquidity() (gas: 913257)
+[PASS] testWithdrawalFillsImmediatelyWhenLiquid() (gas: 403335)
+[PASS] testWithdrawalQueuesUntilDepositsRestoreLiquidity() (gas: 1033097)
+[PASS] testWithdrawalRequestRejectsMoreThanDeposited() (gas: 243916)
+Suite result: ok. 35 passed; 0 failed; 0 skipped; finished in 30.81ms (29.47ms CPU time)
+
+Ran 9 tests for test/MetaTransactions.t.sol:MetaTransactionsTest
+[PASS] testCannotRedirectDisbursement() (gas: 486067)
+[PASS] testExpiredDeadline() (gas: 20779)
+[PASS] testGaslessBorrowing() (gas: 549470)
+[PASS] testGaslessRepaymentWithPermit() (gas: 607726)
+[PASS] testInvalidNonce() (gas: 43425)
+[PASS] testInvalidSignature() (gas: 50485)
+[PASS] testNonceIncrementingPreventsReplay() (gas: 476105)
+[PASS] testRelayerWhitelist() (gas: 530994)
+[PASS] testScoreGatingAppliesToMetaRequests() (gas: 73178)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 4.22ms (2.86ms CPU time)
+
+Ran 18 tests for test/OracleScoreProvider.t.sol:OracleScoreProviderTest
+[PASS] testAdminIsOwnerOnly() (gas: 26816)
+[PASS] testBudgetStaysHeldWhileALineMayBeInUse() (gas: 539454)
+[PASS] testEpochsMustIncrease() (gas: 243844)
+[PASS] testForwarderDeliversReportsFromThePinnedWorkflow() (gas: 304840)
+[PASS] testLoweringTheBudgetStillAcceptsReductions() (gas: 555049)
+[PASS] testMaxScoreAgeIsBounded() (gas: 31577)
+[PASS] testNoScoresBeforeTheFirstReport() (gas: 15157)
+[PASS] testOnReportRejectsOtherSendersAndWorkflows() (gas: 114010)
+[PASS] testOneReportCanRaiseScoresOnlySoFar() (gas: 588588)
+[PASS] testOnlyTheReporterPublishes() (gas: 28867)
+[PASS] testOwnershipTransferNeedsAcceptance() (gas: 35839)
+[PASS] testReleaseNeedsTheLendingPool() (gas: 110795)
+[PASS] testReporterPublishesScores() (gas: 344445)
+[PASS] testReportsAreValidated() (gas: 257663)
+[PASS] testReportsCannotIssueBeyondTheBudget() (gas: 684716)
+[PASS] testScoresGoStaleUntilTheNextHeartbeat() (gas: 245842)
+[PASS] testSupportsInterfaces() (gas: 12611)
+[PASS] testUnpinnedForwarderAcceptsAnyWorkflow() (gas: 263002)
+Suite result: ok. 18 passed; 0 failed; 0 skipped; finished in 2.40ms (1.84ms CPU time)
+
+Ran 6 tests for test/RelayerRetry.t.sol:RelayerRetryTest
+[PASS] testCalldataCarriesSignedRequest() (gas: 836326)
+[PASS] testFreshSignatureAfterLandedRepayRevertsAndPullsNothing() (gas: 664707)
+[PASS] testReceiptDoesNotBindSignedIntent() (gas: 653739)
+[PASS] testReplaySameSignedRequestPullsOnce() (gas: 650994)
+[PASS] testUnknownOutcomeRecoveryReadsNonce() (gas: 654320)
+[PASS] testWrappedBatchHidesRequestFromTopLevelSelector() (gas: 788327)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 7.62ms (6.74ms CPU time)
+
+Ran 5 tests for test/RelayerRetryBatch.t.sol:RelayerRetryBatchTest
+[PASS] testEnvelopeOrderDoesNotChangeTheConsumedNonceRange() (gas: 662921)
+[PASS] testEnvelopeSucceedsWhileWrappedIntentDidNotLand() (gas: 578862)
+[PASS] testNonceRangeNamesWhichWrappedIntentLanded() (gas: 666000)
+[PASS] testTwoSignersEachRangeNamesItsOwnLandedIntent() (gas: 1239259)
+[PASS] testTwoSignersOnlyTheLandedSignersNonceMoves() (gas: 1159511)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 6.62ms (5.35ms CPU time)
+
+Ran 19 tests for test/ShareAccounting.t.sol:ShareAccountingTest
+[PASS] testClosedLoansReadZeroOutstanding() (gas: 785428)
+[PASS] testFundingPoolApyIsNetOfFee() (gas: 786239)
+[PASS] testImpairmentIsReleasedAsTheBorrowerRepays() (gas: 823029)
+[PASS] testImpairmentStopsAnExitAheadOfAKnownLoss() (gas: 851876)
+[PASS] testInterestIsSharedProRata() (gas: 892634)
+[PASS] testLastLenderCanWithdrawEverything() (gas: 759725)
+[PASS] testLateDepositorDoesNotCaptureEarlierInterest() (gas: 899837)
+[PASS] testLenderPrincipalTracksCostBasis() (gas: 773689)
+[PASS] testLensShowsUtilisationAndRealisedReturn() (gas: 1079774)
+[PASS] testMaxWithdrawableIsWhatWithdrawFundsPays() (gas: 915113)
+[PASS] testPartialRepaymentPaysInterestFirst() (gas: 841593)
+[PASS] testProtocolFeeAdminIsOwnerOnlyAndBounded() (gas: 843346)
+[PASS] testProtocolFeeTakesShareOfInterestOnly() (gas: 866063)
+[PASS] testProtocolFeesAreNotLentOrWithdrawn() (gas: 820498)
+[PASS] testQueuedSharesKeepEarningUntilPaid() (gas: 987034)
+[PASS] testRepaidInterestAccruesToLender() (gas: 778913)
+[PASS] testSecuredBackingIsNotProvisioned() (gas: 1015104)
+[PASS] testStrayTransferDoesNotMoveSharePrice() (gas: 390769)
+[PASS] testWithdrawalsMayDrawOnTheBufferButLoansMayNot() (gas: 788411)
+Suite result: ok. 19 passed; 0 failed; 0 skipped; finished in 5.44ms (4.25ms CPU time)
+
+Ran 18 tests for test/SybilResistance.t.sol:SybilResistanceTest
+[PASS] testAttackerWhoIsAlsoALenderCannotFarmDues() (gas: 1361548)
+[PASS] testBackingCannotBeCutBelowWhatTheBorrowerOwes() (gas: 781920)
+[PASS] testBackingMovesCreditItDoesNotCopyIt() (gas: 540415)
+[PASS] testCommittedStakeCannotBeWithdrawn() (gas: 358842)
+[PASS] testCompromisedOracleCannotRotateItsBudget() (gas: 908428)
+[PASS] testDefaulterLosesTheCreditItGaveOthers() (gas: 741049)
+[PASS] testDuesCanBackOthers() (gas: 1124896)
+[PASS] testDuesPaidByAThirdPartyAreLockedInTheReserve() (gas: 1210144)
+[PASS] testHistoryEarnsOnlyTheDuesItPaid() (gas: 1247100)
+[PASS] testLostCreditStopsBackingOthers() (gas: 464352)
+[PASS] testOwnLoansReduceWhatYouCanBack() (gas: 702702)
+[PASS] testReceivedBackingCannotBePassedOn() (gas: 447939)
+[PASS] testRecycledSeedBuildsHistoryThatEarnsNoCredit() (gas: 6619456)
+[PASS] testRingCannotMultiplyOneMembersCredit() (gas: 1076615)
+[PASS] testRingOfFreshAccountsCannotBackOrBorrow() (gas: 1853857)
+[PASS] testStakeIsNotPoolLiquidity() (gas: 110104)
+[PASS] testStakedRingBorrowsNoMoreThanItsStakeAndLendersLoseNothing() (gas: 1946726)
+[PASS] testUnstakeRejectsMoreThanStaked() (gas: 99548)
+Suite result: ok. 18 passed; 0 failed; 0 skipped; finished in 9.68ms (8.49ms CPU time)
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/TransitiveStakeRouterInvariantTest/invariant_R1_routerHoldsExactlyTheFreeBalancesAndStrayFunds" file was ignored because test contract bytecode has changed.
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/TransitiveStakeRouterInvariantTest/invariant_R2_eachRootConserves" file was ignored because test contract bytecode has changed.
+
+Ran 19 tests for test/BootstrapOrderEscrow.t.sol:BootstrapOrderEscrowTest
+[PASS] testASecondOrderCannotAttachTheFirstLoan() (gas: 1612475)
+[PASS] testAWorkerAcceptanceOfAnotherJobIsRejected() (gas: 715212)
+[PASS] testBackingBeforeTheManagerLocksTheChoice() (gas: 312193)
+[PASS] testExpiredOrderRefundsOnlyTheOriginalPayer() (gas: 370978)
+[PASS] testFuzzEverySettledUnitIsConserved(uint256) (runs: 256, μ: 1118710, ~: 1120424)
+[PASS] testLateInterestAboveTheCapNeverReleasesWorkerMoney() (gas: 985701)
+[PASS] testNoLoanCanExistBeforeTheOrderSoNoneCanBeBoundToIt() (gas: 74263)
+[PASS] testOriginatePaysTheVendorAndSettleClearsDebtBeforeTheWorker() (gas: 1132715)
+[PASS] testPartialRepaymentByAnyoneReducesWhatSettleRepays() (gas: 1057851)
+[PASS] testRefundThenBroadcastTheSignedAdvanceFails() (gas: 423117)
+[PASS] testRejectionRefundsTheCustomerAndLeavesTheDisbursedDebt() (gas: 959626)
+[PASS] testRelayerWhitelistMustNameTheAdapter() (gas: 1047940)
+[PASS] testRepaidLoanPaysTheWholePriceAndDefaultDoesNotSettle() (gas: 1745659)
+[PASS] testReplayAndDuplicateExecutionAreRejected() (gas: 1037835)
+[PASS] testSevenDaySettlementPaysInterestAndLeavesTheProtectedReserve() (gas: 1188710)
+[PASS] testSignaturesDoNotReplayOnAnotherChainOrAnotherAdapter() (gas: 2399392)
+[PASS] testUnauthorizedSettlementCannotReleaseFunds() (gas: 975564)
+[PASS] testUnmanagedWorkerCannotBeOriginatedByTheAdapter() (gas: 687905)
+[PASS] testWrongVendorAmountTermAprNonceDeadlineAreEachRejected() (gas: 2331179)
+Suite result: ok. 19 passed; 0 failed; 0 skipped; finished in 166.28ms (172.46ms CPU time)
+
+Ran 37 tests for test/TransitiveStakeRouter.t.sol:TransitiveStakeRouterTest
+[PASS] testAHigherLimitConsentOfTheSameVersionStaysUsableUntilTheRootRevokes() (gas: 1712636)
+[PASS] testALotBelowTheMinimumBackingIsRefusedByThePool() (gas: 938826)
+[PASS] testASignedPoolRequestCannotBeReplayed() (gas: 1968007)
+[PASS] testAThirdPartyBackerShareTheSlashSoTheRootsLoseLess() (gas: 1730740)
+[PASS] testBorrowerMustHaveNamedTheRouter() (gas: 198524)
+[PASS] testCertifiedLoanRepaidDirectlyAtPoolCannotBeReopenedOnAnyOtherPath() (gas: 1631187)
+[PASS] testConsentDoesNotReplayOnAnotherRouterOrChain() (gas: 2623655)
+[PASS] testConsentExpiryVersionSignerLimitAndTermAreEnforced() (gas: 398944)
+[PASS] testConsentLimitBoundaryIsExact() (gas: 1705734)
+[PASS] testDefaultNeverTouchesLendersPrincipalWhenTheLotCoversTheLoan() (gas: 1502932)
+[PASS] testDefaultedBorrowerCannotBorrowAgainThroughTheRouter() (gas: 1844198)
+[PASS] testDepositRefusesAFeeOnTransferShortfallAndZero() (gas: 20641)
+[PASS] testDirectRepaymentBeforeSyncDoesNotFreeRootCapacityForAnotherBorrower() (gas: 2842721)
+[PASS] testDonationToTheVaultCannotHideALossNorBreakTheLedger() (gas: 1521489)
+[PASS] testExactScopeNamesOneBorrowerAndWildcardNamesAny() (gas: 2992897)
+[PASS] testFuzzAttributionSumsToTheLossAndNeverExceedsAPath(uint96,uint96,uint96,uint96,uint8,uint256) (runs: 257, μ: 2503149, ~: 2502096)
+[PASS] testManagerCannotBeChangedWhileTheLotIsLive() (gas: 1628857)
+[PASS] testMidEdgeMustStartAtTheMidAndEndAtTheBorrower() (gas: 231255)
+[PASS] testNonRouterCannotDriveTheVault() (gas: 1679835)
+[PASS] testOneRootTwoBorrowersCannotOverdrawItsFreeBalance() (gas: 2975251)
+[PASS] testOnlyOneOpenLotPerBorrower() (gas: 1706284)
+[PASS] testPartialRepaymentThenDefaultChargesTheUnpaidPrincipalToTheRootsProRata() (gas: 1860369)
+[PASS] testPathCountAndAmountsAreChecked() (gas: 455931)
+[PASS] testRelayerWhitelistMustNameTheRouter() (gas: 2735167)
+[PASS] testRepeatedRootEdgeInOneCertificateCountsTwiceAgainstTheLimit() (gas: 361896)
+[PASS] testRevokedConsentCannotBeUsedAndLiveExposureIsUnaffected() (gas: 2297621)
+[PASS] testRevokingTheRootEdgeInvalidatesEveryBorrowersConsentButAMidRevocationIsLocal() (gas: 3093418)
+[PASS] testRootCannotBeItsOwnMidNorTheBorrowerNorTheRouter() (gas: 300989)
+[PASS] testRootCannotWithdrawALockedLotUntilItIsSynced() (gas: 1683458)
+[PASS] testRootToMidCapIsSharedAcrossBorrowers() (gas: 2823209)
+[PASS] testSecondCycleOnTheSameConsentsWithinTheLimit() (gas: 2267108)
+[PASS] testSharedMidEdgeLimitBindsAcrossRoots() (gas: 2099624)
+[PASS] testSmartWalletRootSignsThroughErc1271() (gas: 1791442)
+[PASS] testStrayUsdcInTheRouterOrVaultDoesNotChangeAccounting() (gas: 1628041)
+[PASS] testSyncDoesNothingWhileTheLoanIsOpen() (gas: 1691495)
+[PASS] testTwoHopLoanIsBackedByTheRootsStakeAndReleasedOnRepayment() (gas: 1653072)
+[PASS] testTwoRootsAndTwoMidsSplitOneLot() (gas: 1744700)
+Suite result: ok. 37 passed; 0 failed; 0 skipped; finished in 69.17ms (89.12ms CPU time)
+
+Ran 1 test for test/fork/TransitiveStakeRouterFork.t.sol:TransitiveStakeRouterForkTest
+[SKIP: skipped: set BASE_SEPOLIA_RPC_URL to run fork tests] setUp() (gas: 0)
+Suite result: ok. 0 passed; 0 failed; 1 skipped; finished in 1.17ms (0.00ns CPU time)
+
+Ran 25 tests for test/BootstrapOrderRouter.t.sol:BootstrapOrderRouterTest
+[PASS] testASecondOrderWaitsForTheFirstLotAndNeverAttachesTheFirstLoan() (gas: 3147806)
+[PASS] testAThirdPartyCuresTheLoanBeforeSettlementAndNothingIsReleasedTwice() (gas: 2173337)
+[PASS] testAWorkerAcceptanceOfAnotherJobIsRejected() (gas: 769514)
+[PASS] testBackingBeforeTheManagerLocksTheChoiceAndLiveBackingFixesIt() (gas: 2440912)
+[PASS] testComposedFlowFundedOrderTwoHopStakeVendorPaymentDebtFirstSettlementAndFullExit() (gas: 2171561)
+[PASS] testDefaultAfterPartialRepaymentChargesOnlyTheUnpaidPrincipal() (gas: 2173057)
+[PASS] testDefaultedLoanCannotBeSettled() (gas: 2044797)
+[PASS] testEscrowIsNeverCountedAsBacking() (gas: 573549)
+[PASS] testExpiredOrderRefundsOnlyTheOriginalPayer() (gas: 375820)
+[PASS] testFuzzEverySettledUnitIsConserved(uint256,uint256) (runs: 257, μ: 2252102, ~: 2252473)
+[PASS] testLateInterestAboveTheCapNeverReleasesWorkerMoney() (gas: 2180155)
+[PASS] testNoLoanCanExistBeforeTheOrderSoNoneCanBeBoundToIt() (gas: 115864)
+[PASS] testPartialRepaymentByAnyoneReducesWhatSettleRepays() (gas: 2197770)
+[PASS] testRefundThenBroadcastTheSignedAdvanceFails() (gas: 482501)
+[PASS] testRejectionThenDefaultChargesTheRootsExactlyAndLeavesLendersWhole() (gas: 2061988)
+[PASS] testRelayerWhitelistMustNameTheRouter() (gas: 3381268)
+[PASS] testReplayAndDuplicateExecutionAreRejected() (gas: 1996178)
+[PASS] testRootsCannotWithdrawEscrowAndRefundsCannotTouchRootFunds() (gas: 491965)
+[PASS] testSevenDaySettlementPaysInterestAndLeavesTheProtectedReserve() (gas: 2171289)
+[PASS] testSignaturesDoNotReplayOnAnotherRouterOrChain() (gas: 4266473)
+[PASS] testTheRouterHasNoUnboundOriginationEntry() (gas: 162861)
+[PASS] testTheSameRootToMidBudgetBindsTwoWorkersOrders() (gas: 3600955)
+[PASS] testUnauthorizedSettlementCannotReleaseFunds() (gas: 2169669)
+[PASS] testUnmanagedWorkerCannotBeOriginatedByTheRouter() (gas: 457438)
+[PASS] testWrongVendorAmountTermAprNonceDeadlineWorkerAreEachRejected() (gas: 2435535)
+Suite result: ok. 25 passed; 0 failed; 0 skipped; finished in 468.90ms (481.69ms CPU time)
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/CreditConservationInvariantTest/invariant_I7_impairment" file was ignored because test contract bytecode has changed.
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/BootstrapOrderRouterInvariantTest/invariant_O3_eachRootConserves" file was ignored because test contract bytecode has changed.
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/TransitiveStakeRouterInvariantTest/invariant_R3_lockedAndEdgeExposureFollowTheOpenPaths" file was ignored because test contract bytecode has changed.
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/BootstrapOrderRouterInvariantTest/invariant_O4_lockedFollowsTheOpenPaths" file was ignored because test contract bytecode has changed.
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/BootstrapOrderRouterInvariantTest/invariant_O5_sharedEdgeExposureIsTheSumAcrossWorkers" file was ignored because test contract bytecode has changed.
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/TransitiveStakeRouterInvariantTest/invariant_R4_openLotsAreSecuredByTheVaultAndClosedOnesLeaveNothing" file was ignored because test contract bytecode has changed.
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/BootstrapOrderRouterInvariantTest/invariant_O6_poolExposureWithinTheLotsAndLendersLoseNothing" file was ignored because test contract bytecode has changed.
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/BootstrapOrderRouterInvariantTest/invariant_O7_everyCreatedUnitHasAKnownHolder" file was ignored because test contract bytecode has changed.
+
+Ran 7 tests for test/invariant/BootstrapOrderRouter.invariant.t.sol:BootstrapOrderRouterInvariantTest
+[PASS] invariant_O1_routerHoldsExactlyFreeRootsPlusEscrowPlusStrays() (runs: 64, calls: 5120, reverts: 0)
+
+╭--------------------+--------------+-------+---------+----------╮
+| Contract           | Selector     | Calls | Reverts | Discards |
++================================================================+
+| OrderRouterHandler | defaultOne   | 517   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | fund         | 532   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | originate    | 519   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | refund       | 508   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | repay        | 480   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootDeposit  | 511   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootWithdraw | 499   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | settle       | 532   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | syncOne      | 516   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | warp         | 506   | 0       | 0        |
+╰--------------------+--------------+-------+---------+----------╯
+
+[PASS] invariant_O2_escrowHeldIsTheOpenOrdersPrices() (runs: 64, calls: 5120, reverts: 0)
+
+╭--------------------+--------------+-------+---------+----------╮
+| Contract           | Selector     | Calls | Reverts | Discards |
++================================================================+
+| OrderRouterHandler | defaultOne   | 509   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | fund         | 517   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | originate    | 516   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | refund       | 495   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | repay        | 527   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootDeposit  | 526   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootWithdraw | 509   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | settle       | 500   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | syncOne      | 514   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | warp         | 507   | 0       | 0        |
+╰--------------------+--------------+-------+---------+----------╯
+
+[PASS] invariant_O3_eachRootConserves() (runs: 64, calls: 5120, reverts: 0)
+
+╭--------------------+--------------+-------+---------+----------╮
+| Contract           | Selector     | Calls | Reverts | Discards |
++================================================================+
+| OrderRouterHandler | defaultOne   | 487   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | fund         | 540   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | originate    | 527   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | refund       | 488   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | repay        | 487   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootDeposit  | 510   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootWithdraw | 474   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | settle       | 538   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | syncOne      | 532   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | warp         | 537   | 0       | 0        |
+╰--------------------+--------------+-------+---------+----------╯
+
+[PASS] invariant_O4_lockedFollowsTheOpenPaths() (runs: 64, calls: 5120, reverts: 0)
+
+╭--------------------+--------------+-------+---------+----------╮
+| Contract           | Selector     | Calls | Reverts | Discards |
++================================================================+
+| OrderRouterHandler | defaultOne   | 510   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | fund         | 503   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | originate    | 556   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | refund       | 514   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | repay        | 508   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootDeposit  | 508   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootWithdraw | 471   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | settle       | 508   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | syncOne      | 532   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | warp         | 510   | 0       | 0        |
+╰--------------------+--------------+-------+---------+----------╯
+
+[PASS] invariant_O5_sharedEdgeExposureIsTheSumAcrossWorkers() (runs: 64, calls: 5120, reverts: 0)
+
+╭--------------------+--------------+-------+---------+----------╮
+| Contract           | Selector     | Calls | Reverts | Discards |
++================================================================+
+| OrderRouterHandler | defaultOne   | 491   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | fund         | 567   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | originate    | 520   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | refund       | 514   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | repay        | 485   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootDeposit  | 518   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootWithdraw | 494   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | settle       | 492   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | syncOne      | 520   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | warp         | 519   | 0       | 0        |
+╰--------------------+--------------+-------+---------+----------╯
+
+[PASS] invariant_O6_poolExposureWithinTheLotsAndLendersLoseNothing() (runs: 64, calls: 5120, reverts: 0)
+
+╭--------------------+--------------+-------+---------+----------╮
+| Contract           | Selector     | Calls | Reverts | Discards |
++================================================================+
+| OrderRouterHandler | defaultOne   | 551   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | fund         | 485   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | originate    | 504   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | refund       | 499   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | repay        | 507   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootDeposit  | 531   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootWithdraw | 517   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | settle       | 507   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | syncOne      | 522   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | warp         | 497   | 0       | 0        |
+╰--------------------+--------------+-------+---------+----------╯
+
+[PASS] invariant_O7_everyCreatedUnitHasAKnownHolder() (runs: 64, calls: 5120, reverts: 0)
+
+╭--------------------+--------------+-------+---------+----------╮
+| Contract           | Selector     | Calls | Reverts | Discards |
++================================================================+
+| OrderRouterHandler | defaultOne   | 518   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | fund         | 511   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | originate    | 486   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | refund       | 520   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | repay        | 474   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootDeposit  | 486   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | rootWithdraw | 535   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | settle       | 530   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | syncOne      | 555   | 0       | 0        |
+|--------------------+--------------+-------+---------+----------|
+| OrderRouterHandler | warp         | 505   | 0       | 0        |
+╰--------------------+--------------+-------+---------+----------╯
+
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 10.13s (13.22s CPU time)
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/CreditConservationInvariantTest/invariant_handlerHealth" file was ignored because test contract bytecode has changed.
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/TransitiveStakeRouterInvariantTest/invariant_R6_handlerChecksHold" file was ignored because test contract bytecode has changed.
+Warning: Failure from "/home/user/microcredit-contract/packages/foundry/cache/invariant/failures/CreditConservationInvariantTest/invariant_poolLedgers" file was ignored because test contract bytecode has changed.
+
+Ran 7 tests for test/invariant/TransitiveStakeRouter.invariant.t.sol:TransitiveStakeRouterInvariantTest
+[PASS] invariant_R1_routerHoldsExactlyTheFreeBalancesAndStrayFunds() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+------------------+-------+---------+----------╮
+| Contract      | Selector         | Calls | Reverts | Discards |
++===============================================================+
+| RouterHandler | attemptDirect    | 494   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | defaultOne       | 473   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | deposit          | 448   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | originate        | 463   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | repay            | 476   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | revoke           | 445   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | syncOne          | 459   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyBack   | 492   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyUnback | 423   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | warp             | 471   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | withdraw         | 476   | 0       | 0        |
+╰---------------+------------------+-------+---------+----------╯
+
+[PASS] invariant_R2_eachRootConserves() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+------------------+-------+---------+----------╮
+| Contract      | Selector         | Calls | Reverts | Discards |
++===============================================================+
+| RouterHandler | attemptDirect    | 487   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | defaultOne       | 437   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | deposit          | 450   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | originate        | 466   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | repay            | 456   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | revoke           | 492   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | syncOne          | 504   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyBack   | 493   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyUnback | 451   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | warp             | 440   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | withdraw         | 444   | 0       | 0        |
+╰---------------+------------------+-------+---------+----------╯
+
+[PASS] invariant_R3_lockedAndEdgeExposureFollowTheOpenPaths() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+------------------+-------+---------+----------╮
+| Contract      | Selector         | Calls | Reverts | Discards |
++===============================================================+
+| RouterHandler | attemptDirect    | 484   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | defaultOne       | 422   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | deposit          | 476   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | originate        | 477   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | repay            | 463   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | revoke           | 480   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | syncOne          | 456   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyBack   | 452   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyUnback | 470   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | warp             | 468   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | withdraw         | 472   | 0       | 0        |
+╰---------------+------------------+-------+---------+----------╯
+
+[PASS] invariant_R4_openLotsAreSecuredByTheVaultAndClosedOnesLeaveNothing() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+------------------+-------+---------+----------╮
+| Contract      | Selector         | Calls | Reverts | Discards |
++===============================================================+
+| RouterHandler | attemptDirect    | 489   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | defaultOne       | 464   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | deposit          | 471   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | originate        | 476   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | repay            | 463   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | revoke           | 452   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | syncOne          | 442   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyBack   | 432   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyUnback | 462   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | warp             | 514   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | withdraw         | 455   | 0       | 0        |
+╰---------------+------------------+-------+---------+----------╯
+
+[PASS] invariant_R5_lendersLosePrincipalOnlyToThePoolsRounding() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+------------------+-------+---------+----------╮
+| Contract      | Selector         | Calls | Reverts | Discards |
++===============================================================+
+| RouterHandler | attemptDirect    | 503   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | defaultOne       | 461   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | deposit          | 450   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | originate        | 465   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | repay            | 465   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | revoke           | 455   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | syncOne          | 451   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyBack   | 463   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyUnback | 440   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | warp             | 490   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | withdraw         | 477   | 0       | 0        |
+╰---------------+------------------+-------+---------+----------╯
+
+[PASS] invariant_R6_handlerChecksHold() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+------------------+-------+---------+----------╮
+| Contract      | Selector         | Calls | Reverts | Discards |
++===============================================================+
+| RouterHandler | attemptDirect    | 429   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | defaultOne       | 452   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | deposit          | 496   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | originate        | 450   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | repay            | 484   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | revoke           | 471   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | syncOne          | 469   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyBack   | 448   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyUnback | 448   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | warp             | 485   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | withdraw         | 488   | 0       | 0        |
+╰---------------+------------------+-------+---------+----------╯
+
+[PASS] invariant_R7_managedPoolExposureEqualsRouterRecordedActivePrincipal() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+------------------+-------+---------+----------╮
+| Contract      | Selector         | Calls | Reverts | Discards |
++===============================================================+
+| RouterHandler | attemptDirect    | 450   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | defaultOne       | 476   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | deposit          | 472   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | originate        | 456   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | repay            | 467   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | revoke           | 456   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | syncOne          | 472   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyBack   | 480   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | thirdPartyUnback | 457   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | warp             | 460   | 0       | 0        |
+|---------------+------------------+-------+---------+----------|
+| RouterHandler | withdraw         | 474   | 0       | 0        |
+╰---------------+------------------+-------+---------+----------╯
+
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 12.43s (20.66s CPU time)
+
+Ran 14 tests for test/invariant/CreditConservation.invariant.t.sol:CreditConservationInvariantTest
+[PASS] invariant_I1_capacityBound() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 269   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 261   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 251   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 228   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 225   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 213   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 242   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 254   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 245   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 219   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 247   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 261   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 272   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 275   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 247   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 236   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 222   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 245   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 231   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 222   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+[PASS] invariant_I1b_lostCreditBacksNobody() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 232   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 289   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 267   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 233   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 253   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 225   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 258   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 221   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 271   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 235   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 249   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 243   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 235   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 252   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 243   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 200   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 256   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 242   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 234   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+[PASS] invariant_I2_lossBound() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 242   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 243   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 240   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 227   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 219   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 219   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 244   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 242   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 262   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 262   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 234   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 239   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 269   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 264   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 260   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 232   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 240   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 235   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 257   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 249   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+[PASS] invariant_I3_sybilIndependence() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 262   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 231   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 227   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 253   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 220   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 245   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 248   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 261   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 244   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 260   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 260   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 240   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 250   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 258   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 225   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 205   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 232   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 248   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+[PASS] invariant_I4_sybilsCommitNothingTheyDidNotPay() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 244   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 271   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 263   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 234   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 247   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 221   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 264   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 263   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 253   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 243   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 231   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 217   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 227   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 231   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 247   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 225   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 250   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 238   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+[PASS] invariant_I5_solvency() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 257   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 249   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 227   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 224   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 267   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 248   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 243   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 268   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 229   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 219   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 268   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 263   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 221   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 229   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 242   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 247   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+[PASS] invariant_I6_lenderClaims() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 228   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 261   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 261   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 246   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 245   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 232   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 262   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 246   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 228   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 240   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 249   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 210   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 259   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 244   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 244   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 235   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 223   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 253   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 248   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 251   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+[PASS] invariant_I7_impairment() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 237   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 253   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 264   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 211   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 259   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 252   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 283   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 237   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 234   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 246   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 223   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 268   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 244   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 247   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 227   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 238   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 233   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 248   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 236   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 221   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 259   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+[PASS] invariant_I8_honestLendersPayOnlyForIssuedLines() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 262   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 256   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 259   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 240   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 231   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 236   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 228   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 226   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 261   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 237   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 251   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 258   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 249   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 231   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 228   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 245   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 230   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 223   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 259   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+[PASS] invariant_I9_noPrincipalForgiven() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 259   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 243   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 233   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 273   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 252   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 254   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 259   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 252   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 217   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 226   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 248   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 214   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 243   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 240   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 244   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 237   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 252   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 234   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 257   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 228   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+[PASS] invariant_Q_perAccountCreditBudget() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 248   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 235   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 250   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 245   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 258   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 227   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 249   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 243   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 266   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 254   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 256   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 218   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 220   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 228   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 238   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 245   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 257   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 236   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 265   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+[PASS] invariant_creditLedgers() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 220   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 249   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 226   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 236   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 248   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 242   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 243   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 247   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 225   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 229   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 254   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 233   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 257   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 250   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 243   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 251   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 235   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 280   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 256   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+[PASS] invariant_handlerHealth() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 209   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 219   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 232   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 251   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 266   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 260   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 261   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 226   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 249   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 251   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 234   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 242   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 247   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 233   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 213   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 264   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 234   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 264   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 269   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+[PASS] invariant_poolLedgers() (runs: 64, calls: 5120, reverts: 0)
+
+╭---------------+-------------------+-------+---------+----------╮
+| Contract      | Selector          | Calls | Reverts | Discards |
++================================================================+
+| CreditHandler | back              | 252   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrow            | 258   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | borrowWithTerm    | 223   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | cancelLoan        | 267   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | claimFees         | 269   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | deposit           | 216   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | disburseLoan      | 241   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | donate            | 246   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | fundReserve       | 220   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | impairLoan        | 270   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | markDefaulted     | 242   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | processQueue      | 247   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | releaseReserve    | 209   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | repay             | 261   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestLoan       | 242   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | requestWithdrawal | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | stake             | 255   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | sybilRing         | 243   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | unstake           | 239   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | warp              | 227   | 0       | 0        |
+|---------------+-------------------+-------+---------+----------|
+| CreditHandler | withdraw          | 238   | 0       | 0        |
+╰---------------+-------------------+-------+---------+----------╯
+
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 15.68s (53.58s CPU time)
+
+Ran 31 test suites in 15.70s (39.12s CPU time): 340 tests passed, 0 failed, 14 skipped (354 total tests)

@@ -42,3 +42,6 @@ packages/foundry/deployment.production.json
 # Python
 __pycache__/
 *.pyc
+
+# Temporary static-build lock (removed on exit)
+packages/nextjs/.static-build-lock/

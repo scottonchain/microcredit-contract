@@ -1,0 +1,21 @@
+No files changed, compilation skipped
+
+Ran 9 tests for test/BootstrapReadiness.t.sol:BootstrapReadinessTest
+[PASS] testCancelledReservationReturnsCapacityWithoutPayingVendor() (gas: 927425)
+[PASS] testOneRootCannotDoubleAllocateItsStakeOrExitWhileLoansRemain() (gas: 1995402)
+[PASS] testPartialSubCentPrincipalCannotEscapeTheLoanOrBacking() (gas: 1398775)
+[PASS] testReceivedBackingIsNotAnImplementedTransitiveRoute() (gas: 282324)
+[PASS] testRejectedOrderUsesSponsorStakeWithoutCustomerOrOperatorCure() (gas: 1097407)
+[PASS] testSecondSettlementCannotPullCustomerFundsAgain() (gas: 1308306)
+[PASS] testSevenDayCustomerPaymentFundsInterestAndLeavesProtectedReserve() (gas: 1373700)
+Logs:
+  interest base units: 357
+  lender gross return base units: 196
+  protected reserve base units: 160
+  worker remainder base units: 299643
+
+[PASS] testSignedVendorCannotBeSubstitutedAndOriginationCannotReplay() (gas: 772521)
+[PASS] testZeroGrantZeroEthBorrowerPaysVendorAndCompletesFirstDayCycle() (gas: 1291973)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 4.61ms (8.24ms CPU time)
+
+Ran 1 test suite in 5.21ms (4.61ms CPU time): 9 tests passed, 0 failed, 0 skipped (9 total tests)

@@ -1,0 +1,19 @@
+settle forgets to debit escrow: KILLED by 14 test(s), e.g. testAThirdPartyCuresTheLoanBeforeSettlementAndNothingIsReleasedTwice
+refund forgets to debit escrow: KILLED by 10 test(s), e.g. testDefaultedLoanCannotBeSettled
+settle skips returning the lot: KILLED by 4 test(s), e.g. testComposedFlowFundedOrderTwoHopStakeVendorPaymentDebtFirstSettlementAndFullExit
+fund counts escrow twice: KILLED by 28 test(s), e.g. testAThirdPartyCuresTheLoanBeforeSettlementAndNothingIsReleasedTwice
+root edge key scoped to the borrower again: KILLED by 68 test(s), e.g. testASecondOrderWaitsForTheFirstLotAndNeverAttachesTheFirstLoan
+wildcard scope not accepted: KILLED by 52 test(s), e.g. testASecondOrderWaitsForTheFirstLotAndNeverAttachesTheFirstLoan
+exact scope ignored: KILLED by 4 test(s), e.g. testExactScopeNamesOneBorrowerAndWildcardNamesAny
+router accepts a pool that does not name it: KILLED by 4 test(s), e.g. testRouterRefusesAPoolThatNamesSomeoneElseAsOriginator
+no officer gate in originateOrder: KILLED by 10 test(s), e.g. testAnOutageStopsNewAdmissionsOnlyAndLeavesEveryExitWorking
+approval amount ceiling ignored: KILLED by 2 test(s), e.g. testAnApprovalBelowTheAmountCannotOriginate
+officer rotation keeps the epoch: KILLED by 2 test(s), e.g. testRotationWithTheSamePolicyStillVoidsOldApprovals
+approval not bound to the intent hash: KILLED by 2 test(s), e.g. testAnApprovalForOneOrderCannotBeUsedForAnother
+anyone can name the officer: KILLED by 2 test(s), e.g. testOnlyTheAdminOrTheOfficerCanChangeTheOfficer
+anyone can revoke the officer: KILLED by 2 test(s), e.g. testOnlyTheAdminOrTheOfficerCanChangeTheOfficer
+stale epoch accepted when recording an approval: KILLED by 2 test(s), e.g. testRotationWithTheSamePolicyStillVoidsOldApprovals
+pool originator gate removed: KILLED by 22 test(s), e.g. testDirectRepaymentFreesCapacityOnlyForTheOriginator
+pool originator gate inverted: KILLED by 114 test(s), e.g. testDefaultOfAnOriginatedLoanChargesTheSponsorStakeByTheUnpaidPrincipal
+pool treats a zero originator as closed: KILLED by 308 test(s), e.g. testAdvanceNearACentStaysOpenUntilItsPrincipalIsRepaid
+18 mutants, 0 survived or did not compile

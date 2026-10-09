@@ -56,11 +56,10 @@ covered by `SybilResistance.t.sol` and the invariant suite, not by this script.
 import argparse
 import json
 import sys
-import urllib.request
 from decimal import Decimal
+from rpc_client import RpcError, rpc
 
 USDC = 10**6
-USER_AGENT = "two-hop-check/1 (+https://github.com/scottonchain/microcredit-contract)"
 MIN_BACKING = USDC  # the pool's MIN_BACKING
 
 SEL = {
@@ -108,24 +107,6 @@ SIGNATURES = {
 }
 
 
-class RpcError(Exception):
-    def __init__(self, message, data=None):
-        super().__init__(message)
-        self.data = data
-
-
-def rpc(url, method, params):
-    body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
-    # Some public endpoints refuse Python's default user agent with 403.
-    req = urllib.request.Request(url, data=body, headers={"content-type": "application/json", "user-agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        out = json.loads(resp.read())
-    if "error" in out:
-        err = out["error"]
-        raise RpcError(err.get("message", "rpc error"), err.get("data"))
-    return out["result"]
-
-
 def word_address(addr):
     a = addr.lower()
     if a.startswith("0x"):
@@ -136,8 +117,8 @@ def word_address(addr):
 
 
 def word_uint(n):
-    if n < 0:
-        raise ValueError("negative amount")
+    if not isinstance(n, int) or isinstance(n, bool) or not 0 <= n < 2**256:
+        raise ValueError("amount must be a uint256")
     return format(n, "x").rjust(64, "0")
 
 
@@ -147,6 +128,8 @@ def calldata(selector, *words):
 
 def words_of(result):
     h = result[2:] if result.startswith("0x") else result
+    if not h or len(h) % 64 or any(c not in "0123456789abcdefABCDEF" for c in h):
+        raise ValueError("RPC result is not a sequence of complete ABI words")
     return [int(h[i : i + 64], 16) for i in range(0, len(h), 64)]
 
 

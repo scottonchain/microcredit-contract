@@ -63,3 +63,21 @@ An account can borrow only against credit it holds, or credit that someone who h
 ## After the Demo
 
 Servers (Anvil and Next.js) stop automatically when the Playwright script finishes. Logs are in `logs/`, and the chain state is saved to `chain-state-demo.json`. By default the next run deploys fresh; pass `--reuse` to reload the saved state instead.
+
+## Wallets and local funding
+
+The demo injects a local `window.ethereum` provider and sets `NEXT_PUBLIC_DEMO_WALLET=true`. It uses Anvil's unlocked accounts so that the persona switcher can sign without extension pop-ups. This mode requires the browser and Anvil on the same machine, at `http://127.0.0.1:8545` (chain ID `31337`). It is a development facility.
+
+For a real browser wallet, use the separate-terminal setup in the [README](README.md), leaving `NEXT_PUBLIC_DEMO_WALLET` unset or false. The local burner wallet is available, alongside the configured MetaMask, Rabby and Coinbase connectors. The maintained connector list is `packages/nextjs/services/web3/wagmiConnectors.tsx`; the project does not claim support for every wallet listed by RainbowKit. A custom WalletConnect project ID can be set with `NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` in `packages/nextjs/.env.local`.
+
+Add a custom local wallet network with RPC `http://127.0.0.1:8545`, chain ID `31337` and currency `ETH`. Leave the wallet's explorer field empty: the RPC endpoint is not a block explorer. Use the app's `/blockexplorer` or `/debug` for inspection. A phone's `127.0.0.1` points to the phone, so scanning a QR code does not expose the desktop's local chain.
+
+After connecting, `/fund` can add 1 ETH or mint 10,000 MockUSDC. It checks that both the app and RPC target local Anvil and waits for a successful mint receipt. The token address comes from the generated deployment map. `/populate-test-data` links back to the same deployment script; it does not run a second simulation or seed another collection of accounts.
+
+For local relayer configuration, Anvil's first unlocked account pays gas by default; `LOCAL_RPC_URL` overrides its endpoint. A server relayer on a non-local chain requires `RPC_URL` and a server-only `RELAYER_PRIVATE_KEY`. Never put a relayer key in a `NEXT_PUBLIC_*` variable. Public execution still follows the separate release gates.
+
+## Troubleshooting and reset
+
+If the app cannot read balances or contracts, confirm that Anvil is running on chain `31337`, run the local deployment, and reload the app so its generated addresses match the chain. If a wallet retains a transaction nonce after a chain reset, clear that wallet's local activity before retrying. Browser wallet configuration changes and `NEXT_PUBLIC_*` environment changes require restarting the app.
+
+`yarn restart` stops only the repository's recorded processes, removes its local saved chain state, restarts and redeploys. Use `yarn demo --manual --reuse` when the existing demo state is wanted. The faucet has no reset button. Logs are in `logs/`; inspect them locally without publishing secrets or session details.

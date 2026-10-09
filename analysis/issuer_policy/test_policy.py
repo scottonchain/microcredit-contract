@@ -227,6 +227,27 @@ class TheoremThreeCompliance(unittest.TestCase):
         pool.account(second).defaulted_loans = 1
         self.assertEqual(plan_for(pool, reg, provider, [first]).targets[first].reason, "identity_ended")
 
+    def test_rebinding_an_address_cannot_hide_its_identity_default(self):
+        provider, pool, reg = world()
+        first, second = addr(1), addr(2)
+        verify(pool, reg, first, "standard", "person")
+        verify(pool, reg, second, "standard", "person")
+        pool.account(first).defaulted_loans = 1
+        with self.assertRaisesRegex(ValueError, "different identity"):
+            reg.bind("new-person", "standard", second)
+        self.assertNotIn("new-person", reg.identities)
+        self.assertEqual(reg.by_address[second], "person")
+        self.assertEqual(plan_for(pool, reg, provider, [second]).targets[second].reason, "identity_ended")
+
+    def test_binding_is_idempotent_but_cannot_silently_reclassify_a_tier(self):
+        reg = pol.IdentityRegistry()
+        reg.bind("person", "standard", addr(1))
+        reg.bind("person", "standard", addr(1))
+        self.assertEqual(reg.identities["person"].addresses, [addr(1)])
+        with self.assertRaisesRegex(ValueError, "change tier"):
+            reg.bind("person", "enhanced", addr(2))
+        self.assertNotIn(addr(2), reg.by_address)
+
 
 # ───────────────────────────── property 2: identity-cost bound ─────────────────────────────
 

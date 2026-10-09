@@ -1,0 +1,944 @@
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/OrderRouterHandler.sol:33:47
+   |
+33 |     DecentralizedMicrocredit public immutable credit;
+   |                                               ^^^^^^ help: consider using: `CREDIT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> contracts/BootstrapOrderEscrow.sol:56:47
+   |
+56 |     DecentralizedMicrocredit public immutable pool;
+   |                                               ^^^^ help: consider using: `POOL`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> contracts/BootstrapOrderEscrow.sol:57:29
+   |
+57 |     IERC20 public immutable token;
+   |                             ^^^^^ help: consider using: `TOKEN`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/OrderRouterHandler.sol:34:31
+   |
+34 |     MockUSDC public immutable usdc;
+   |                               ^^^^ help: consider using: `USDC`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/OrderRouterHandler.sol:35:43
+   |
+35 |     BootstrapOrderRouter public immutable router;
+   |                                           ^^^^^^ help: consider using: `ROUTER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/OrderRouterHandler.sol:36:30
+   |
+36 |     address public immutable stranger = address(0x57A4);
+   |                              ^^^^^^^^ help: consider using: `STRANGER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unused-import]: unused imports should be removed
+ --> test/fork/TransitiveStakeRouterFork.t.sol:8:27
+  |
+8 | import { StakeRouterBase, TransitiveStakeRouter } from "../../contracts/TransitiveStakeRouter.sol";
+  |                           ^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/OrderRouterHandler.sol:37:30
+   |
+37 |     address public immutable vendor = address(0x7E4D);
+   |                              ^^^^^^ help: consider using: `VENDOR`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[asm-keccak256]: use of inefficient hashing mechanism; consider using inline assembly
+   --> contracts/BootstrapOrderEscrow.sol:93:16
+    |
+ 93 |           return keccak256(
+    |  ________________^
+ 94 | |             abi.encode(
+ 95 | |                 INTENT_TYPEHASH,
+ 96 | |                 address(pool),
+...   |
+107 | |         );
+    | |_________^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#asm-keccak256
+
+note[named-struct-fields]: prefer initializing structs with named fields
+   --> contracts/BootstrapOrderEscrow.sol:123:22
+    |
+123 |         orders[id] = Order(msg.sender, price, maxDebt, settleBy, h, 0, State.Funded);
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using named fields: `Order({ payer: msg.sender, price: price, maxDebt: maxDebt, settleBy: settleBy, intentHash: h, loanId: 0, state: State.Funded })`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#named-struct-fields
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+  --> test/invariant/OrderRouterHandler.sol:90:36
+   |
+90 |             customers.push(address(uint160(0xC057 + i)));
+   |                                    ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: consider disabling this lint if you're certain the cast is safe
+           
+           // casting to 'uint160' is safe because [explain why]
+           // forge-lint: disable-next-line(unsafe-typecast)
+           
+           
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/invariant/BootstrapOrderRouter.invariant.t.sol:145:46
+    |
+145 |         if (bytes(statsFile).length != 0) vm.writeLine(statsFile, line);
+    |                                              ^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unused-import]: unused imports should be removed
+ --> test/invariant/BootstrapOrderRouter.invariant.t.sol:6:10
+  |
+6 | import { StakeRouterBase } from "../../contracts/TransitiveStakeRouter.sol";
+  |          ^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> contracts/MicrocreditLens.sol:17:47
+   |
+17 |     DecentralizedMicrocredit public immutable credit;
+   |                                               ^^^^^^ help: consider using: `CREDIT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[mixed-case-function]: function names should use mixedCase
+  --> contracts/MicrocreditLens.sol:26:14
+   |
+26 |     function getFundingPoolAPY() external view returns (uint256) {
+   |              ^^^^^^^^^^^^^^^^^ help: consider using: `getFundingPoolApy`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+warning[divide-before-multiply]: multiplication should occur before division to avoid loss of precision
+  --> contracts/MicrocreditLens.sol:95:16
+   |
+95 |         return ((credit.getCurrentOutstandingAmount(loanId) + CENT - 1) / CENT) * CENT;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#divide-before-multiply
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/invariant/CreditConservation.invariant.t.sol:505:46
+    |
+505 |         if (bytes(statsFile).length != 0) vm.writeLine(statsFile, line);
+    |                                              ^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/RouterHandler.sol:58:47
+   |
+58 |     DecentralizedMicrocredit public immutable credit;
+   |                                               ^^^^^^ help: consider using: `CREDIT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/RouterHandler.sol:59:31
+   |
+59 |     MockUSDC public immutable usdc;
+   |                               ^^^^ help: consider using: `USDC`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/RouterHandler.sol:60:44
+   |
+60 |     TransitiveStakeRouter public immutable router;
+   |                                            ^^^^^^ help: consider using: `ROUTER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/HermesPR16.t.sol:215:18
+    |
+215 |         assertLe(int256(lena0) - int256(lena1), int256(dues), "honest lender loses at most the dues");
+    |                  ^^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'int256' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/RouterHandler.sol:61:30
+   |
+61 |     address public immutable stranger = address(0x57A4);
+   |                              ^^^^^^^^ help: consider using: `STRANGER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/RouterHandler.sol:62:30
+   |
+62 |     address public immutable vendor = address(0x7E4D);
+   |                              ^^^^^^ help: consider using: `VENDOR`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/HermesPR16.t.sol:215:34
+    |
+215 |         assertLe(int256(lena0) - int256(lena1), int256(dues), "honest lender loses at most the dues");
+    |                                  ^^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'int256' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/HermesPR16.t.sol:215:49
+    |
+215 |         assertLe(int256(lena0) - int256(lena1), int256(dues), "honest lender loses at most the dues");
+    |                                                 ^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'int256' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/RelayerRetry.t.sol:181:13
+    |
+181 |             bytes4(outer) != DecentralizedMicrocredit.repayLoanMeta.selector, "top-level selector is the wrapper's"
+    |             ^^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'bytes4' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+   --> contracts/DecentralizedMicrocredit.sol:187:29
+    |
+187 |     IERC20 public immutable usdc;
+    |                             ^^^^ help: consider using: `USDC`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[divide-before-multiply]: multiplication should occur before division to avoid loss of precision
+   --> test/invariant/RouterHandler.sol:391:43
+    |
+391 |             elapsed < GRACE_PERIOD ? 0 : (((lot.amount * lot.rate) / BASIS_POINTS) * elapsed) / SECONDS_PER_YEAR;
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#divide-before-multiply
+
+note[mixed-case-variable]: mutable variables should use mixedCase
+   --> contracts/DecentralizedMicrocredit.sol:249:37
+    |
+249 |     mapping(address => bool) public isKYCVerified;
+    |                                     ^^^^^^^^^^^^^ help: consider using: `isKycVerified`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-variable
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:71:12
+   |
+71 |         vm.setEnv("ADMIN", vm.toString(admin));
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:72:12
+   |
+72 |         vm.setEnv("EFFR_BPS", "433");
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/invariant/RouterHandler.sol:116:39
+    |
+116 |             thirdParties.push(address(uint160(0xB0B0 + i)));
+    |                                       ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'uint160' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:76:12
+   |
+76 |         vm.setEnv("USDC_ADDRESS", vm.toString(address(usdc)));
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:77:12
+   |
+77 |         vm.setEnv("ADMIN", "");
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[mixed-case-function]: function names should use mixedCase
+   --> contracts/DecentralizedMicrocredit.sol:561:14
+    |
+561 |     function markKYCVerified(address user) external onlyOracle {
+    |              ^^^^^^^^^^^^^^^ help: consider using: `markKycVerified`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#mixed-case-function
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/invariant/RouterHandler.sol:235:26
+    |
+235 |             bytes4 sel = bytes4(err);
+    |                          ^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'bytes4' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+warning[erc20-unchecked-transfer]: ERC20 'transfer' and 'transferFrom' calls should check the return value
+  --> test/BootstrapReadiness.t.sol:77:9
+   |
+77 |         usdc.transfer(borrower, ORDER_PRICE - debt);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#erc20-unchecked-transfer
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:81:12
+   |
+81 |         vm.setEnv("ADMIN", vm.toString(admin));
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:82:12
+   |
+82 |         vm.setEnv("USDC_ADDRESS", vm.toString(address(new EighteenDecimalToken())));
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:85:12
+   |
+85 |         vm.setEnv("USDC_ADDRESS", vm.toString(address(usdc)));
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:87:12
+   |
+87 |         vm.setEnv("EFFR_BPS", "");
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:90:12
+   |
+90 |         vm.setEnv("EFFR_BPS", "433");
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:93:12
+   |
+93 |         vm.setEnv("RISK_PREMIUM_BPS", "8OO");
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> test/DeployProduction.t.sol:99:12
+   |
+99 |         vm.setEnv("RISK_PREMIUM_BPS", "");
+   |            ^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:106:12
+    |
+106 |         vm.setEnv("TIMELOCK_DELAY", "259200");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:107:12
+    |
+107 |         vm.setEnv("RISK_PREMIUM_BPS", "1400");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:108:12
+    |
+108 |         vm.setEnv("MAX_LOAN", "50e6");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:109:12
+    |
+109 |         vm.setEnv("RESERVE_BPS", "7500");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:110:12
+    |
+110 |         vm.setEnv("PROTOCOL_FEE_BPS", "500");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:111:12
+    |
+111 |         vm.setEnv("ISSUANCE_BUDGET_LINES", "40");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:112:12
+    |
+112 |         vm.setEnv("MAX_INCREASE_PER_REPORT_LINES", "10");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+warning[divide-before-multiply]: multiplication should occur before division to avoid loss of precision
+    --> contracts/DecentralizedMicrocredit.sol:1430:17
+     |
+1430 |         return (((loan.principal * loan.interestRate) / BASIS_POINTS) * elapsed) / SECONDS_PER_YEAR;
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: https://book.getfoundry.sh/reference/forge/forge-lint#divide-before-multiply
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:113:12
+    |
+113 |         vm.setEnv("MAX_SCORE_AGE", "86400");
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:114:12
+    |
+114 |         vm.setEnv("CRE_FORWARDER", vm.toString(forwarder));
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:115:12
+    |
+115 |         vm.setEnv("CRE_WORKFLOW_OWNER", vm.toString(workflowOwner));
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:116:12
+    |
+116 |         vm.setEnv("CRE_WORKFLOW_ID", vm.toString(WORKFLOW_ID));
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:117:12
+    |
+117 |         vm.setEnv("RELAYER", vm.toString(relayer));
+    |            ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unwrapped-modifier-logic]: wrap modifier logic to reduce code size
+   --> contracts/DecentralizedMicrocredit.sol:397:5
+    |
+397 | /     modifier onlyOwner() {
+398 | |         require(msg.sender == owner, NotOwner());
+399 | |         _;
+400 | |     }
+    | |_____^
+    |
+help: wrap modifier logic to reduce code size
+    |
+397 ~     modifier onlyOwner() {
+398 +         _onlyOwner();
+399 +         _;
+400 +     }
+401 + 
+402 +     function _onlyOwner() internal {
+403 +         require(msg.sender == owner, NotOwner());
+404 +     }
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unwrapped-modifier-logic
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:84:47
+   |
+84 |     DecentralizedMicrocredit public immutable credit;
+   |                                               ^^^^^^ help: consider using: `CREDIT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:85:31
+   |
+85 |     MockUSDC public immutable usdc;
+   |                               ^^^^ help: consider using: `USDC`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:86:30
+   |
+86 |     address public immutable owner;
+   |                              ^^^^^ help: consider using: `OWNER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:87:30
+   |
+87 |     address public immutable poolLender;
+   |                              ^^^^^^^^^^ help: consider using: `POOL_LENDER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:88:30
+   |
+88 |     address public immutable lender;
+   |                              ^^^^^^ help: consider using: `LENDER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[unwrapped-modifier-logic]: wrap modifier logic to reduce code size
+   --> contracts/DecentralizedMicrocredit.sol:402:5
+    |
+402 | /     modifier onlyOracle() {
+403 | |         require(msg.sender == oracle, NotOracle());
+404 | |         _;
+405 | |     }
+    | |_____^
+    |
+help: wrap modifier logic to reduce code size
+    |
+402 ~     modifier onlyOracle() {
+403 +         _onlyOracle();
+404 +         _;
+405 +     }
+406 + 
+407 +     function _onlyOracle() internal {
+408 +         require(msg.sender == oracle, NotOracle());
+409 +     }
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unwrapped-modifier-logic
+
+note[unwrapped-modifier-logic]: wrap modifier logic to reduce code size
+   --> contracts/DecentralizedMicrocredit.sol:408:5
+    |
+408 | /     modifier onlyAllowedRelayer() {
+409 | |         if (relayerWhitelistEnabled) {
+410 | |             require(relayerWhitelist[msg.sender], UnauthorizedRelayer());
+...   |
+413 | |     }
+    | |_____^
+    |
+help: wrap modifier logic to reduce code size
+    |
+408 ~     modifier onlyAllowedRelayer() {
+409 +         _onlyAllowedRelayer();
+410 +         _;
+411 +     }
+412 + 
+413 +     function _onlyAllowedRelayer() internal {
+414 +         if (relayerWhitelistEnabled) {
+415 +             require(relayerWhitelist[msg.sender], UnauthorizedRelayer());
+416 +         }
+417 +     }
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unwrapped-modifier-logic
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/DeployProduction.t.sol:337:16
+    |
+337 |             vm.setEnv(envVars[i], "");
+    |                ^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:89:32
+   |
+89 |     uint256 internal immutable lenderKey;
+   |                                ^^^^^^^^^ help: consider using: `LENDER_KEY`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:90:30
+   |
+90 |     address public immutable feeRecipient;
+   |                              ^^^^^^^^^^^^ help: consider using: `FEE_RECIPIENT`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:91:30
+   |
+91 |     address public immutable funder;
+   |                              ^^^^^^ help: consider using: `FUNDER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:92:30
+   |
+92 |     uint256 public immutable feeBps;
+   |                              ^^^^^^ help: consider using: `FEE_BPS`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/TransitiveStakeRouter.t.sol:924:64
+    |
+924 |             paths[i] = StakeRouterBase.PathLot({ root: address(uint160(i + 1)), mid: address(0xBEEF), amount: amt });
+    |                                                                ^^^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'uint160' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> test/invariant/CreditHandler.sol:93:30
+   |
+93 |     uint256 public immutable reserveBps;
+   |                              ^^^^^^^^^^ help: consider using: `RESERVE_BPS`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[asm-keccak256]: use of inefficient hashing mechanism; consider using inline assembly
+   --> contracts/BootstrapOrderRouter.sol:93:16
+    |
+ 93 |           return keccak256(
+    |  ________________^
+ 94 | |             abi.encode(
+ 95 | |                 INTENT_TYPEHASH,
+ 96 | |                 address(pool),
+...   |
+107 | |         );
+    | |_________^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#asm-keccak256
+
+note[named-struct-fields]: prefer initializing structs with named fields
+   --> contracts/BootstrapOrderRouter.sol:124:22
+    |
+124 |         orders[id] = Order(msg.sender, price, maxDebt, settleBy, h, 0, State.Funded);
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using named fields: `Order({ payer: msg.sender, price: price, maxDebt: maxDebt, settleBy: settleBy, intentHash: h, loanId: 0, state: State.Funded })`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#named-struct-fields
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> contracts/TransitiveStakeRouter.sol:22:47
+   |
+22 |     DecentralizedMicrocredit public immutable pool;
+   |                                               ^^^^ help: consider using: `POOL`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> contracts/TransitiveStakeRouter.sol:23:29
+   |
+23 |     IERC20 public immutable token;
+   |                             ^^^^^ help: consider using: `TOKEN`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+  --> contracts/TransitiveStakeRouter.sol:24:30
+   |
+24 |     address public immutable router;
+   |                              ^^^^^^ help: consider using: `ROUTER`
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[divide-before-multiply]: multiplication should occur before division to avoid loss of precision
+   --> test/invariant/CreditHandler.sol:713:17
+    |
+713 |         return (((m.principal * m.rate) / BASIS_POINTS) * elapsed) / SECONDS_PER_YEAR;
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#divide-before-multiply
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+   --> contracts/TransitiveStakeRouter.sol:117:47
+    |
+117 |     DecentralizedMicrocredit public immutable pool;
+    |                                               ^^^^ help: consider using: `POOL`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+note[screaming-snake-case-immutable]: immutables should use SCREAMING_SNAKE_CASE
+   --> contracts/TransitiveStakeRouter.sol:118:29
+    |
+118 |     IERC20 public immutable token;
+    |                             ^^^^^ help: consider using: `TOKEN`
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#screaming-snake-case-immutable
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+  --> test/OracleScoreProvider.t.sol:61:45
+   |
+61 |         return abi.encodePacked(workflowId, bytes10("scores"), owner_, bytes2(0));
+   |                                             ^^^^^^^^^^^^^^^^^
+   |
+   = note: consider disabling this lint if you're certain the cast is safe
+           
+           // casting to 'bytes10' is safe because [explain why]
+           // forge-lint: disable-next-line(unsafe-typecast)
+           
+           
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[asm-keccak256]: use of inefficient hashing mechanism; consider using inline assembly
+   --> contracts/TransitiveStakeRouter.sol:349:16
+    |
+349 |         return keccak256(abi.encode(from, to, scope));
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#asm-keccak256
+
+note[unaliased-plain-import]: use named imports '{A, B}' or alias 'import ".." as X'
+ --> contracts/MockUSDC.sol:4:8
+  |
+4 | import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unaliased-plain-import
+
+note[unaliased-plain-import]: use named imports '{A, B}' or alias 'import ".." as X'
+ --> contracts/MockUSDC.sol:5:8
+  |
+5 | import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unaliased-plain-import
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   --> test/invariant/CreditHandler.sol:994:48
+    |
+994 |         bytes4 selector = reason.length >= 4 ? bytes4(reason) : bytes4(0);
+    |                                                ^^^^^^^^^^^^^^
+    |
+    = note: consider disabling this lint if you're certain the cast is safe
+            
+            // casting to 'bytes4' is safe because [explain why]
+            // forge-lint: disable-next-line(unsafe-typecast)
+            
+            
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-typecast
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> test/invariant/TransitiveStakeRouter.invariant.t.sol:183:46
+    |
+183 |         if (bytes(statsFile).length != 0) vm.writeLine(statsFile, line);
+    |                                              ^^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unused-import]: unused imports should be removed
+ --> test/invariant/TransitiveStakeRouter.invariant.t.sol:6:10
+  |
+6 | import { StakeRouterBase, StakeVault, TransitiveStakeRouter } from "../../contracts/TransitiveStakeRouter.sol";
+  |          ^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unused-import
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   --> script/Deploy.s.sol:127:39
+    |
+127 |             string memory config = vm.readFile(configPath);
+    |                                       ^^^^^^^^
+    |
+    = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unaliased-plain-import]: use named imports '{A, B}' or alias 'import ".." as X'
+ --> script/UpdateOracle.s.sol:4:8
+  |
+4 | import "forge-std/Script.sol";
+  |        ^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unaliased-plain-import
+
+note[unaliased-plain-import]: use named imports '{A, B}' or alias 'import ".." as X'
+ --> script/UpdateOracle.s.sol:5:8
+  |
+5 | import "../contracts/DecentralizedMicrocredit.sol";
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unaliased-plain-import
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> script/UpdateOracle.s.sol:10:43
+   |
+10 |         string memory deploymentJson = vm.readFile("deployment.json");
+   |                                           ^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unaliased-plain-import]: use named imports '{A, B}' or alias 'import ".." as X'
+ --> script/VerifyAll.s.sol:4:8
+  |
+4 | import "forge-std/Script.sol";
+  |        ^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: https://book.getfoundry.sh/reference/forge/forge-lint#unaliased-plain-import
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> script/VerifyAll.s.sol:18:36
+   |
+18 |         string memory content = vm.readFile(path);
+   |                                    ^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+  --> script/VerifyAll.s.sol:77:31
+   |
+77 |         compiledBytecode = vm.readFile(path);
+   |                               ^^^^^^^^
+   |
+   = help: https://book.getfoundry.sh/reference/forge/forge-lint#unsafe-cheatcode
+
+No files changed, compilation skipped
+
+╭-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------╮
+| Contract                                                                                        | Runtime Size (B) | Initcode Size (B) | Runtime Margin (B) | Initcode Margin (B) |
++===================================================================================================================================================================================+
+| Address                                                                                         | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| AttributionHarness                                                                              | 12,066           | 13,475            | 12,510             | 35,677              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| BlacklistableUSDC                                                                               | 3,609            | 5,458             | 20,967             | 43,694              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| BootstrapOrderEscrow                                                                            | 7,852            | 9,229             | 16,724             | 39,923              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| BootstrapOrderRouter                                                                            | 16,748           | 18,211            | 7,828              | 30,941              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Bytes                                                                                           | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| CreditHandler                                                                                   | 38,002           | 40,921            | -13,426            | 8,231               |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| DecentralizedMicrocredit                                                                        | 24,538           | 25,911            | 38                 | 23,241              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| ECDSA                                                                                           | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| EighteenDecimalToken                                                                            | 1,543            | 2,356             | 23,033             | 46,796              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Errors                                                                                          | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Math (../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol)                           | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Math (/home/user/microcredit-contract/lib/openzeppelin-contracts/contracts/utils/math/Math.sol) | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| MessageHashUtils                                                                                | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| MicrocreditLens                                                                                 | 3,287            | 3,473             | 21,289             | 45,679              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| MockUSDC                                                                                        | 3,237            | 5,086             | 21,339             | 44,066              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| OracleScoreProvider                                                                             | 4,916            | 5,401             | 19,660             | 43,751              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| OrderRouterHandler                                                                              | 17,209           | 19,429            | 7,367              | 29,723              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Panic                                                                                           | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| RouterHandler                                                                                   | 21,639           | 23,894            | 2,937              | 25,258              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| SafeCast                                                                                        | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| SafeERC20                                                                                       | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| ShortStrings                                                                                    | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| SignatureChecker                                                                                | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| SignedMath                                                                                      | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| SmartRoot                                                                                       | 284              | 310               | 24,292             | 48,842              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| StakeVault                                                                                      | 1,763            | 1,981             | 22,813             | 47,171              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| StorageSlot                                                                                     | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Strings                                                                                         | 57               | 85                | 24,519             | 49,067              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| SwallowingBatch                                                                                 | 594              | 620               | 23,982             | 48,532              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| TimelockController                                                                              | 5,450            | 6,755             | 19,126             | 42,397              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| TransitiveStakeRouter                                                                           | 11,794           | 13,203            | 12,782             | 35,949              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| UsageStub                                                                                       | 299              | 325               | 24,277             | 48,827              |
+|-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------|
+| Wrapper                                                                                         | 378              | 404               | 24,198             | 48,748              |
+╰-------------------------------------------------------------------------------------------------+------------------+-------------------+--------------------+---------------------╯
+
+Error: some contracts exceed the runtime size limit (EIP-170: 24576 bytes)

@@ -43,7 +43,7 @@ contract DeployScript is Script {
         vm.startBroadcast(ALEXIS_PK);
 
         address usdc = _resolveUsdc();
-        credit = new DecentralizedMicrocredit(EFFR_BPS, RISK_PREMIUM_BPS, MAX_LOAN, usdc, alexis);
+        credit = new DecentralizedMicrocredit(EFFR_BPS, RISK_PREMIUM_BPS, MAX_LOAN, usdc, alexis, address(0));
         console.log("DecentralizedMicrocredit deployed at:", address(credit));
         console.log("MicrocreditLens deployed at:", address(new MicrocreditLens(credit)));
 

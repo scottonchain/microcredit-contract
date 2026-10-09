@@ -1,5 +1,6 @@
 import { listKeystores } from "./listKeystores.js";
-import { execSync } from "child_process";
+import { fileURLToPath } from "url";
+import { runCast } from "./keystores.js";
 
 async function revealPk() {
   try {
@@ -15,11 +16,7 @@ async function revealPk() {
     }
 
     try {
-      const revealPKCommand = `cast wallet decrypt-keystore ${selectedKeystore}`;
-
-      const revealPKResult = execSync(revealPKCommand).toString().trim();
-
-      console.log(`\n🔑 ${revealPKResult}`);
+      await runCast(["wallet", "decrypt-keystore", selectedKeystore]);
     } catch (error) {
       console.error("\n❌ Failed to decrypt keystore. Wrong password?");
       process.exit(1);
@@ -31,7 +28,9 @@ async function revealPk() {
   }
 }
 
-revealPk().catch((error) => {
-  console.error("\n❌ Unexpected error:", error);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  revealPk().catch((error) => {
+    console.error("\n❌ Unexpected error:", error.message);
+    process.exitCode = 1;
+  });
+}

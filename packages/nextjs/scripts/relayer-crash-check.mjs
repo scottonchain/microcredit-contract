@@ -21,10 +21,12 @@ import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { createPublicClient, createWalletClient, defineChain, http, keccak256, parseAbi } from "viem";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
 const nextjsDir = path.resolve(here, "..");
 const repoDir = path.resolve(nextjsDir, "../..");
 const RPC = "http://127.0.0.1:8545";
@@ -161,6 +163,7 @@ async function main() {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60_000),
     });
     return { status: r.status, body: await r.json() };
   };
@@ -179,7 +182,7 @@ async function main() {
 
   async function startServer() {
     let out = "";
-    server = start("npx", ["next", "dev", "-p", "3055"], {
+    server = start(process.execPath, [require.resolve("next/dist/bin/next"), "dev", "--hostname", "127.0.0.1", "-p", "3055"], {
       cwd: nextjsDir,
       env: {
         ...process.env,
@@ -192,7 +195,14 @@ async function main() {
     });
     server.stdout.on("data", d => (out += d));
     server.stderr.on("data", d => (out += d));
-    await waitFor(() => /Ready in/.test(out), "the Next dev server", 120_000);
+    try {
+      await waitFor(() => {
+        if (server.exitCode !== null) throw new Error(`Next dev server exited ${server.exitCode}`);
+        return /Ready in/.test(out);
+      }, "the Next dev server", 120_000);
+    } catch (error) {
+      throw new Error(`${error.message}\n${out.slice(-2000)}`);
+    }
   }
   await startServer();
 
@@ -203,6 +213,9 @@ async function main() {
   const first = await signed(n0, 1_000_000n);
   const r1 = await post(first);
   check("the request relays and is mined", r1.status === 200 && r1.body.status === "mined", `HTTP ${r1.status}`);
+  if (r1.status !== 200 || r1.body.status !== "mined") {
+    throw new Error(`The initial relay failed: ${String(r1.body.error ?? r1.body.status ?? "no error detail").slice(0, 300)}`);
+  }
   const entry = journal().find(e => e.state === "submitted" && e.key.nonce === String(n0));
   check(
     "the journal holds the hash and the signed bytes, and the hash is keccak256 of those bytes",
@@ -252,6 +265,12 @@ async function main() {
     `HTTP ${r4.status} after ${Math.round((Date.now() - t0) / 1000)} s`,
   );
   check("the journal entry is still submitted", statesFor(n1).at(-1) === "submitted", statesFor(n1).join(","));
+  const conflictingPending = await post(await signed(n1, 4_000_000n));
+  check(
+    "a different request under the pending nonce is refused without reporting the original request as success",
+    conflictingPending.status === 409,
+    `HTTP ${conflictingPending.status}`,
+  );
   check(
     "still exactly one relayer transaction (the identical bytes, no second one)",
     (await relayerTxs("pending")) - before === 1n,

@@ -211,6 +211,7 @@ approving the address at gate 2. Each one is tied to what the code and its tests
   than one relayer process, confirmation depth against reorganisations, the receipt being read
   from the same endpoint that took the write, permit-only routes' weaker key, and the fact that
   the service is code and tests, not yet a service anyone outside the team has used.
+  A consumed sender nonce without a receipt leaves a hash-journaled intent `submitted` (HTTP 202); if receipt recovery cannot resolve it, the [documented operator reconciliation](https://github.com/scottonchain/microcredit-agent-testbed/blob/main/coordination/relayer-journal-design.md) is required, preserving uncertainty at a liveness cost.
 - **Key custody named.** Who holds the relayer key and where, how it is rotated, and what the
   service's public endpoint and uptime practice are. Gas for the key is a running cost the
   approval states.

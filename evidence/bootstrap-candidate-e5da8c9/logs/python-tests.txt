@@ -1,0 +1,12 @@
+== test_verify_candidate_deployment
+Ran 4 tests in 0.000s
+
+OK
+== test_candidate_rehearsal
+Ran 8 tests in 0.003s
+
+OK
+== test_two_hop_check
+Ran 31 tests in 0.106s
+
+OK

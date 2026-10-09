@@ -1,554 +1,126 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useAccount } from "wagmi";
-import {
-  createPublicClient,
-  createWalletClient,
-  http,
-  toHex,
-  custom,
-} from "viem";
-import { localhost } from "viem/chains";
-import { privateKeyToAccount } from "viem/accounts";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { DocumentDuplicateIcon } from "@heroicons/react/24/outline";
-import QRCodeDisplay from "~~/components/QRCodeDisplay";
-import { ANVIL_RPC_URL, CHAIN_ID, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
+import { type Address as WalletAddress, formatEther } from "viem";
+import { useAccount } from "wagmi";
+import { Address } from "~~/components/scaffold-eth";
+import { formatUSDC } from "~~/utils/format";
+import { createLocalFaucetClient, fundLocalEth, mintLocalUsdc } from "~~/utils/localFaucet";
+import { ANVIL_RPC_URL, CHAIN_ID, IS_MOCK_USDC, USDC_ABI, USDC_ADDRESS } from "~~/utils/microcredit";
 
-const publicClient = createPublicClient({
-  chain: { ...localhost, id: CHAIN_ID },
-  transport: http(ANVIL_RPC_URL),
-});
+const client = createLocalFaucetClient(ANVIL_RPC_URL);
+const isLocal = (CHAIN_ID as number) === 31337;
+const localToken = IS_MOCK_USDC ? USDC_ADDRESS : undefined;
+type Balances = { address: WalletAddress; eth: bigint; usdc?: bigint };
 
 export default function FundPage() {
-  const { address: connectedAddress } = useAccount();
-  const [status, setStatus] = useState<string | null>(null);
-  const [processing, setProcessing] = useState(false);
-  const [ethBalance, setEthBalance] = useState<string>("0");
-  const [usdcBalance, setUsdcBalance] = useState<string>("0");
+  const { address } = useAccount();
+  const [balances, setBalances] = useState<Balances>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
-
-  // Check if RPC endpoint is accessible
-  useEffect(() => {
-    const checkRPC = async () => {
-      try {
-        const response = await fetch(ANVIL_RPC_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
-            method: "eth_chainId",
-            params: [],
-          }),
-        });
-        
-        if (!response.ok) {
-          console.error("RPC endpoint not accessible:", response.status, response.statusText);
-          setStatus("❌ RPC endpoint not accessible. Make sure Anvil is running on port 8545.");
-        } else {
-          const data = await response.json();
-          console.log("RPC endpoint accessible, chain ID:", data.result);
-        }
-      } catch (error) {
-        console.error("Failed to connect to RPC endpoint:", error);
-        setStatus("❌ Failed to connect to RPC endpoint. Make sure Anvil is running on port 8545.");
-      }
-    };
-    
-    checkRPC();
+  const readBalances = useCallback(async (wallet: WalletAddress): Promise<Balances> => {
+    if (!isLocal || (await client.getChainId()) !== 31337) throw new Error("Start local Anvil on chain 31337.");
+    const [eth, usdc] = await Promise.all([
+      client.getBalance({ address: wallet }),
+      localToken
+        ? client.readContract({ address: localToken, abi: USDC_ABI, functionName: "balanceOf", args: [wallet] })
+        : undefined,
+    ]);
+    return { address: wallet, eth, usdc };
   }, []);
 
-  // Function to fetch ETH balance
-  const fetchEthBalance = useCallback(async (address: string) => {
-    try {
-      const { result: balanceHex } = await fetch(ANVIL_RPC_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "eth_getBalance",
-          params: [address, "latest"],
-        }),
-      }).then(res => res.json());
-      
-      const balance = BigInt(balanceHex || "0x0");
-      const ethBalance = Number(balance) / 1e18;
-      setEthBalance(ethBalance.toFixed(4));
-    } catch (err) {
-      console.error("Failed to fetch ETH balance:", err);
-      setEthBalance("0");
-    }
-  }, [setEthBalance]);
-
-  // Function to fetch USDC balance
-  const fetchUsdcBalance = useCallback(async (address: string) => {
-    if (!USDC_ADDRESS || !USDC_ABI) {
-      console.log("USDC_ADDRESS or USDC_ABI not available");
-      setUsdcBalance("0");
-      return;
-    }
-    
-    console.log("Fetching USDC balance for address:", address);
-    console.log("USDC contract address:", USDC_ADDRESS);
-    
-    try {
-      // First, check if the contract exists at the address
-      const code = await publicClient.getBytecode({ address: USDC_ADDRESS });
-      if (!code || code === "0x") {
-        console.error("No contract found at USDC address:", USDC_ADDRESS);
-        setUsdcBalance("0");
-        return;
-      }
-      
-      console.log("Contract found at USDC address, calling balanceOf...");
-      
-      const balance = await publicClient.readContract({
-        address: USDC_ADDRESS,
-        abi: USDC_ABI,
-        functionName: "balanceOf",
-        args: [address],
-      });
-      
-      console.log("USDC balance result:", balance);
-      
-      const usdcBalance = Number(balance) / 1e6; // USDC has 6 decimals
-      setUsdcBalance(usdcBalance.toFixed(2));
-    } catch (err) {
-      console.error("Failed to fetch USDC balance:", err);
-      console.error("Error details:", {
-        address: USDC_ADDRESS,
-        targetAddress: address,
-        abi: USDC_ABI ? "Available" : "Missing"
-      });
-      setUsdcBalance("0");
-    }
-  }, [setUsdcBalance]);
-
-  // Fetch balances when address changes
   useEffect(() => {
-    if (connectedAddress) {
-      console.log("Address changed, fetching balances for:", connectedAddress);
-      fetchEthBalance(connectedAddress);
-      fetchUsdcBalance(connectedAddress);
-    } else {
-      setEthBalance("0");
-      setUsdcBalance("0");
+    let active = true;
+    setError("");
+    setMessage("");
+    if (isLocal && address) {
+      readBalances(address).then(
+        result => active && setBalances(result),
+        () => active && setError("Cannot read local balances. Start Anvil and run yarn deploy."),
+      );
     }
-  }, [connectedAddress, fetchEthBalance, fetchUsdcBalance]);
+    return () => {
+      active = false;
+    };
+  }, [address, readBalances]);
 
-  const ensureMinterEth = async () => {
-    // Use private key 0x01 as minting account (same as populate page)
-    const MINTER_PK = toHex(1, { size: 32 }) as `0x${string}`;
-    const minterAccount = privateKeyToAccount(MINTER_PK);
-    
-    // Set 50 ETH to ensure sufficient balance for gas
-    const response = await fetch(ANVIL_RPC_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "anvil_setBalance",
-        params: [minterAccount.address, toHex(50n * 10n ** 18n)],
-      }),
-    });
-    
-    if (!response.ok) {
-      throw new Error("Failed to set minter balance");
-    }
-    
-    // Verify the balance was set correctly
-    const balanceResponse = await fetch(ANVIL_RPC_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 2,
-        method: "eth_getBalance",
-        params: [minterAccount.address, "latest"],
-      }),
-    });
-    
-    const balanceData = await balanceResponse.json();
-    const balance = BigInt(balanceData.result || "0x0");
-    console.log(`Minter balance set to: ${Number(balance) / 1e18} ETH`);
-    
-    return createWalletClient({
-      chain: { ...localhost, id: CHAIN_ID },
-      transport: http(ANVIL_RPC_URL),
-      account: minterAccount,
-    });
-  };
-
-  const fundEth = async () => {
-    if (!connectedAddress) return;
-    setProcessing(true);
-    setStatus("⛽ Funding ETH...");
+  async function run(action: "eth" | "usdc" | "refresh") {
+    if (!address || busy || !isLocal) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
     try {
-      // Fetch current ETH balance
-      const { result: currentBalanceHex } = await fetch(ANVIL_RPC_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "eth_getBalance",
-          params: [connectedAddress, "latest"],
-        }),
-      }).then(res => res.json());
-      
-      const currentBalance = BigInt(currentBalanceHex || "0x0");
-      const newBalance = currentBalance + 1n * 10n ** 18n;
-      
-      console.log(`Setting balance for ${connectedAddress} from ${Number(currentBalance) / 1e18} ETH to ${Number(newBalance) / 1e18} ETH`);
-      
-      const response = await fetch(ANVIL_RPC_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "anvil_setBalance",
-          params: [connectedAddress, toHex(newBalance)],
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (action === "eth") await fundLocalEth(client, CHAIN_ID, address);
+      if (action === "usdc") {
+        if (!localToken) throw new Error("This deployment does not use a local MockUSDC token.");
+        await mintLocalUsdc(client, CHAIN_ID, address, localToken);
       }
-      
-      const responseData = await response.json();
-      if (responseData.error) {
-        throw new Error(`RPC error: ${responseData.error.message}`);
+      if (action !== "refresh") setMessage(`${action === "eth" ? "1 ETH" : "10,000 USDC"} added to ${address}.`);
+      try {
+        setBalances(await readBalances(address));
+      } catch {
+        setError("Could not refresh balances. Check that Anvil and the local token are available.");
       }
-      
-      console.log("Balance set successfully:", responseData);
-      
-      // Verify the balance was set correctly
-      const verifyResponse = await fetch(ANVIL_RPC_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 2,
-          method: "eth_getBalance",
-          params: [connectedAddress, "latest"],
-        }),
-      });
-      
-      const verifyData = await verifyResponse.json();
-      const actualBalance = BigInt(verifyData.result || "0x0");
-      console.log(`Verified balance: ${Number(actualBalance) / 1e18} ETH`);
-      
-      if (actualBalance < newBalance) {
-        throw new Error(`Balance verification failed. Expected: ${Number(newBalance) / 1e18} ETH, Got: ${Number(actualBalance) / 1e18} ETH`);
-      }
-      
-      setStatus("✅ Funded 1 ETH to your address");
-      // Refresh ETH balance
-      await fetchEthBalance(connectedAddress);
-    } catch (err) {
-      console.error("ETH funding error:", err);
-      setStatus(`❌ Failed to fund ETH: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Local funding failed.");
     } finally {
-      setProcessing(false);
+      setBusy(false);
     }
-  };
+  }
 
-  // Test function to verify anvil_setBalance is working
-  const testAnvilSetBalance = async () => {
-    if (!connectedAddress) return;
-    setProcessing(true);
-    setStatus("🧪 Testing anvil_setBalance...");
-    try {
-      // Test with a simple balance setting
-      const testBalance = 5n * 10n ** 18n; // 5 ETH
-      
-      const response = await fetch(ANVIL_RPC_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "anvil_setBalance",
-          params: [connectedAddress, toHex(testBalance)],
-        }),
-      });
-      
-      const responseData = await response.json();
-      console.log("Test anvil_setBalance response:", responseData);
-      
-      if (responseData.error) {
-        throw new Error(`Test failed: ${responseData.error.message}`);
-      }
-      
-      // Verify the test balance
-      const verifyResponse = await fetch(ANVIL_RPC_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 2,
-          method: "eth_getBalance",
-          params: [connectedAddress, "latest"],
-        }),
-      });
-      
-      const verifyData = await verifyResponse.json();
-      const actualBalance = BigInt(verifyData.result || "0x0");
-      
-      if (actualBalance === testBalance) {
-        setStatus("✅ anvil_setBalance test passed! Balance set to 5 ETH");
-        await fetchEthBalance(connectedAddress);
-      } else {
-        throw new Error(`Test verification failed. Expected: 5 ETH, Got: ${Number(actualBalance) / 1e18} ETH`);
-      }
-    } catch (err) {
-      console.error("Test error:", err);
-      setStatus(`❌ Test failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  // Function to refresh wallet balance
-  const refreshWalletBalance = async () => {
-    setProcessing(true);
-    setStatus("🔄 Refreshing wallet balance...");
-    try {
-      // Trigger a small transaction to force wallet refresh
-      // We'll use a simple RPC call that doesn't change state but forces a refresh
-      await fetch(ANVIL_RPC_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "eth_blockNumber",
-          params: [],
-        }),
-      });
-      
-      // Also try to trigger a wallet refresh by requesting account info
-      if (window.ethereum) {
-        try {
-          await window.ethereum.request({
-            method: 'eth_requestAccounts'
-          });
-          console.log("Wallet refresh triggered");
-        } catch (walletError) {
-          console.log("Wallet refresh failed, but that's okay:", walletError);
-        }
-      }
-      
-      setStatus("✅ Wallet refresh triggered. Check your wallet now!");
-      
-      // Refresh our local balance display
-      if (connectedAddress) {
-        await fetchEthBalance(connectedAddress);
-        await fetchUsdcBalance(connectedAddress);
-      }
-    } catch (err) {
-      console.error("Wallet refresh error:", err);
-      setStatus(`❌ Failed to refresh wallet: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const fundUsdc = async () => {
-    if (!connectedAddress || !USDC_ADDRESS || !USDC_ABI) return;
-    setProcessing(true);
-    setStatus("💵 Minting 10,000 USDC...");
-    try {
-      // Fetch current USDC balance
-      const currentUsdc = await publicClient.readContract({
-        address: USDC_ADDRESS,
-        abi: USDC_ABI,
-        functionName: "balanceOf",
-        args: [connectedAddress],
-      });
-      
-      const mintAmount = 10_000n * 1_000_000n;
-      console.log(`Current USDC balance: ${Number(currentUsdc) / 1e6}`);
-      console.log(`Minting ${Number(mintAmount) / 1e6} USDC to ${connectedAddress}`);
-      
-      // Ensure minter has sufficient ETH
-      const minter = await ensureMinterEth();
-      
-      // Mint 10,000 USDC on top of current balance
-      const txHash = await minter.writeContract({
-        address: USDC_ADDRESS,
-        abi: USDC_ABI,
-        functionName: "mint",
-        args: [connectedAddress, mintAmount],
-        gas: 500_000n, // Reduced gas limit
-      });
-      
-      console.log("USDC mint transaction hash:", txHash);
-      
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-      console.log("USDC mint transaction receipt:", receipt);
-      
-      // Verify the mint was successful by checking the new balance
-      const newUsdcBalance = await publicClient.readContract({
-        address: USDC_ADDRESS,
-        abi: USDC_ABI,
-        functionName: "balanceOf",
-        args: [connectedAddress],
-      });
-      
-      console.log(`New USDC balance: ${Number(newUsdcBalance) / 1e6}`);
-      
-      if (newUsdcBalance < currentUsdc + mintAmount) {
-        throw new Error(`USDC mint verification failed. Expected: ${Number(currentUsdc + mintAmount) / 1e6}, Got: ${Number(newUsdcBalance) / 1e6}`);
-      }
-      
-      setStatus("✅ Minted 10,000 USDC to your address");
-      // Refresh USDC balance
-      await fetchUsdcBalance(connectedAddress);
-    } catch (err) {
-      console.error("USDC minting error:", err);
-      setStatus(`❌ Failed to mint USDC: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  if (!connectedAddress) return <p className="p-6">🔌 Connect wallet…</p>;
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setStatus("✅ Copied to clipboard!");
-      setTimeout(() => setStatus(null), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-      setStatus("❌ Failed to copy to clipboard");
-    }
-  };
-
+  const current = balances?.address === address ? balances : undefined;
   return (
-    <div className="container mx-auto px-4 py-10 max-w-lg">
-      <h1 className="text-3xl font-bold mb-6">🚰 Faucet</h1>
-      <p className="mb-4 text-sm text-base-content break-all">
-        Connected Address: <span className="font-mono">{connectedAddress}</span>
-      </p>
-      
-      {/* Wallet Balance Refresh Notice */}
-      <div className="mb-6 p-4 bg-warning-surface border border-outline rounded-lg">
-        <h3 className="text-lg font-semibold mb-2 text-caution">💡 Wallet Balance Notice</h3>
-        <p className="text-sm text-caution mb-3">
-          After funding ETH or USDC, your wallet may not immediately show the updated balance due to caching. 
-          Use the &quot;Refresh Wallet Balance&quot; button below to force your wallet to update.
-        </p>
-        <div className="text-xs text-caution">
-          <strong>Alternative solutions:</strong>
-          <ul className="mt-1 ml-4 list-disc">
-            <li>Switch networks in your wallet and switch back</li>
-            <li>Disconnect and reconnect your wallet</li>
-            <li>Make a small transaction to trigger a balance refresh</li>
-          </ul>
-        </div>
-      </div>
-      
-      {/* Current Balances */}
-      <div className="mb-6 p-4 bg-info-surface border border-outline rounded-lg">
-        <h3 className="text-lg font-semibold mb-3 text-info">Current Balances</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-info">{ethBalance}</div>
-            <div className="text-sm text-info">ETH</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-success">{usdcBalance}</div>
-            <div className="text-sm text-success">USDC</div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Mock USDC Token Address */}
-      {USDC_ADDRESS ? (
-        <div className="mb-6 p-4 bg-base-200 rounded-lg">
-          <h3 className="text-lg font-semibold mb-2">Mock USDC Token</h3>
-          <div className="flex items-start gap-4">
-            {/* QR Code */}
-            <div className="flex-shrink-0">
-              <div
-                onClick={() => copyToClipboard(USDC_ADDRESS!)}
-                className="cursor-pointer flex flex-col items-center"
-              >
-                <QRCodeDisplay value={USDC_ADDRESS} size={80} />
-                <span className="text-xs text-muted mt-2">Click to copy</span>
-              </div>
-            </div>
-            
-            {/* Address and Copy Button */}
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <p className="text-sm text-base-content break-all font-mono flex-1">
-                  {USDC_ADDRESS}
-                </p>
-                <button
-                  onClick={() => copyToClipboard(USDC_ADDRESS!)}
-                  className="btn btn-sm btn-ghost"
-                  title="Copy token address"
-                >
-                  <DocumentDuplicateIcon className="h-4 w-4" />
+    <main className="w-full max-w-2xl mx-auto p-6 space-y-5">
+      <h1 className="text-3xl font-bold">Local faucet</h1>
+      {!isLocal ? (
+        <p>This faucet is available only on local Anvil. This build targets chain {CHAIN_ID}.</p>
+      ) : (
+        <>
+          <p>Start Anvil and deploy the local demo before adding test ETH or MockUSDC to a connected wallet.</p>
+          {!address ? (
+            <p>Connect your wallet to continue.</p>
+          ) : (
+            <div className="bg-base-100 rounded-lg p-6 space-y-4">
+              <Address address={address} />
+              <p>ETH: {current ? formatEther(current.eth) : "—"}</p>
+              <p>MockUSDC: {current?.usdc !== undefined ? formatUSDC(current.usdc) : "—"}</p>
+              <div className="flex gap-3 flex-wrap">
+                <button className="btn btn-primary" disabled={busy} onClick={() => run("eth")}>
+                  Fund 1 ETH
+                </button>
+                <button className="btn btn-primary" disabled={busy || !localToken} onClick={() => run("usdc")}>
+                  Mint 10,000 USDC
+                </button>
+                <button className="btn btn-outline" disabled={busy} onClick={() => run("refresh")}>
+                  Refresh balances
                 </button>
               </div>
-              <p className="text-xs text-muted">
-                Use this address to add Mock USDC to your wallet. Click the QR code or copy button to copy the address.
-              </p>
+              {localToken && (
+                <div>
+                  <p>Local token</p>
+                  <Address address={localToken} />
+                </div>
+              )}
             </div>
-          </div>
-        </div>
-      ) : (
-        <div className="mb-6 p-4 bg-warning-surface border border-outline rounded-lg">
-          <h3 className="text-lg font-semibold mb-2 text-caution">Mock USDC Not Deployed</h3>
-          <p className="text-sm text-caution">
-            Mock USDC contract is not deployed. Deploy contracts first to get the token address.
-          </p>
-        </div>
+          )}
+          {message && (
+            <p role="status" className="text-success break-all">
+              {message}
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="text-error break-words">
+              {error}
+            </p>
+          )}
+          <Link href="/populate-test-data" className="link">
+            Local demo setup
+          </Link>
+        </>
       )}
-      <div className="space-y-4">
-        <button
-          onClick={fundEth}
-          disabled={processing}
-          className="btn btn-primary w-full"
-        >
-          Fund 1 ETH
-        </button>
-        <button
-          onClick={fundUsdc}
-          disabled={processing}
-          className="btn btn-secondary w-full"
-        >
-          Mint 10,000 USDC
-        </button>
-        <button
-          onClick={testAnvilSetBalance}
-          disabled={processing}
-          className="btn btn-outline w-full"
-        >
-          🧪 Test anvil_setBalance
-        </button>
-        <button
-          onClick={refreshWalletBalance}
-          disabled={processing}
-          className="btn btn-ghost w-full"
-        >
-          🔄 Refresh Wallet Balance
-        </button>
-      </div>
-      {status && <p className="mt-4 text-sm">{status}</p>}
-
-      <div className="mt-8">
-        <Link href="/" className="link">← Back Home</Link>
-      </div>
-    </div>
+    </main>
   );
-} 
+}

@@ -89,14 +89,22 @@ export class Journal {
   /** Replays appended lines in order; later lines for a key supersede earlier ones, but a terminal state never reverts. */
   static replay(lines: readonly string[]): Journal {
     const j = new Journal();
-    for (const line of lines) {
+    for (const [index, line] of lines.entries()) {
       let e: Entry;
       try {
         e = JSON.parse(line);
       } catch {
-        continue; // a torn last line (crash during append) is ignored, never trusted
+        if (index === lines.length - 1 && !line.endsWith("\n")) continue; // only an unterminated tail may be ignored
+        throw new Error(`journal: corrupt record at line ${index + 1}`);
       }
-      if (!e || e.v !== JOURNAL_VERSION || !e.key || typeof e.state !== "string") continue;
+      if (!e || e.v !== JOURNAL_VERSION || !e.key ||
+        !["intent", "submitted", ...TERMINAL].includes(e.state) ||
+        !Number.isSafeInteger(e.key.chainId) || e.key.chainId <= 0 ||
+        typeof e.key.pool !== "string" || !e.key.pool || typeof e.key.signer !== "string" || !e.key.signer ||
+        !["pool", "permit"].includes(e.key.kind) || typeof e.key.nonce !== "string" || !e.key.nonce ||
+        (e.key.kind === "pool" && !/^\d+$/.test(e.key.nonce)) ||
+        typeof e.digest !== "string" || !e.digest || typeof e.at !== "string")
+        throw new Error(`journal: invalid record at line ${index + 1}`);
       j.apply(e);
     }
     return j;
@@ -167,6 +175,21 @@ export class Journal {
     return this.advance(key, { state, note }, now);
   }
 
+  /** Recovery may settle only the exact entry it read. Persist synchronously before publishing its new state. */
+  settleCurrent(
+    entry: Entry,
+    state: State,
+    note: string | undefined,
+    now: string,
+    persist: (entry: Entry) => void,
+  ): Entry | undefined {
+    if (this.get(entry.key) !== entry || isTerminal(entry.state)) return undefined;
+    const next: Entry = { ...entry, state, at: now, ...(note === undefined ? {} : { note }) };
+    persist(next); // a failed write leaves the in-memory entry unchanged
+    this.apply(next);
+    return next;
+  }
+
   private advance(key: IntentKey, patch: Partial<Entry>, now: string): Entry {
     const prev = this.get(key);
     if (!prev) throw new Error("journal: no intent for " + keyId(key));
@@ -198,52 +221,43 @@ export async function recover(
   now: string,
   only: (e: Entry) => boolean = () => true,
   onReadError: (entry: Entry, error: unknown) => void = () => {},
+  persist: (entry: Entry) => void = () => {},
 ): Promise<Recovery[]> {
   const out: Recovery[] = [];
-  for (const entry of journal.open().filter(only)) {
-    let next: Entry | undefined;
+  for (const entry of journal.open()) {
+    const current = () => journal.get(entry.key) === entry && only(entry);
+    if (!current()) continue;
+    let state: State | undefined;
+    let note: string | undefined;
     try {
       if (entry.hash) {
         const r = await reads.receipt(entry.hash);
-        if (r) next = journal.outcome(entry.key, r.status, now);
+        if (r) state = r.status === "success" ? "mined" : "reverted";
       } else if (entry.key.kind === "pool") {
-        const current = await reads.poolNonce(entry.key.signer);
-        next =
-          current <= BigInt(entry.key.nonce)
-            ? journal.settle(
-                entry.key,
-                "abandoned",
-                "nonce unconsumed and no hash: nothing landed; a retry may submit",
-                now,
-              )
-            : journal.settle(
-                entry.key,
-                "consumed_unattributed",
-                "nonce consumed and no hash known: decode the consuming transaction's calldata to attribute it; never resend",
-                now,
-              );
+        const nonce = await reads.poolNonce(entry.key.signer);
+        state = nonce <= BigInt(entry.key.nonce) ? "abandoned" : "consumed_unattributed";
+        note = nonce <= BigInt(entry.key.nonce)
+          ? "nonce unconsumed and no hash: nothing landed; a retry may submit"
+          : "nonce consumed and no hash known: decode the consuming transaction's calldata to attribute it; never resend";
       } else if (entry.hashFirst) {
         // Hash-first (rule 1b): the hash is journaled before the broadcast, so no hash means nothing was broadcast.
-        next = journal.settle(
-          entry.key,
-          "abandoned",
-          "no hash was journaled, so nothing was broadcast; a retry may submit",
-          now,
-        );
+        state = "abandoned";
+        note = "no hash was journaled, so nothing was broadcast; a retry may submit";
       } else {
-        next = journal.settle(
-          entry.key,
-          "unresolved",
-          "permit-only intent with no hash: operator decides; never resend",
-          now,
-        );
+        state = "unresolved";
+        note = "permit-only intent with no hash: operator decides; never resend";
       }
     } catch (e) {
       // A read that fails is neither confirmation nor absence (fixture email-9): the entry stays open, the others go on.
       onReadError(entry, e);
       continue;
     }
-    if (next && next !== entry) out.push({ entry, next });
+    // Reads yield to other requests: a flight may have started or replaced this entry in the meantime.
+    // Record each transition before the next await, so a later retry cannot overtake its durable record.
+    if (state && current()) {
+      const next = journal.settleCurrent(entry, state, note, now, persist);
+      if (next) out.push({ entry, next });
+    }
   }
   return out;
 }

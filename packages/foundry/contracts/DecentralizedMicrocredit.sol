@@ -263,6 +263,10 @@ contract DecentralizedMicrocredit is EIP712 {
     mapping(address => uint256) public completedLoans; // per borrower, repaid in full
     mapping(address => uint256) public defaultedLoans; // per borrower; any default blocks borrowing
     mapping(address => uint256) private _outstandingPrincipal; // per borrower, across open loans
+    /// @notice The only caller that may originate any loan (requestLoan, requestLoanMeta, borrowAndDisburseMeta), fixed
+    ///         at construction; zero means an open pool, where anyone may, as before. Immutable on purpose: a
+    ///         governed originator would be an owner bypass of whatever rules the originator enforces (CI-32).
+    address public immutable ORIGINATOR;
 
     // Meta-transactions
     mapping(address => uint256) public nonces;
@@ -373,13 +377,19 @@ contract DecentralizedMicrocredit is EIP712 {
     error InsufficientCredit();
     error BackingInUse();
     error StakeCommitted();
+    error NotManager();
     error InsufficientStake();
 
     // ───────────────────────────── setup & access ─────────────────────────────
 
-    constructor(uint256 _effrRate, uint256 _riskPremium, uint256 _maxLoanAmount, address _usdc, address _oracle)
-        EIP712("DecentralizedMicrocredit", "1")
-    {
+    constructor(
+        uint256 _effrRate,
+        uint256 _riskPremium,
+        uint256 _maxLoanAmount,
+        address _usdc,
+        address _oracle,
+        address _originator
+    ) EIP712("DecentralizedMicrocredit", "1") {
         require(_usdc != address(0) && _oracle != address(0), ZeroAddress());
         usdc = IERC20(_usdc);
         owner = msg.sender;
@@ -387,6 +397,7 @@ contract DecentralizedMicrocredit is EIP712 {
         effrRate = _effrRate;
         riskPremium = _riskPremium;
         maxLoanAmount = _maxLoanAmount;
+        ORIGINATOR = _originator;
         lendingUtilizationCap = 9000; // 90%
         liquidityBuffer = 500; // 5%
     }
@@ -1226,6 +1237,7 @@ contract DecentralizedMicrocredit is EIP712 {
         require(amount > 0, ZeroAmount());
         require(term >= MIN_LOAN_TERM && term <= MAX_LOAN_TERM, InvalidTerm());
         require(defaultedLoans[borrower] == 0, BorrowerInDefault());
+        require(ORIGINATOR == address(0) || msg.sender == ORIGINATOR, NotManager());
         (uint256 limit, uint256 available) = getBorrowLimit(borrower);
         require(limit > 0, NoCredit());
         require(amount <= available, BorrowLimitExceeded());

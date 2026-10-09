@@ -1,7 +1,6 @@
-export const formatUSDC = (amount?: bigint): string => {
-  if (!amount) return "$0.00";
-  return `$${(Number(amount) / 1e6).toFixed(2)}`;
-};
+import { formatUsdcDecimal } from "./amounts";
+
+export const formatUSDC = (amount = 0n): string => `$${formatUsdcDecimal(amount)}`;
 
 /**
  * Format a USDC allowance value.  When users approve the maximum uint256 the

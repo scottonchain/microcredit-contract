@@ -11,6 +11,7 @@ import { useUsdcWrite } from "~~/hooks/useUsdc";
 import { getParsedError } from "~~/utils/scaffold-eth";
 import { TestnetMint } from "~~/components/TestnetMint";
 import { toast } from "react-hot-toast";
+import { parsePositiveCents, formatUsdcDecimal, roundDownToCent, roundUpToCent, roundToCentHalfUp } from "~~/utils/amounts";
 import { formatUSDC } from "~~/utils/format";
 import {
   type OriginationIntent,
@@ -35,8 +36,8 @@ import {
 } from "~~/utils/walletWrite";
 import { stopMessage } from "~~/utils/stopMessage";
 import { usePoolToken } from "~~/hooks/usePoolToken";
-import { relayerErrorMessage } from "~~/utils/contractErrors";
-import QRCodeDisplay from "~~/components/QRCodeDisplay";
+import { readRelayerResponse } from "~~/utils/relayerResponse";
+import { QRCodeSVG } from "qrcode.react";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 import { MICRO_DOMAIN, type PermitDomain, TYPES, readPermitDomain, splitSignature } from "~~/utils/eip712";
 import {
@@ -116,81 +117,9 @@ const BorrowPage: NextPage = () => {
     args: [connectedAddress],
   });
 
-  // Helper function to round down to the nearest penny (0.01 USDC = 10000 wei)
-  const roundDownToNearestPenny = (amount: bigint): bigint => {
-    const pennyInWei = 10000n; // 0.01 USDC = 10000 wei
-    return (amount / pennyInWei) * pennyInWei;
-  };
-
-  // (event-driven sync inserted below after dependencies)
-
-  // (moved) event-driven sync is defined below after dependencies are declared
-
-  // Helper function to round up to the nearest penny (0.01 USDC = 10000 wei)
-  const roundUpToNearestPenny = (amount: bigint): bigint => {
-    const pennyInWei = 10000n;
-    if (amount % pennyInWei === 0n) return amount;
-    return ((amount / pennyInWei) + 1n) * pennyInWei;
-  };
-
-  // Preferred display rounding (half-up) for parity with contract helper
-  const roundToCentHalfUp = (amount: bigint): bigint => ((amount + 5_000n) / 10_000n) * 10_000n;
-
-  // Compute max eligible amount (BigInt, 6-decimals)
-  // TODO: This should be made consistent with best practices for loan amount calculation
-  // Current implementation reduces borrowable amount by 1% for each additional week beyond 1 week
-  const maxEligibleAmount = useMemo(() => {
-    if (!borrowLimit) return 0n;
-    const baseAmount = borrowLimit[1];
-    
-    // Calculate weeks from repayment period (repaymentPeriod is in days)
-    const weeks = Math.ceil(effectivePeriodDays / 7);
-
-    // For 1 week, full amount is available. For each additional week, reduce by 1%
-    if (weeks <= 1) {
-      return roundDownToNearestPenny(baseAmount);
-    }
-
-    // Calculate reduction factor: (0.99)^(weeks-1)
-    const reductionFactor = Math.pow(0.99, weeks - 1);
-    const reducedAmount = BigInt(Math.floor(Number(baseAmount) * reductionFactor));
-    return roundDownToNearestPenny(reducedAmount);
-  }, [borrowLimit, effectivePeriodDays]);
-
-  // Auto-update loan amount when repayment period changes
-  useEffect(() => {
-    if (maxEligibleAmount > 0n) {
-      const maxAmountInUSDC = Number(maxEligibleAmount) / 1e6;
-      setLoanAmount(maxAmountInUSDC.toFixed(2));
-    }
-  }, [maxEligibleAmount]);
-
+  // Credit capacity comes from the pool. The UI adds no separate term-dependent credit policy.
+  const maxEligibleAmount = borrowLimit ? roundDownToCent(borrowLimit[1]) : 0n;
   const { displayName } = useDisplayName();
-
-  // Pre-populate amount once eligible amount known and input empty (hasCredit defined below)
-  // This useEffect must come after hasCredit declaration to avoid linter error
-
-  // Helper to convert token amount (string) to micro-USDC BigInt
-  const parseLoanAmount = (val: string): bigint | null => {
-    if (!val || val.trim() === "") return null;
-    const num = parseFloat(val);
-    if (isNaN(num) || num <= 0) return null;
-    // Use string manipulation to avoid floating-point precision issues
-    const parts = val.split('.');
-    let amountInWei: bigint;
-    if (parts.length === 1) {
-      // No decimal part
-      amountInWei = BigInt(parseInt(parts[0]) * 1e6);
-    } else {
-      // Has decimal part
-      const whole = parts[0];
-      const decimal = parts[1].padEnd(6, '0').substring(0, 6); // Pad to 6 digits and truncate
-      amountInWei = BigInt(parseInt(whole) * 1e6 + parseInt(decimal));
-    }
-    
-    // Round down to the nearest penny to ensure borrowers can always repay
-    return roundDownToNearestPenny(amountInWei);
-  };
 
   const publicClient = usePublicClient({ chainId: CHAIN_ID });
 
@@ -228,7 +157,7 @@ const BorrowPage: NextPage = () => {
 
       console.log("USDC Balance:", balance.toString());
       // Always compare with the required amount rounded down to the nearest penny
-      const required = roundDownToNearestPenny(amount);
+      const required = roundDownToCent(amount);
       console.log("Required amount (rounded to cent):", required.toString());
       console.log("Balance as number:", Number(balance));
       console.log("Amount as number:", Number(required));
@@ -306,7 +235,7 @@ const BorrowPage: NextPage = () => {
     functionName: "previewLoanTerms",
     args: [
       connectedAddress as `0x${string}` | undefined,
-      connectedAddress && loanAmount ? parseLoanAmount(loanAmount) ?? undefined : undefined,
+      connectedAddress && loanAmount ? parsePositiveCents(loanAmount) ?? undefined : undefined,
       connectedAddress && loanAmount ? BigInt(Math.round(effectivePeriodDays * 24 * 60 * 60)) : undefined,
     ],
   });
@@ -616,7 +545,7 @@ const BorrowPage: NextPage = () => {
     setIsLoading(true);
     setStepError("");
     try {
-      const principal = parseLoanAmount(loanAmount);
+      const principal = parsePositiveCents(loanAmount);
       if (!principal) return;
       if (!publicClient) throw new Error("Contract not available");
       if (!RELAYER_ENABLED) {
@@ -736,8 +665,7 @@ const BorrowPage: NextPage = () => {
           signature: sig,
         }),
       });
-      if (!resp.ok) throw new Error(await relayerErrorMessage(resp));
-      const resJson = await resp.json();
+      const resJson = await readRelayerResponse(resp);
       console.log("One-click borrow completed:", { txHash: resJson.txHash, status: resJson.status, loanId: resJson.loanId });
 
       // Refresh frontend state deterministically
@@ -815,14 +743,13 @@ const BorrowPage: NextPage = () => {
   // Prefill amount when eligible known
   useEffect(() => {
     if (hasCredit && maxEligibleAmount > 0n && loanAmount === "") {
-      const floorTwoDecimals = Math.floor(Number(maxEligibleAmount) / 1e4) / 100; // safe floor
-      setLoanAmount(floorTwoDecimals.toFixed(2));
+      setLoanAmount(formatUsdcDecimal(maxEligibleAmount));
     }
   }, [hasCredit, maxEligibleAmount, loanAmount]);
 
   // Ensure user-entered amount does not exceed maximum
   const isAmountTooHigh = () => {
-    const parsed = parseLoanAmount(loanAmount);
+    const parsed = parsePositiveCents(loanAmount);
     return parsed !== null && parsed > maxEligibleAmount;
   };
 
@@ -882,7 +809,11 @@ const BorrowPage: NextPage = () => {
                 className="cursor-pointer flex flex-col items-center"
                 title="Click to copy link"
               >
-                <QRCodeDisplay value={backingUrl} size={72} />
+                {backingUrl && (
+                  <div className="p-2 bg-white rounded-md border border-gray-300 inline-block">
+                    <QRCodeSVG value={backingUrl} size={72} />
+                  </div>
+                )}
                 <span className="text-xs text-muted mt-1">scan or copy</span>
               </div>
             </div>
@@ -1050,7 +981,7 @@ const BorrowPage: NextPage = () => {
                 isLoading ||
                 signingRef.current ||
                 !loanAmount ||
-                parseLoanAmount(loanAmount) === null ||
+                parsePositiveCents(loanAmount) === null ||
                 isAmountTooHigh()
               }
               onClick={handleOneClickBorrow}
@@ -1228,8 +1159,7 @@ const BorrowPage: NextPage = () => {
                           permit: permitPayload,
                         }),
                       });
-                      if (!resp.ok) throw new Error(await relayerErrorMessage(resp));
-                      const result = await resp.json();
+                      const result = await readRelayerResponse(resp);
                       console.log("Repayment submitted (gasless, single approval)", { txHash: result.txHash, amountUsed: result.amountUsed });
 
                       // Transaction is mined. Refetch state in parallel.
@@ -1285,13 +1215,13 @@ const BorrowPage: NextPage = () => {
                       activeLoanId === undefined ||
                       !loanIsActive ||
                       !repayAmount ||
-                      !parseLoanAmount(repayAmount)
+                      !parsePositiveCents(repayAmount)
                     }
                     onClick={async () => {
                       if (signingRef.current) return;
                       if (!activeLoanId || !repayAmount || !connectedAddress) return;
                       signingRef.current = true;
-                      const repayAmountBigInt = parseLoanAmount(repayAmount);
+                      const repayAmountBigInt = parsePositiveCents(repayAmount);
                       if (!repayAmountBigInt) return;
                       setIsLoading(true);
                       setStepError("");
@@ -1371,8 +1301,7 @@ const BorrowPage: NextPage = () => {
                             permit: permitPayload,
                           }),
                         });
-                        if (!resp.ok) throw new Error(await relayerErrorMessage(resp));
-                        const result = await resp.json();
+                        const result = await readRelayerResponse(resp);
                         console.log("Partial repayment submitted (gasless, single approval)", { txHash: result.txHash, amountUsed: result.amountUsed });
                         setRepayAmount("");
                         // Transaction is mined. Refetch state in parallel.

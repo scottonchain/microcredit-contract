@@ -1,0 +1,82 @@
+{
+ "rpc_chain_id": 84532,
+ "contracts": {
+  "pool": {
+   "address": "0xD1de9F0DFC0B40fB1eF2F02FA8474479B3DD2B8f",
+   "onchain_bytes": 24439,
+   "eip170_margin": 137,
+   "masked_sha256_onchain": "d64baea7b470412c2463dac0b2fbe1d48e2708b946f920bc28ee0b4b9d009fe9",
+   "masked_sha256_build": "d64baea7b470412c2463dac0b2fbe1d48e2708b946f920bc28ee0b4b9d009fe9",
+   "match_strict": true,
+   "match_ignoring_metadata": true,
+   "immutables": {
+    "45578": "000000000000000000000000036cbd53842c5426634e7929541ec2318f3dcf7e",
+    "45744": "000000000000000000000000aa9da4d1030e52196f9e3ed0f66f9681a44f761c",
+    "693": "32c2afedad5ef4038c1ccc9a2c7cfa705f6c3621a76b4e674caa0ebf994937fd",
+    "695": "0000000000000000000000000000000000000000000000000000000000014a34",
+    "697": "000000000000000000000000d1de9f0dfc0b40fb1ef2f02fa8474479b3dd2b8f",
+    "699": "ccd7a6d423c514e9182859c259eb285ec754049113c607d81f40a855507e02eb",
+    "701": "c89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6",
+    "704": "446563656e7472616c697a65644d6963726f6372656469740000000000000018",
+    "707": "3100000000000000000000000000000000000000000000000000000000000001"
+   },
+   "abi_sha256": "35755c5dbc61b3af72763452975fee8148a24a08864f7a606959b578d93132df"
+  },
+  "lens": {
+   "address": "0xfb84744c7aD2162F40623B65858Cb3041fe3dbF4",
+   "onchain_bytes": 3287,
+   "eip170_margin": 21289,
+   "masked_sha256_onchain": "2641269fb22bb92ff7921c289518f8133362224b97dd71d3938811440fd5c7fc",
+   "masked_sha256_build": "2641269fb22bb92ff7921c289518f8133362224b97dd71d3938811440fd5c7fc",
+   "match_strict": true,
+   "match_ignoring_metadata": true,
+   "immutables": {
+    "50667": "000000000000000000000000d1de9f0dfc0b40fb1ef2f02fa8474479b3dd2b8f"
+   },
+   "abi_sha256": "cea757c169ae1215d1da938b796d35334c46c1ed025257d342adc13ac715f337"
+  },
+  "router": {
+   "address": "0xaa9Da4d1030E52196F9E3ed0F66f9681a44f761C",
+   "onchain_bytes": 18105,
+   "eip170_margin": 6471,
+   "masked_sha256_onchain": "9396176d260b00c402817a1c6479e5267b665fa5aaa2494ed566aec73033171a",
+   "masked_sha256_build": "9396176d260b00c402817a1c6479e5267b665fa5aaa2494ed566aec73033171a",
+   "match_strict": true,
+   "match_ignoring_metadata": true,
+   "immutables": {
+    "51169": "000000000000000000000000d1de9f0dfc0b40fb1ef2f02fa8474479b3dd2b8f",
+    "51172": "000000000000000000000000036cbd53842c5426634e7929541ec2318f3dcf7e",
+    "693": "0927bd2ecbad655a40274bf9020bc22932317581f365e8384cfe6c94ec684125",
+    "695": "0000000000000000000000000000000000000000000000000000000000014a34",
+    "697": "000000000000000000000000aa9da4d1030e52196f9e3ed0f66f9681a44f761c",
+    "699": "82b16123102638cd791fc20f0f8e4361c951a32ea4957e168d41a9cdd31cd4b2",
+    "701": "c89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6",
+    "704": "426f6f7473747261704f72646572526f75746572000000000000000000000014",
+    "707": "3100000000000000000000000000000000000000000000000000000000000001"
+   },
+   "abi_sha256": "97d70fa6f17785c292a0e2819f13e1df58d89930a6f494063ac7c9b160fd86ae"
+  }
+ },
+ "wiring": {
+  "pool.usdc": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+  "pool.owner": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+  "pool.effrRate()": 433,
+  "pool.riskPremium()": 500,
+  "pool.maxLoanAmount()": 100000000,
+  "lens.pool": null,
+  "router.pool": "0xd1de9f0dfc0b40fb1ef2f02fa8474479b3dd2b8f",
+  "router.token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+  "pool.ORIGINATOR": "0xaa9da4d1030e52196f9e3ed0f66f9681a44f761c",
+  "router.officer": "0x0000000000000000000000000000000000000000",
+  "router.officerAdmin": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+ },
+ "checks": {
+  "pool.usdc == Circle Base Sepolia USDC (chain 84532 only)": true,
+  "router.pool == pool": true,
+  "pool.ORIGINATOR == router (the pool admits no other originator, for any borrower)": true,
+  "router.token == pool.usdc": true,
+  "lens.pool == pool": true,
+  "pool params 433/500/100e6": true
+ },
+ "ok": true
+}

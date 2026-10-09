@@ -1,0 +1,11 @@
+- funded roles by impersonating the USDC holder; aggregate of roles+vaults+pool+router before = 8500000 units
+- lender deposited 5 USDC to the candidate pool
+- worker named the router as its only manager (before any backing exists)
+- two roots deposited 1 USDC each to the router
+- customer funded order 1 (1 USDC advance to the vendor, price 1.5 USDC); worker signed the pool request and the acceptance; roots and mid signed consents
+- negative controls refused: direct requestLoan by the worker, borrowAndDisburseMeta by a stranger, a tampered vendor, a forged consent, the unbound `originate` entry
+- originateOrder by a stranger (tx 0xe28ae3b1390e55cc8ab3d8eb2f1e39e2a8b5fd271fe182b20c176bed41bded4a): loan 1 bound to order 1, vendor +1 USDC, pool lent out +1 USDC; roots locked 0.6 and 0.4 USDC; the customer's escrow stays apart
+- replay of the same order and signatures refused
+- customer settled: the 1 USDC debt was repaid first (loan closed), the worker received 500000 units, the roots' lot returned, escrow is zero
+- roots and lender withdrew everything; aggregate after = 8500000 units (before 8500000)
+REHEARSAL OK

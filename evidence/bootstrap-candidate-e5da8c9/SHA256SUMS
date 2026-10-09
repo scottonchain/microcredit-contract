@@ -1,0 +1,11 @@
+fb63f35b349b7732c9f91fbe827c8f04f4dd5dd041e991a529b51febbe469b7c  ./README.md
+3605d1349cf27c45354d1f3ae95d5c6675acaae400c341b1a047897544288d28  ./logs/build-sizes.txt
+5b1fd0447296fa73c63cf4791799dbd3b07b3a632d8fbd1d8a5a9e48b326e392  ./logs/forge-test-fork-routers.txt
+351cacdd81ceb3e1775cf433fa5ff22e6ebc7fbdda47d1413c60e5d5c9dbaeca  ./logs/forge-test-local.txt
+e6efb5d44d6442e1f4aff7f7ea48490bf54762aa0805fade7a8060100c71d542  ./logs/invariant-deep.txt
+9df71bf0804b65a87ab0dbbfd8283e169c2c762009869d27874099481d6539a9  ./logs/mutants.txt
+5f7269f4c5ef1d705bfe19533f0fff62b8dc88ab63174994606cb2afbcbf1036  ./logs/python-tests.txt
+dc925ae9caa33cb8b5d2e9276d00d1d09462c735248a9963261730c8014482f7  ./logs/rehearsal-normal.txt
+1b36987475985e94b8779acf36134b05f626ce54cbcf5ac043b77969630d0cc7  ./logs/rehearsal-with-default.txt
+348c52bafa9797e4e1f588fefea893c521e964e81802da3a99f0be511ac34ded  ./logs/toolchain.txt
+062afe37b37910588058bd594d4ff84f29443f7ff37a1b2e6ac50d0fc41e6bce  ./logs/verifier.json

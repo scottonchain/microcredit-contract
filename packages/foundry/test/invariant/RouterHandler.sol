@@ -1,0 +1,594 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.30;
+
+import { CommonBase } from "forge-std/Base.sol";
+import { StdCheats } from "forge-std/StdCheats.sol";
+import { StdUtils } from "forge-std/StdUtils.sol";
+import { DecentralizedMicrocredit } from "../../contracts/DecentralizedMicrocredit.sol";
+import { MockUSDC } from "../../contracts/MockUSDC.sol";
+import { StakeRouterBase, TransitiveStakeRouter } from "../../contracts/TransitiveStakeRouter.sol";
+
+/**
+ * @dev Drives the two-hop router for the allocation-certificate invariants with a fixed cast: three roots,
+ *      three mids and six managed borrowers (each has named the router as its pool manager), plus a stranger
+ *      that repays. Every call is wrapped in try/catch, so the handler never reverts; a revert that is not
+ *      one of the two documented refusals (a root without free funds, a consent limit reached) is counted and
+ *      fails the suite. Next to the router the handler keeps an independent model built from the documented
+ *      rules, not from the router's storage: each open lot with its paths, each loan's principal and
+ *      interest-first repayments (so the unpaid principal at a default is known without asking the pool),
+ *      each root's deposits, withdrawals and losses. The borrowers are the only borrowers, so every pool loan
+ *      is a router loan, fully covered by the vault's stake.
+ */
+contract RouterHandler is CommonBase, StdCheats, StdUtils {
+    uint256 public constant NR = 3;
+    uint256 public constant NM = 3;
+    uint256 public constant NB = 6;
+    uint256 internal constant BASIS_POINTS = 10_000;
+    uint256 internal constant CENT = 10_000;
+    uint256 internal constant GRACE_PERIOD = 1 days;
+    uint256 internal constant SECONDS_PER_YEAR = 365 days;
+
+    bytes32 internal constant EIP712_DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    bytes32 internal constant LOAN_REQUEST_TYPEHASH =
+        keccak256("LoanRequest(address borrower,uint256 amount,uint256 nonce,uint256 deadline)");
+    bytes32 internal constant BORROW_AND_DISBURSE_TYPEHASH = keccak256(
+        "BorrowAndDisburse(address borrower,uint256 amount,address to,uint256 repaymentPeriod,uint256 maxAprBps,uint256 nonce,uint256 deadline)"
+    );
+
+    struct PathM {
+        address root;
+        address mid;
+        uint256 amount;
+    }
+
+    struct LotM {
+        bool open;
+        uint256 loanId;
+        uint256 amount;
+        uint256 term;
+        uint256 disbursedAt;
+        uint256 rate;
+        uint256 repaid;
+        uint256 principalRepaid;
+        uint256 expectedVaultLoss; // the vault's slash at default, from the pool's backing snapshot
+        PathM[] paths;
+    }
+
+    DecentralizedMicrocredit public immutable credit;
+    MockUSDC public immutable usdc;
+    TransitiveStakeRouter public immutable router;
+    address public immutable stranger = address(0x57A4);
+    address public immutable vendor = address(0x7E4D);
+
+    address[] public roots;
+    address[] public mids;
+    address[] public borrowers;
+    uint256[] internal _rootKeys;
+    uint256[] internal _midKeys;
+    uint256[] internal _borrowerKeys;
+
+    mapping(address => LotM) internal _lots;
+    mapping(address => uint256) public deposited;
+    mapping(address => uint256) public withdrawn;
+    mapping(address => uint256) public modelLoss;
+    uint256 public strayInRouter;
+
+    // coverage and failure counters
+    uint256 public unexpectedReverts;
+    uint256 public violations;
+    uint256 public originations;
+    uint256 public refusals;
+    uint256 public repaidLots;
+    uint256 public defaultedLots;
+    uint256 public partialRepayDefaults;
+    uint256 public multiPathLots;
+    uint256 public totalLossAttributed;
+    uint256 public revocations;
+    uint256 public dust; // pool rounding left unslashed at defaults: at most (backers - 1) units each
+    uint256 public thirdPartyBackings;
+    uint256 public bypassAttempts;
+    uint256 public sharedSlashDefaults;
+    address[] public thirdParties;
+
+    constructor(DecentralizedMicrocredit credit_, MockUSDC usdc_, TransitiveStakeRouter router_) {
+        credit = credit_;
+        usdc = usdc_;
+        router = router_;
+        for (uint256 i = 0; i < NR; i++) {
+            uint256 k = uint256(keccak256(abi.encode("root", i)));
+            _rootKeys.push(k);
+            address r = vm.addr(k);
+            roots.push(r);
+            usdc_.mint(r, 30e6);
+            vm.startPrank(r);
+            usdc_.approve(address(router_), 30e6);
+            router_.deposit(30e6);
+            vm.stopPrank();
+            deposited[r] = 30e6;
+        }
+        for (uint256 i = 0; i < NM; i++) {
+            uint256 k = uint256(keccak256(abi.encode("mid", i)));
+            _midKeys.push(k);
+            mids.push(vm.addr(k));
+        }
+        for (uint256 i = 0; i < 2; i++) {
+            thirdParties.push(address(uint160(0xB0B0 + i)));
+        }
+        for (uint256 i = 0; i < NB; i++) {
+            uint256 k = uint256(keccak256(abi.encode("borrower", i)));
+            _borrowerKeys.push(k);
+            address b = vm.addr(k);
+            borrowers.push(b);
+        }
+    }
+
+    // ───────────── actions ─────────────
+
+    function deposit(uint256 seed, uint256 amount) external {
+        address r = roots[seed % NR];
+        amount = bound(amount, 1e6, 40e6);
+        usdc.mint(r, amount);
+        vm.startPrank(r);
+        usdc.approve(address(router), amount);
+        try router.deposit(amount) {
+            deposited[r] += amount;
+        } catch {
+            unexpectedReverts++;
+        }
+        vm.stopPrank();
+    }
+
+    function withdraw(uint256 seed, uint256 amount) external {
+        address r = roots[seed % NR];
+        uint256 free = router.free(r);
+        vm.startPrank(r);
+        // asking for more than the free balance must always fail
+        try router.withdraw(free + 1) {
+            violations++;
+        } catch { }
+        if (free != 0) {
+            amount = bound(amount, 1, free);
+            try router.withdraw(amount) {
+                withdrawn[r] += amount;
+            } catch {
+                unexpectedReverts++;
+            }
+        }
+        vm.stopPrank();
+    }
+
+    function revoke(uint256 seed) external {
+        address b = borrowers[seed % NB];
+        if ((seed >> 8) % 2 == 0) {
+            address r = roots[(seed >> 16) % NR];
+            vm.prank(r);
+            router.revokeRootEdge(mids[(seed >> 24) % NM]);
+        } else {
+            address m = mids[(seed >> 16) % NM];
+            vm.prank(m);
+            router.revokeMidEdge(b);
+        }
+        revocations++;
+    }
+
+    function originate(uint256 seed) external {
+        uint256 bi = seed % NB;
+        address b = borrowers[bi];
+        if (credit.defaultedLoans(b) != 0) return;
+        _syncModel(b);
+        if (_lots[b].open) return;
+
+        uint256 n = 1 + ((seed >> 8) % 4);
+        uint256 term = bound(seed >> 16, 1 days, 30 days);
+        StakeRouterBase.Path[] memory paths = new StakeRouterBase.Path[](n);
+        uint256 total;
+        for (uint256 i = 0; i < n; i++) {
+            uint256 h = uint256(keccak256(abi.encode(seed, i)));
+            uint256 ri = h % NR;
+            uint256 mi = (h >> 8) % NM;
+            uint256 amount = 3e5 + ((h >> 16) % 3e6);
+            if (i == 0 && n == 1 && amount < 1e6) amount = 1e6;
+            bool tightRoot = (h >> 40) % 3 == 0;
+            bool tightMid = (h >> 48) % 3 == 0;
+            paths[i] = _path(ri, mi, bi, amount, tightRoot, tightMid);
+            total += amount;
+        }
+        if (total < 1e6) {
+            paths[0].amount += 1e6 - total;
+            total = 1e6;
+            // limits are rebuilt for the larger amount
+            uint256 h0 = uint256(keccak256(abi.encode(seed, uint256(0))));
+            paths[0] = _path(h0 % NR, (h0 >> 8) % NM, bi, paths[0].amount, false, false);
+        }
+
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = DecentralizedMicrocredit.BorrowAndDisburse({
+            borrower: b,
+            amount: total,
+            to: vendor,
+            repaymentPeriod: term,
+            maxAprBps: 933,
+            nonce: credit.nonces(b),
+            deadline: vm.getBlockTimestamp() + 1 hours
+        });
+        bytes memory sig = _signPool(_borrowerKeys[bi], req);
+
+        try router.originate(req, sig, paths) returns (uint256 loanId) {
+            originations++;
+            LotM storage lot = _lots[b];
+            lot.open = true;
+            lot.loanId = loanId;
+            lot.amount = total;
+            lot.term = term;
+            (,,, uint256 rate,) = credit.getLoan(loanId);
+            lot.rate = rate;
+            (,,, uint256 disbursedAt,) = credit.getLoanTerms(loanId);
+            lot.disbursedAt = disbursedAt;
+            for (uint256 i = 0; i < n; i++) {
+                lot.paths
+                    .push(PathM({ root: paths[i].rootEdge.from, mid: paths[i].rootEdge.to, amount: paths[i].amount }));
+            }
+            if (n > 1) multiPathLots++;
+        } catch (bytes memory err) {
+            bytes4 sel = bytes4(err);
+            if (sel == StakeRouterBase.InsufficientFree.selector || sel == StakeRouterBase.LimitExceeded.selector) {
+                refusals++;
+            } else {
+                unexpectedReverts++;
+            }
+        }
+    }
+
+    function repay(uint256 seed, uint256 fraction) external {
+        address b = borrowers[seed % NB];
+        LotM storage lot = _lots[b];
+        if (!lot.open) return;
+        (DecentralizedMicrocredit.LoanStatus status,,,,) = credit.getLoanTerms(lot.loanId);
+        if (status != DecentralizedMicrocredit.LoanStatus.Active) return;
+        uint256 owed = credit.getCurrentOutstandingAmount(lot.loanId);
+        uint256 amount = fraction % 3 == 0 ? owed : bound(fraction, 1, owed);
+        usdc.mint(stranger, amount);
+        vm.startPrank(stranger);
+        usdc.approve(address(credit), amount);
+        try credit.repayLoan(lot.loanId, amount) {
+            _modelRepay(lot, owed, amount);
+        } catch {
+            unexpectedReverts++;
+        }
+        vm.stopPrank();
+    }
+
+    function warp(uint256 seconds_) external {
+        vm.warp(vm.getBlockTimestamp() + bound(seconds_, 1 hours, 40 days));
+    }
+
+    function defaultOne(uint256 seed) external {
+        address b = borrowers[seed % NB];
+        LotM storage lot = _lots[b];
+        if (!lot.open) return;
+        (DecentralizedMicrocredit.LoanStatus status,,,,) = credit.getLoanTerms(lot.loanId);
+        if (status != DecentralizedMicrocredit.LoanStatus.Active) return;
+        if (vm.getBlockTimestamp() <= lot.disbursedAt + lot.term + credit.LATE_PERIOD()) return;
+        // the pool charges secured backing pro rata, rounding each backer's share down: snapshot it first
+        DecentralizedMicrocredit.Backing[] memory edges = credit.getBackings(b);
+        uint256 totalSecured;
+        uint256 vaultSecured;
+        for (uint256 i = 0; i < edges.length; i++) {
+            totalSecured += edges[i].secured;
+            if (edges[i].backer == address(router.vaultOf(b))) vaultSecured = edges[i].secured;
+        }
+        uint256 unpaid = lot.amount - lot.principalRepaid;
+        uint256 fromStake = unpaid < totalSecured ? unpaid : totalSecured;
+        uint256 slashedTotal;
+        for (uint256 i = 0; i < edges.length; i++) {
+            slashedTotal += fromStake == 0 ? 0 : (fromStake * edges[i].secured) / totalSecured;
+        }
+        uint256 vaultLoss = fromStake == 0 ? 0 : (fromStake * vaultSecured) / totalSecured;
+        try credit.markDefaulted(lot.loanId) {
+            defaultedLots++;
+            lot.expectedVaultLoss = vaultLoss;
+            dust += unpaid - slashedTotal;
+            if (edges.length > 1) sharedSlashDefaults++;
+            if (lot.principalRepaid != 0) partialRepayDefaults++;
+        } catch {
+            unexpectedReverts++;
+        }
+    }
+
+    function syncOne(uint256 seed) external {
+        _syncModel(borrowers[seed % NB]);
+    }
+
+    function donate(uint256 seed, uint256 amount) external {
+        amount = bound(amount, 1, 5e6);
+        if (seed % 2 == 0) {
+            usdc.mint(address(router), amount);
+            strayInRouter += amount;
+        } else {
+            // prefer a vault whose lot is open, so a donation can meet a default
+            address b = borrowers[(seed >> 1) % NB];
+            for (uint256 i = 0; i < NB && !_lots[b].open; i++) {
+                b = borrowers[(seed + i) % NB];
+            }
+            address v = address(router.vaultOf(b));
+            if (v != address(0)) usdc.mint(v, amount);
+        }
+    }
+
+    /// @dev A third party stakes and backs a borrower alongside the vault: the slash is then shared pro rata.
+    function thirdPartyBack(uint256 seed, uint256 amount) external {
+        address tp = thirdParties[seed % 2];
+        address b = borrowers[(seed >> 8) % NB];
+        if (credit.defaultedLoans(b) != 0) return;
+        amount = bound(amount, 1e6, 8e6);
+        (uint256 secured, uint256 unsecured) = credit.getBacking(tp, b);
+        usdc.mint(tp, amount);
+        vm.startPrank(tp);
+        usdc.approve(address(credit), amount);
+        credit.stake(amount);
+        try credit.back(b, secured + unsecured + amount) {
+            thirdPartyBackings++;
+        } catch {
+            unexpectedReverts++;
+        }
+        vm.stopPrank();
+    }
+
+    function thirdPartyUnback(uint256 seed) external {
+        address tp = thirdParties[seed % 2];
+        address b = borrowers[(seed >> 8) % NB];
+        (uint256 secured, uint256 unsecured) = credit.getBacking(tp, b);
+        if (secured + unsecured == 0) return;
+        vm.prank(tp);
+        try credit.back(b, 0) { }
+        catch {
+            unexpectedReverts++; // the vault alone covers every router loan, so this must always succeed
+        }
+    }
+
+    /// @dev Every direct origination path for a managed borrower must refuse, whoever calls and in whatever state.
+    function attemptDirect(uint256 seed) external {
+        uint256 bi = seed % NB;
+        address b = borrowers[bi];
+        bypassAttempts++;
+        vm.prank(b);
+        try credit.requestLoan(1e6) {
+            violations++;
+        } catch { }
+
+        DecentralizedMicrocredit.LoanRequest memory lr = DecentralizedMicrocredit.LoanRequest({
+            borrower: b, amount: 1e6, nonce: credit.nonces(b), deadline: vm.getBlockTimestamp() + 1 hours
+        });
+        bytes memory lsig = _signLoanRequest(_borrowerKeys[bi], lr);
+        vm.prank(stranger);
+        try credit.requestLoanMeta(lr, lsig) {
+            violations++;
+        } catch { }
+
+        DecentralizedMicrocredit.BorrowAndDisburse memory req = DecentralizedMicrocredit.BorrowAndDisburse({
+            borrower: b,
+            amount: 1e6,
+            to: vendor,
+            repaymentPeriod: 7 days,
+            maxAprBps: 933,
+            nonce: credit.nonces(b),
+            deadline: vm.getBlockTimestamp() + 1 hours
+        });
+        bytes memory sig = _signPool(_borrowerKeys[bi], req);
+        vm.prank(stranger);
+        try credit.borrowAndDisburseMeta(req, sig) {
+            violations++;
+        } catch { }
+    }
+
+    // ───────────── model ─────────────
+
+    function _modelRepay(LotM storage lot, uint256 owed, uint256 amount) internal {
+        uint256 elapsed = vm.getBlockTimestamp() - lot.disbursedAt;
+        uint256 accrued =
+            elapsed < GRACE_PERIOD ? 0 : (((lot.amount * lot.rate) / BASIS_POINTS) * elapsed) / SECONDS_PER_YEAR;
+        uint256 interestDue = accrued - (lot.repaid - lot.principalRepaid);
+        uint256 paid = amount < owed ? amount : owed;
+        uint256 rest = owed - paid;
+        bool closes = rest < CENT && rest <= interestDue;
+        uint256 interest = closes ? interestDue - rest : (paid < interestDue ? paid : interestDue);
+        lot.repaid += paid;
+        lot.principalRepaid += paid - interest;
+    }
+
+    /// @dev Syncs a closed lot through the router and checks the result against the model.
+    function _syncModel(address b) internal {
+        LotM storage lot = _lots[b];
+        if (!lot.open) return;
+        (DecentralizedMicrocredit.LoanStatus status,,,,) = credit.getLoanTerms(lot.loanId);
+        if (
+            status == DecentralizedMicrocredit.LoanStatus.Active
+                || status == DecentralizedMicrocredit.LoanStatus.Requested
+        ) return;
+
+        uint256 expectedLoss = status == DecentralizedMicrocredit.LoanStatus.Defaulted ? lot.expectedVaultLoss : 0;
+        uint256[3] memory freeBefore;
+        uint256[3] memory lossBefore;
+        uint256[3] memory lotted; // path amounts per root
+        uint256[3] memory floors; // sum of floor(loss * amount / total) per root
+        for (uint256 i = 0; i < NR; i++) {
+            freeBefore[i] = router.free(roots[i]);
+            lossBefore[i] = router.lossOf(roots[i]);
+        }
+        for (uint256 i = 0; i < lot.paths.length; i++) {
+            uint256 ri = _rootIndex(lot.paths[i].root);
+            lotted[ri] += lot.paths[i].amount;
+            floors[ri] += (expectedLoss * lot.paths[i].amount) / lot.amount;
+        }
+
+        try router.sync(b) { }
+        catch {
+            unexpectedReverts++;
+            return;
+        }
+
+        uint256 sumLoss;
+        for (uint256 i = 0; i < NR; i++) {
+            uint256 dLoss = router.lossOf(roots[i]) - lossBefore[i];
+            uint256 dFree = router.free(roots[i]) - freeBefore[i];
+            sumLoss += dLoss;
+            modelLoss[roots[i]] += dLoss;
+            // each root gets back exactly what it put in less its share of the loss
+            if (dFree + dLoss != lotted[i]) violations++;
+            // and bears no more than its own paths, and no less than the floor of its pro rata share
+            if (dLoss > lotted[i] || dLoss < floors[i] || dLoss > floors[i] + lot.paths.length) violations++;
+        }
+        // the loss attributed is exactly the unpaid principal that was charged to the vault's stake
+        if (sumLoss != expectedLoss) violations++;
+        totalLossAttributed += sumLoss;
+        if (status == DecentralizedMicrocredit.LoanStatus.Repaid) repaidLots++;
+        delete _lots[b];
+    }
+
+    // ───────────── views for the invariants ─────────────
+
+    function lotOpen(address b) external view returns (bool) {
+        return _lots[b].open;
+    }
+
+    function lotAmount(address b) external view returns (uint256) {
+        return _lots[b].amount;
+    }
+
+    function lotLoan(address b) external view returns (uint256) {
+        return _lots[b].loanId;
+    }
+
+    /// @dev Principal the model says is still owed to the pool on active router loans: the managed pool exposure.
+    function expectedLentOut() external view returns (uint256 sum) {
+        for (uint256 i = 0; i < NB; i++) {
+            LotM storage lot = _lots[borrowers[i]];
+            if (!lot.open) continue;
+            (DecentralizedMicrocredit.LoanStatus status,,,,) = credit.getLoanTerms(lot.loanId);
+            if (status == DecentralizedMicrocredit.LoanStatus.Active) sum += lot.amount - lot.principalRepaid;
+        }
+    }
+
+    function expectedLocked(address root) external view returns (uint256 sum) {
+        for (uint256 i = 0; i < NB; i++) {
+            LotM storage lot = _lots[borrowers[i]];
+            for (uint256 j = 0; j < lot.paths.length; j++) {
+                if (lot.paths[j].root == root) sum += lot.paths[j].amount;
+            }
+        }
+    }
+
+    /// @dev Live exposure the model expects on a mid edge (mid, borrower).
+    function expectedEdgeUsed(address from, address to, address borrower) external view returns (uint256 sum) {
+        LotM storage lot = _lots[borrower];
+        for (uint256 j = 0; j < lot.paths.length; j++) {
+            PathM storage p = lot.paths[j];
+            if (p.mid == from && borrower == to) sum += p.amount;
+        }
+    }
+
+    /// @dev Live exposure the model expects on the shared root edge (root, mid): all borrowers together.
+    function expectedRootEdgeUsed(address root, address mid) external view returns (uint256 sum) {
+        for (uint256 i = 0; i < NB; i++) {
+            LotM storage lot = _lots[borrowers[i]];
+            for (uint256 j = 0; j < lot.paths.length; j++) {
+                if (lot.paths[j].root == root && lot.paths[j].mid == mid) sum += lot.paths[j].amount;
+            }
+        }
+    }
+
+    function _rootIndex(address root) internal view returns (uint256) {
+        for (uint256 i = 0; i < NR; i++) {
+            if (roots[i] == root) return i;
+        }
+        revert("unknown root");
+    }
+
+    // ───────────── builders ─────────────
+
+    function _path(uint256 ri, uint256 mi, uint256 bi, uint256 amount, bool tightRoot, bool tightMid)
+        internal
+        view
+        returns (StakeRouterBase.Path memory p)
+    {
+        address b = borrowers[bi];
+        StakeRouterBase.Consent memory re = StakeRouterBase.Consent({
+            from: roots[ri],
+            to: mids[mi],
+            borrower: (amount + ri + mi + bi) % 2 == 0 ? address(0) : b, // wildcard or exact scope
+            limit: tightRoot ? amount : 100e6,
+            maxTerm: 30 days,
+            version: router.edgeVersion(router.edgeKey(roots[ri], mids[mi], address(0))),
+            expiry: vm.getBlockTimestamp() + 60 days
+        });
+        StakeRouterBase.Consent memory me = StakeRouterBase.Consent({
+            from: mids[mi],
+            to: b,
+            borrower: b,
+            limit: tightMid ? amount : 100e6,
+            maxTerm: 30 days,
+            version: router.edgeVersion(router.edgeKey(mids[mi], b, b)),
+            expiry: vm.getBlockTimestamp() + 60 days
+        });
+        p.amount = amount;
+        p.rootEdge = re;
+        p.rootSig = _signConsent(_rootKeys[ri], re);
+        p.midEdge = me;
+        p.midSig = _signConsent(_midKeys[mi], me);
+    }
+
+    function _signConsent(uint256 pk, StakeRouterBase.Consent memory c) internal view returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, router.consentDigest(c));
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _signLoanRequest(uint256 pk, DecentralizedMicrocredit.LoanRequest memory req)
+        internal
+        view
+        returns (bytes memory)
+    {
+        bytes32 domain = keccak256(
+            abi.encode(
+                EIP712_DOMAIN_TYPEHASH,
+                keccak256("DecentralizedMicrocredit"),
+                keccak256("1"),
+                block.chainid,
+                address(credit)
+            )
+        );
+        bytes32 structHash =
+            keccak256(abi.encode(LOAN_REQUEST_TYPEHASH, req.borrower, req.amount, req.nonce, req.deadline));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, keccak256(abi.encodePacked("\x19\x01", domain, structHash)));
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _signPool(uint256 pk, DecentralizedMicrocredit.BorrowAndDisburse memory req)
+        internal
+        view
+        returns (bytes memory)
+    {
+        bytes32 domain = keccak256(
+            abi.encode(
+                EIP712_DOMAIN_TYPEHASH,
+                keccak256("DecentralizedMicrocredit"),
+                keccak256("1"),
+                block.chainid,
+                address(credit)
+            )
+        );
+        bytes32 structHash = keccak256(
+            abi.encode(
+                BORROW_AND_DISBURSE_TYPEHASH,
+                req.borrower,
+                req.amount,
+                req.to,
+                req.repaymentPeriod,
+                req.maxAprBps,
+                req.nonce,
+                req.deadline
+            )
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, keccak256(abi.encodePacked("\x19\x01", domain, structHash)));
+        return abi.encodePacked(r, s, v);
+    }
+}

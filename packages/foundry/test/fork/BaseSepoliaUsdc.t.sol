@@ -6,6 +6,7 @@ import { MicrocreditLens } from "../../contracts/MicrocreditLens.sol";
 import { MockUSDC } from "../../contracts/MockUSDC.sol";
 import { ICreditUsage, OracleScoreProvider } from "../../contracts/OracleScoreProvider.sol";
 import { MicrocreditTestBase } from "../utils/MicrocreditTestBase.sol";
+import { BaseSepoliaFork } from "../utils/BaseSepoliaFork.sol";
 
 /// @dev The parts of Circle's FiatToken (v2.2) these tests use beyond ERC-20 and EIP-2612.
 interface IFiatToken {
@@ -39,12 +40,12 @@ contract BaseSepoliaUsdcForkTest is MicrocreditTestBase {
     function setUp() public {
         string memory rpc = vm.envOr("BASE_SEPOLIA_RPC_URL", string(""));
         if (bytes(rpc).length == 0) return;
-        vm.createSelectFork(rpc);
+        BaseSepoliaFork.select(rpc);
         forked = true;
 
         usdc = MockUSDC(BASE_SEPOLIA_USDC); // only ERC-20 and EIP-2612 functions are called on it
         vm.prank(owner);
-        credit = new DecentralizedMicrocredit(433, 500, 100e6, BASE_SEPOLIA_USDC, oracle);
+        credit = new DecentralizedMicrocredit(433, 500, 100e6, BASE_SEPOLIA_USDC, oracle, address(0));
         lens = new MicrocreditLens(credit);
         scores = new OracleScoreProvider(owner, oracle, MAX_SCORE_AGE, ISSUANCE_BUDGET);
         vm.startPrank(owner);

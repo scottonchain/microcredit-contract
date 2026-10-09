@@ -1,7 +1,6 @@
 import { type ChainReads, type IntentKey, Journal, decide, recover } from "./relayerJournal.ts";
 import { FileStore } from "./relayerJournalStore.ts";
 import {
-  BroadcastRejected,
   BroadcastUnconfirmed,
   JournalWriteFailed,
   type SendDeps,
@@ -164,23 +163,47 @@ test("a retry whose node never received the bytes sends them now", async () => {
   assert.equal(await rebroadcast(j.get(key(5))!, deps), "sent");
 });
 
-test("nonce too low on the first broadcast: nothing can land; abandoned, a fresh attempt may follow", async () => {
+test("a nonce-too-low response after transport retries preserves the accepted transaction until its receipt settles it", async () => {
   const s = store();
   const j = new Journal();
-  j.begin(key(6), "d", "backMeta", T);
+  s.append(j.begin(key(6), "d", "backMeta", T).entry);
+  let acceptedRaw: string | undefined;
+  let signatures = 0;
   const deps: SendDeps = {
-    sign: async () => SIGNED,
+    sign: async () => {
+      signatures += 1;
+      return SIGNED;
+    },
     append: e => s.append(e),
-    broadcast: async () => {
+    broadcast: async raw => {
+      // One broadcast call can retry internally: the node accepted the first HTTP request,
+      // its response was lost, and the retry now finds the account nonce consumed.
+      acceptedRaw = raw;
       throw Object.assign(new Error("nonce too low: next nonce 12, tx nonce 11"), {
         shortMessage: "Nonce provided for the transaction is lower than the current nonce",
       });
     },
   };
-  await assert.rejects(sendHashFirst(j, key(6), deps, now), BroadcastRejected);
-  assert.equal(j.get(key(6))!.state, "abandoned");
-  assert.equal(JSON.parse(s.readLines().at(-1)!).state, "abandoned", "the settlement is durable");
-  assert.equal(decide(j, key(6), "d", "backMeta", T).action, "send");
+  await assert.rejects(sendHashFirst(j, key(6), deps, now), error =>
+    error instanceof BroadcastUnconfirmed && error.hash === SIGNED.hash);
+  assert.equal(acceptedRaw, SIGNED.raw);
+  assert.equal(signatures, 1);
+  assert.equal(j.get(key(6))!.state, "submitted");
+
+  const restarted = Journal.replay(s.readLines());
+  assert.equal(restarted.get(key(6))!.state, "submitted");
+  assert.equal(restarted.get(key(6))!.hash, SIGNED.hash);
+  assert.equal(restarted.get(key(6))!.raw, SIGNED.raw);
+  assert.equal((await recover(restarted, reads({ nonce: 7n }), T)).length, 0,
+    "an unseen receipt remains unknown even when the signer nonce advanced");
+  const retry = decide(restarted, key(6), "d", "backMeta", T);
+  assert.equal(retry.action, "answer");
+  if (retry.action === "answer") assert.equal(retry.answer.status, 202);
+  assert.equal(decide(restarted, key(6), "different", "backMeta", T).action, "answer");
+
+  const settled = await recover(restarted, reads({ receipts: { [SIGNED.hash]: "success" } }), T);
+  assert.equal(settled[0].next.state, "mined");
+  assert.equal(settled[0].next.hash, SIGNED.hash);
 });
 
 test("nonce too low on a rebroadcast proves nothing (the original may have mined while this node lags): the entry is left as it is", async () => {
