@@ -104,8 +104,8 @@ Amounts in USDC base units (6 decimals). `P` pool, `R` router, `U` token.
    record one with `maxAmount = 1e6 - 1` and check that `R.originateOrder` by `eth_call` reverts `ApprovalTooSmall`; then
    have the officer re-sign for `maxAmount = 1e6` and record it (`approveOrder` overwrites the stored approval). Approval-field
    check, by `eth_call` of `R.approveOrder(a, sig)` where `a` is the valid approval except `policyVersion = R.policyVersion() - 1`,
-   with any signature: expect `NoApproval` (the field check runs before the signature check, so this shows that the epoch and
-   policy fields are enforced when an approval is recorded; it does not show anything about the signature). What a later
+   with any signature: expect `NoApproval` (the field check runs before the signature check, so this is a policy-version field check only: it does not
+   by itself show the epoch check, which is shown in C3, and it shows nothing about the signature). What a later
    rotation does to an approval that is already recorded is shown only in C3, not here: `originateOrder` accepts no officer
    signature, it consumes the stored approval.
 6b. Consent control, after the valid approval of 6a is recorded. By `eth_call`, `R.originateOrder` with every input valid except
