@@ -2,7 +2,7 @@
 """Assemble a reviewable evidence packet from the published logs of a run that was made elsewhere.
 
   candidate_package_run.py --src COPY --out evidence/DIR --tested-head SHA --parser-rev SHA --reeval-rev SHA --packaging-rev SHA \
-      --run-by TEXT --input-ref TEXT --failed-ref TEXT [--source-index FILE] [--original-failed FILE] [--selection TEXT]
+      --parser-gate-sha256 HEX --run-by TEXT --input-ref TEXT --failed-ref TEXT [--source-index FILE] [--original-failed FILE] [--selection TEXT]
 
 Why it exists: the clean run at 3efdb6f was made by Hermes and passed every stage, but the gate that judged it read only the Forge 1.5
 output form and refused it (original FAILED.txt, kept at its publication). The designated reviewer chose that run as the evidence of
@@ -89,10 +89,10 @@ git checkout @HEAD@
 scripts/candidate_evidence.sh
 ```
 
-2. Judge a copy of that output directory with the repaired gate, from a checkout of the parser revision (`{a.parser_rev}`) or later, and package it (the header of `scripts/candidate_package_run.py` lists its arguments):
+2. Judge a copy of that output directory with the repaired gate and package it, from a checkout of the **packaging revision** (`{a.packaging_rev}`), which is the first revision that contains `scripts/candidate_package_run.py` (the parser revision `{a.parser_rev}` does not). The gate file there is byte-identical to the one at the parser revision (sha256 `{a.parser_gate_sha256}`, checked when this packet was assembled). The header of `scripts/candidate_package_run.py` lists its arguments:
 
 ```
-git checkout {a.parser_rev}
+git checkout {a.packaging_rev}
 python3 scripts/candidate_evidence_gate.py <a copy of the run's output directory>
 python3 scripts/candidate_package_run.py --src <the run's output directory> --out <a new directory> ...
 ```
@@ -108,6 +108,9 @@ def package(a):
         raise PackageError(f"{logs_src} is not a directory")
     if os.path.exists(a.out):
         raise PackageError(f"{a.out} already exists; the packet is written once")
+    actual_gate = sha256(gate.__file__)
+    if actual_gate != a.parser_gate_sha256:
+        raise PackageError(f"the gate file here has sha256 {actual_gate}, not the parser revision's {a.parser_gate_sha256}")
     if a.source_index:
         check_index(logs_src, a.source_index)
     a.failed_sha = sha256(a.original_failed) if a.original_failed else None
@@ -137,7 +140,7 @@ def package(a):
 
 def main():
     ap = argparse.ArgumentParser()
-    for name in ("src", "out", "tested-head", "parser-rev", "reeval-rev", "packaging-rev", "run-by", "input-ref", "failed-ref"):
+    for name in ("src", "out", "tested-head", "parser-rev", "reeval-rev", "packaging-rev", "parser-gate-sha256", "run-by", "input-ref", "failed-ref"):
         ap.add_argument("--" + name, required=True)
     ap.add_argument("--source-index")
     ap.add_argument("--original-failed")

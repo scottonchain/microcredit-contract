@@ -47,7 +47,7 @@ class PackageRunTest(unittest.TestCase):
 
     def args(self, **over):
         a = argparse.Namespace(src=self.src, out=os.path.join(self.tmp, "out"), tested_head=REV, parser_rev="5d17e2c", reeval_rev="1803b40",
-                               packaging_rev="abcdef1", run_by="Hermes (AI agent)", input_ref="testbed commit 8f80978 (evidence/pr28-clean-rerun-3efdb6f-hermes)",
+                               packaging_rev="abcdef1", parser_gate_sha256=sha(gate.__file__), run_by="Hermes (AI agent)", input_ref="testbed commit 8f80978 (evidence/pr28-clean-rerun-3efdb6f-hermes)",
                                failed_ref="testbed commit 8f80978", source_index=self.index, original_failed=self.failed,
                                selection="The designated reviewer chose this run as the evidence of record.")
         for k, v in over.items():
@@ -58,7 +58,7 @@ class PackageRunTest(unittest.TestCase):
         a = self.args()
         n = pk.package(a)
         md = read(os.path.join(a.out, "README.md"))
-        for needle in (REV, "Hermes (AI agent)", "5d17e2c", "1803b40", "abcdef1", "The script exited 1", "failed on the output format", "only the retrospective evaluation", "Reproducing takes two steps", "git checkout 5d17e2c", "still meets the old parser",
+        for needle in (REV, "Hermes (AI agent)", "5d17e2c", "1803b40", "abcdef1", "The script exited 1", "failed on the output format", "only the retrospective evaluation", "Reproducing takes two steps", "git checkout abcdef1", "first revision that contains", "byte-identical to the one at the parser revision", "still meets the old parser",
                        "One host, one run", "skipped tests", "no readiness is claimed", "sha256 `" + sha(self.failed) + "`",
                        "41234567", "14 distinct invariants", "git checkout " + REV):
             self.assertIn(needle, md, needle)
@@ -102,6 +102,13 @@ class PackageRunTest(unittest.TestCase):
         self.assertIn("mutants: exited 1", str(cm.exception))
         self.assertFalse(os.path.exists(a.out))
 
+    def test_a_gate_file_that_is_not_the_parser_revisions_stops_the_packet(self):
+        a = self.args(parser_gate_sha256="0" * 64)
+        with self.assertRaises(pk.PackageError) as cm:
+            pk.package(a)
+        self.assertIn("not the parser revision's", str(cm.exception))
+        self.assertFalse(os.path.exists(a.out))
+
     def test_the_packet_is_written_once(self):
         a = self.args()
         pk.package(a)
@@ -110,7 +117,7 @@ class PackageRunTest(unittest.TestCase):
 
     def test_main_rejects_a_value_that_is_not_a_revision(self):
         argv = ["--src", self.src, "--out", os.path.join(self.tmp, "o2"), "--tested-head", "main", "--parser-rev", "5d17e2c", "--reeval-rev", "1803b40",
-                "--packaging-rev", "abcdef1", "--run-by", "x", "--input-ref", "y", "--failed-ref", "z"]
+                "--packaging-rev", "abcdef1", "--parser-gate-sha256", "0" * 64, "--run-by", "x", "--input-ref", "y", "--failed-ref", "z"]
         import sys
         old = sys.argv
         sys.argv = ["candidate_package_run.py"] + argv
