@@ -56,19 +56,19 @@ if ! command -v node >/dev/null 2>&1; then
     echo ""
     echo "  You're running in WSL but Node.js isn't installed inside WSL."
     echo "  Fix A — Install Node.js in WSL (recommended):"
-    echo "    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
+    echo "    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -"
     echo "    sudo apt-get install -y nodejs"
     echo ""
     echo "  Fix B — Run from Git Bash instead of WSL bash:"
     echo "    Open Git Bash in this folder and run:  bash demo.sh"
   else
-    echo "  Install Node.js >= 20.18.3 from https://nodejs.org"
+    echo "  Install Node.js >= 22.18.0 from https://nodejs.org"
   fi
   exit 1
 fi
 if ! command -v yarn >/dev/null 2>&1 && ! command -v yarn.cmd >/dev/null 2>&1; then
   echo ""
-  echo "ERROR: 'yarn' not found. Install it with:  npm install -g yarn"
+  echo "ERROR: 'yarn' not found. Enable the pinned repository Yarn with:  corepack enable"
   exit 1
 fi
 if ! command -v anvil >/dev/null 2>&1; then

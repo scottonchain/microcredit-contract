@@ -1,125 +1,36 @@
 "use client";
 
-import { useState } from "react";
-import type { NextPage } from "next";
-import { useAccount } from "wagmi";
-import { CogIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
+import Link from "next/link";
 import { Address } from "~~/components/scaffold-eth";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useIsAdmin } from "~~/hooks/useIsAdmin";
 
-const OracleSetupPage: NextPage = () => {
-  const { address: connectedAddress } = useAccount();
-
-  // Read contract data - always call hooks at the top level
-  const { data: oracle } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "oracle",
-  });
-
-  const { data: owner } = useScaffoldReadContract({
-    contractName: "DecentralizedMicrocredit",
-    functionName: "owner",
-  });
-
-  const isOwner = connectedAddress && owner && connectedAddress.toLowerCase() === owner.toLowerCase();
-  const isOracle = oracle && connectedAddress && connectedAddress.toLowerCase() === oracle.toLowerCase();
-
+export default function OracleSetupPage() {
+  const { address, owner, oracle, admin, loading } = useIsAdmin();
   return (
-    <>
-      <div className="flex items-center flex-col grow pt-10">
-        <div className="px-5 w-full max-w-4xl">
-          <div className="flex items-center justify-center mb-8">
-            <CogIcon className="h-8 w-8 mr-3" />
-            <h1 className="text-3xl font-bold">Oracle Setup</h1>
-          </div>
-
-          {/* Current Status */}
-          <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">Current Status</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="font-medium mb-2">Current Oracle</h3>
-                {oracle ? (
-                  <Address address={oracle as `0x${string}`} />
-                ) : (
-                  <div className="text-muted">Loading...</div>
-                )}
-              </div>
-              <div>
-                <h3 className="font-medium mb-2">Contract Owner</h3>
-                {owner ? (
-                  <Address address={owner as `0x${string}`} />
-                ) : (
-                  <div className="text-muted">Loading...</div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Your Address */}
-          {connectedAddress && (
-            <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8">
-              <h2 className="text-xl font-semibold mb-4">Your Address</h2>
-              <Address address={connectedAddress} />
-              <div className="mt-4 space-y-2">
-                <div className={`flex items-center space-x-2 ${isOwner ? 'text-success' : 'text-error'}`}>
-                  <ShieldCheckIcon className="h-5 w-5" />
-                  <span>{isOwner ? 'You are the contract owner' : 'You are not the contract owner'}</span>
-                </div>
-                <div className={`flex items-center space-x-2 ${isOracle ? 'text-success' : 'text-error'}`}>
-                  <ShieldCheckIcon className="h-5 w-5" />
-                  <span>{isOracle ? 'You are the oracle' : 'You are not the oracle'}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Instructions */}
-          <div className="bg-base-300 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">How to Access Admin Page</h2>
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <div className="bg-info text-info-content rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
-                  1
-                </div>
-                <div>
-                  <h3 className="font-medium">Check Current Status</h3>
-                  <p className="text-muted">Verify if you are the owner or oracle above</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="bg-info text-info-content rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
-                  2
-                </div>
-                <div>
-                  <h3 className="font-medium">If You&apos;re the Owner</h3>
-                  <p className="text-muted">Use the debug page to call setOracle and set yourself as the oracle</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="bg-info text-info-content rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
-                  3
-                </div>
-                <div>
-                  <h3 className="font-medium">If You&apos;re Not the Owner</h3>
-                  <p className="text-muted">Ask the contract owner to set you as the oracle, or use the debug page to call setOracle directly</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="bg-info text-info-content rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold mt-0.5">
-                  4
-                </div>
-                <div>
-                  <h3 className="font-medium">Access Admin Page</h3>
-                  <p className="text-muted">Once you&apos;re the oracle, you can access <a href="/admin" className="text-info underline">/admin</a> to manage the system</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
+    <main className="w-full max-w-2xl mx-auto p-6 space-y-5">
+      <h1 className="text-3xl font-bold">Oracle and admin access</h1>
+      <dl className="bg-base-100 rounded-lg p-6 space-y-3">
+        <dt className="font-semibold">Contract owner</dt>
+        <dd>{owner ? <Address address={owner} /> : "Loading…"}</dd>
+        <dt className="font-semibold">Current oracle</dt>
+        <dd>{oracle ? <Address address={oracle} /> : "Loading…"}</dd>
+      </dl>
+      <p>
+        {!address
+          ? "Connect your wallet to check admin access."
+          : loading
+            ? "Checking your roles…"
+            : admin
+              ? "Your wallet can open the admin page. Each action still requires its contract role."
+              : "Your wallet has no configured admin access. Contact the contract owner if you need a role."}
+      </p>
+      <p>
+        Only an authorized contract role can change the oracle. Connecting a wallet or opening the debug page grants no
+        permissions.
+      </p>
+      <Link href="/admin" className="btn btn-primary">
+        Open admin
+      </Link>
+    </main>
   );
-};
-
-export default OracleSetupPage; 
+}

@@ -37,7 +37,7 @@ import {
 import { stopMessage } from "~~/utils/stopMessage";
 import { usePoolToken } from "~~/hooks/usePoolToken";
 import { readRelayerResponse } from "~~/utils/relayerResponse";
-import QRCodeDisplay from "~~/components/QRCodeDisplay";
+import { QRCodeSVG } from "qrcode.react";
 import { useDisplayName } from "~~/components/scaffold-eth/DisplayNameContext";
 import { MICRO_DOMAIN, type PermitDomain, TYPES, readPermitDomain, splitSignature } from "~~/utils/eip712";
 import {
@@ -809,7 +809,11 @@ const BorrowPage: NextPage = () => {
                 className="cursor-pointer flex flex-col items-center"
                 title="Click to copy link"
               >
-                <QRCodeDisplay value={backingUrl} size={72} />
+                {backingUrl && (
+                  <div className="p-2 bg-white rounded-md border border-gray-300 inline-block">
+                    <QRCodeSVG value={backingUrl} size={72} />
+                  </div>
+                )}
                 <span className="text-xs text-muted mt-1">scan or copy</span>
               </div>
             </div>

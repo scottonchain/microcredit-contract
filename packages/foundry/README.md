@@ -25,9 +25,11 @@ yarn deploy
 `scaffold-eth-default` keystore on first use. It writes `deployment.json` and regenerates
 `../nextjs/contracts/deployedContracts.ts`.
 
-`Deploy.s.sol` is local-only: it broadcasts with Anvil's published private keys. For a public
-network, write a separate script whose contract is named `DeployScript` and run
-`yarn deploy --file <Script>.s.sol --network <name>` with a keystore (`yarn account:generate`).
+`Deploy.s.sol` is local-only: it broadcasts with Anvil's published private keys. The existing
+[testnet](../../docs/TESTNET.md) and [deployment](../../docs/DEPLOYMENT.md) guides describe
+the separate public-network scripts and keystores. Inspect CLI options with
+`yarn deploy --help`; that command needs no key. Candidate execution remains subject to the
+[reviewed packet and its gates](../../docs/BOOTSTRAP_EXECUTION_PACKET.md).
 
 ## USDC
 
