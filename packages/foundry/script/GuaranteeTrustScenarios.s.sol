@@ -42,6 +42,8 @@ contract GuaranteeTrustScenarios is Script {
     uint256 internal sigCount;
 
     function run() external {
+        // testnet only: Base Sepolia or a local chain, never a network with real value
+        require(block.chainid == 84532 || block.chainid == 31337, "GuaranteeTrust scripts are testnet only");
         gt = GuaranteeTrust(vm.envAddress("GT"));
         usdc = MockUSDC(address(gt.token()));
         mnemonic = vm.envOr("SIM_MNEMONIC", string(""));
@@ -150,7 +152,7 @@ contract GuaranteeTrustScenarios is Script {
     /// @dev Persona i signs its consent to `attester`; the broadcaster relays it.
     function _consent(uint32 i, address attester) internal {
         address member = _who(i);
-        uint256 n = _nonce();
+        uint256 n = gt.consentNonce(member, attester);
         uint256 deadline = block.timestamp + 1 days;
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_pk(i), gt.consentDigest(member, attester, true, n, deadline));
         _asMe();
@@ -266,8 +268,11 @@ contract GuaranteeTrustScenarios is Script {
         _as(30);
         gt.remit(id);
         _end();
-        _openG(30, _client(3, 2), 0, 5 * U, keccak256("S3c"));
+        uint256 id2 = _openG(30, _client(3, 2), 0, 5 * U, keccak256("S3c"));
         console.log("S3 after remitting, the next guarantee opened; Priya dues", gt.memberOf(priya).dues);
+        _asAdj();
+        gt.cancelGuarantee(id2); // the job did not go ahead; nothing stays open
+        _end();
     }
 
     /// @dev Personas 40 to 45 (the ring), 46 (Rafe, a real staker who backs the ring).

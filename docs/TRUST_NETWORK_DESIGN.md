@@ -1,7 +1,8 @@
 # Trust for new members: a conserved-trust design for the revolving first-job guarantee
 
-Status: **revision 3, after Codex's devil's-advocate review and re-review** (contract PR 28, reviews
-5484296919 and 5484377736, and the polling session's first pass; section 12 records each finding and fix). Written by Claude Code (AI agent) on 2026-10-11
+Status: **revision 4, after Codex's devil's-advocate review and re-review and the polling session's non-author
+review** (contract PR 28, reviews 5484296919 and 5484377736; board 15 `c-20261011-guaranteetrust-review-r1`;
+section 12 records each finding and fix). Written by Claude Code (AI agent) on 2026-10-11
 at the operator's direction. Testnet only. No real money, no outreach, no live guarantee. The
 operator's questions, the answer, every parameter and its reason, and what the contract
 (`GuaranteeTrust`) and the agentic simulations must show.
@@ -230,4 +231,23 @@ new ones, fixed in revision 3:
 
 Provenance correction: `c150af0..b5e5e99` also changed `CLAUDE.md` (the five-line pointer of `ef8dec8`), not only
 the design, contract, tests and scenario as revision 2's note said.
+
+**The polling session's non-author review of `c195800..cff18f3`** (board 15 `c-20261011-guaranteetrust-review-r1`):
+ACCEPT for a Base Sepolia MockUSDC deploy once a chain guard lands, with two changes strongly advised because a
+deployed contract cannot be patched. All three, and the cheap minor items, are in revision 4:
+
+| Item | Fix | Regression |
+| --- | --- | --- |
+| Must: the testnet scripts could run on any chain | both scripts require Base Sepolia (84532) or a local chain (31337); a given `TOKEN` must be Circle's Base Sepolia test USDC, otherwise a fresh MockUSDC is deployed | the deploy script refuses a chain with id 1 ("testnet only") |
+| Group was per guarantee, not per client: a known client reopened under another group escaped its group's default and cap | `clientGroup` fixes a client's group at its first guarantee; a later acceptance must name the same group (`GroupMismatch`) | `testAKnownClientCannotChangeGroup` |
+| Consent signatures were unordered: an earlier unsubmitted approval could override a later revocation | sequential `consentNonce` per member and attester; `setConsent` also advances it, so any later decision kills earlier signatures | `testALaterRevocationKillsAnEarlierUnsubmittedConsent` |
+| Revoked dust attesters kept their slots | `dropAttester`: a member removes an attester with nothing locked, returning its backing and withdrawing consent | `testAMemberCanDropAnAttesterWithNothingLocked`; fuzzed in the invariant handler |
+| No minimum remaining term | `MIN_TERM` of one day for `settleBy` | `testSettleByIsBoundedAndPassedGuaranteesExpireWithoutAClaim` |
+| Scenario 3 left a guarantee open | it now cancels the second job, so every scenario ends with nothing outstanding | scenario run |
+
+Stated rather than changed: MockUSDC's ERC-20 name is "USD Coin", so every receipt labels it MockUSDC; a funder
+who joins while guarantees are open shares in their line-backed losses, as in any mutual pool; defaults are
+permanent for a client and its group; the adjudicator reports the wage, and the contribution is bounded by the
+signed cap (Hermes's receipt on PR 28, comment 6112353325); and because nothing is released while a guarantee is
+open, a sponsor of a busy pool may wait for a quiet moment to exit.
 

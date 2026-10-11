@@ -19,12 +19,19 @@ import { GuaranteeTrust } from "../contracts/GuaranteeTrust.sol";
  *      forge script script/DeployGuaranteeTrust.s.sol --rpc-url https://sepolia.base.org --broadcast
  */
 contract DeployGuaranteeTrust is Script {
+    address internal constant BASE_SEPOLIA_TEST_USDC = 0x036CbD53842c5426634e7929541eC2318f3dCF7e;
+
     function run() external returns (GuaranteeTrust gt, address token) {
+        // testnet only: Base Sepolia or a local chain, never a network with real value
+        require(block.chainid == 84532 || block.chainid == 31337, "GuaranteeTrust scripts are testnet only");
         uint256 unit = vm.envOr("UNIT", uint256(1e6));
         uint256 budget = vm.envOr("ISSUER_BUDGET", 60 * unit);
         vm.startBroadcast();
         (, address me,) = vm.readCallers();
         token = vm.envOr("TOKEN", address(0));
+        // a given token must be Circle's Base Sepolia test USDC; otherwise a fresh MockUSDC (labelled MockUSDC in
+        // every receipt, although its ERC-20 name is "USD Coin")
+        if (token != address(0)) require(token == BASE_SEPOLIA_TEST_USDC, "TOKEN must be Base Sepolia test USDC");
         if (token == address(0)) token = address(new MockUSDC());
         string memory mnemonic = vm.envOr("SIM_MNEMONIC", string(""));
         bool sim = bytes(mnemonic).length != 0;

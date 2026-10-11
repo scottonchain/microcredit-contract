@@ -33,6 +33,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     using SafeERC20 for IERC20;
 
     uint256 public constant BPS = 10_000;
+    uint256 public constant MIN_TERM = 1 days; // shortest settle-by a worker may accept
 
     bytes32 public constant ACCEPTANCE_TYPEHASH = keccak256(
         "Acceptance(address worker,bytes32 clientId,bytes32 groupId,uint256 amount,uint256 maxFromDues,bytes32 termsHash,uint256 contributionBps,uint256 contributionCap,uint256 remitWindow,uint64 settleBy,uint256 nonce,uint256 deadline)"
@@ -181,6 +182,8 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     mapping(bytes32 => bool) public clientDefaulted;
     mapping(bytes32 => uint256) public groupExposure;
     mapping(bytes32 => bool) public groupDefaulted;
+    mapping(bytes32 => bytes32) public clientGroup; // canonical group, fixed at the client's first guarantee
+    mapping(address => mapping(address => uint256)) public consentNonce; // member => attester => next nonce
     Guarantee[] internal guarantees;
     mapping(uint256 => Share[]) internal shares;
 
@@ -263,6 +266,8 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     error PolicyMismatch();
     error BadTerm();
     error PastSettleBy();
+    error StaleNonce();
+    error GroupMismatch();
     error SponsorCapital();
     error ReleaseWhileOpen();
 
@@ -373,7 +378,8 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
 
     /// @notice Anyone may fund the reserve and receives shares of the sponsor capital at its current value. The
     ///         owner can return capital only to a funder, only up to the current value of its shares, never dues,
-    ///         never the capital behind issuer lines and never while any guarantee is open.
+    ///         never the capital behind issuer lines and never while any guarantee is open. A funder who joins
+    ///         while guarantees are open shares in their line-backed losses, as in any mutual pool.
     function fundReserve(uint256 amount) external {
         if (amount == 0) revert ZeroAmount();
         uint256 minted = (amount * (totalSponsorShares + 1)) / (sponsorCapital + 1);
@@ -457,14 +463,16 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     // ---------------------------------------------------------------- consent and nonces
 
     /// @notice A member chooses who may back it. Without consent anyone with a little stake could fill a
-    ///         newcomer's attester slots and lock out real attesters.
+    ///         newcomer's attester slots and lock out real attesters. Each decision advances the pair's nonce, so it
+    ///         cancels every earlier unsubmitted signature for that attester.
     function setConsent(address attester, bool allowed) external {
+        consentNonce[msg.sender][attester] += 1;
         consent[msg.sender][attester] = allowed;
         emit ConsentSet(msg.sender, attester, allowed, msg.sender);
     }
 
     /// @notice The member's signed consent, submitted by anyone (a newcomer may hold no gas). No role can consent
-    ///         for a member.
+    ///         for a member. Nonces are sequential per member and attester, so decisions apply in the order signed.
     function setConsentBySig(
         address member,
         address attester,
@@ -474,14 +482,15 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         bytes calldata signature
     ) external {
         if (block.timestamp > deadline) revert SignatureExpired();
-        _useNonce(member, nonce);
+        if (nonce != consentNonce[member][attester]) revert StaleNonce();
         bytes32 digest = consentDigest(member, attester, allowed, nonce, deadline);
         if (!SignatureChecker.isValidSignatureNow(member, digest, signature)) revert BadSignature();
+        consentNonce[member][attester] = nonce + 1;
         consent[member][attester] = allowed;
         emit ConsentSet(member, attester, allowed, msg.sender);
     }
 
-    /// @notice Withdraw a signed acceptance or consent before anyone submits it.
+    /// @notice Withdraw a signed acceptance before anyone submits it.
     function revokeNonce(uint256 nonce) external {
         _useNonce(msg.sender, nonce);
         emit NonceRevoked(msg.sender, nonce);
@@ -528,6 +537,21 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         emit BackingWithdrawn(msg.sender, member, amount, left);
     }
 
+    /// @notice A member removes an attester whose backing is not locked in an open guarantee, freeing its slot. The
+    ///         backing returns to the attester's own free trust.
+    function dropAttester(address attester) external {
+        uint256 amount = backing[attester][msg.sender];
+        if (amount == 0) revert ZeroAmount();
+        if (lockedBacking[attester][msg.sender] != 0) revert BackingLocked();
+        backing[attester][msg.sender] = 0;
+        members[attester].backingGiven -= amount;
+        members[msg.sender].backingReceived -= amount;
+        consent[msg.sender][attester] = false;
+        consentNonce[msg.sender][attester] += 1;
+        _unlink(attester, msg.sender);
+        emit BackingWithdrawn(attester, msg.sender, amount, 0);
+    }
+
     function withdrawableBacking(address attester, address member) public view returns (uint256) {
         return backing[attester][member] - lockedBacking[attester][member];
     }
@@ -540,7 +564,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         if (paused) revert IsPaused();
         if (a.amount == 0) revert ZeroAmount();
         if (block.timestamp > a.deadline) revert SignatureExpired();
-        if (a.settleBy <= block.timestamp || a.settleBy > block.timestamp + maxTerm) revert BadTerm();
+        if (a.settleBy < block.timestamp + MIN_TERM || a.settleBy > block.timestamp + maxTerm) revert BadTerm();
         if (a.contributionBps != contributionBps || a.contributionCap != contributionCap || a.remitWindow != remitWindow) {
             revert PolicyMismatch();
         }
@@ -548,6 +572,9 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         if (!SignatureChecker.isValidSignatureNow(a.worker, acceptanceDigest(a), signature)) revert BadSignature();
 
         bytes32 group = a.groupId == bytes32(0) ? a.clientId : a.groupId;
+        bytes32 known = clientGroup[a.clientId];
+        if (known == bytes32(0)) clientGroup[a.clientId] = group;
+        else if (known != group) revert GroupMismatch();
         if (clientOpen[a.clientId] || clientDefaulted[a.clientId] || groupDefaulted[group]) revert ClientBlocked();
         Member storage w = members[a.worker];
         if (w.unpaidContributions != 0) revert ContributionOutstanding();

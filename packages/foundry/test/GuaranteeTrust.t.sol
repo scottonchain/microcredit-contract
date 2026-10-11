@@ -201,9 +201,10 @@ contract GuaranteeTrustTest is Test {
         gt.attest(nia, 5 * U);
         // a newcomer with no gas signs; anyone may submit it
         uint256 deadline = block.timestamp + 1 hours;
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(keyOf[nia], gt.consentDigest(nia, avery, true, 7, deadline));
+        uint256 n = gt.consentNonce(nia, avery);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(keyOf[nia], gt.consentDigest(nia, avery, true, n, deadline));
         vm.prank(issuer);
-        gt.setConsentBySig(nia, avery, true, 7, deadline, abi.encodePacked(r, s, v));
+        gt.setConsentBySig(nia, avery, true, n, deadline, abi.encodePacked(r, s, v));
         vm.prank(avery);
         gt.attest(nia, 5 * U);
         assertEq(gt.capacity(nia), 5 * U);
@@ -211,22 +212,62 @@ contract GuaranteeTrustTest is Test {
 
     function testNoRoleCanFabricateConsent() public {
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = gt.consentDigest(nia, avery, true, 1, deadline);
+        bytes32 digest = gt.consentDigest(nia, avery, true, 0, deadline);
         // the issuer signs for the newcomer: refused
         (, uint256 issuerKey) = makeAddrAndKey("issuer");
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(issuerKey, digest);
         vm.expectRevert(GuaranteeTrust.BadSignature.selector);
-        gt.setConsentBySig(nia, avery, true, 1, deadline, abi.encodePacked(r, s, v));
+        gt.setConsentBySig(nia, avery, true, 0, deadline, abi.encodePacked(r, s, v));
         // the newcomer's real signature, replayed: refused
-        (v, r, s) = vm.sign(keyOf[nia], gt.consentDigest(nia, avery, true, 2, deadline));
-        gt.setConsentBySig(nia, avery, true, 2, deadline, abi.encodePacked(r, s, v));
-        vm.expectRevert(GuaranteeTrust.NonceAlreadyUsed.selector);
-        gt.setConsentBySig(nia, avery, true, 2, deadline, abi.encodePacked(r, s, v));
+        (v, r, s) = vm.sign(keyOf[nia], digest);
+        gt.setConsentBySig(nia, avery, true, 0, deadline, abi.encodePacked(r, s, v));
+        vm.expectRevert(GuaranteeTrust.StaleNonce.selector);
+        gt.setConsentBySig(nia, avery, true, 0, deadline, abi.encodePacked(r, s, v));
         // expired: refused
         vm.warp(deadline + 1);
-        (v, r, s) = vm.sign(keyOf[nia], gt.consentDigest(nia, brighton, true, 3, deadline));
+        (v, r, s) = vm.sign(keyOf[nia], gt.consentDigest(nia, brighton, true, 0, deadline));
         vm.expectRevert(GuaranteeTrust.SignatureExpired.selector);
-        gt.setConsentBySig(nia, brighton, true, 3, deadline, abi.encodePacked(r, s, v));
+        gt.setConsentBySig(nia, brighton, true, 0, deadline, abi.encodePacked(r, s, v));
+    }
+
+    /// @dev Decisions apply in order: an earlier, unsubmitted "allowed" signature dies once the member revokes.
+    function testALaterRevocationKillsAnEarlierUnsubmittedConsent() public {
+        uint256 deadline = block.timestamp + 1 days;
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(keyOf[nia], gt.consentDigest(nia, avery, true, 0, deadline));
+        bytes memory early = abi.encodePacked(r, s, v);
+        vm.prank(nia);
+        gt.setConsent(avery, false);
+        vm.expectRevert(GuaranteeTrust.StaleNonce.selector);
+        gt.setConsentBySig(nia, avery, true, 0, deadline, early);
+        assertFalse(gt.consent(nia, avery));
+        // a signed revocation also outranks an earlier signed approval
+        (v, r, s) = vm.sign(keyOf[omar], gt.consentDigest(omar, avery, true, 0, deadline));
+        bytes memory approve = abi.encodePacked(r, s, v);
+        (v, r, s) = vm.sign(keyOf[omar], gt.consentDigest(omar, avery, false, 0, deadline));
+        gt.setConsentBySig(omar, avery, false, 0, deadline, abi.encodePacked(r, s, v));
+        vm.expectRevert(GuaranteeTrust.StaleNonce.selector);
+        gt.setConsentBySig(omar, avery, true, 0, deadline, approve);
+    }
+
+    function testAMemberCanDropAnAttesterWithNothingLocked() public {
+        _stake(avery, 20 * U);
+        _stake(brighton, 20 * U);
+        _attest(avery, nia, 1);
+        _attest(brighton, nia, 10 * U);
+        uint256 id = _open(nia, "c", 10 * U);
+        vm.prank(nia);
+        vm.expectRevert(GuaranteeTrust.BackingLocked.selector);
+        gt.dropAttester(brighton);
+        vm.prank(adj);
+        gt.markPaid(id, 0, bytes32(0));
+        vm.prank(nia);
+        gt.dropAttester(avery);
+        assertEq(gt.attestersOf(nia).length, 1);
+        assertEq(gt.freeToBack(avery), 20 * U, "the dropped backing returns to the attester");
+        assertFalse(gt.consent(nia, avery));
+        vm.prank(avery);
+        vm.expectRevert(GuaranteeTrust.NoConsent.selector);
+        gt.attest(nia, 1);
     }
 
     // -------------------------------------------------------------- the worker accepts every guarantee
@@ -319,6 +360,9 @@ contract GuaranteeTrustTest is Test {
         GuaranteeTrust.Acceptance memory a = _terms(nia, keccak256("c"), 0, 10 * U);
         a.settleBy = uint64(block.timestamp + 61 days);
         _expectOpenReverts(a, GuaranteeTrust.BadTerm.selector);
+        a = _terms(nia, keccak256("c"), 0, 10 * U);
+        a.settleBy = uint64(block.timestamp + 1 days - 1); // shorter than the minimum term
+        _expectOpenReverts(a, GuaranteeTrust.BadTerm.selector);
         uint256 id = _open(nia, "c", 10 * U);
         vm.expectRevert(GuaranteeTrust.TooEarly.selector);
         gt.expireGuarantee(id);
@@ -398,6 +442,20 @@ contract GuaranteeTrustTest is Test {
 
     /// @dev The limit: client identity is bound off chain by whoever writes the terms. An alias presented under a
     ///      different group is not linked by the contract; the worker-signed group is the only on-chain binding.
+    /// @dev A client keeps the group it was first guaranteed under, so it cannot escape its group's default or cap.
+    function testAKnownClientCannotChangeGroup() public {
+        vm.startPrank(issuer);
+        gt.setLine(nia, 20 * U);
+        gt.setLine(omar, 20 * U);
+        vm.stopPrank();
+        uint256 id = _openWith(_terms(nia, keccak256("acme"), keccak256("acme-group"), 10 * U));
+        vm.prank(adj);
+        gt.cancelGuarantee(id);
+        _expectOpenReverts(_terms(omar, keccak256("acme"), keccak256("other-group"), 10 * U), GuaranteeTrust.GroupMismatch.selector);
+        _expectOpenReverts(_terms(omar, keccak256("acme"), 0, 10 * U), GuaranteeTrust.GroupMismatch.selector);
+        _openWith(_terms(omar, keccak256("acme"), keccak256("acme-group"), 10 * U));
+    }
+
     function testAnAliasUnderAnotherGroupIsNotCaughtOnChain() public {
         vm.startPrank(issuer);
         gt.setLine(nia, 20 * U);

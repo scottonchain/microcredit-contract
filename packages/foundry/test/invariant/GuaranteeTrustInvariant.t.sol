@@ -80,6 +80,11 @@ contract GuaranteeTrustHandler is Test {
         try gt.withdrawBacking(_a(from), amt) { } catch { }
     }
 
+    function drop(uint256 who, uint256 att) external {
+        vm.prank(_a(who));
+        try gt.dropAttester(_a(att)) { } catch { }
+    }
+
     function setLine(uint256 who, uint256 amt) external {
         amt = bound(amt, 0, 20 * U);
         vm.prank(issuer);
