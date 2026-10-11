@@ -268,6 +268,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     error PastSettleBy();
     error StaleNonce();
     error GroupMismatch();
+    error ZeroClient();
     error SponsorCapital();
     error ReleaseWhileOpen();
 
@@ -550,6 +551,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         consentNonce[msg.sender][attester] += 1;
         _unlink(attester, msg.sender);
         emit BackingWithdrawn(attester, msg.sender, amount, 0);
+        emit ConsentSet(msg.sender, attester, false, msg.sender);
     }
 
     function withdrawableBacking(address attester, address member) public view returns (uint256) {
@@ -563,6 +565,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     function openGuarantee(Acceptance calldata a, bytes calldata signature) external onlyAdjudicator returns (uint256 id) {
         if (paused) revert IsPaused();
         if (a.amount == 0) revert ZeroAmount();
+        if (a.clientId == bytes32(0)) revert ZeroClient(); // zero is clientGroup's "unset"
         if (block.timestamp > a.deadline) revert SignatureExpired();
         if (a.settleBy < block.timestamp + MIN_TERM || a.settleBy > block.timestamp + maxTerm) revert BadTerm();
         if (a.contributionBps != contributionBps || a.contributionCap != contributionCap || a.remitWindow != remitWindow) {

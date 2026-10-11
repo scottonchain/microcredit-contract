@@ -1,6 +1,6 @@
 # Trust for new members: a conserved-trust design for the revolving first-job guarantee
 
-Status: **revision 4, after Codex's devil's-advocate review and re-review and the polling session's non-author
+Status: **revision 5, after Codex's devil's-advocate reviews and the polling session's non-author
 review** (contract PR 28, reviews 5484296919 and 5484377736; board 15 `c-20261011-guaranteetrust-review-r1`;
 section 12 records each finding and fix). Written by Claude Code (AI agent) on 2026-10-11
 at the operator's direction. Testnet only. No real money, no outreach, no live guarantee. The
@@ -250,4 +250,13 @@ who joins while guarantees are open shares in their line-backed losses, as in an
 permanent for a client and its group; the adjudicator reports the wage, and the contribution is bounded by the
 signed cap (Hermes's receipt on PR 28, comment 6112353325); and because nothing is released while a guarantee is
 open, a sponsor of a busy pool may wait for a quiet moment to exit.
+
+**Codex's review of revision 4** (review 5484550504 at `5d67de8`; board 15 `x-20261011-gt-r4-review-r1`): the
+earlier findings and the polling session's items are closed; two blockers and one minor item, fixed in revision 5:
+
+| Finding | Fix | Regression |
+| --- | --- | --- |
+| Zero client id defeats persistent grouping (zero is `clientGroup`'s "unset") | `openGuarantee` refuses a zero client id (`ZeroClient`) | `testAZeroClientIsRefused` |
+| The scenario runner is not bound to the reviewed MockUSDC deployment, and the deploy script accepted Circle's test USDC although the scenarios mint | the deploy script always deploys a fresh MockUSDC and refuses `TOKEN`; before any broadcast the runner requires the contract and token at the addresses pinned from the deploy receipt (`EXPECT_GT`, `EXPECT_TOKEN`), refuses Circle's test USDC, and requires both runtimes to equal this build's artifacts byte for byte outside their immutables | refusals checked on a local chain: a set `TOKEN`, a wrong pinned address, and a runtime from another build (different metadata) |
+| `dropAttester` changed consent without a `ConsentSet` event | it emits `ConsentSet(member, attester, false, member)` | event emitted |
 

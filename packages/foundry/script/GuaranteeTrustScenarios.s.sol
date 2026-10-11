@@ -14,7 +14,8 @@ import { GuaranteeTrust } from "../contracts/GuaranteeTrust.sol";
  *      SIM_MNEMONIC (private to the runner); the broadcaster tops each up with ETH for gas and mints MockUSDC to it.
  *      A client pays the wage off chain; the script stands for that payment by minting the wage to the worker, so
  *      each contribution is remitted out of the wage itself.
- *      Env: GT (contract), SIM_MNEMONIC, SCENARIO (0 setup, 1 to 6), RUN_TAG (any string; client ids and the
+ *      Env: GT (contract), EXPECT_GT and EXPECT_TOKEN (the addresses in the deploy receipt; the runner checks them
+ *      and both runtimes against this build before any broadcast), SIM_MNEMONIC, SCENARIO (0 setup, 1 to 6), RUN_TAG (any string; client ids and the
  *      scenario draws depend on it), FUND_ETH (wei per gas top-up, default 0.0001 ether; a persona is topped up
  *      before each of its transactions when it holds less than half of that).
  *      Each scenario prints its read-backs; the runner posts the transaction hashes from the broadcast file.
@@ -46,6 +47,7 @@ contract GuaranteeTrustScenarios is Script {
         require(block.chainid == 84532 || block.chainid == 31337, "GuaranteeTrust scripts are testnet only");
         gt = GuaranteeTrust(vm.envAddress("GT"));
         usdc = MockUSDC(address(gt.token()));
+        _bind();
         mnemonic = vm.envOr("SIM_MNEMONIC", string(""));
         runTag = vm.envOr("RUN_TAG", string("r1"));
         fundEth = vm.envOr("FUND_ETH", uint256(0.0001 ether));
@@ -61,6 +63,47 @@ contract GuaranteeTrustScenarios is Script {
         else if (scenario == 5) _clientGroup();
         else if (scenario == 6) _community();
         _report();
+    }
+
+    // ------------------------------------------------------------------ binding
+
+    address internal constant BASE_SEPOLIA_TEST_USDC = 0x036CbD53842c5426634e7929541eC2318f3dCF7e;
+
+    struct ImmutableRef {
+        uint256 length;
+        uint256 start;
+    }
+
+    /// @dev Fail closed before any broadcast: the contract and its token must be the pinned deployment (addresses from
+    ///      the deploy receipt, EXPECT_GT and EXPECT_TOKEN), the token must not be Circle's test USDC (this runner
+    ///      mints), and both runtimes must equal this build's artifacts byte for byte outside their immutables.
+    function _bind() internal view {
+        require(address(gt) == vm.envAddress("EXPECT_GT"), "GT is not the pinned deployment");
+        require(address(usdc) == vm.envAddress("EXPECT_TOKEN"), "token is not the pinned deployment");
+        require(address(usdc) != BASE_SEPOLIA_TEST_USDC, "this runner mints: it refuses Circle's test USDC");
+        require(_isBuild(address(gt), "out/GuaranteeTrust.sol/GuaranteeTrust.json"), "GT runtime is not the reviewed build");
+        require(_isBuild(address(usdc), "out/MockUSDC.sol/MockUSDC.json"), "token runtime is not this build's MockUSDC");
+    }
+
+    /// @dev Deployed runtime equals the artifact's deployed bytecode, with constructor-set immutables masked.
+    function _isBuild(address deployed, string memory artifact) internal view returns (bool) {
+        string memory json = vm.readFile(artifact);
+        bytes memory want = vm.parseJsonBytes(json, ".deployedBytecode.object");
+        bytes memory got = deployed.code;
+        if (want.length == 0 || want.length != got.length) return false;
+        string[] memory ids = vm.parseJsonKeys(json, ".deployedBytecode.immutableReferences");
+        for (uint256 i; i < ids.length; i++) {
+            ImmutableRef[] memory refs = abi.decode(
+                vm.parseJson(json, string.concat(".deployedBytecode.immutableReferences.", ids[i])), (ImmutableRef[])
+            );
+            for (uint256 k; k < refs.length; k++) {
+                for (uint256 b; b < refs[k].length; b++) {
+                    want[refs[k].start + b] = 0;
+                    got[refs[k].start + b] = 0;
+                }
+            }
+        }
+        return keccak256(want) == keccak256(got);
     }
 
     // ------------------------------------------------------------------ helpers

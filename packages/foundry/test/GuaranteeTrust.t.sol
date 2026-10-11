@@ -456,6 +456,14 @@ contract GuaranteeTrustTest is Test {
         _openWith(_terms(omar, keccak256("acme"), keccak256("acme-group"), 10 * U));
     }
 
+    /// @dev Zero is clientGroup's "unset" value, so a zero client id is refused outright.
+    function testAZeroClientIsRefused() public {
+        vm.prank(issuer);
+        gt.setLine(nia, 20 * U);
+        _expectOpenReverts(_terms(nia, bytes32(0), 0, 10 * U), GuaranteeTrust.ZeroClient.selector);
+        _expectOpenReverts(_terms(nia, bytes32(0), keccak256("some-group"), 10 * U), GuaranteeTrust.ZeroClient.selector);
+    }
+
     function testAnAliasUnderAnotherGroupIsNotCaughtOnChain() public {
         vm.startPrank(issuer);
         gt.setLine(nia, 20 * U);

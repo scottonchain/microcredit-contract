@@ -9,7 +9,7 @@ import { GuaranteeTrust } from "../contracts/GuaranteeTrust.sol";
 /**
  * @notice Deploys GuaranteeTrust for testnet simulations. Testnet only; no live guarantee.
  * @dev Env (all optional):
- *      TOKEN          token to use; if unset, a fresh MockUSDC is deployed and every receipt must say MockUSDC
+ *      (TOKEN must be unset: a fresh MockUSDC is always deployed, and every receipt says MockUSDC)
  *      UNIT           one token unit for the caps (default 1e6: line 20, attest 20, contribution cap 3)
  *      ISSUER_BUDGET  issuer line budget (default 60 x UNIT)
  *      ADJUDICATOR    defaults to SIM_MNEMONIC index 1 when SIM_MNEMONIC is set, else the broadcaster
@@ -19,8 +19,6 @@ import { GuaranteeTrust } from "../contracts/GuaranteeTrust.sol";
  *      forge script script/DeployGuaranteeTrust.s.sol --rpc-url https://sepolia.base.org --broadcast
  */
 contract DeployGuaranteeTrust is Script {
-    address internal constant BASE_SEPOLIA_TEST_USDC = 0x036CbD53842c5426634e7929541eC2318f3dCF7e;
-
     function run() external returns (GuaranteeTrust gt, address token) {
         // testnet only: Base Sepolia or a local chain, never a network with real value
         require(block.chainid == 84532 || block.chainid == 31337, "GuaranteeTrust scripts are testnet only");
@@ -28,11 +26,10 @@ contract DeployGuaranteeTrust is Script {
         uint256 budget = vm.envOr("ISSUER_BUDGET", 60 * unit);
         vm.startBroadcast();
         (, address me,) = vm.readCallers();
-        token = vm.envOr("TOKEN", address(0));
-        // a given token must be Circle's Base Sepolia test USDC; otherwise a fresh MockUSDC (labelled MockUSDC in
-        // every receipt, although its ERC-20 name is "USD Coin")
-        if (token != address(0)) require(token == BASE_SEPOLIA_TEST_USDC, "TOKEN must be Base Sepolia test USDC");
-        if (token == address(0)) token = address(new MockUSDC());
+        // always a fresh MockUSDC (labelled MockUSDC in every receipt, although its ERC-20 name is "USD Coin"): the
+        // scenarios mint, so a deployment on any real token needs its own reviewed script
+        require(vm.envOr("TOKEN", address(0)) == address(0), "this script deploys a fresh MockUSDC only");
+        token = address(new MockUSDC());
         string memory mnemonic = vm.envOr("SIM_MNEMONIC", string(""));
         bool sim = bytes(mnemonic).length != 0;
         address adjudicator = vm.envOr("ADJUDICATOR", sim ? vm.addr(vm.deriveKey(mnemonic, 1)) : me);
