@@ -62,6 +62,11 @@ in their docs; skipped suites are not successful fork runs.
   [CANDIDATE_VERIFICATION.md](docs/CANDIDATE_VERIFICATION.md): candidate design and checks.
 - [BOOTSTRAP_EXECUTION_PACKET.md](docs/BOOTSTRAP_EXECUTION_PACKET.md): the held
   execution draft, scope, ordered steps and unresolved operator decisions.
+- [TRUST_NETWORK_DESIGN.md](docs/TRUST_NETWORK_DESIGN.md): conserved trust for new members of
+  the revolving first-job guarantee (stake, dues and a budgeted issuer line; one-hop consented
+  attestation; history is a score, never capacity), implemented by `GuaranteeTrust` with its
+  tests, `script/DeployGuaranteeTrust.s.sol` and the seven testnet scenarios in
+  `script/GuaranteeTrustScenarios.s.sol`. Testnet only, MockUSDC, no live guarantee.
 
 The main branch, candidate source, local test results and live bytecode are distinct.
 Read each record's exact revision; do not replace old receipt hashes after a refactor.
