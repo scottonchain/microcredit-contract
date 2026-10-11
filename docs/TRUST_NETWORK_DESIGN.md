@@ -46,9 +46,9 @@ real dues or a real issuer put into it, and a thousand fake accounts take no mor
 
 | Source | Gives capacity? | How much | Why |
 | --- | --- | --- | --- |
-| **Issuer line** (programme vetting) | Yes | at most `lineCap` per member (testnet: 20 USDC, one guarantee), within the issuer's total budget `issuerBudget` | an accountable party bears the misjudgement; the budget stays held until the line is unused, so it cannot be rotated through many accounts (`CREDIT_MODEL.md`, Theorem 2') |
+| **Issuer line** (programme vetting) | Yes, **only for the member's own guarantees** | at most `lineCap` per member (testnet: 20 USDC, one guarantee), within the issuer's total budget `issuerBudget` | an accountable party bears the misjudgement of the person it vetted, and no one else: a line cannot be attested onward, or the issuer would stand behind people it never saw; the budget holds every line, a line can be lowered only to what is committed, and claims spend budget permanently, so it cannot be rotated away from open exposure (`CREDIT_MODEL.md`, Theorem 2') |
 | **Stake in the common pool** | Yes, 1:1, but **only to back others** | the member's locked stake | stake is cash at risk; using a worker's own stake for their own guarantee would charge them cash for their client's default, which the operator ruled out |
-| **First-job commission** (contribution paid after a client pays) | Yes, exactly 1:1 for what is paid | `r` per paid job: `contributionBps` of the wage, capped at `contributionCap` (testnet: 5%, 3 USDC) | it is irrevocably in the reserve, so it is the dues bound: history earns no more than it put out of reach (Theorem 3); a colluding client and worker buy capacity only at its full price |
+| **First-job commission** (contribution paid after a client pays) | Yes, exactly 1:1 for what is paid, usable both for the member's own guarantees and to back others | `r` per paid job: `contributionBps` of the wage, capped at `contributionCap` (testnet: 5%, 3 USDC) | it is irrevocably in the reserve, so it is the dues bound: history earns no more than it put out of reach (Theorem 3); a colluding client and worker buy capacity only at its full price |
 | **Repayment and paid-job history** (counts) | **No** capacity; information only | appears in the score | any rule granting more than dues for history can be farmed with recycled capital (Theorem 3) |
 | **Attestation** from a member with free trust | Yes, conserved | up to the attester's free trust; at most `attestCap` per newcomer (20 USDC) and `maxOpenAttestees` newcomers per attester (5) | trust is risk; the attester's backing absorbs claim losses first, so it works through selection and monitoring (Stiglitz 1990; Ghatak and Guinnane 1999) |
 | **Second- or third-degree** (passing on received backing) | **No** | 0 | relaying multiplies what the same attack edges can take by 3.3 to 7 times and charges people who never chose the borrower (`CREDIT_MODEL.md` section 6, `analysis/liquidity`); a newcomer backs others only with trust of their own |
@@ -56,8 +56,9 @@ real dues or a real issuer put into it, and a thousand fake accounts take no mor
 
 ## 5. The guarantee and the loss order
 
-**Capacity.** A member's guarantee capacity is `dues + line + B − committed`. Stake is not counted
-for the member's own guarantees (section 4).
+**Capacity.** A member's guarantee capacity is free received backing + free line + free dues (dues not
+already standing behind backing the member gave). Stake is not counted for the member's own guarantees,
+and only stake and dues can back others (section 4).
 
 **Opening a guarantee** (adjudicator) for worker `w`, client `k`, amount `G`, terms hash:
 
