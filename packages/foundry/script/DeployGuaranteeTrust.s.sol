@@ -12,9 +12,10 @@ import { GuaranteeTrust } from "../contracts/GuaranteeTrust.sol";
  *      TOKEN          token to use; if unset, a fresh MockUSDC is deployed and every receipt must say MockUSDC
  *      UNIT           one token unit for the caps (default 1e6: line 20, attest 20, contribution cap 3)
  *      ISSUER_BUDGET  issuer line budget (default 60 x UNIT)
- *      ADJUDICATOR    defaults to the broadcaster
- *      ISSUER         defaults to the broadcaster
- *      Owner and guardian are the broadcaster.
+ *      ADJUDICATOR    defaults to SIM_MNEMONIC index 1 when SIM_MNEMONIC is set, else the broadcaster
+ *      ISSUER         defaults to SIM_MNEMONIC index 2 when SIM_MNEMONIC is set, else the broadcaster
+ *      Owner, guardian and sponsor are the broadcaster. For the scenarios, set SIM_MNEMONIC so that the
+ *      adjudicator and the issuer are distinct keys and no one address holds every role.
  *      forge script script/DeployGuaranteeTrust.s.sol --rpc-url https://sepolia.base.org --broadcast
  */
 contract DeployGuaranteeTrust is Script {
@@ -25,8 +26,10 @@ contract DeployGuaranteeTrust is Script {
         (, address me,) = vm.readCallers();
         token = vm.envOr("TOKEN", address(0));
         if (token == address(0)) token = address(new MockUSDC());
-        address adjudicator = vm.envOr("ADJUDICATOR", me);
-        address issuer = vm.envOr("ISSUER", me);
+        string memory mnemonic = vm.envOr("SIM_MNEMONIC", string(""));
+        bool sim = bytes(mnemonic).length != 0;
+        address adjudicator = vm.envOr("ADJUDICATOR", sim ? vm.addr(vm.deriveKey(mnemonic, 1)) : me);
+        address issuer = vm.envOr("ISSUER", sim ? vm.addr(vm.deriveKey(mnemonic, 2)) : me);
         gt = new GuaranteeTrust(IERC20(token), me, adjudicator, issuer, budget, unit);
         vm.stopBroadcast();
         console.log("GuaranteeTrust", address(gt));

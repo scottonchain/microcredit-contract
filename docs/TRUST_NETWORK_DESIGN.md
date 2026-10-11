@@ -139,6 +139,9 @@ raise by repetition cannot be allowed to create capacity.
 | A client returning under a new id | caught only if the signed terms bind it to its group: client identity is checked off chain by whoever writes the terms (tested as a stated limit) |
 | A lost or stalled adjudicator | settle-by date in the signed terms; anyone may expire an unsettled guarantee after it |
 | Compromised adjudicator approving false claims | bounded by committed capacity and the reserve; the main trust assumption, stated; a two-of-n adjudicator is the next step |
+| One address holding owner, issuer and adjudicator | issuer lines plus spent lines never exceed the sponsor capital funded, so even a captured issuer and adjudicator together can pay claims only from sponsor capital and committed backing, never from members' dues; the simulations use three distinct keys (owner and sponsor, adjudicator, issuer) |
+| Releasing sponsor capital that stands behind issuer lines | `releasable()` locks held lines with open cover and dues, and a release may never leave the sponsor capital below lines held plus lines spent |
+| A former owner keeping pause power | a guardian that was the old owner follows ownership on transfer |
 | Reserve run | exposure cap per guarantee, floor, outstanding ≤ reserve |
 
 ## 8. What stays off-chain
@@ -205,4 +208,13 @@ signed pledge); a line **or** real attester stake is enough, since requiring bot
 barrier; keep one hop; a single adjudicator only for synthetic testnet mechanics; and the first attack a
 ring finds is client-id aliasing with role-controlled consent and terms, which the signed acceptance,
 member-only consent and client groups now address as far as on-chain rules can.
+
+**Carryover from the polling session's first pass** (its review of `c150af0`, rechecked against revision 2):
+
+| Item | Disposition | Regression |
+| --- | --- | --- |
+| `releasable()` ignored held issuer lines, so capital behind them could be released and later line-backed claims paid from dues | held lines are locked; lines held plus spent never exceed sponsor capital, enforced on `setLine` and on release | `testReleaseOnlyToTheFunderAndNeverDuesOpenExposureOrLines`, `testLinesNeverExceedSponsorCapital`, `invariant_issuerBudget`, and `invariant_reserveIdentity`: the reserve always equals sponsor capital minus line-backed claims plus members' dues |
+| One address held owner, issuer and adjudicator | the bound above caps what any role holder can take; the deploy script gives the adjudicator and the issuer their own keys whenever the simulation mnemonic is set | all seven scenarios run with three distinct keys |
+| The former owner kept guardian power after a transfer | `_transferOwnership` moves a guardian that was the old owner | `testGuardianPowerFollowsOwnership` |
+| `attesteeClaims` counted per charge, not per claim | cured by fixed shares: an attester has at most one share per guarantee | `testClaimPaysWorkerAndConsumesBackingFirstSlashingStake` |
 

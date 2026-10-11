@@ -567,16 +567,19 @@ contract GuaranteeTrustTest is Test {
 
     // -------------------------------------------------------------- sponsor capital
 
-    function testReleaseOnlyToTheFunderAndNeverDuesOrOpenExposure() public {
+    function testReleaseOnlyToTheFunderAndNeverDuesOpenExposureOrLines() public {
         vm.prank(issuer);
         gt.setLine(nia, 20 * U);
         uint256 id = _open(nia, "a", 20 * U);
-        assertEq(gt.releasable(), 80 * U);
+        assertEq(gt.releasable(), 60 * U, "open cover and the line both held");
         vm.prank(adj);
         gt.markPaid(id, 60 * U, bytes32(0));
         _fund(nia, 3 * U);
         vm.prank(nia);
         gt.remit(id);
+        assertEq(gt.releasable(), 80 * U, "the held line stays behind");
+        vm.prank(issuer);
+        gt.setLine(nia, 0);
         assertEq(gt.releasable(), 100 * U);
         // not to the owner, who funded nothing
         vm.prank(owner);
@@ -590,6 +593,42 @@ contract GuaranteeTrustTest is Test {
         gt.releaseReserve(sponsor, 100 * U);
         assertEq(usdc.balanceOf(sponsor), before + 100 * U);
         assertEq(gt.reserve(), 3 * U, "the worker's dues stay");
+    }
+
+    /// @dev Lines held plus lines spent never exceed the sponsor capital funded, so no line-backed claim is paid out
+    ///      of members' dues, and capital behind lines cannot be released.
+    function testLinesNeverExceedSponsorCapital() public {
+        GuaranteeTrust gt2 = new GuaranteeTrust(usdc, owner, adj, issuer, 500 * U, U);
+        vm.prank(sponsor);
+        usdc.approve(address(gt2), type(uint256).max);
+        vm.prank(sponsor);
+        gt2.fundReserve(30 * U);
+        vm.prank(issuer);
+        gt2.setLine(nia, 20 * U);
+        vm.prank(issuer);
+        vm.expectRevert(GuaranteeTrust.SponsorCapital.selector);
+        gt2.setLine(omar, 11 * U);
+        vm.prank(issuer);
+        gt2.setLine(omar, 10 * U);
+        assertEq(gt2.releasable(), 0);
+        vm.prank(owner);
+        vm.expectRevert(GuaranteeTrust.ReleaseTooLarge.selector);
+        gt2.releaseReserve(sponsor, 1);
+    }
+
+    function testGuardianPowerFollowsOwnership() public {
+        address next = makeAddr("next-owner");
+        vm.prank(owner);
+        gt.transferOwnership(next);
+        vm.prank(next);
+        gt.acceptOwnership();
+        assertEq(gt.guardian(), next);
+        vm.prank(owner);
+        vm.expectRevert(GuaranteeTrust.NotGuardian.selector);
+        gt.setPaused(true);
+        vm.prank(next);
+        gt.setPaused(true);
+        assertTrue(gt.paused());
     }
 
     function testPauseStopsOnlyNewGuarantees() public {

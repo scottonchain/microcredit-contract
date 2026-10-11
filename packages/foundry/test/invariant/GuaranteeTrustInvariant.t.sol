@@ -12,6 +12,8 @@ contract GuaranteeTrustHandler is Test {
     GuaranteeTrust public gt;
     address public adj;
     address public issuer;
+    address public owner;
+    address public funder;
     address[] public actors;
     mapping(address => uint256) internal keyOf;
     bytes32[] public groups;
@@ -19,11 +21,13 @@ contract GuaranteeTrustHandler is Test {
     uint256 public sigNonce;
     uint256 public claimsPaid;
 
-    constructor(MockUSDC usdc_, GuaranteeTrust gt_, address adj_, address issuer_) {
+    constructor(MockUSDC usdc_, GuaranteeTrust gt_, address adj_, address issuer_, address owner_, address funder_) {
         usdc = usdc_;
         gt = gt_;
         adj = adj_;
         issuer = issuer_;
+        owner = owner_;
+        funder = funder_;
         for (uint256 i; i < 6; i++) {
             (address a, uint256 key) = makeAddrAndKey(string.concat("actor", vm.toString(i)));
             actors.push(a);
@@ -137,6 +141,12 @@ contract GuaranteeTrustHandler is Test {
         try gt.markLapsed(idSeed % n) { } catch { }
     }
 
+    function release(uint256 amt) external {
+        amt = bound(amt, 1, 50 * U);
+        vm.prank(owner);
+        try gt.releaseReserve(funder, amt) { } catch { }
+    }
+
     function expire(uint256 idSeed, uint256 dt) external {
         uint256 n = gt.guaranteeCount();
         if (n == 0) return;
@@ -160,7 +170,7 @@ contract GuaranteeTrustInvariantTest is Test {
         usdc.mint(address(this), 200 * U);
         usdc.approve(address(gt), type(uint256).max);
         gt.fundReserve(200 * U);
-        h = new GuaranteeTrustHandler(usdc, gt, adj, issuer);
+        h = new GuaranteeTrustHandler(usdc, gt, adj, issuer, owner, address(this));
         targetContract(address(h));
     }
 
@@ -210,8 +220,15 @@ contract GuaranteeTrustInvariantTest is Test {
         assertEq(sum, gt.outstanding(), "group exposure sums to outstanding");
     }
 
-    /// @dev The issuer never holds plus spends more than its budget.
+    /// @dev The issuer never holds plus spends more than its budget, nor more than the sponsor capital funded.
     function invariant_issuerBudget() public view {
         assertLe(gt.issuerHeld() + gt.issuerSpent(), gt.issuerBudget());
+        assertLe(gt.issuerHeld() + gt.issuerSpent(), gt.sponsorFunded());
+    }
+
+    /// @dev The reserve is exactly the sponsor capital left after line-backed claims plus members' dues, so no claim
+    ///      is ever paid from dues that were not consumed by name.
+    function invariant_reserveIdentity() public view {
+        assertEq(gt.reserve(), gt.sponsorFunded() - gt.issuerSpent() + gt.totalDues(), "reserve identity");
     }
 }

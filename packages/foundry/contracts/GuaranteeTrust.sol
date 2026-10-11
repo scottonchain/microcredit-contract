@@ -257,6 +257,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     error PolicyMismatch();
     error BadTerm();
     error PastSettleBy();
+    error SponsorCapital();
 
     modifier onlyAdjudicator() {
         if (msg.sender != adjudicator) revert NotAdjudicator();
@@ -288,6 +289,13 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     }
 
     // ---------------------------------------------------------------- admin
+
+    /// @dev A guardian that was the old owner follows ownership, so a transferred owner keeps no pause power.
+    function _transferOwnership(address newOwner) internal override {
+        address old = owner();
+        super._transferOwnership(newOwner);
+        if (guardian == old) guardian = newOwner;
+    }
 
     function setRoles(address guardian_, address adjudicator_, address issuer_, uint256 issuerBudget_) external onlyOwner {
         if (issuerBudget_ < issuerHeld + issuerSpent) revert BudgetExceeded();
@@ -367,10 +375,12 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         emit ReserveFunded(msg.sender, amount, reserve);
     }
 
-    /// @notice Returns sponsor capital to its funder. Never dues, never cover for open guarantees.
+    /// @notice Returns sponsor capital to its funder. Never dues, never cover for open guarantees, never the capital
+    ///         standing behind issuer lines.
     function releaseReserve(address funder, uint256 amount) external onlyOwner {
         if (amount == 0) revert ZeroAmount();
         if (amount > releasable() || amount > fundedBy[funder]) revert ReleaseTooLarge();
+        if (sponsorFunded - amount < issuerHeld + issuerSpent) revert ReleaseTooLarge();
         reserve -= amount;
         sponsorFunded -= amount;
         fundedBy[funder] -= amount;
@@ -378,8 +388,9 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         emit ReserveReleased(funder, amount, reserve);
     }
 
+    /// @dev Conservative: held lines are locked whether or not they are committed to an open guarantee.
     function releasable() public view returns (uint256) {
-        uint256 locked = outstanding + totalDues;
+        uint256 locked = outstanding + totalDues + issuerHeld;
         uint256 free = reserve > locked ? reserve - locked : 0;
         return free < sponsorFunded ? free : sponsorFunded;
     }
@@ -406,7 +417,8 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     }
 
     /// @notice The issuer sets a member's line. The budget holds every line; a line can be lowered only to what
-    ///         its member has committed, so held budget cannot be rotated away from open exposure.
+    ///         its member has committed, so held budget cannot be rotated away from open exposure. Lines held plus
+    ///         lines spent never exceed the sponsor capital funded, so a line-backed claim is never paid from dues.
     function setLine(address member, uint256 newLine) external onlyIssuer {
         if (newLine > lineCap) revert BadParam();
         Member storage m = members[member];
@@ -414,6 +426,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         if (newLine > m.line) {
             uint256 add = newLine - m.line;
             if (issuerHeld + issuerSpent + add > issuerBudget) revert BudgetExceeded();
+            if (issuerHeld + issuerSpent + add > sponsorFunded) revert SponsorCapital();
             issuerHeld += add;
         } else {
             issuerHeld -= m.line - newLine;
