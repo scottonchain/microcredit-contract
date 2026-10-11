@@ -77,6 +77,7 @@ contract GuaranteeTrustTest is Test {
             termsHash: keccak256("terms v1"),
             contributionBps: gt.contributionBps(),
             contributionCap: gt.contributionCap(),
+            remitWindow: gt.remitWindow(),
             settleBy: uint64(block.timestamp + 30 days),
             nonce: ++nonce,
             deadline: block.timestamp + 1 days
@@ -571,7 +572,10 @@ contract GuaranteeTrustTest is Test {
         vm.prank(issuer);
         gt.setLine(nia, 20 * U);
         uint256 id = _open(nia, "a", 20 * U);
-        assertEq(gt.releasable(), 60 * U, "open cover and the line both held");
+        assertEq(gt.releasable(), 0, "nothing is released while a guarantee is open");
+        vm.prank(owner);
+        vm.expectRevert(GuaranteeTrust.ReleaseWhileOpen.selector);
+        gt.releaseReserve(sponsor, 1);
         vm.prank(adj);
         gt.markPaid(id, 60 * U, bytes32(0));
         _fund(nia, 3 * U);
@@ -614,6 +618,87 @@ contract GuaranteeTrustTest is Test {
         vm.prank(owner);
         vm.expectRevert(GuaranteeTrust.ReleaseTooLarge.selector);
         gt2.releaseReserve(sponsor, 1);
+    }
+
+    /// @dev Codex's sequence: A funds, a line-backed claim takes 20, A takes back the rest, B funds 20. A cannot then
+    ///      take B's deposit: the loss burned A's entitlement, not B's.
+    function testALineLossBurnsTheFundersEntitlementNotALaterFunders() public {
+        address funderA = makeAddr("funder-a");
+        address funderB = makeAddr("funder-b");
+        GuaranteeTrust g2 = new GuaranteeTrust(usdc, owner, adj, issuer, 100 * U, U);
+        _fund(funderA, 100 * U);
+        _fund(funderB, 20 * U);
+        vm.prank(funderA);
+        usdc.approve(address(g2), type(uint256).max);
+        vm.prank(funderB);
+        usdc.approve(address(g2), type(uint256).max);
+        vm.prank(funderA);
+        g2.fundReserve(100 * U);
+        vm.prank(issuer);
+        g2.setLine(nia, 20 * U);
+        GuaranteeTrust.Acceptance memory a = _terms(nia, keccak256("x"), 0, 20 * U);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(keyOf[nia], g2.acceptanceDigest(a));
+        vm.prank(adj);
+        uint256 id = g2.openGuarantee(a, abi.encodePacked(r, s, v));
+        vm.prank(adj);
+        g2.claim(id, bytes32(0));
+        assertEq(g2.sponsorCapital(), 80 * U);
+        assertApproxEqAbs(g2.sponsorValueOf(funderA), 80 * U, 1);
+        vm.prank(owner);
+        g2.releaseReserve(funderA, 80 * U);
+        vm.prank(funderB);
+        g2.fundReserve(20 * U);
+        assertEq(g2.sponsorValueOf(funderB), 20 * U);
+        assertEq(g2.sponsorValueOf(funderA), 0);
+        vm.prank(owner);
+        vm.expectRevert(GuaranteeTrust.ReleaseTooLarge.selector);
+        g2.releaseReserve(funderA, 20 * U);
+        vm.prank(owner);
+        g2.releaseReserve(funderB, 20 * U);
+        assertEq(usdc.balanceOf(funderB), 20 * U);
+    }
+
+    function testTwoFundersShareALossProRata() public {
+        address funderA = makeAddr("funder-a");
+        GuaranteeTrust g2 = new GuaranteeTrust(usdc, owner, adj, issuer, 100 * U, U);
+        _fund(funderA, 75 * U);
+        vm.prank(funderA);
+        usdc.approve(address(g2), type(uint256).max);
+        vm.prank(sponsor);
+        usdc.approve(address(g2), type(uint256).max);
+        vm.prank(funderA);
+        g2.fundReserve(75 * U);
+        vm.prank(sponsor);
+        g2.fundReserve(25 * U);
+        vm.prank(issuer);
+        g2.setLine(nia, 20 * U);
+        GuaranteeTrust.Acceptance memory a = _terms(nia, keccak256("x"), 0, 20 * U);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(keyOf[nia], g2.acceptanceDigest(a));
+        vm.prank(adj);
+        uint256 id = g2.openGuarantee(a, abi.encodePacked(r, s, v));
+        vm.prank(adj);
+        g2.claim(id, bytes32(0));
+        assertApproxEqAbs(g2.sponsorValueOf(funderA), 60 * U, 1);
+        assertApproxEqAbs(g2.sponsorValueOf(sponsor), 20 * U, 1);
+    }
+
+    function testTheRemitWindowIsTheOneTheWorkerSigned() public {
+        vm.prank(issuer);
+        gt.setLine(nia, 20 * U);
+        GuaranteeTrust.Acceptance memory a = _terms(nia, keccak256("w"), 0, 10 * U);
+        a.remitWindow = 1 days;
+        _expectOpenReverts(a, GuaranteeTrust.PolicyMismatch.selector);
+        uint256 id = _open(nia, "w", 10 * U);
+        vm.prank(adj);
+        gt.markPaid(id, 60 * U, bytes32(0));
+        // the owner shortens the window afterwards; the signed 14 days still hold
+        vm.prank(owner);
+        gt.setParams(2000, 2, 500, 3 * U, 1 days, 20 * U, 20 * U, 5, 5);
+        vm.warp(block.timestamp + 2 days);
+        vm.expectRevert(GuaranteeTrust.TooEarly.selector);
+        gt.markLapsed(id);
+        vm.warp(block.timestamp + 12 days);
+        gt.markLapsed(id);
     }
 
     function testGuardianPowerFollowsOwnership() public {

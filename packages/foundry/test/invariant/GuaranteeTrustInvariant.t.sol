@@ -100,6 +100,7 @@ contract GuaranteeTrustHandler is Test {
             termsHash: bytes32(0),
             contributionBps: gt.contributionBps(),
             contributionCap: gt.contributionCap(),
+            remitWindow: gt.remitWindow(),
             settleBy: uint64(block.timestamp + 30 days),
             nonce: ++sigNonce,
             deadline: block.timestamp + 1 hours
@@ -141,10 +142,22 @@ contract GuaranteeTrustHandler is Test {
         try gt.markLapsed(idSeed % n) { } catch { }
     }
 
-    function release(uint256 amt) external {
+    uint256 public releasedWhileOpen;
+
+    function fund(uint256 who, uint256 amt) external {
+        amt = bound(amt, 1, 30 * U);
+        vm.prank(_a(who));
+        try gt.fundReserve(amt) { } catch { }
+    }
+
+    function release(uint256 to, uint256 amt) external {
         amt = bound(amt, 1, 50 * U);
+        address target = to % 7 == 6 ? funder : _a(to);
+        bool open = gt.outstanding() != 0;
         vm.prank(owner);
-        try gt.releaseReserve(funder, amt) { } catch { }
+        try gt.releaseReserve(target, amt) {
+            if (open) releasedWhileOpen += 1;
+        } catch { }
     }
 
     function expire(uint256 idSeed, uint256 dt) external {
@@ -220,15 +233,21 @@ contract GuaranteeTrustInvariantTest is Test {
         assertEq(sum, gt.outstanding(), "group exposure sums to outstanding");
     }
 
-    /// @dev The issuer never holds plus spends more than its budget, nor more than the sponsor capital funded.
+    /// @dev The issuer never holds plus spends more than its budget, and held lines never exceed sponsor capital.
     function invariant_issuerBudget() public view {
         assertLe(gt.issuerHeld() + gt.issuerSpent(), gt.issuerBudget());
-        assertLe(gt.issuerHeld() + gt.issuerSpent(), gt.sponsorFunded());
+        assertLe(gt.issuerHeld(), gt.sponsorCapital());
     }
 
-    /// @dev The reserve is exactly the sponsor capital left after line-backed claims plus members' dues, so no claim
-    ///      is ever paid from dues that were not consumed by name.
+    /// @dev The reserve is exactly the sponsor capital plus members' dues, so no claim is ever paid from dues that
+    ///      were not consumed by name; shares are fully held by funders; nothing is released while a guarantee is open.
     function invariant_reserveIdentity() public view {
-        assertEq(gt.reserve(), gt.sponsorFunded() - gt.issuerSpent() + gt.totalDues(), "reserve identity");
+        assertEq(gt.reserve(), gt.sponsorCapital() + gt.totalDues(), "reserve identity");
+        uint256 held = gt.sponsorSharesOf(address(this));
+        for (uint256 i; i < h.actorCount(); i++) {
+            held += gt.sponsorSharesOf(h.actors(i));
+        }
+        assertEq(held, gt.totalSponsorShares(), "shares held by funders");
+        assertEq(h.releasedWhileOpen(), 0, "release while a guarantee is open");
     }
 }

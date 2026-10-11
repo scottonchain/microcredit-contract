@@ -1,7 +1,7 @@
 # Trust for new members: a conserved-trust design for the revolving first-job guarantee
 
-Status: **revision 2, after Codex's devil's-advocate review** (contract PR 28, review 5484296919, which
-required five changes; section 12 records each and its fix). Written by Claude Code (AI agent) on 2026-10-11
+Status: **revision 3, after Codex's devil's-advocate review and re-review** (contract PR 28, reviews
+5484296919 and 5484377736, and the polling session's first pass; section 12 records each finding and fix). Written by Claude Code (AI agent) on 2026-10-11
 at the operator's direction. Testnet only. No real money, no outreach, no live guarantee. The
 operator's questions, the answer, every parameter and its reason, and what the contract
 (`GuaranteeTrust`) and the agentic simulations must show.
@@ -33,7 +33,7 @@ real dues or a real issuer put into it, and a thousand fake accounts take no mor
 
 | Role | Who | What it can do |
 | --- | --- | --- |
-| Sponsor | anyone, typically the operator | funds the reserve; the owner can return only uncommitted sponsor capital, only to the address that funded it, never dues or cover for open guarantees |
+| Sponsor | anyone, typically the operator | funds the reserve and holds shares of the sponsor capital; a line-backed loss lowers every funder's shares pro rata; the owner can return capital only to a funder, up to its shares' current value, never dues, never the capital behind lines and never while a guarantee is open |
 | Member | a newcomer or an established worker | holds trust; consents to its attesters; signs its acceptance of each guarantee; remits contributions |
 | Attester | any member with free trust of their own | backs a newcomer with part of that trust |
 | Issuer | an accountable programme that vets newcomers | sets small lines within an on-chain budget |
@@ -139,8 +139,9 @@ raise by repetition cannot be allowed to create capacity.
 | A client returning under a new id | caught only if the signed terms bind it to its group: client identity is checked off chain by whoever writes the terms (tested as a stated limit) |
 | A lost or stalled adjudicator | settle-by date in the signed terms; anyone may expire an unsettled guarantee after it |
 | Compromised adjudicator approving false claims | bounded by committed capacity and the reserve; the main trust assumption, stated; a two-of-n adjudicator is the next step |
-| One address holding owner, issuer and adjudicator | issuer lines plus spent lines never exceed the sponsor capital funded, so even a captured issuer and adjudicator together can pay claims only from sponsor capital and committed backing, never from members' dues; the simulations use three distinct keys (owner and sponsor, adjudicator, issuer) |
-| Releasing sponsor capital that stands behind issuer lines | `releasable()` locks held lines with open cover and dues, and a release may never leave the sponsor capital below lines held plus lines spent |
+| One address holding owner, issuer and adjudicator | held lines never exceed the sponsor capital (net of line-backed losses), so even a captured issuer and adjudicator together can pay claims only from sponsor capital and committed backing, never from members' dues; the simulations use three distinct keys (owner and sponsor, adjudicator, issuer) |
+| Releasing sponsor capital that stands behind issuer lines, or the loading behind open guarantees | nothing is released while any guarantee is open, and never the capital behind held lines |
+| A later funder's deposit repaying an earlier funder's loss | funders hold shares of the sponsor capital; a line-backed loss lowers every share, and a release burns shares at current value |
 | A former owner keeping pause power | a guardian that was the old owner follows ownership on transfer |
 | Reserve run | exposure cap per guarantee, floor, outstanding ≤ reserve |
 
@@ -213,8 +214,20 @@ member-only consent and client groups now address as far as on-chain rules can.
 
 | Item | Disposition | Regression |
 | --- | --- | --- |
-| `releasable()` ignored held issuer lines, so capital behind them could be released and later line-backed claims paid from dues | held lines are locked; lines held plus spent never exceed sponsor capital, enforced on `setLine` and on release | `testReleaseOnlyToTheFunderAndNeverDuesOpenExposureOrLines`, `testLinesNeverExceedSponsorCapital`, `invariant_issuerBudget`, and `invariant_reserveIdentity`: the reserve always equals sponsor capital minus line-backed claims plus members' dues |
+| `releasable()` ignored held issuer lines, so capital behind them could be released and later line-backed claims paid from dues | held lines are locked and never exceed the sponsor capital, enforced on `setLine` and by `releasable()` | `testReleaseOnlyToTheFunderAndNeverDuesOpenExposureOrLines`, `testLinesNeverExceedSponsorCapital`, `invariant_issuerBudget`, and `invariant_reserveIdentity`: the reserve always equals sponsor capital plus members' dues |
 | One address held owner, issuer and adjudicator | the bound above caps what any role holder can take; the deploy script gives the adjudicator and the issuer their own keys whenever the simulation mnemonic is set | all seven scenarios run with three distinct keys |
 | The former owner kept guardian power after a transfer | `_transferOwnership` moves a guardian that was the old owner | `testGuardianPowerFollowsOwnership` |
 | `attesteeClaims` counted per charge, not per claim | cured by fixed shares: an attester has at most one share per guarantee | `testClaimPaysWorkerAndConsumesBackingFirstSlashingStake` |
+
+**Codex's re-review of revision 2** (review 5484377736 at `b5e5e99`): the five findings above are closed; three
+new ones, fixed in revision 3:
+
+| Finding | Fix | Regression |
+| --- | --- | --- |
+| P0: losses did not reduce each funder's entitlement, so a later funder's deposit could repay an earlier funder's loss | sponsor capital is held as shares (`sponsorSharesOf`, `totalSponsorShares`); a line-backed claim lowers `sponsorCapital` and so every share; `fundReserve` mints and `releaseReserve` burns shares at current value, rounded against the funder | `testALineLossBurnsTheFundersEntitlementNotALaterFunders` (Codex's exact sequence), `testTwoFundersShareALossProRata`, and `invariant_reserveIdentity` (shares fully held by funders; funding and release by several funders fuzzed) |
+| P1: a release could strip the safety loading of open guarantees | no release while any guarantee is open (`ReleaseWhileOpen`); `releasable()` is zero then | `testReleaseOnlyToTheFunderAndNeverDuesOpenExposureOrLines`; the invariant handler counts any release made while a guarantee was open and requires zero |
+| P1: the remit window was mutable after the worker signed | `remitWindow` is in the signed acceptance, must equal the window in force and is fixed per guarantee | `testTheRemitWindowIsTheOneTheWorkerSigned` |
+
+Provenance correction: `c150af0..b5e5e99` also changed `CLAUDE.md` (the five-line pointer of `ef8dec8`), not only
+the design, contract, tests and scenario as revision 2's note said.
 

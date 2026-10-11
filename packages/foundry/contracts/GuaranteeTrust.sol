@@ -6,6 +6,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { Ownable, Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import { SignatureChecker } from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @notice Conserved trust for new members of a revolving first-job payment guarantee. Testnet only: no live
@@ -34,7 +35,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     uint256 public constant BPS = 10_000;
 
     bytes32 public constant ACCEPTANCE_TYPEHASH = keccak256(
-        "Acceptance(address worker,bytes32 clientId,bytes32 groupId,uint256 amount,uint256 maxFromDues,bytes32 termsHash,uint256 contributionBps,uint256 contributionCap,uint64 settleBy,uint256 nonce,uint256 deadline)"
+        "Acceptance(address worker,bytes32 clientId,bytes32 groupId,uint256 amount,uint256 maxFromDues,bytes32 termsHash,uint256 contributionBps,uint256 contributionCap,uint256 remitWindow,uint64 settleBy,uint256 nonce,uint256 deadline)"
     );
     bytes32 public constant CONSENT_TYPEHASH =
         keccak256("Consent(address member,address attester,bool allowed,uint256 nonce,uint256 deadline)");
@@ -58,6 +59,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         bytes32 termsHash; // the human-readable terms the worker accepted
         uint256 contributionBps; // must equal the policy in force; fixed for this guarantee
         uint256 contributionCap;
+        uint256 remitWindow; // must equal the window in force; fixed for this guarantee
         uint64 settleBy; // after this, the adjudicator can no longer settle and anyone may expire the guarantee
         uint256 nonce; // any unused number of the worker's; revocable before use
         uint256 deadline; // the signature's own expiry
@@ -109,6 +111,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         uint128 contributionDue;
         uint128 contributionBps;
         uint128 contributionCap;
+        uint64 remitWindow;
         bytes32 evidenceHash;
     }
 
@@ -162,8 +165,11 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     uint256 public outstanding;
     uint256 public totalStake;
     uint256 public totalDues;
-    uint256 public sponsorFunded;
-    mapping(address => uint256) public fundedBy;
+    // sponsor capital: funded, less released, less line-backed claims; funders hold shares of it, so a loss lowers
+    // every funder's entitlement pro rata and a later deposit never repays an earlier funder
+    uint256 public sponsorCapital;
+    uint256 public totalSponsorShares;
+    mapping(address => uint256) public sponsorSharesOf;
 
     mapping(address => Member) internal members;
     mapping(address => mapping(address => uint256)) public backing; // attester => member => amount
@@ -258,6 +264,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     error BadTerm();
     error PastSettleBy();
     error SponsorCapital();
+    error ReleaseWhileOpen();
 
     modifier onlyAdjudicator() {
         if (msg.sender != adjudicator) revert NotAdjudicator();
@@ -364,35 +371,47 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
 
     // ---------------------------------------------------------------- reserve
 
-    /// @notice Anyone may fund the reserve. Funding is a transfer into the reserve; the owner can return only
-    ///         uncommitted sponsor capital, only to the address that funded it and only up to what it funded.
+    /// @notice Anyone may fund the reserve and receives shares of the sponsor capital at its current value. The
+    ///         owner can return capital only to a funder, only up to the current value of its shares, never dues,
+    ///         never the capital behind issuer lines and never while any guarantee is open.
     function fundReserve(uint256 amount) external {
         if (amount == 0) revert ZeroAmount();
+        uint256 minted = (amount * (totalSponsorShares + 1)) / (sponsorCapital + 1);
+        if (minted == 0) revert ZeroAmount();
         token.safeTransferFrom(msg.sender, address(this), amount);
         reserve += amount;
-        sponsorFunded += amount;
-        fundedBy[msg.sender] += amount;
+        sponsorCapital += amount;
+        totalSponsorShares += minted;
+        sponsorSharesOf[msg.sender] += minted;
         emit ReserveFunded(msg.sender, amount, reserve);
     }
 
-    /// @notice Returns sponsor capital to its funder. Never dues, never cover for open guarantees, never the capital
-    ///         standing behind issuer lines.
+    /// @notice Returns sponsor capital to a funder, burning its shares at their current value (rounded against the
+    ///         funder). Released only while nothing is open, so no admitted guarantee loses its safety loading.
     function releaseReserve(address funder, uint256 amount) external onlyOwner {
         if (amount == 0) revert ZeroAmount();
-        if (amount > releasable() || amount > fundedBy[funder]) revert ReleaseTooLarge();
-        if (sponsorFunded - amount < issuerHeld + issuerSpent) revert ReleaseTooLarge();
+        if (outstanding != 0) revert ReleaseWhileOpen();
+        if (amount > releasable()) revert ReleaseTooLarge();
+        uint256 burned = Math.mulDiv(amount, totalSponsorShares + 1, sponsorCapital + 1, Math.Rounding.Ceil);
+        if (burned > sponsorSharesOf[funder]) revert ReleaseTooLarge();
+        sponsorSharesOf[funder] -= burned;
+        totalSponsorShares -= burned;
         reserve -= amount;
-        sponsorFunded -= amount;
-        fundedBy[funder] -= amount;
+        sponsorCapital -= amount;
         token.safeTransfer(funder, amount);
         emit ReserveReleased(funder, amount, reserve);
     }
 
-    /// @dev Conservative: held lines are locked whether or not they are committed to an open guarantee.
+    /// @notice Sponsor capital that could be released now: nothing while a guarantee is open, never dues and never
+    ///         the capital behind held lines.
     function releasable() public view returns (uint256) {
-        uint256 locked = outstanding + totalDues + issuerHeld;
-        uint256 free = reserve > locked ? reserve - locked : 0;
-        return free < sponsorFunded ? free : sponsorFunded;
+        if (outstanding != 0) return 0;
+        return sponsorCapital > issuerHeld ? sponsorCapital - issuerHeld : 0;
+    }
+
+    /// @notice The current value of a funder's shares of the sponsor capital.
+    function sponsorValueOf(address funder) external view returns (uint256) {
+        return Math.mulDiv(sponsorSharesOf[funder], sponsorCapital + 1, totalSponsorShares + 1);
     }
 
     // ---------------------------------------------------------------- own trust
@@ -417,8 +436,8 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     }
 
     /// @notice The issuer sets a member's line. The budget holds every line; a line can be lowered only to what
-    ///         its member has committed, so held budget cannot be rotated away from open exposure. Lines held plus
-    ///         lines spent never exceed the sponsor capital funded, so a line-backed claim is never paid from dues.
+    ///         its member has committed, so held budget cannot be rotated away from open exposure. Lines held never
+    ///         exceed the sponsor capital, so a line-backed claim is never paid from dues.
     function setLine(address member, uint256 newLine) external onlyIssuer {
         if (newLine > lineCap) revert BadParam();
         Member storage m = members[member];
@@ -426,7 +445,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         if (newLine > m.line) {
             uint256 add = newLine - m.line;
             if (issuerHeld + issuerSpent + add > issuerBudget) revert BudgetExceeded();
-            if (issuerHeld + issuerSpent + add > sponsorFunded) revert SponsorCapital();
+            if (issuerHeld + add > sponsorCapital) revert SponsorCapital();
             issuerHeld += add;
         } else {
             issuerHeld -= m.line - newLine;
@@ -522,7 +541,9 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         if (a.amount == 0) revert ZeroAmount();
         if (block.timestamp > a.deadline) revert SignatureExpired();
         if (a.settleBy <= block.timestamp || a.settleBy > block.timestamp + maxTerm) revert BadTerm();
-        if (a.contributionBps != contributionBps || a.contributionCap != contributionCap) revert PolicyMismatch();
+        if (a.contributionBps != contributionBps || a.contributionCap != contributionCap || a.remitWindow != remitWindow) {
+            revert PolicyMismatch();
+        }
         _useNonce(a.worker, a.nonce);
         if (!SignatureChecker.isValidSignatureNow(a.worker, acceptanceDigest(a), signature)) revert BadSignature();
 
@@ -572,6 +593,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
                 contributionDue: 0,
                 contributionBps: uint128(a.contributionBps),
                 contributionCap: uint128(a.contributionCap),
+                remitWindow: uint64(a.remitWindow),
                 evidenceHash: bytes32(0)
             })
         );
@@ -635,12 +657,12 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         emit ContributionRemitted(id, msg.sender, g.worker, due);
     }
 
-    /// @notice After the remit window anyone may record a lapse. It is history, not a debt: the contribution stays
+    /// @notice After the remit window the worker signed, anyone may record a lapse. It is history, not a debt: the contribution stays
     ///         payable, and until it is paid the worker gets no new guarantee.
     function markLapsed(uint256 id) external {
         Guarantee storage g = guarantees[id];
         if (g.state != State.Paid || g.remitted || g.lapsed) revert NothingDue();
-        if (block.timestamp < g.paidAt + remitWindow) revert TooEarly();
+        if (block.timestamp < g.paidAt + g.remitWindow) revert TooEarly();
         g.lapsed = true;
         members[g.worker].contributionsLapsed += 1;
         emit ContributionLapsed(id, g.worker);
@@ -671,6 +693,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
             w.line -= g.fromLine;
             issuerHeld -= g.fromLine;
             issuerSpent += g.fromLine;
+            sponsorCapital -= g.fromLine;
             emit LineConsumed(id, worker, g.fromLine);
         }
         if (g.fromDues != 0) {
@@ -701,6 +724,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
                     a.termsHash,
                     a.contributionBps,
                     a.contributionCap,
+                    a.remitWindow,
                     a.settleBy,
                     a.nonce,
                     a.deadline
