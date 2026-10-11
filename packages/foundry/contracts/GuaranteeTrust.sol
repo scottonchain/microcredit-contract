@@ -128,6 +128,7 @@ contract GuaranteeTrust is Ownable2Step {
     mapping(address => Member) internal members;
     mapping(address => mapping(address => uint256)) public backing; // attester => member => amount
     mapping(address => address[]) internal attesters; // member => current attesters
+    mapping(address => mapping(address => bool)) public consent; // member => attester => allowed
     mapping(bytes32 => bool) public clientOpen;
     mapping(bytes32 => bool) public clientDefaulted;
     Guarantee[] internal guarantees;
@@ -151,6 +152,7 @@ contract GuaranteeTrust is Ownable2Step {
     event Unstaked(address indexed member, uint256 amount, uint256 stake);
     event LineSet(address indexed member, uint256 line, uint256 issuerHeld);
     event Attested(address indexed attester, address indexed member, uint256 amount, uint256 backing);
+    event ConsentSet(address indexed member, address indexed attester, bool allowed, address by);
     event BackingWithdrawn(address indexed attester, address indexed member, uint256 amount, uint256 backing);
     event GuaranteeOpened(
         uint256 indexed id,
@@ -186,6 +188,7 @@ contract GuaranteeTrust is Ownable2Step {
     error ClientBlocked();
     error ContributionOutstanding();
     error SelfAttestation();
+    error NoConsent();
     error AttestCap();
     error TooManyAttesters();
     error TooManyAttestees();
@@ -349,11 +352,26 @@ contract GuaranteeTrust is Ownable2Step {
 
     // ---------------------------------------------------------------- backing (one hop)
 
-    /// @notice Back `member` with `amount` of the caller's own stake and dues. Received backing and issuer lines
-    ///         cannot be attested onward.
+    /// @notice A member chooses who may back it. Without consent anyone with a little stake could fill a
+    ///         newcomer's attester slots and lock out real attesters.
+    function setConsent(address attester, bool allowed) external {
+        consent[msg.sender][attester] = allowed;
+        emit ConsentSet(msg.sender, attester, allowed, msg.sender);
+    }
+
+    /// @notice The issuer may record a newcomer's consent for it (a newcomer may hold no gas), as the vetting
+    ///         programme that knows the member.
+    function setConsentFor(address member, address attester, bool allowed) external onlyIssuer {
+        consent[member][attester] = allowed;
+        emit ConsentSet(member, attester, allowed, msg.sender);
+    }
+
+    /// @notice Back `member` with `amount` of the caller's own stake and dues, with the member's consent. Received
+    ///         backing and issuer lines cannot be attested onward.
     function attest(address member, uint256 amount) external {
         if (amount == 0) revert ZeroAmount();
         if (member == msg.sender) revert SelfAttestation();
+        if (!consent[member][msg.sender]) revert NoConsent();
         Member storage a = members[msg.sender];
         if (_freeToBack(a) < amount) revert InsufficientTrust();
         uint256 current = backing[msg.sender][member];

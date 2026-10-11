@@ -50,7 +50,7 @@ real dues or a real issuer put into it, and a thousand fake accounts take no mor
 | **Stake in the common pool** | Yes, 1:1, but **only to back others** | the member's locked stake | stake is cash at risk; using a worker's own stake for their own guarantee would charge them cash for their client's default, which the operator ruled out |
 | **First-job commission** (contribution paid after a client pays) | Yes, exactly 1:1 for what is paid, usable both for the member's own guarantees and to back others | `r` per paid job: `contributionBps` of the wage, capped at `contributionCap` (testnet: 5%, 3 USDC) | it is irrevocably in the reserve, so it is the dues bound: history earns no more than it put out of reach (Theorem 3); a colluding client and worker buy capacity only at its full price |
 | **Repayment and paid-job history** (counts) | **No** capacity; information only | appears in the score | any rule granting more than dues for history can be farmed with recycled capital (Theorem 3) |
-| **Attestation** from a member with free trust | Yes, conserved | up to the attester's free trust; at most `attestCap` per newcomer (20 USDC) and `maxOpenAttestees` newcomers per attester (5) | trust is risk; the attester's backing absorbs claim losses first, so it works through selection and monitoring (Stiglitz 1990; Ghatak and Guinnane 1999) |
+| **Attestation** from a member with free trust, **with the member's consent** | Yes, conserved | up to the attester's free trust; at most `attestCap` per newcomer (20 USDC) and `maxOpenAttestees` newcomers per attester (5) | trust is risk; the attester's backing absorbs claim losses first, so it works through selection and monitoring (Stiglitz 1990; Ghatak and Guinnane 1999) |
 | **Second- or third-degree** (passing on received backing) | **No** | 0 | relaying multiplies what the same attack edges can take by 3.3 to 7 times and charges people who never chose the borrower (`CREDIT_MODEL.md` section 6, `analysis/liquidity`); a newcomer backs others only with trust of their own |
 | **"Had" trust** (a past member) | Only trust still held | current free `T` | spent or lost trust is gone; past conduct is in the score |
 
@@ -114,6 +114,7 @@ raise by repetition cannot be allowed to create capacity.
 | --- | --- |
 | Ring of fake workers and clients claiming nonpayment | claims consume capacity that only stake, dues or an issuer can create; a ring with none gets nothing |
 | Farming dues with a fake client | buys capacity 1:1 for what it pays; claiming it back returns at most what it paid |
+| Unsolicited attestations filling a newcomer's attester slots | the member's consent is required, given by the member or by the issuer on a newcomer's behalf (found by Claude's own adversarial pass before review) |
 | Attester backing its own sock puppet | loses its own backing; extraction ≤ its own trust |
 | Rotating an issuer line through many accounts | budget charged on the highest line held until released |
 | One client failing many workers at once | one open guarantee per client; attester cap on open attestees |

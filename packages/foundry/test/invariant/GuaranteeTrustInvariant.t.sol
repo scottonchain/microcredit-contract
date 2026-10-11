@@ -53,6 +53,8 @@ contract GuaranteeTrustHandler is Test {
 
     function attest(uint256 who, uint256 to, uint256 amt) external {
         amt = bound(amt, 1, 20 * U);
+        vm.prank(_a(to));
+        gt.setConsent(_a(who), true);
         vm.prank(_a(who));
         try gt.attest(_a(to), amt) { } catch { }
     }

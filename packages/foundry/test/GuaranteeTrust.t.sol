@@ -44,6 +44,13 @@ contract GuaranteeTrustTest is Test {
         gt.stake(amt);
     }
 
+    function _attest(address att, address m, uint256 amt) internal {
+        vm.prank(m);
+        gt.setConsent(att, true);
+        vm.prank(att);
+        gt.attest(m, amt);
+    }
+
     function _open(address worker, string memory client, uint256 amt) internal returns (uint256) {
         vm.prank(adj);
         return gt.openGuarantee(worker, keccak256(bytes(client)), amt, keccak256("terms"));
@@ -76,6 +83,8 @@ contract GuaranteeTrustTest is Test {
         vm.prank(issuer);
         gt.setLine(nia, 20 * U);
         assertEq(gt.freeToBack(nia), 0);
+        vm.prank(omar);
+        gt.setConsent(nia, true);
         vm.prank(nia);
         vm.expectRevert(GuaranteeTrust.InsufficientTrust.selector);
         gt.attest(omar, 1);
@@ -84,17 +93,30 @@ contract GuaranteeTrustTest is Test {
     function testStakeBacksOthersButNotItself() public {
         _stake(avery, 50 * U);
         assertEq(gt.capacity(avery), 0, "stake gives no capacity for the staker's own guarantee");
-        vm.prank(avery);
-        gt.attest(nia, 20 * U);
+        _attest(avery, nia, 20 * U);
         assertEq(gt.capacity(nia), 20 * U);
         assertEq(gt.freeToBack(avery), 30 * U);
     }
 
-    function testReceivedBackingCannotBePassedOn() public {
+    function testAttestationNeedsTheMembersConsent() public {
         _stake(avery, 20 * U);
         vm.prank(avery);
-        gt.attest(nia, 20 * U);
+        vm.expectRevert(GuaranteeTrust.NoConsent.selector);
+        gt.attest(nia, 5 * U);
+        // the issuer may consent for a newcomer that holds no gas
+        vm.prank(issuer);
+        gt.setConsentFor(nia, avery, true);
+        vm.prank(avery);
+        gt.attest(nia, 5 * U);
+        assertEq(gt.capacity(nia), 5 * U);
+    }
+
+    function testReceivedBackingCannotBePassedOn() public {
+        _stake(avery, 20 * U);
+        _attest(avery, nia, 20 * U);
         assertEq(gt.freeToBack(nia), 0);
+        vm.prank(omar);
+        gt.setConsent(nia, true);
         vm.prank(nia);
         vm.expectRevert(GuaranteeTrust.InsufficientTrust.selector);
         gt.attest(omar, 1);
@@ -138,8 +160,7 @@ contract GuaranteeTrustTest is Test {
 
     function testGuaranteeIsAtMostAFifthOfTheReserve() public {
         _stake(avery, 50 * U);
-        vm.prank(avery);
-        gt.attest(nia, 20 * U);
+        _attest(avery, nia, 20 * U);
         vm.prank(issuer);
         gt.setLine(nia, 20 * U);
         vm.prank(adj);
@@ -182,10 +203,8 @@ contract GuaranteeTrustTest is Test {
     function testClaimPaysWorkerAndConsumesBackingFirstSlashingStake() public {
         _stake(avery, 30 * U);
         _stake(brighton, 10 * U);
-        vm.prank(avery);
-        gt.attest(nia, 15 * U);
-        vm.prank(brighton);
-        gt.attest(nia, 5 * U);
+        _attest(avery, nia, 15 * U);
+        _attest(brighton, nia, 5 * U);
         uint256 id = _open(nia, "acme", 20 * U);
         uint256 reserveBefore = gt.reserve();
         vm.prank(adj);
@@ -217,8 +236,7 @@ contract GuaranteeTrustTest is Test {
 
     function testPaidGuaranteeReleasesBackingForWithdrawal() public {
         _stake(avery, 20 * U);
-        vm.prank(avery);
-        gt.attest(nia, 20 * U);
+        _attest(avery, nia, 20 * U);
         uint256 id = _open(nia, "acme", 20 * U);
         vm.prank(avery);
         vm.expectRevert(GuaranteeTrust.BackingLocked.selector);
@@ -266,6 +284,8 @@ contract GuaranteeTrustTest is Test {
             ring[i] = makeAddr(string.concat("sybil", vm.toString(i)));
         }
         for (uint256 i; i < ring.length; i++) {
+            vm.prank(ring[(i + 1) % ring.length]);
+            gt.setConsent(ring[i], true); // the ring consents to itself freely
             vm.prank(ring[i]);
             vm.expectRevert(GuaranteeTrust.InsufficientTrust.selector);
             gt.attest(ring[(i + 1) % ring.length], 1);
