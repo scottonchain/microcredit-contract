@@ -4,6 +4,8 @@ pragma solidity ^0.8.30;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Ownable, Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import { SignatureChecker } from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
 /**
  * @notice Conserved trust for new members of a revolving first-job payment guarantee. Testnet only: no live
@@ -16,24 +18,49 @@ import { Ownable, Ownable2Step } from "@openzeppelin/contracts/access/Ownable2St
  *      - stake (cash, locked here): backs others only, so no worker's cash pays for its own client's default;
  *      - dues (contributions irrevocably in the reserve): backs others and the member's own guarantees;
  *      - line (an issuer's vetting, inside the issuer's budget): the member's own guarantees only, never passed on.
- *      Backing moves trust one hop from an attester to a member and never creates it: received backing cannot be
- *      attested onward. A guarantee commits the worker's capacity (received backing, then line, then dues). A claim
- *      pays the worker in full and consumes the committed capacity: attesters lose their backing pro rata (their
- *      stake first, which returns cash to the reserve, then their dues), the issuer's budget is spent, the worker's
- *      dues are written down. Capacity never reads history; the score is information only.
+ *      Backing moves trust one hop from an attester to a member who consented, and never creates it: received
+ *      backing cannot be attested onward. A guarantee opens only on the worker's signed acceptance of its exact
+ *      terms (client, client group, amount, the dues it pledges, terms hash, contribution policy, settle-by date).
+ *      It commits the worker's capacity (received backing, then line, then pledged dues); each attester's share of
+ *      the backing is fixed when the guarantee opens. A claim pays the worker in full and consumes exactly the
+ *      committed capacity: each attester's share (its stake first, which returns cash to the reserve, then its
+ *      dues), the issuer's budget, the worker's pledged dues. Capacity never reads history; the score is
+ *      information only. A guarantee not settled by its settle-by date can be expired by anyone, releasing it.
  *      Accounting identity: token.balanceOf(this) = reserve + totalStake + stray transfers.
  */
-contract GuaranteeTrust is Ownable2Step {
+contract GuaranteeTrust is Ownable2Step, EIP712 {
     using SafeERC20 for IERC20;
 
     uint256 public constant BPS = 10_000;
+
+    bytes32 public constant ACCEPTANCE_TYPEHASH = keccak256(
+        "Acceptance(address worker,bytes32 clientId,bytes32 groupId,uint256 amount,uint256 maxFromDues,bytes32 termsHash,uint256 contributionBps,uint256 contributionCap,uint64 settleBy,uint256 nonce,uint256 deadline)"
+    );
+    bytes32 public constant CONSENT_TYPEHASH =
+        keccak256("Consent(address member,address attester,bool allowed,uint256 nonce,uint256 deadline)");
 
     enum State {
         None,
         Open,
         Paid,
         Claimed,
-        Cancelled
+        Cancelled,
+        Expired
+    }
+
+    /// @notice What a worker signs to accept one guarantee. A gasless relay may submit it; nobody can replace it.
+    struct Acceptance {
+        address worker;
+        bytes32 clientId; // the client the guarantee covers
+        bytes32 groupId; // the client's canonical group (a common parent or payer); zero: the client is its own group
+        uint256 amount;
+        uint256 maxFromDues; // the most of the worker's own dues it agrees may stand behind this guarantee
+        bytes32 termsHash; // the human-readable terms the worker accepted
+        uint256 contributionBps; // must equal the policy in force; fixed for this guarantee
+        uint256 contributionCap;
+        uint64 settleBy; // after this, the adjudicator can no longer settle and anyone may expire the guarantee
+        uint256 nonce; // any unused number of the worker's; revocable before use
+        uint256 deadline; // the signature's own expiry
     }
 
     struct Member {
@@ -47,7 +74,7 @@ contract GuaranteeTrust is Ownable2Step {
         uint256 committedDues; // dues committed to own open guarantees
         // received
         uint256 backingReceived;
-        uint256 backingCommitted; // received backing committed to own open guarantees
+        uint256 backingCommitted; // received backing committed to own open guarantees (sum of locked shares)
         uint256 openAttestees;
         uint256 unpaidContributions;
         // history (information only)
@@ -66,6 +93,7 @@ contract GuaranteeTrust is Ownable2Step {
     struct Guarantee {
         address worker;
         bytes32 clientId;
+        bytes32 groupId;
         uint128 amount;
         uint128 fromBacking;
         uint128 fromLine;
@@ -76,9 +104,18 @@ contract GuaranteeTrust is Ownable2Step {
         bool lapsed;
         uint64 openedAt;
         uint64 paidAt;
+        uint64 settleBy;
         uint128 wage;
         uint128 contributionDue;
+        uint128 contributionBps;
+        uint128 contributionCap;
         bytes32 evidenceHash;
+    }
+
+    /// @notice One attester's share of a guarantee's backing, fixed at opening.
+    struct Share {
+        address attester;
+        uint128 amount;
     }
 
     struct Score {
@@ -117,6 +154,8 @@ contract GuaranteeTrust is Ownable2Step {
     uint256 public attestCap;
     uint256 public maxAttesters = 5; // attesters per member
     uint256 public maxOpenAttestees = 5; // members per attester
+    uint256 public maxGroupShareBps = 3000; // open guarantees on one client group are at most 30% of the reserve
+    uint256 public maxTerm = 60 days; // longest settle-by a worker may accept
 
     // ledgers
     uint256 public reserve;
@@ -124,14 +163,20 @@ contract GuaranteeTrust is Ownable2Step {
     uint256 public totalStake;
     uint256 public totalDues;
     uint256 public sponsorFunded;
+    mapping(address => uint256) public fundedBy;
 
     mapping(address => Member) internal members;
     mapping(address => mapping(address => uint256)) public backing; // attester => member => amount
+    mapping(address => mapping(address => uint256)) public lockedBacking; // attester => member => in open shares
     mapping(address => address[]) internal attesters; // member => current attesters
     mapping(address => mapping(address => bool)) public consent; // member => attester => allowed
+    mapping(address => mapping(uint256 => bool)) public nonceUsed; // signer => nonce => used or revoked
     mapping(bytes32 => bool) public clientOpen;
     mapping(bytes32 => bool) public clientDefaulted;
+    mapping(bytes32 => uint256) public groupExposure;
+    mapping(bytes32 => bool) public groupDefaulted;
     Guarantee[] internal guarantees;
+    mapping(uint256 => Share[]) internal shares;
 
     event ParamsSet(
         uint256 maxShareBps,
@@ -144,27 +189,33 @@ contract GuaranteeTrust is Ownable2Step {
         uint256 maxAttesters,
         uint256 maxOpenAttestees
     );
+    event GroupAndTermSet(uint256 maxGroupShareBps, uint256 maxTerm);
     event RolesSet(address guardian, address adjudicator, address issuer, uint256 issuerBudget);
     event Paused(bool paused);
     event ReserveFunded(address indexed from, uint256 amount, uint256 reserve);
-    event ReserveReleased(address indexed to, uint256 amount, uint256 reserve);
+    event ReserveReleased(address indexed funder, uint256 amount, uint256 reserve);
     event Staked(address indexed member, uint256 amount, uint256 stake);
     event Unstaked(address indexed member, uint256 amount, uint256 stake);
     event LineSet(address indexed member, uint256 line, uint256 issuerHeld);
     event Attested(address indexed attester, address indexed member, uint256 amount, uint256 backing);
-    event ConsentSet(address indexed member, address indexed attester, bool allowed, address by);
+    event ConsentSet(address indexed member, address indexed attester, bool allowed, address submittedBy);
+    event NonceRevoked(address indexed signer, uint256 nonce);
     event BackingWithdrawn(address indexed attester, address indexed member, uint256 amount, uint256 backing);
     event GuaranteeOpened(
         uint256 indexed id,
         address indexed worker,
         bytes32 indexed clientId,
+        bytes32 groupId,
         uint256 amount,
         uint256 fromBacking,
         uint256 fromLine,
         uint256 fromDues,
-        bytes32 termsHash
+        bytes32 termsHash,
+        uint64 settleBy
     );
+    event ShareLocked(uint256 indexed id, address indexed attester, uint256 amount);
     event GuaranteeCancelled(uint256 indexed id);
+    event GuaranteeExpired(uint256 indexed id, address by);
     event GuaranteePaid(uint256 indexed id, uint256 wage, uint256 contributionDue);
     event ContributionRemitted(uint256 indexed id, address indexed payer, address indexed worker, uint256 amount);
     event ContributionLapsed(uint256 indexed id, address indexed worker);
@@ -184,6 +235,7 @@ contract GuaranteeTrust is Ownable2Step {
     error InsufficientTrust();
     error InsufficientCapacity();
     error ExposureCap();
+    error GroupCap();
     error ReserveFloor();
     error ClientBlocked();
     error ContributionOutstanding();
@@ -199,6 +251,12 @@ contract GuaranteeTrust is Ownable2Step {
     error TooEarly();
     error NothingDue();
     error ReleaseTooLarge();
+    error BadSignature();
+    error SignatureExpired();
+    error NonceAlreadyUsed();
+    error PolicyMismatch();
+    error BadTerm();
+    error PastSettleBy();
 
     modifier onlyAdjudicator() {
         if (msg.sender != adjudicator) revert NotAdjudicator();
@@ -217,7 +275,7 @@ contract GuaranteeTrust is Ownable2Step {
         address issuer_,
         uint256 issuerBudget_,
         uint256 unit // one token unit, e.g. 1e6 for USDC: sets the testnet caps
-    ) Ownable(owner_) {
+    ) Ownable(owner_) EIP712("GuaranteeTrust", "2") {
         token = token_;
         guardian = owner_;
         adjudicator = adjudicator_;
@@ -240,6 +298,8 @@ contract GuaranteeTrust is Ownable2Step {
         emit RolesSet(guardian_, adjudicator_, issuer_, issuerBudget_);
     }
 
+    /// @notice New parameters apply to guarantees opened afterwards; an open guarantee keeps the contribution policy
+    ///         its worker signed.
     function setParams(
         uint256 maxShareBps_,
         uint256 floorMultiple_,
@@ -278,7 +338,16 @@ contract GuaranteeTrust is Ownable2Step {
         );
     }
 
-    /// @notice Stops new guarantees only. Payment records, remittances, claims and withdrawals keep working.
+    function setGroupAndTerm(uint256 maxGroupShareBps_, uint256 maxTerm_) external onlyOwner {
+        if (maxGroupShareBps_ == 0 || maxGroupShareBps_ > BPS || maxTerm_ < 1 days || maxTerm_ > 365 days) {
+            revert BadParam();
+        }
+        maxGroupShareBps = maxGroupShareBps_;
+        maxTerm = maxTerm_;
+        emit GroupAndTermSet(maxGroupShareBps_, maxTerm_);
+    }
+
+    /// @notice Stops new guarantees only. Payment records, remittances, claims, expiry and withdrawals keep working.
     function setPaused(bool paused_) external {
         if (msg.sender != guardian && msg.sender != owner()) revert NotGuardian();
         paused = paused_;
@@ -287,23 +356,26 @@ contract GuaranteeTrust is Ownable2Step {
 
     // ---------------------------------------------------------------- reserve
 
-    /// @notice Anyone may fund the reserve. Funds are never returned to the funder; only uncommitted sponsor
-    ///         capital can be released by the owner, never dues.
+    /// @notice Anyone may fund the reserve. Funding is a transfer into the reserve; the owner can return only
+    ///         uncommitted sponsor capital, only to the address that funded it and only up to what it funded.
     function fundReserve(uint256 amount) external {
         if (amount == 0) revert ZeroAmount();
         token.safeTransferFrom(msg.sender, address(this), amount);
         reserve += amount;
         sponsorFunded += amount;
+        fundedBy[msg.sender] += amount;
         emit ReserveFunded(msg.sender, amount, reserve);
     }
 
-    /// @notice Releases sponsor capital that is neither committed to open guarantees nor standing behind dues.
-    function releaseReserve(address to, uint256 amount) external onlyOwner {
-        if (amount > releasable()) revert ReleaseTooLarge();
+    /// @notice Returns sponsor capital to its funder. Never dues, never cover for open guarantees.
+    function releaseReserve(address funder, uint256 amount) external onlyOwner {
+        if (amount == 0) revert ZeroAmount();
+        if (amount > releasable() || amount > fundedBy[funder]) revert ReleaseTooLarge();
         reserve -= amount;
         sponsorFunded -= amount;
-        token.safeTransfer(to, amount);
-        emit ReserveReleased(to, amount, reserve);
+        fundedBy[funder] -= amount;
+        token.safeTransfer(funder, amount);
+        emit ReserveReleased(funder, amount, reserve);
     }
 
     function releasable() public view returns (uint256) {
@@ -350,7 +422,7 @@ contract GuaranteeTrust is Ownable2Step {
         emit LineSet(member, newLine, issuerHeld);
     }
 
-    // ---------------------------------------------------------------- backing (one hop)
+    // ---------------------------------------------------------------- consent and nonces
 
     /// @notice A member chooses who may back it. Without consent anyone with a little stake could fill a
     ///         newcomer's attester slots and lock out real attesters.
@@ -359,12 +431,31 @@ contract GuaranteeTrust is Ownable2Step {
         emit ConsentSet(msg.sender, attester, allowed, msg.sender);
     }
 
-    /// @notice The issuer may record a newcomer's consent for it (a newcomer may hold no gas), as the vetting
-    ///         programme that knows the member.
-    function setConsentFor(address member, address attester, bool allowed) external onlyIssuer {
+    /// @notice The member's signed consent, submitted by anyone (a newcomer may hold no gas). No role can consent
+    ///         for a member.
+    function setConsentBySig(
+        address member,
+        address attester,
+        bool allowed,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) external {
+        if (block.timestamp > deadline) revert SignatureExpired();
+        _useNonce(member, nonce);
+        bytes32 digest = consentDigest(member, attester, allowed, nonce, deadline);
+        if (!SignatureChecker.isValidSignatureNow(member, digest, signature)) revert BadSignature();
         consent[member][attester] = allowed;
         emit ConsentSet(member, attester, allowed, msg.sender);
     }
+
+    /// @notice Withdraw a signed acceptance or consent before anyone submits it.
+    function revokeNonce(uint256 nonce) external {
+        _useNonce(msg.sender, nonce);
+        emit NonceRevoked(msg.sender, nonce);
+    }
+
+    // ---------------------------------------------------------------- backing (one hop)
 
     /// @notice Back `member` with `amount` of the caller's own stake and dues, with the member's consent. Received
     ///         backing and issuer lines cannot be attested onward.
@@ -391,8 +482,7 @@ contract GuaranteeTrust is Ownable2Step {
         emit Attested(msg.sender, member, amount, current + amount);
     }
 
-    /// @notice Withdraw backing not committed to the member's open guarantees (each attester's committed share is
-    ///         pro rata to its backing).
+    /// @notice Withdraw backing that is not locked in a share of one of the member's open guarantees.
     function withdrawBacking(address member, uint256 amount) external {
         if (amount == 0) revert ZeroAmount();
         if (amount > withdrawableBacking(msg.sender, member)) revert BackingLocked();
@@ -407,26 +497,29 @@ contract GuaranteeTrust is Ownable2Step {
     }
 
     function withdrawableBacking(address attester, address member) public view returns (uint256) {
-        uint256 b = backing[attester][member];
-        Member storage m = members[member];
-        if (b == 0 || m.backingCommitted == 0) return b;
-        uint256 locked = (b * m.backingCommitted + m.backingReceived - 1) / m.backingReceived; // round up
-        return b > locked ? b - locked : 0;
+        return backing[attester][member] - lockedBacking[attester][member];
     }
 
     // ---------------------------------------------------------------- guarantees
 
-    function openGuarantee(address worker, bytes32 clientId, uint256 amount, bytes32 termsHash)
-        external
-        onlyAdjudicator
-        returns (uint256 id)
-    {
+    /// @notice Opens a guarantee on the worker's signed acceptance of its exact terms. The adjudicator submits it;
+    ///         neither the adjudicator nor anyone else can open one the worker did not sign.
+    function openGuarantee(Acceptance calldata a, bytes calldata signature) external onlyAdjudicator returns (uint256 id) {
         if (paused) revert IsPaused();
-        if (amount == 0) revert ZeroAmount();
-        if (clientOpen[clientId] || clientDefaulted[clientId]) revert ClientBlocked();
-        Member storage w = members[worker];
+        if (a.amount == 0) revert ZeroAmount();
+        if (block.timestamp > a.deadline) revert SignatureExpired();
+        if (a.settleBy <= block.timestamp || a.settleBy > block.timestamp + maxTerm) revert BadTerm();
+        if (a.contributionBps != contributionBps || a.contributionCap != contributionCap) revert PolicyMismatch();
+        _useNonce(a.worker, a.nonce);
+        if (!SignatureChecker.isValidSignatureNow(a.worker, acceptanceDigest(a), signature)) revert BadSignature();
+
+        bytes32 group = a.groupId == bytes32(0) ? a.clientId : a.groupId;
+        if (clientOpen[a.clientId] || clientDefaulted[a.clientId] || groupDefaulted[group]) revert ClientBlocked();
+        Member storage w = members[a.worker];
         if (w.unpaidContributions != 0) revert ContributionOutstanding();
+        uint256 amount = a.amount;
         if (amount * BPS > reserve * maxShareBps) revert ExposureCap();
+        if ((groupExposure[group] + amount) * BPS > reserve * maxGroupShareBps) revert GroupCap();
         if (outstanding + amount + floorMultiple * amount > reserve) revert ReserveFloor();
 
         uint256 fromBacking = w.backingReceived - w.backingCommitted;
@@ -435,36 +528,41 @@ contract GuaranteeTrust is Ownable2Step {
         uint256 fromLine = w.line - w.committedLine;
         if (fromLine > rest) fromLine = rest;
         uint256 fromDues = rest - fromLine;
-        if (fromDues > _freeOwnDues(w)) revert InsufficientCapacity();
-
-        w.backingCommitted += fromBacking;
-        w.committedLine += fromLine;
-        w.committedDues += fromDues;
-        outstanding += amount;
-        clientOpen[clientId] = true;
-        w.guaranteesOpened += 1;
+        if (fromDues > _freeOwnDues(w) || fromDues > a.maxFromDues) revert InsufficientCapacity();
 
         id = guarantees.length;
+        w.committedLine += fromLine;
+        w.committedDues += fromDues;
+        if (fromBacking != 0) _lockShares(id, a.worker, fromBacking);
+        outstanding += amount;
+        groupExposure[group] += amount;
+        clientOpen[a.clientId] = true;
+        w.guaranteesOpened += 1;
+
         guarantees.push(
             Guarantee({
-                worker: worker,
-                clientId: clientId,
+                worker: a.worker,
+                clientId: a.clientId,
+                groupId: group,
                 amount: uint128(amount),
                 fromBacking: uint128(fromBacking),
                 fromLine: uint128(fromLine),
                 fromDues: uint128(fromDues),
-                termsHash: termsHash,
+                termsHash: a.termsHash,
                 state: State.Open,
                 remitted: false,
                 lapsed: false,
                 openedAt: uint64(block.timestamp),
                 paidAt: 0,
+                settleBy: a.settleBy,
                 wage: 0,
                 contributionDue: 0,
+                contributionBps: uint128(a.contributionBps),
+                contributionCap: uint128(a.contributionCap),
                 evidenceHash: bytes32(0)
             })
         );
-        emit GuaranteeOpened(id, worker, clientId, amount, fromBacking, fromLine, fromDues, termsHash);
+        emit GuaranteeOpened(id, a.worker, a.clientId, group, amount, fromBacking, fromLine, fromDues, a.termsHash, a.settleBy);
     }
 
     /// @notice The job did not go ahead: release everything, record nothing against anyone.
@@ -472,21 +570,33 @@ contract GuaranteeTrust is Ownable2Step {
         Guarantee storage g = guarantees[id];
         if (g.state != State.Open) revert WrongState();
         g.state = State.Cancelled;
-        _release(g);
+        _release(id, g);
         emit GuaranteeCancelled(id);
     }
 
-    /// @notice The client paid the wage. The contribution becomes due; the commitment is released.
+    /// @notice Past its settle-by date an unsettled guarantee can be expired by anyone: everything is released, no
+    ///         claim is paid and no contribution falls due. This bounds how long a lost adjudicator can lock capacity.
+    function expireGuarantee(uint256 id) external {
+        Guarantee storage g = guarantees[id];
+        if (g.state != State.Open) revert WrongState();
+        if (block.timestamp <= g.settleBy) revert TooEarly();
+        g.state = State.Expired;
+        _release(id, g);
+        emit GuaranteeExpired(id, msg.sender);
+    }
+
+    /// @notice The client paid the wage. The contribution the worker signed for becomes due; the commitment is released.
     function markPaid(uint256 id, uint256 wage, bytes32 evidenceHash) external onlyAdjudicator {
         Guarantee storage g = guarantees[id];
         if (g.state != State.Open) revert WrongState();
+        if (block.timestamp > g.settleBy) revert PastSettleBy();
         g.state = State.Paid;
         g.wage = uint128(wage);
         g.paidAt = uint64(block.timestamp);
         g.evidenceHash = evidenceHash;
-        _release(g);
-        uint256 due = (wage * contributionBps) / BPS;
-        if (due > contributionCap) due = contributionCap;
+        _release(id, g);
+        uint256 due = (wage * g.contributionBps) / BPS;
+        if (due > g.contributionCap) due = g.contributionCap;
         g.contributionDue = uint128(due);
         Member storage w = members[g.worker];
         w.guaranteesPaid += 1;
@@ -524,10 +634,12 @@ contract GuaranteeTrust is Ownable2Step {
     }
 
     /// @notice The client did not pay. The reserve pays the worker in full; the worker owes nothing. The capacity
-    ///         that underwrote the guarantee is consumed: attesters' backing pro rata, the issuer line, the dues.
+    ///         that underwrote the guarantee is consumed: each attester's fixed share, the issuer line, the pledged
+    ///         dues. The client and its group take no further guarantee.
     function claim(uint256 id, bytes32 evidenceHash) external onlyAdjudicator {
         Guarantee storage g = guarantees[id];
         if (g.state != State.Open) revert WrongState();
+        if (block.timestamp > g.settleBy) revert PastSettleBy();
         g.state = State.Claimed;
         g.evidenceHash = evidenceHash;
         address worker = g.worker;
@@ -535,8 +647,10 @@ contract GuaranteeTrust is Ownable2Step {
         uint256 amount = g.amount;
 
         outstanding -= amount;
+        groupExposure[g.groupId] -= amount;
         clientOpen[g.clientId] = false;
         clientDefaulted[g.clientId] = true;
+        groupDefaulted[g.groupId] = true;
         w.claimsAsWorker += 1;
 
         if (g.fromLine != 0) {
@@ -552,14 +666,43 @@ contract GuaranteeTrust is Ownable2Step {
             totalDues -= g.fromDues;
             emit DuesConsumed(id, worker, g.fromDues);
         }
-        if (g.fromBacking != 0) _consumeBacking(id, worker, g.fromBacking);
+        if (g.fromBacking != 0) _consumeShares(id, worker, g.fromBacking);
 
-        reserve -= amount; // slashed stake added back inside _consumeBacking
+        reserve -= amount; // slashed stake was added back inside _consumeShares
         token.safeTransfer(worker, amount);
         emit Claimed(id, worker, g.clientId, amount, evidenceHash);
     }
 
     // ---------------------------------------------------------------- views
+
+    function acceptanceDigest(Acceptance calldata a) public view returns (bytes32) {
+        return _hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    ACCEPTANCE_TYPEHASH,
+                    a.worker,
+                    a.clientId,
+                    a.groupId,
+                    a.amount,
+                    a.maxFromDues,
+                    a.termsHash,
+                    a.contributionBps,
+                    a.contributionCap,
+                    a.settleBy,
+                    a.nonce,
+                    a.deadline
+                )
+            )
+        );
+    }
+
+    function consentDigest(address member, address attester, bool allowed, uint256 nonce, uint256 deadline)
+        public
+        view
+        returns (bytes32)
+    {
+        return _hashTypedDataV4(keccak256(abi.encode(CONSENT_TYPEHASH, member, attester, allowed, nonce, deadline)));
+    }
 
     /// @notice What the member can be guaranteed now: free received backing, free line, free dues.
     function capacity(address member) public view returns (uint256) {
@@ -582,6 +725,10 @@ contract GuaranteeTrust is Ownable2Step {
 
     function guarantee(uint256 id) external view returns (Guarantee memory) {
         return guarantees[id];
+    }
+
+    function sharesOf(uint256 id) external view returns (Share[] memory) {
+        return shares[id];
     }
 
     function guaranteeCount() external view returns (uint256) {
@@ -608,6 +755,11 @@ contract GuaranteeTrust is Ownable2Step {
 
     // ---------------------------------------------------------------- internals
 
+    function _useNonce(address signer, uint256 nonce) internal {
+        if (nonceUsed[signer][nonce]) revert NonceAlreadyUsed();
+        nonceUsed[signer][nonce] = true;
+    }
+
     /// @dev Stake and uncommitted dues not yet given as backing.
     function _freeToBack(Member storage m) internal view returns (uint256) {
         uint256 own = m.stake + (m.dues - m.committedDues);
@@ -622,61 +774,80 @@ contract GuaranteeTrust is Ownable2Step {
         return free > backedFromDues ? free - backedFromDues : 0;
     }
 
-    function _release(Guarantee storage g) internal {
+    /// @dev Fix each attester's share of `amount` now, pro rata to its unlocked backing, remainder to whoever has room.
+    function _lockShares(uint256 id, address member_, uint256 amount) internal {
+        Member storage m = members[member_];
+        address[] storage list = attesters[member_];
+        uint256 n = list.length;
+        uint256 totalFree = m.backingReceived - m.backingCommitted;
+        uint256[] memory part = new uint256[](n);
+        uint256 left = amount;
+        for (uint256 k; k < n; k++) {
+            address att = list[k];
+            part[k] = (amount * (backing[att][member_] - lockedBacking[att][member_])) / totalFree;
+            left -= part[k];
+        }
+        for (uint256 k; k < n && left != 0; k++) {
+            address att = list[k];
+            uint256 room = backing[att][member_] - lockedBacking[att][member_] - part[k];
+            uint256 add = room < left ? room : left;
+            part[k] += add;
+            left -= add;
+        }
+        for (uint256 k; k < n; k++) {
+            if (part[k] == 0) continue;
+            address att = list[k];
+            lockedBacking[att][member_] += part[k];
+            shares[id].push(Share({ attester: att, amount: uint128(part[k]) }));
+            emit ShareLocked(id, att, part[k]);
+        }
+        m.backingCommitted += amount;
+    }
+
+    function _release(uint256 id, Guarantee storage g) internal {
         Member storage w = members[g.worker];
+        Share[] storage s = shares[id];
+        for (uint256 k; k < s.length; k++) {
+            lockedBacking[s[k].attester][g.worker] -= s[k].amount;
+        }
         w.backingCommitted -= g.fromBacking;
         w.committedLine -= g.fromLine;
         w.committedDues -= g.fromDues;
         outstanding -= g.amount;
+        groupExposure[g.groupId] -= g.amount;
         clientOpen[g.clientId] = false;
     }
 
-    /// @dev Charge `loss` of received backing to `member`'s attesters pro rata. Each attester pays from its stake
-    ///      first (the cash returns to the reserve), then from its uncommitted dues.
-    function _consumeBacking(uint256 id, address member_, uint256 loss) internal {
+    /// @dev Charge each attester exactly its share: stake first (the cash returns to the reserve), then its
+    ///      uncommitted dues, which the backing invariant guarantees cover the rest.
+    function _consumeShares(uint256 id, address member_, uint256 total) internal {
         Member storage m = members[member_];
-        address[] storage list = attesters[member_];
-        uint256 total = m.backingReceived;
-        uint256 left = loss;
-        uint256 n = list.length;
-        // iterate backwards so that unlinking (swap and pop) does not skip anyone
-        for (uint256 k = n; k > 0; k--) {
-            address att = list[k - 1];
-            uint256 b = backing[att][member_];
-            uint256 share = k == 1 ? left : (loss * b) / total;
-            left -= _charge(id, att, member_, b, share > left ? left : share);
+        Share[] storage s = shares[id];
+        for (uint256 k; k < s.length; k++) {
+            address att = s[k].attester;
+            uint256 amt = s[k].amount;
+            uint256 left = backing[att][member_] - amt;
+            backing[att][member_] = left;
+            lockedBacking[att][member_] -= amt;
+            Member storage a = members[att];
+            a.backingGiven -= amt;
+            a.backingLost += amt;
+            a.attesteeClaims += 1;
+            uint256 slash = amt <= a.stake ? amt : a.stake;
+            if (slash != 0) {
+                a.stake -= slash;
+                totalStake -= slash;
+                reserve += slash;
+            }
+            if (amt != slash) {
+                a.dues -= amt - slash;
+                totalDues -= amt - slash;
+            }
+            if (left == 0) _unlink(att, member_);
+            emit BackingConsumed(id, att, member_, amt, slash);
         }
-        // rounding can leave a few units when the last share was capped by its backing: take them from anyone left
-        for (uint256 k = list.length; left != 0 && k > 0; k--) {
-            address att = list[k - 1];
-            left -= _charge(id, att, member_, backing[att][member_], left);
-        }
-        m.backingReceived -= loss;
-        m.backingCommitted -= loss;
-    }
-
-    /// @dev Charge up to `want` to one attester's backing of `member_`; returns what was charged.
-    function _charge(uint256 id, address att, address member_, uint256 b, uint256 want) internal returns (uint256 share) {
-        share = want > b ? b : want;
-        if (share == 0) return 0;
-        backing[att][member_] = b - share;
-        Member storage a = members[att];
-        a.backingGiven -= share;
-        a.backingLost += share;
-        a.attesteeClaims += 1;
-        uint256 slash = share <= a.stake ? share : a.stake;
-        if (slash != 0) {
-            a.stake -= slash;
-            totalStake -= slash;
-            reserve += slash;
-        }
-        uint256 fromDues = share - slash;
-        if (fromDues != 0) {
-            a.dues -= fromDues; // _freeToBack guaranteed uncommitted dues cover the rest
-            totalDues -= fromDues;
-        }
-        if (b == share) _unlink(att, member_);
-        emit BackingConsumed(id, att, member_, share, slash);
+        m.backingReceived -= total;
+        m.backingCommitted -= total;
     }
 
     function _unlink(address att, address member_) internal {

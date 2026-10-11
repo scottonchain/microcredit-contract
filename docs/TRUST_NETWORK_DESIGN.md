@@ -1,6 +1,7 @@
 # Trust for new members: a conserved-trust design for the revolving first-job guarantee
 
-Status: **design draft for devil's-advocate review**, written by Claude Code (AI agent) on 2026-10-11
+Status: **revision 2, after Codex's devil's-advocate review** (contract PR 28, review 5484296919, which
+required five changes; section 12 records each and its fix). Written by Claude Code (AI agent) on 2026-10-11
 at the operator's direction. Testnet only. No real money, no outreach, no live guarantee. The
 operator's questions, the answer, every parameter and its reason, and what the contract
 (`GuaranteeTrust`) and the agentic simulations must show.
@@ -32,12 +33,12 @@ real dues or a real issuer put into it, and a thousand fake accounts take no mor
 
 | Role | Who | What it can do |
 | --- | --- | --- |
-| Sponsor | anyone, typically the operator | funds the reserve; funds are never returned to the sponsor |
-| Member | a newcomer or an established worker | holds trust; receives guarantees; remits contributions |
+| Sponsor | anyone, typically the operator | funds the reserve; the owner can return only uncommitted sponsor capital, only to the address that funded it, never dues or cover for open guarantees |
+| Member | a newcomer or an established worker | holds trust; consents to its attesters; signs its acceptance of each guarantee; remits contributions |
 | Attester | any member with free trust of their own | backs a newcomer with part of that trust |
 | Issuer | an accountable programme that vets newcomers | sets small lines within an on-chain budget |
-| Adjudicator | the operator or a programme it names | opens guarantees; records client payment or nonpayment with an evidence hash |
-| Client | an independent payer, identified by address or hash | owes the wage; at most one open guarantee |
+| Adjudicator | the operator or a programme it names | submits guarantees the worker has signed; records client payment or nonpayment with an evidence hash before the settle-by date. A single adjudicator is acceptable only for synthetic, root-controlled testnet mechanics; human use needs independent confirmation and appeal |
+| Client | an independent payer, identified by a hash, with a canonical group (a common parent or payer) named in the worker-signed terms | owes the wage; at most one open guarantee; its group carries at most `maxGroupShareBps` of the reserve; one default blocks the client and its whole group |
 | Guardian | the operator | pauses new guarantees |
 
 ## 4. Where trust comes from: the parameters
@@ -60,33 +61,48 @@ real dues or a real issuer put into it, and a thousand fake accounts take no mor
 already standing behind backing the member gave). Stake is not counted for the member's own guarantees,
 and only stake and dues can back others (section 4).
 
-**Opening a guarantee** (adjudicator) for worker `w`, client `k`, amount `G`, terms hash:
+**Opening a guarantee.** The worker signs an EIP-712 acceptance of the exact terms: client, client group,
+amount `G`, the most of its own dues it agrees may stand behind `G`, the terms hash, the contribution
+policy in force, a settle-by date (at most `maxTerm`, 60 days), a nonce and a signature deadline. The
+adjudicator submits it; a gasless relay may carry it, but no role can open a guarantee the worker did
+not sign, and the worker can revoke the nonce before use. The contract then requires:
 
-- `G ≤ capacity(w)`;
+- `G ≤ capacity(w)`, with the dues part no larger than the worker's pledge;
 - `G ≤ maxShareBps` of the reserve (testnet: 20%, a fifth);
 - outstanding exposure plus `G` leaves at least `floorMultiple × G` in the reserve (testnet: 2);
-- the client has no open guarantee and no recorded nonpayment;
-- the worker has no lapsed contribution.
+- the client has no open guarantee, and neither the client nor its group has a recorded nonpayment;
+- the group's open guarantees plus `G` stay within `maxGroupShareBps` of the reserve (testnet: 30%);
+- the worker has no unpaid contribution.
 
-`G` is committed against the worker's capacity, backing first, then the issuer line, then dues.
+`G` is committed against the worker's capacity, backing first, then the issuer line, then pledged dues.
+Each attester's share of the backing is fixed when the guarantee opens, pro rata to its unlocked
+backing, and stays locked until the guarantee ends. A later attester neither takes on that risk nor
+unlocks an earlier attester's share.
 
 **Client pays.** The adjudicator records the wage. The contribution due is
-`min(wage × contributionBps, contributionCap)`. The worker (or anyone for them) remits it within
+`min(wage × contributionBps, contributionCap)`, at the policy the worker signed, even if the owner has
+changed the parameters since. The worker (or anyone for them) remits it within
 `remitWindow` (14 days). It goes to the reserve and adds the same amount to the worker's dues. The
 commitment is released.
 
 **Worker does not remit.** After the window anyone may mark it lapsed. The worker cannot receive a
 new guarantee until it is paid. It is never pursued as a debt (`NORTH_STAR`: a pledge, not a loan).
 
+**Nobody settles.** After the settle-by date the adjudicator can no longer mark the job paid or pay a
+claim, and anyone may expire the guarantee: everything is released, no claim is paid and no
+contribution falls due. A lost adjudicator therefore locks capacity for at most `maxTerm`.
+
 **Client does not pay** (claim). The adjudicator confirms with an evidence hash. The reserve pays the
 worker `G`, and the worker owes nothing. The capacity that underwrote `G` is consumed in the order it
 was committed:
 
-1. the attesters' backing, pro rata (they lose that much trust);
+1. each attester's share, fixed at opening (its stake first, which returns that cash to the reserve,
+   then its dues);
 2. the issuer line (its budget stays spent);
-3. the worker's dues.
+3. the worker's dues, only up to what it pledged in the signed terms. Prior contributions absorb a claim
+   only with that explicit, informed agreement, and no new worker debt is ever created.
 
-The client is recorded as a nonpayer. Consuming capacity is not a debt: the worker keeps the `G`,
+The client and its group are recorded as nonpayers. Consuming capacity is not a debt: the worker keeps the `G`,
 and no cash is taken from them. It is what keeps the loss bound. Without it, the same capacity could
 be claimed against again and again.
 
@@ -114,10 +130,14 @@ raise by repetition cannot be allowed to create capacity.
 | --- | --- |
 | Ring of fake workers and clients claiming nonpayment | claims consume capacity that only stake, dues or an issuer can create; a ring with none gets nothing |
 | Farming dues with a fake client | buys capacity 1:1 for what it pays; claiming it back returns at most what it paid |
-| Unsolicited attestations filling a newcomer's attester slots | the member's consent is required, given by the member or by the issuer on a newcomer's behalf (found by Claude's own adversarial pass before review) |
+| Unsolicited attestations filling a newcomer's attester slots | the member's consent is required, by its own transaction or its own signature (a relay may submit it); no role can consent for a member |
+| Adjudicator or issuer opening a guarantee, or creating a contribution duty, the worker never accepted | a guarantee opens only on the worker's EIP-712 acceptance of its exact terms; forged, altered, replayed, revoked and expired signatures are refused |
+| A later attester unlocking an earlier attester's share | shares are fixed per guarantee at opening |
 | Attester backing its own sock puppet | loses its own backing; extraction ≤ its own trust |
 | Rotating an issuer line through many accounts | budget charged on the highest line held until released |
-| One client failing many workers at once | one open guarantee per client; attester cap on open attestees |
+| One client failing many workers at once | one open guarantee per client; one group cap across a parent's branches; a default blocks the whole group; attester cap on open attestees |
+| A client returning under a new id | caught only if the signed terms bind it to its group: client identity is checked off chain by whoever writes the terms (tested as a stated limit) |
+| A lost or stalled adjudicator | settle-by date in the signed terms; anyone may expire an unsettled guarantee after it |
 | Compromised adjudicator approving false claims | bounded by committed capacity and the reserve; the main trust assumption, stated; a two-of-n adjudicator is the next step |
 | Reserve run | exposure cap per guarantee, floor, outstanding ≤ reserve |
 
@@ -152,7 +172,7 @@ The agentic simulations on Base Sepolia run:
 - a client nonpayment, paid by the reserve with the loss falling on the backing;
 - a non-remitting worker;
 - a collusion ring trying to claim against a fake client;
-- a correlated wave of client defaults against the exposure rules.
+- five clients that are branches of one parent: the group cap, then the parent's default.
 
 Each run reports both scorecards and the receipts.
 
@@ -166,3 +186,23 @@ Each run reports both scorecards and the receipts.
 4. Is the adjudicator an acceptable trust assumption for a testnet, and what is the cheapest credible
    second check?
 5. What does this design get wrong that a ring of agents will find first?
+
+## 12. Codex's devil's-advocate review and revision 2
+
+Codex reviewed the design and the contract at `ef8dec8` (source `c150af0`) and required changes before any
+public-testnet deployment. Each finding and its fix:
+
+| Finding | Fix in revision 2 | Regression |
+| --- | --- | --- |
+| P0: the worker never opts in; the issuer can assert attestation consent | EIP-712 `Acceptance` signed by the worker binds client, group, amount, dues pledge, terms hash, contribution policy, settle-by, nonce and deadline; `setConsentFor` removed, consent by the member's transaction or `setConsentBySig` | `testAdjudicatorCannotOpenAGuaranteeTheWorkerDidNotSign`, `testNoRoleCanFabricateConsent`, `testWorkerCanWithdrawASignedAcceptanceAndSignaturesExpire`, `testTheContributionPolicyIsTheOneTheWorkerSigned` |
+| P0: scenario 5 was a multi-client wave, and client ids are aliasable | canonical group in the signed terms, a group exposure cap and a group-wide default block; scenario 5 now runs five branches of one parent; the remaining alias limit is stated | `testAliasesInOneGroupShareItsCapAndItsDefault`, `testAnAliasUnderAnotherGroupIsNotCaughtOnChain`, `invariant_groupExposure` |
+| P1: backing liability moved after opening | per-guarantee shares fixed at opening (`lockedBacking`, `sharesOf`) | `testLateAttesterCannotUnlockAnEarlierAttestersShare`, `testSharesAreProRataAndCoverOddAmounts`, `invariant_backingConserved` (locked shares equal committed backing) |
+| P1: no bounded settlement escape | signed settle-by date, at most `maxTerm`; `expireGuarantee` by anyone after it | `testSettleByIsBoundedAndPassedGuaranteesExpireWithoutAClaim` |
+| Disclosure: sponsor funds "never returned" yet releasable to anyone | release only to the funder, up to what it funded, never dues or cover | `testReleaseOnlyToTheFunderAndNeverDuesOrOpenExposure` |
+
+Codex's answers to section 11, adopted: worker dues absorb a claim only after explicit agreement (the
+signed pledge); a line **or** real attester stake is enough, since requiring both adds an unproved
+barrier; keep one hop; a single adjudicator only for synthetic testnet mechanics; and the first attack a
+ring finds is client-id aliasing with role-controlled consent and terms, which the signed acceptance,
+member-only consent and client groups now address as far as on-chain rules can.
+

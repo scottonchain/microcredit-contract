@@ -7,7 +7,9 @@ import { GuaranteeTrust } from "../contracts/GuaranteeTrust.sol";
 
 /**
  * @notice Agentic scenarios against a deployed GuaranteeTrust (testnet only, MockUSDC units, no value).
- * @dev The broadcaster is the deployer: owner, adjudicator, issuer and sponsor. Personas are keys derived from
+ * @dev The broadcaster is the deployer: owner, adjudicator, issuer and sponsor. Every guarantee opens on the
+ *      worker persona's own EIP-712 acceptance, and every consent is the member persona's own signature; the
+ *      broadcaster only relays them, as a gasless relay would. Personas are keys derived from
  *      SIM_MNEMONIC (private to the runner); the broadcaster tops each up with ETH for gas and mints MockUSDC to it.
  *      A client pays the wage off chain; the script stands for that payment by minting the wage to the worker, so
  *      each contribution is remitted out of the wage itself.
@@ -22,7 +24,8 @@ import { GuaranteeTrust } from "../contracts/GuaranteeTrust.sol";
  *      3 non-remitter: a paid worker does not remit and is refused the next guarantee; remitting clears it.
  *      4 collusion ring: fake workers, clients and attesters with nothing rooted get nothing; one real staker
  *        backing the ring is the most the ring can take.
- *      5 correlated client defaults: guarantees until the floor refuses; one client stops several workers.
+ *      5 one client group: five workers with five clients that share one parent; the group cap refuses what
+ *        would overload the parent, then the parent defaults and every open guarantee on it is claimed.
  *      6 community run: twelve jobs among four workers and two attesters who back the best-scored workers;
  *        clients default and workers remit by seeded draws. Prints the reserve's change, claims, wages and
  *        contributions; the benefit multiplier needs a counterfactual that a simulation cannot supply.
@@ -35,6 +38,7 @@ contract GuaranteeTrustScenarios is Script {
     string internal runTag;
     uint256 internal fundEth;
     address internal me;
+    uint256 internal sigCount;
 
     function run() external {
         gt = GuaranteeTrust(vm.envAddress("GT"));
@@ -51,7 +55,7 @@ contract GuaranteeTrustScenarios is Script {
         else if (scenario == 2) _nonpayment();
         else if (scenario == 3) _nonRemitter();
         else if (scenario == 4) _ring();
-        else if (scenario == 5) _correlated();
+        else if (scenario == 5) _clientGroup();
         else if (scenario == 6) _community();
         _report();
     }
@@ -117,18 +121,50 @@ contract GuaranteeTrustScenarios is Script {
     }
 
     /// @dev The contract's own opening rules, read before acting, so a refused guarantee is never a failed transaction.
-    function _canOpen(address w, bytes32 c, uint256 amount) internal view returns (bool) {
-        if (gt.paused() || gt.clientOpen(c) || gt.clientDefaulted(c)) return false;
+    function _canOpen(address w, bytes32 c, bytes32 group, uint256 amount) internal view returns (bool) {
+        bytes32 g = group == bytes32(0) ? c : group;
+        if (gt.paused() || gt.clientOpen(c) || gt.clientDefaulted(c) || gt.groupDefaulted(g)) return false;
         if (gt.memberOf(w).unpaidContributions != 0) return false;
         uint256 r = gt.reserve();
         if (amount * gt.BPS() > r * gt.maxShareBps()) return false;
+        if ((gt.groupExposure(g) + amount) * gt.BPS() > r * gt.maxGroupShareBps()) return false;
         if (gt.outstanding() + amount + gt.floorMultiple() * amount > r) return false;
         return gt.capacity(w) >= amount;
     }
 
-    function _consent(address member, address attester) internal {
+    function _nonce() internal returns (uint256) {
+        return uint256(keccak256(abi.encode(runTag, "nonce", ++sigCount)));
+    }
+
+    /// @dev Persona i signs its consent to `attester`; the broadcaster relays it.
+    function _consent(uint32 i, address attester) internal {
+        address member = _who(i);
+        uint256 n = _nonce();
+        uint256 deadline = block.timestamp + 1 days;
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_pk(i), gt.consentDigest(member, attester, true, n, deadline));
         _asMe();
-        gt.setConsentFor(member, attester, true);
+        gt.setConsentBySig(member, attester, true, n, deadline, abi.encodePacked(r, s, v));
+        _end();
+    }
+
+    /// @dev Persona i signs its acceptance of exactly these terms; the broadcaster, as adjudicator, submits it.
+    function _openG(uint32 i, bytes32 client, bytes32 group, uint256 amount, bytes32 terms) internal returns (uint256 id) {
+        GuaranteeTrust.Acceptance memory a = GuaranteeTrust.Acceptance({
+            worker: _who(i),
+            clientId: client,
+            groupId: group,
+            amount: amount,
+            maxFromDues: amount,
+            termsHash: terms,
+            contributionBps: gt.contributionBps(),
+            contributionCap: gt.contributionCap(),
+            settleBy: uint64(block.timestamp + 30 days),
+            nonce: _nonce(),
+            deadline: block.timestamp + 1 days
+        });
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_pk(i), gt.acceptanceDigest(a));
+        _asMe();
+        id = gt.openGuarantee(a, abi.encodePacked(r, s, v));
         _end();
     }
 
@@ -151,7 +187,7 @@ contract GuaranteeTrustScenarios is Script {
         _as(10);
         gt.stake(10 * U);
         _end();
-        _consent(nia, avery);
+        _consent(11, avery);
         _as(10);
         gt.attest(nia, 5 * U);
         _end();
@@ -160,8 +196,8 @@ contract GuaranteeTrustScenarios is Script {
         _end();
         console.log("S1 capacity before", gt.capacity(nia));
         for (uint256 j; j < 3; j++) {
+            uint256 id = _openG(11, _client(1, j), 0, 10 * U, keccak256("S1"));
             _asMe();
-            uint256 id = gt.openGuarantee(nia, _client(1, j), 10 * U, keccak256("S1"));
             gt.markPaid(id, 60 * U, keccak256(abi.encode("paid", j)));
             _end();
             _wage(nia, 60 * U);
@@ -180,14 +216,16 @@ contract GuaranteeTrustScenarios is Script {
         _as(20);
         gt.stake(10 * U);
         _end();
-        _consent(omar, brighton);
+        _consent(21, brighton);
         _as(20);
         gt.attest(omar, 10 * U);
         _end();
         _asMe();
         gt.setLine(omar, 5 * U);
+        _end();
         uint256 reserveBefore = gt.reserve();
-        uint256 id = gt.openGuarantee(omar, _client(2, 0), 15 * U, keccak256("S2"));
+        uint256 id = _openG(21, _client(2, 0), 0, 15 * U, keccak256("S2"));
+        _asMe();
         gt.claim(id, keccak256("S2 client did not pay"));
         _end();
         console.log("S2 Omar received", usdc.balanceOf(omar));
@@ -202,18 +240,21 @@ contract GuaranteeTrustScenarios is Script {
         address priya = _ready(30, 0);
         _asMe();
         gt.setLine(priya, 5 * U);
-        uint256 id = gt.openGuarantee(priya, _client(3, 0), 5 * U, keccak256("S3"));
+        _end();
+        uint256 id = _openG(30, _client(3, 0), 0, 5 * U, keccak256("S3"));
+        _asMe();
         gt.markPaid(id, 40 * U, keccak256("S3 paid"));
         _end();
         _wage(priya, 40 * U);
-        if (_canOpen(priya, _client(3, 1), 5 * U)) console.log("S3 UNEXPECTED: next guarantee allowed while unpaid");
-        else console.log("S3 next guarantee refused while the contribution is unpaid");
+        if (_canOpen(priya, _client(3, 1), 0, 5 * U)) {
+            console.log("S3 UNEXPECTED: next guarantee allowed while unpaid");
+        } else {
+            console.log("S3 next guarantee refused while the contribution is unpaid");
+        }
         _as(30);
         gt.remit(id);
         _end();
-        _asMe();
-        gt.openGuarantee(priya, _client(3, 2), 5 * U, keccak256("S3c"));
-        _end();
+        _openG(30, _client(3, 2), 0, 5 * U, keccak256("S3c"));
         console.log("S3 after remitting, the next guarantee opened; Priya dues", gt.memberOf(priya).dues);
     }
 
@@ -227,9 +268,9 @@ contract GuaranteeTrustScenarios is Script {
             gt.setConsent(a, true);
             _end();
             if (gt.freeToBack(a) >= 1 * U) console.log("S4 UNEXPECTED: a ring attester holds trust");
-            if (_canOpen(w, _client(4, k), 1 * U)) {
+            if (_canOpen(w, _client(4, k), 0, 1 * U)) {
+                uint256 id = _openG(40 + k, _client(4, k), 0, 1 * U, keccak256("S4"));
                 _asMe();
-                uint256 id = gt.openGuarantee(w, _client(4, k), 1 * U, keccak256("S4"));
                 gt.claim(id, keccak256("S4 fake default"));
                 _end();
                 taken += 1 * U;
@@ -241,15 +282,15 @@ contract GuaranteeTrustScenarios is Script {
         _as(46);
         gt.stake(3 * U);
         _end();
-        _consent(w0, rafe);
+        _consent(40, rafe);
         _as(46);
         gt.attest(w0, 3 * U);
         _end();
         uint256 took;
         for (uint256 j; j < 3; j++) {
-            if (_canOpen(w0, _client(4, 10 + j), 3 * U)) {
+            if (_canOpen(w0, _client(4, 10 + j), 0, 3 * U)) {
+                uint256 id = _openG(40, _client(4, 10 + j), 0, 3 * U, keccak256("S4b"));
                 _asMe();
-                uint256 id = gt.openGuarantee(w0, _client(4, 10 + j), 3 * U, keccak256("S4b"));
                 gt.claim(id, keccak256("S4 fake default"));
                 _end();
                 took += 3 * U;
@@ -259,43 +300,46 @@ contract GuaranteeTrustScenarios is Script {
         console.log("S4 Rafe stake after (was 3)", gt.memberOf(rafe).stake);
     }
 
-    /// @dev Personas 50 to 54 (newcomers), 55 (attester Sana).
-    function _correlated() internal {
+    /// @dev Personas 50 to 54 (newcomers), 55 (attester Sana). Five clients are branches of one parent (one group).
+    function _clientGroup() internal {
         address sana = _ready(55, 60 * U);
         _as(55);
         gt.stake(50 * U);
         _end();
+        bytes32 parent = keccak256(abi.encode(runTag, "S5 parent"));
         uint256 opened;
         uint256 refused;
         uint256[] memory ids = new uint256[](5);
-        bytes32 sharedClient = _client(5, 99);
         for (uint32 k; k < 5; k++) {
             address w = _ready(50 + k, 0);
-            _consent(w, sana);
+            _consent(50 + k, sana);
             _as(55);
             gt.attest(w, 10 * U);
             _end();
-            // the first guarantee uses the shared client; the others must use their own
-            bytes32 c = k == 0 ? sharedClient : _client(5, k);
-            if (_canOpen(w, c, 10 * U)) {
-                _asMe();
-                ids[opened] = gt.openGuarantee(w, c, 10 * U, keccak256("S5"));
-                _end();
+            bytes32 c = _client(5, k);
+            if (_canOpen(w, c, parent, 10 * U)) {
+                ids[opened] = _openG(50 + k, c, parent, 10 * U, keccak256("S5"));
                 opened += 1;
             } else {
                 refused += 1;
             }
         }
-        if (_canOpen(_who(51), sharedClient, 1 * U)) console.log("S5 UNEXPECTED: a second guarantee on one client");
+        console.log("S5 parent's open exposure", gt.groupExposure(parent));
+        if (_canOpen(_who(54), _client(5, 0), 0, 1 * U)) console.log("S5 UNEXPECTED: a second guarantee on one client");
         else console.log("S5 one client could not carry a second open guarantee");
         _asMe();
         for (uint256 j; j < opened; j++) {
-            gt.claim(ids[j], keccak256("S5 wave of client defaults"));
+            gt.claim(ids[j], keccak256("S5 the parent did not pay"));
         }
         _end();
+        if (_canOpen(_who(54), _client(5, 9), parent, 1 * U)) {
+            console.log("S5 UNEXPECTED: a new branch of the defaulted parent was allowed");
+        } else {
+            console.log("S5 a new branch of the defaulted parent was refused");
+        }
         console.log("S5 opened", opened);
-        console.log("S5 refused by the exposure rules", refused);
-        console.log("S5 Sana stake after the wave (was 50)", gt.memberOf(sana).stake);
+        console.log("S5 refused by the group cap", refused);
+        console.log("S5 Sana stake after the parent defaulted (was 50)", gt.memberOf(sana).stake);
     }
 
     /// @dev Personas 60 to 63 (workers), 64 and 65 (attesters). Twelve jobs; p = 25%, q = 75% by seeded draws.
@@ -313,7 +357,7 @@ contract GuaranteeTrustScenarios is Script {
             gt.stake(20 * U);
             _end();
             for (uint32 k; k < 4; k++) {
-                _consent(w[k], att);
+                _consent(60 + k, att);
             }
         }
         uint256 wages;
@@ -354,12 +398,12 @@ contract GuaranteeTrustScenarios is Script {
                     pending[k] = false;
                 }
             }
-            if (!_canOpen(w[k], _client(6, j), 5 * U)) {
+            if (!_canOpen(w[k], _client(6, j), 0, 5 * U)) {
                 refused += 1;
                 continue;
             }
+            uint256 id = _openG(uint32(60 + k), _client(6, j), 0, 5 * U, keccak256("S6"));
             _asMe();
-            uint256 id = gt.openGuarantee(w[k], _client(6, j), 5 * U, keccak256("S6"));
             if (_draw(6, j, "default") < 25) {
                 gt.claim(id, keccak256("S6 client did not pay"));
                 claims += 1;
