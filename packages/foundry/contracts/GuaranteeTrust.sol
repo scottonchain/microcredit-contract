@@ -277,6 +277,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     error ReleaseWhileOpen();
     error NotParty();
     error NoResolution();
+    error NoReason();
 
     modifier onlyAdjudicator() {
         if (msg.sender != adjudicator) revert NotAdjudicator();
@@ -652,8 +653,8 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         emit GuaranteeCancelled(id, resolutionHash);
     }
 
-    /// @notice The worker or the adjudicator records a dispute, once, by the settle-by date, with an opaque hash of its
-    ///         reason (no private data on chain). A disputed guarantee stays settleable until the hold-until date the
+    /// @notice The worker or the adjudicator records a dispute, once, by the settle-by date, with a required nonzero
+    ///         opaque hash of its reason (no private data on chain). A disputed guarantee stays settleable until the hold-until date the
     ///         worker signed (at most the longest term from opening), so a dispute still open at settle-by is not lost
     ///         to expiry. Only a settlement carrying a resolution evidence hash closes it, or expiry at hold-until. The
     ///         adjudicator is trusted to resolve it: there is no appeal on chain, and nothing extends the hold.
@@ -662,7 +663,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         if (msg.sender != g.worker && msg.sender != adjudicator) revert NotParty();
         if (g.state != State.Open || g.disputed) revert WrongState();
         if (block.timestamp > g.settleBy) revert PastSettleBy();
-        if (reasonHash == bytes32(0)) revert NoResolution();
+        if (reasonHash == bytes32(0)) revert NoReason();
         g.disputed = true;
         emit DisputeOpened(id, msg.sender, g.holdUntil, reasonHash);
     }

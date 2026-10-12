@@ -486,10 +486,10 @@ contract GuaranteeTrustTest is Test {
         gt.setLine(nia, 20 * U);
         uint256 id = _openHeld(nia, "c", 10 * U, 20 days);
         vm.prank(nia);
-        vm.expectRevert(GuaranteeTrust.NoResolution.selector);
+        vm.expectRevert(GuaranteeTrust.NoReason.selector);
         gt.openDispute(id, bytes32(0));
         vm.prank(adj);
-        vm.expectRevert(GuaranteeTrust.NoResolution.selector);
+        vm.expectRevert(GuaranteeTrust.NoReason.selector);
         gt.openDispute(id, bytes32(0));
         vm.prank(nia);
         gt.openDispute(id, keccak256("client refuses to pay"));

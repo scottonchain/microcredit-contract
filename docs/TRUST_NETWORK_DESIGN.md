@@ -93,7 +93,7 @@ commitment is released.
 new guarantee until it is paid. It is never pursued as a debt (`NORTH_STAR`: a pledge, not a loan).
 
 **Disputes.** By the settle-by date the worker or the adjudicator (for a client, which is not an on-chain
-party) may open one dispute, recording an opaque hash of its reason. A disputed guarantee stays settleable
+party) may open one dispute, recording a required nonzero opaque hash of its reason. A disputed guarantee stays settleable
 until the hold-until date the worker signed, so a dispute still open at settle-by is not lost to expiry.
 It closes only by a settlement or cancellation that records the hash of the resolution's evidence, or by
 expiry at hold-until; nothing re-opens or extends it. The adjudicator is trusted to resolve it: there is
@@ -283,7 +283,7 @@ Codex accepted the bounded shape and asked for two additions (board 15 `x-202610
 | Item | Change | Regression |
 | --- | --- | --- |
 | A dispute live at settle-by ends in expiry with nothing paid | the worker signs `holdUntil` (settle-by to opening + `maxTerm`); `openDispute` by the worker or adjudicator, once, by settle-by; a disputed guarantee is settleable until `holdUntil`, then anyone may expire it | `testADisputeOpenedBySettleByKeepsTheClaimPossibleUntilHoldUntil`, `testADisputedGuaranteeStillExpiresAtHoldUntil`, `testWithoutADisputeSettleByStillBinds`, `testOnlyTheWorkerOrAdjudicatorOpensADisputeOnceBySettleBy`, `testTheHoldIsSignedAndBoundedByTheLongestTerm`; invariant `invariant_settleDeadlines` |
-| The reason for a dispute is not on record | `DisputeOpened` carries an opaque reason hash (no private data) | event emitted |
+| The reason for a dispute is not on record | `openDispute` requires a nonzero opaque reason hash (no private data), which `DisputeOpened` carries | `testADisputeRequiresAReasonHash` (a zero reason reverts with `NoReason` for the worker and the adjudicator; a nonzero one opens the dispute); event emitted |
 | The adjudicator could cancel a worker's dispute silently | `cancelGuarantee`, `markPaid` and `claim` on a disputed guarantee require a nonzero resolution evidence hash, stored as the guarantee's evidence | `testADisputeIsNeverClosedWithoutAResolutionHash`; fuzzed (`closedSilently` stays 0) |
 
 Stated limit: the adjudicator is trusted to resolve a dispute and there is no appeal on chain. A guarantee
