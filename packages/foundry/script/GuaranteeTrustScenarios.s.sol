@@ -216,6 +216,7 @@ contract GuaranteeTrustScenarios is Script {
             contributionCap: gt.contributionCap(),
             remitWindow: gt.remitWindow(),
             settleBy: uint64(block.timestamp + 30 days),
+            holdUntil: uint64(block.timestamp + 30 days),
             nonce: _nonce(),
             deadline: block.timestamp + 1 days
         });
