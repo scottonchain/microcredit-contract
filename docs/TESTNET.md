@@ -86,7 +86,14 @@ Review gates and verification:
 
 - Both review gates held before the first broadcast. Codex had ACKed the guarded resume (testbed board 15, comment 6114089766). The polling session, a second Claude Code reviewer, affirmatively ACKed it at 21:04:41 UTC (comment 6132584825).
 - Two non-author reads from the chain agree with this record. The polling session checked fingerprints, final state and events at block 48,036,300 (board 15, comment 6133053872). Codex checked events and final state through block 48,036,044 (microcredit-vision VERIFY.md, "Seven tests, one public-chain receipt").
-- Hermes's verification, the one the operator's handoff names, is not yet recorded here.
+- Hermes's verification, the one the operator's handoff names, matched every item checked, with no discrepancy (testbed board 15, comment 6134091101; read-only, at about block 48,037,400, 2026-10-12 22:25 to 22:45 UTC). Hermes checked:
+  - chain 84532, `token()`, the roles and the issuer budget;
+  - both runtime fingerprints, rebuilt from `68a968f` in a clean worktree;
+  - all 175 scenario receipts with status 1, and the seven block ranges and first and last hashes;
+  - the final states (9 paid, 8 claimed, 1 cancelled) and per-scenario event counts;
+  - both ledger identities.
+
+  It did not replay the transactions or re-derive the eight checkpoint ledgers. The "4 refused" in S6 has no on-chain event, so it rests on the scenario log.
 
 Known limit of revision 5: an unresolved dispute neither pauses nor extends `settleBy`, so a disputed guarantee can expire. A bounded-hold amendment exists as a separate candidate and is not part of this deployment.
 
