@@ -662,6 +662,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         if (msg.sender != g.worker && msg.sender != adjudicator) revert NotParty();
         if (g.state != State.Open || g.disputed) revert WrongState();
         if (block.timestamp > g.settleBy) revert PastSettleBy();
+        if (reasonHash == bytes32(0)) revert NoResolution();
         g.disputed = true;
         emit DisputeOpened(id, msg.sender, g.holdUntil, reasonHash);
     }

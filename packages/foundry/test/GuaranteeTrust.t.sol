@@ -481,6 +481,21 @@ contract GuaranteeTrustTest is Test {
         gt.openDispute(id, keccak256("reason"));
     }
 
+    function testADisputeRequiresAReasonHash() public {
+        vm.prank(issuer);
+        gt.setLine(nia, 20 * U);
+        uint256 id = _openHeld(nia, "c", 10 * U, 20 days);
+        vm.prank(nia);
+        vm.expectRevert(GuaranteeTrust.NoResolution.selector);
+        gt.openDispute(id, bytes32(0));
+        vm.prank(adj);
+        vm.expectRevert(GuaranteeTrust.NoResolution.selector);
+        gt.openDispute(id, bytes32(0));
+        vm.prank(nia);
+        gt.openDispute(id, keccak256("client refuses to pay"));
+        assertTrue(gt.guarantee(id).disputed, "nonzero reason opens the dispute");
+    }
+
     function testTheHoldIsSignedAndBoundedByTheLongestTerm() public {
         vm.prank(issuer);
         gt.setLine(nia, 20 * U);
