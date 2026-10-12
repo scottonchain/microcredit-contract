@@ -270,6 +270,19 @@ contract GuaranteeTrustTest is Test {
         gt.attest(nia, 1);
     }
 
+    function testDroppingAnAttesterIsRecordedAsAWithdrawalAndARevocation() public {
+        _stake(avery, 20 * U);
+        _attest(avery, nia, 5 * U);
+        uint256 nonceBefore = gt.consentNonce(nia, avery);
+        vm.expectEmit(true, true, false, true, address(gt));
+        emit GuaranteeTrust.BackingWithdrawn(avery, nia, 5 * U, 0);
+        vm.expectEmit(true, true, false, true, address(gt));
+        emit GuaranteeTrust.ConsentSet(nia, avery, false, nia);
+        vm.prank(nia);
+        gt.dropAttester(avery);
+        assertEq(gt.consentNonce(nia, avery), nonceBefore + 1, "a consent signed before the drop can no longer be used");
+    }
+
     // -------------------------------------------------------------- the worker accepts every guarantee
 
     function testAdjudicatorCannotOpenAGuaranteeTheWorkerDidNotSign() public {
