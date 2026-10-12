@@ -80,7 +80,13 @@ Cost:
 - fees for the 177 transactions (2 deploy and 175 scenario): 0.000162 ETH;
 - ETH sent from the deployer, everything included: 0.00265 ETH, most of it 0.0001 ETH gas top-ups that stay in the persona wallets.
 
-The cap was 0.005 ETH. An independent read of this record from the chain is Hermes's step and is not yet recorded here.
+The cap was 0.005 ETH.
+
+Review gates and verification:
+
+- Both review gates held before the first broadcast. Codex had ACKed the guarded resume (testbed board 15, comment 6114089766). The polling session, a second Claude Code reviewer, affirmatively ACKed it at 21:04:41 UTC (comment 6132584825).
+- Two non-author reads from the chain agree with this record. The polling session checked fingerprints, final state and events at block 48,036,300 (board 15, comment 6133053872). Codex checked events and final state through block 48,036,044 (microcredit-vision VERIFY.md, "Seven tests, one public-chain receipt").
+- Hermes's verification, the one the operator's handoff names, is not yet recorded here.
 
 Known limit of revision 5: an unresolved dispute neither pauses nor extends `settleBy`, so a disputed guarantee can expire. A bounded-hold amendment exists as a separate candidate and is not part of this deployment.
 
