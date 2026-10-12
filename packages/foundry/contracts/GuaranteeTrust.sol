@@ -226,8 +226,8 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         uint64 settleBy
     );
     event ShareLocked(uint256 indexed id, address indexed attester, uint256 amount);
-    event GuaranteeCancelled(uint256 indexed id);
-    event DisputeOpened(uint256 indexed id, address by, uint64 holdUntil);
+    event GuaranteeCancelled(uint256 indexed id, bytes32 resolutionHash);
+    event DisputeOpened(uint256 indexed id, address by, uint64 holdUntil, bytes32 reasonHash);
     event GuaranteeExpired(uint256 indexed id, address by);
     event GuaranteePaid(uint256 indexed id, uint256 wage, uint256 contributionDue);
     event ContributionRemitted(uint256 indexed id, address indexed payer, address indexed worker, uint256 amount);
@@ -276,6 +276,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     error SponsorCapital();
     error ReleaseWhileOpen();
     error NotParty();
+    error NoResolution();
 
     modifier onlyAdjudicator() {
         if (msg.sender != adjudicator) revert NotAdjudicator();
@@ -639,26 +640,30 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         emit GuaranteeOpened(id, a.worker, a.clientId, group, amount, fromBacking, fromLine, fromDues, a.termsHash, a.settleBy);
     }
 
-    /// @notice The job did not go ahead: release everything, record nothing against anyone.
-    function cancelGuarantee(uint256 id) external onlyAdjudicator {
+    /// @notice The job did not go ahead: release everything, record nothing against anyone. A disputed guarantee is
+    ///         cancelled only with the hash of the resolution's evidence, so a dispute is never erased silently.
+    function cancelGuarantee(uint256 id, bytes32 resolutionHash) external onlyAdjudicator {
         Guarantee storage g = guarantees[id];
         if (g.state != State.Open) revert WrongState();
+        if (g.disputed && resolutionHash == bytes32(0)) revert NoResolution();
         g.state = State.Cancelled;
+        g.evidenceHash = resolutionHash;
         _release(id, g);
-        emit GuaranteeCancelled(id);
+        emit GuaranteeCancelled(id, resolutionHash);
     }
 
-    /// @notice The worker or the adjudicator records a dispute, once, by the settle-by date. A disputed guarantee stays
-    ///         settleable until the hold-until date the worker signed (at most the longest term from opening), so a
-    ///         dispute still open at settle-by is not lost to expiry. Settling it closes the dispute; there is no appeal
-    ///         on chain, and nothing extends the hold.
-    function openDispute(uint256 id) external {
+    /// @notice The worker or the adjudicator records a dispute, once, by the settle-by date, with an opaque hash of its
+    ///         reason (no private data on chain). A disputed guarantee stays settleable until the hold-until date the
+    ///         worker signed (at most the longest term from opening), so a dispute still open at settle-by is not lost
+    ///         to expiry. Only a settlement carrying a resolution evidence hash closes it, or expiry at hold-until. The
+    ///         adjudicator is trusted to resolve it: there is no appeal on chain, and nothing extends the hold.
+    function openDispute(uint256 id, bytes32 reasonHash) external {
         Guarantee storage g = guarantees[id];
         if (msg.sender != g.worker && msg.sender != adjudicator) revert NotParty();
         if (g.state != State.Open || g.disputed) revert WrongState();
         if (block.timestamp > g.settleBy) revert PastSettleBy();
         g.disputed = true;
-        emit DisputeOpened(id, msg.sender, g.holdUntil);
+        emit DisputeOpened(id, msg.sender, g.holdUntil, reasonHash);
     }
 
     function _settleDeadline(Guarantee storage g) internal view returns (uint64) {
@@ -682,6 +687,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         Guarantee storage g = guarantees[id];
         if (g.state != State.Open) revert WrongState();
         if (block.timestamp > _settleDeadline(g)) revert PastSettleBy();
+        if (g.disputed && evidenceHash == bytes32(0)) revert NoResolution();
         g.state = State.Paid;
         g.wage = uint128(wage);
         g.paidAt = uint64(block.timestamp);
@@ -732,6 +738,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         Guarantee storage g = guarantees[id];
         if (g.state != State.Open) revert WrongState();
         if (block.timestamp > _settleDeadline(g)) revert PastSettleBy();
+        if (g.disputed && evidenceHash == bytes32(0)) revert NoResolution();
         g.state = State.Claimed;
         g.evidenceHash = evidenceHash;
         address worker = g.worker;

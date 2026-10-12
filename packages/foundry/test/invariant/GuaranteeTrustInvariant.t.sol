@@ -122,18 +122,24 @@ contract GuaranteeTrustHandler is Test {
         uint256 id = idSeed % n;
         wage = bound(wage, 0, 100 * U);
         bool late = block.timestamp > _deadline(id);
+        bool silent = gt.guarantee(id).disputed && how % 2 == 0;
+        bytes32 ev = how % 2 == 0 ? bytes32(0) : keccak256(abi.encode(id));
         vm.startPrank(adj);
         if (how % 3 == 0) {
-            try gt.markPaid(id, wage, bytes32(0)) {
+            try gt.markPaid(id, wage, ev) {
                 if (late) settledLate += 1;
+                if (silent) closedSilently += 1;
             } catch { }
         } else if (how % 3 == 1) {
-            try gt.claim(id, bytes32(0)) {
+            try gt.claim(id, ev) {
                 claimsPaid += 1;
                 if (late) settledLate += 1;
+                if (silent) closedSilently += 1;
             } catch { }
         } else {
-            try gt.cancelGuarantee(id) { } catch { }
+            try gt.cancelGuarantee(id, ev) {
+                if (silent) closedSilently += 1;
+            } catch { }
         }
         vm.stopPrank();
     }
@@ -184,6 +190,7 @@ contract GuaranteeTrustHandler is Test {
     uint256 public settledLate;
     uint256 public expiredEarly;
     uint256 public disputes;
+    uint256 public closedSilently;
 
     function _deadline(uint256 id) internal view returns (uint256) {
         GuaranteeTrust.Guarantee memory g = gt.guarantee(id);
@@ -196,7 +203,7 @@ contract GuaranteeTrustHandler is Test {
         vm.warp(block.timestamp + bound(dt, 0, 35 days));
         uint256 id = idSeed % n;
         vm.prank(byWorker ? gt.guarantee(id).worker : adj);
-        try gt.openDispute(id) {
+        try gt.openDispute(id, keccak256(abi.encode(id, "reason"))) {
             disputes += 1;
         } catch { }
     }
@@ -279,6 +286,7 @@ contract GuaranteeTrustInvariantTest is Test {
     function invariant_settleDeadlines() public view {
         assertEq(h.settledLate(), 0, "settled after the deadline");
         assertEq(h.expiredEarly(), 0, "expired before the deadline");
+        assertEq(h.closedSilently(), 0, "a dispute closed without a resolution hash");
     }
 
     function invariant_reserveIdentity() public view {

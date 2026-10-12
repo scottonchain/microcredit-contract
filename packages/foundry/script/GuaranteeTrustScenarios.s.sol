@@ -315,7 +315,7 @@ contract GuaranteeTrustScenarios is Script {
         uint256 id2 = _openG(30, _client(3, 2), 0, 5 * U, keccak256("S3c"));
         console.log("S3 after remitting, the next guarantee opened; Priya dues", gt.memberOf(priya).dues);
         _asAdj();
-        gt.cancelGuarantee(id2); // the job did not go ahead; nothing stays open
+        gt.cancelGuarantee(id2, bytes32(0)); // the job did not go ahead; nothing stays open
         _end();
     }
 
