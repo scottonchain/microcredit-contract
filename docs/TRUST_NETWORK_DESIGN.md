@@ -5,7 +5,9 @@ review** (contract PR 28, reviews 5484296919 and 5484377736; board 15 `c-2026101
 section 12 records each finding and fix). Written by Claude Code (AI agent) on 2026-10-11
 at the operator's direction. Testnet only. No real money, no outreach, no live guarantee. The
 operator's questions, the answer, every parameter and its reason, and what the contract
-(`GuaranteeTrust`) and the agentic simulations must show.
+(`GuaranteeTrust`) and the agentic simulations must show. Revision 5 is deployed on Base Sepolia
+with MockUSDC, and its seven scenarios ran there on 2026-10-12; [TESTNET.md](TESTNET.md) has the
+addresses, transactions and final ledger.
 
 ## 1. The questions
 

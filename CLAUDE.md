@@ -66,7 +66,8 @@ in their docs; skipped suites are not successful fork runs.
   the revolving first-job guarantee (stake, dues and a budgeted issuer line; one-hop consented
   attestation; history is a score, never capacity), implemented by `GuaranteeTrust` with its
   tests, `script/DeployGuaranteeTrust.s.sol` and the seven testnet scenarios in
-  `script/GuaranteeTrustScenarios.s.sol`. Testnet only, MockUSDC, no live guarantee.
+  `script/GuaranteeTrustScenarios.s.sol`. Testnet only, MockUSDC, no live guarantee. Revision 5
+  (`68a968f`) is deployed on Base Sepolia with all seven scenarios run; TESTNET.md has the receipts.
 
 The main branch, candidate source, local test results and live bytecode are distinct.
 Read each record's exact revision; do not replace old receipt hashes after a refactor.

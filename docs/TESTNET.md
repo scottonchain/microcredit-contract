@@ -2,7 +2,7 @@
 
 A deployment for persona testing by agents and people. It is a testnet: nothing here has value, and this is not the production deployment (`DEPLOYMENT.md`).
 
-The **live deployment** is the canonical-USDC pool in the first section below: its token is Circle's Base Sepolia test USDC (obtained from Circle's faucet, never minted by this project), it runs `1812e7d`, and it is run by Hermes, which holds every role. Everything after that section is history: the **mock-token deployment** (a free-mint `MockUSDC`) with its scenario record, a **duplicate run** by Hermes and the **reference run**, which came first. Those three share the same contract code: `9ab3729` and `main` `19b166e` differ only outside `packages/foundry/contracts`. The live pool's contract differs from `19b166e` in `DecentralizedMicrocredit.sol` (7 insertions and 4 deletions by `git diff --stat 19b166e 1812e7d`).
+The **live deployment** is the canonical-USDC pool in the first section below: its token is Circle's Base Sepolia test USDC (obtained from Circle's faucet, never minted by this project), it runs `1812e7d`, and it is run by Hermes, which holds every role. Everything after that section is history: the **mock-token deployment** (a free-mint `MockUSDC`) with its scenario record, a **duplicate run** by Hermes and the **reference run**, which came first. Those three share the same contract code: `9ab3729` and `main` `19b166e` differ only outside `packages/foundry/contracts`. The live pool's contract differs from `19b166e` in `DecentralizedMicrocredit.sol` (7 insertions and 4 deletions by `git diff --stat 19b166e 1812e7d`). Separately, the second section records `GuaranteeTrust` revision 5, the first-job guarantee contract, on its own MockUSDC with its seven scenarios; it is not a pool and the app does not point at it.
 
 Commit ids: the repository's history was rewritten on 2026-10-04 to remove private identifiers from commit messages (file contents unchanged), so the broadcast logs record the pre-rewrite ids `73cb3f6` (now `9ab3729`) and `489f01a` (now `19b166e`).
 
@@ -26,6 +26,63 @@ Funding: 20 USDC deposited from Hermes's account by `approve` (`0xa07b55523e7977
 Credit: one line of 92 USDC to the Avery persona `0xc5E42B0fB0c109E55f4A40CccfCF3fed1Fc39009` (`publishScores` `0xf3e2abfc88b08545128431b86bcf98bd22b916b035ba6ef1ac32447cc7f14948`, block 47776850), so that a fresh wallet can be backed in the acceptance run; one of the 50 lines is held, no other line exists.
 
 Test USDC for visitors comes from Circle's faucet (https://faucet.circle.com, Base Sepolia); its amounts and quotas are not verified by this project, and Hermes's API access to it returned 403 on 2026-10-06. `docs/TESTNET_WALKTHROUGH.md` is the visitor's guide.
+
+## GuaranteeTrust revision 5 (MockUSDC, 2026-10-11 to 2026-10-12, operated by Claude)
+
+A separate contract, not the lending pool: `GuaranteeTrust` ([TRUST_NETWORK_DESIGN.md](TRUST_NETWORK_DESIGN.md)) at revision 5, commit `68a968fbb3bb9aef7285dc2d2e1ceb3068e4789b`, on its own freshly deployed free-mint `MockUSDC`. Every account in it is a synthetic persona derived for the run. No person is enrolled, no real guarantee exists, and neither Circle's test USDC nor the canonical-USDC pool above is touched.
+
+| Contract | Address | Deploy transaction (block) |
+| --- | --- | --- |
+| `GuaranteeTrust` | `0x0B1dd81598989B199B802510499c22caAd60dd4C` | `0x1a180d1aa3a78c5007764fbccc7798efda49a202e23c3a9a6801ae4017c3f758` (47990535) |
+| `MockUSDC` (public `mint`) | `0x86fF3d60bE81B1531eCC5c756C519B97c382C047` | `0xdae3bc3d5110f72b72bb8f479b0b1343030f7d87515a061d91058a2b553778d7` (47990534) |
+
+Deployed 2026-10-11 by `script/DeployGuaranteeTrust.s.sol` (no `TOKEN`, so it deploys the mock) from `0x2044afD8D1bCE833d19F075cb729635a07d78e0C`, which is owner and guardian. The adjudicator `0x632CFB8A5119E8C2C37E43c41f8722585C01b31f` and the issuer `0xa90F16f2aC8F59Cd4375418F6FD4064791dA8247` are separate keys, so the three roles are distinct; the issuer budget is 60 MockUSDC. Broadcast log: `packages/foundry/broadcast/DeployGuaranteeTrust.s.sol/84532/run-1791749356287.json`.
+
+Runtime binding: with constructor-set immutables zeroed and the CBOR metadata stripped, the deployed runtime hashes to the `68a968f` build's. `GuaranteeTrust` (19,629 bytes) gives `0xfdc8395426e4c84a483dba42899f9e42a56844bd10bc86b81c073baddec7241c`, and `MockUSDC` (3,237 bytes) gives `0xcc3cc948e85bcc9bf63163bfbcd04200ad703829859ab37c0c0cb022de51618d`. The scenario runner refuses to broadcast unless `_bind()` passes. That check requires `EXPECT_GT` and `EXPECT_TOKEN` to name these addresses, refuses Circle's test USDC, and compares each runtime with the build artifact under the same masking.
+
+The first attempt, on 2026-10-11 at 20:08 UTC, stopped before any scenario transaction. The public RPC served a deployer nonce from before the deployment to S0's simulation, and Forge refused to send ("Expected 22 got 23"); the ledger read back all zero. The run resumed on 2026-10-12 from 21:11 to 21:27 UTC against the same deployment, with two guards:
+
+- before each scenario, every sender's latest and pending nonce agree on three reads in a row, with no gap;
+- after each scenario, every receipt is re-read from the chain with status 1, and the ledger is checked exactly.
+
+The same sequence had passed on an anvil fork of the deployment just before.
+
+| Scenario | Transactions (blocks) | Read back | Broadcast log |
+| --- | --- | --- | --- |
+| S0 setup | 4 (48035599 to 48035602) | The sponsor funds the reserve with 100; the remit window is 1 day | `run-1791839491089.json` |
+| S1 honest worker | 23 (48035626 to 48035640) | Nia's capacity grows from 10 (5 backing plus a 5 line) to 19 after three paid jobs, by her 9 of dues only | `run-1791839567174.json` |
+| S2 client does not pay | 11 (48035671 to 48035682) | Omar is paid 15 by the claim. Brighton's 10 stake is consumed first, then the issuer's 5; the reserve goes from 109 to 104 | `run-1791839652758.json` |
+| S3 unpaid contribution | 9 (48035717 to 48035722) | Priya's next guarantee is refused until she remits, and opens after she does; her dues are 2. The job does not go ahead, so the guarantee is cancelled | `run-1791839732100.json` |
+| S4 ring | 24 (48035769 to 48035790) | Six fresh wallets with nothing rooted take 0. With one real staker's 3 behind them they take 3, and Rafe loses exactly that 3 | `run-1791839867045.json` |
+| S5 client group | 30 (48035847 to 48035866) | Five branches of one parent: 3 open (exposure 30) and 2 are refused by the group cap, and one client cannot carry a second guarantee. After the parent defaults, a new branch is refused; Sana's stake goes from 50 to 20 | `run-1791840018719.json` |
+| S6 community | 74 (48035959 to 48036009) | Twelve jobs by seeded draws: 4 refused (no capacity, unpaid contribution or exposure), 200 of wages recorded for paid jobs, 3 claims of 15 in all, 5 contributions remitted; the reserve is 106 at the start and the end | `run-1791840305552.json` |
+
+Broadcast logs are in `packages/foundry/broadcast/GuaranteeTrustScenarios.s.sol/84532/`; each records commit `68a968f`. Amounts are MockUSDC (6 decimals), and wages are mints that stand for a client's off-chain payment.
+
+Final state, read from the chain after S6:
+
+- reserve 106 = sponsor capital 85 + members' dues 21;
+- total stake 65; the token balance of 171 equals reserve plus stake;
+- outstanding 0; the issuer holds 20 and has spent 15 of its 60 budget;
+- 18 guarantees: 9 paid, 8 claimed, 1 cancelled;
+- 25 members; one funder holds all 100 sponsor shares.
+
+At each of the eight checkpoints (before S0 and after each scenario), the checks also held:
+
+- outstanding ≤ reserve;
+- issuer held plus spent ≤ budget, and held ≤ sponsor capital;
+- backing given equals backing received, and each member's attesters' backing and locked shares equal its received and committed backing;
+- open guarantees and group exposures each sum to outstanding;
+- funders' shares sum to the total.
+
+Cost:
+
+- fees for the 177 transactions (2 deploy and 175 scenario): 0.000162 ETH;
+- ETH sent from the deployer, everything included: 0.00265 ETH, most of it 0.0001 ETH gas top-ups that stay in the persona wallets.
+
+The cap was 0.005 ETH. An independent read of this record from the chain is Hermes's step and is not yet recorded here.
+
+Known limit of revision 5: an unresolved dispute neither pauses nor extends `settleBy`, so a disputed guarantee can expire. A bounded-hold amendment exists as a separate candidate and is not part of this deployment.
 
 ## Mock-token deployment (history: 2026-10-03 to 2026-10-06, operated by Hermes)
 
