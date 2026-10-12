@@ -232,7 +232,9 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     event GuaranteePaid(uint256 indexed id, uint256 wage, uint256 contributionDue);
     event ContributionRemitted(uint256 indexed id, address indexed payer, address indexed worker, uint256 amount);
     event ContributionLapsed(uint256 indexed id, address indexed worker);
-    event Claimed(uint256 indexed id, address indexed worker, bytes32 indexed clientId, uint256 amount, bytes32 evidenceHash);
+    event Claimed(
+        uint256 indexed id, address indexed worker, bytes32 indexed clientId, uint256 amount, bytes32 evidenceHash
+    );
     event BackingConsumed(
         uint256 indexed id, address indexed attester, address indexed member, uint256 amount, uint256 stakeSlashed
     );
@@ -317,7 +319,10 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         if (guardian == old) guardian = newOwner;
     }
 
-    function setRoles(address guardian_, address adjudicator_, address issuer_, uint256 issuerBudget_) external onlyOwner {
+    function setRoles(address guardian_, address adjudicator_, address issuer_, uint256 issuerBudget_)
+        external
+        onlyOwner
+    {
         if (issuerBudget_ < issuerHeld + issuerSpent) revert BudgetExceeded();
         guardian = guardian_;
         adjudicator = adjudicator_;
@@ -442,7 +447,9 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     function unstake(uint256 amount) external {
         Member storage m = members[msg.sender];
         if (amount == 0) revert ZeroAmount();
-        if (amount > m.stake || m.stake - amount + (m.dues - m.committedDues) < m.backingGiven) revert InsufficientTrust();
+        if (amount > m.stake || m.stake - amount + (m.dues - m.committedDues) < m.backingGiven) {
+            revert InsufficientTrust();
+        }
         m.stake -= amount;
         totalStake -= amount;
         token.safeTransfer(msg.sender, amount);
@@ -569,15 +576,24 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
 
     /// @notice Opens a guarantee on the worker's signed acceptance of its exact terms. The adjudicator submits it;
     ///         neither the adjudicator nor anyone else can open one the worker did not sign.
-    function openGuarantee(Acceptance calldata a, bytes calldata signature) external onlyAdjudicator returns (uint256 id) {
+    function openGuarantee(Acceptance calldata a, bytes calldata signature)
+        external
+        onlyAdjudicator
+        returns (uint256 id)
+    {
         if (paused) revert IsPaused();
         if (a.amount == 0) revert ZeroAmount();
         if (a.clientId == bytes32(0)) revert ZeroClient(); // zero is clientGroup's "unset"
         if (block.timestamp > a.deadline) revert SignatureExpired();
-        if (a.settleBy < block.timestamp + MIN_TERM || a.holdUntil < a.settleBy || a.holdUntil > block.timestamp + maxTerm) {
+        if (
+            a.settleBy < block.timestamp + MIN_TERM || a.holdUntil < a.settleBy
+                || a.holdUntil > block.timestamp + maxTerm
+        ) {
             revert BadTerm();
         }
-        if (a.contributionBps != contributionBps || a.contributionCap != contributionCap || a.remitWindow != remitWindow) {
+        if (
+            a.contributionBps != contributionBps || a.contributionCap != contributionCap || a.remitWindow != remitWindow
+        ) {
             revert PolicyMismatch();
         }
         _useNonce(a.worker, a.nonce);
@@ -638,7 +654,9 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
                 evidenceHash: bytes32(0)
             })
         );
-        emit GuaranteeOpened(id, a.worker, a.clientId, group, amount, fromBacking, fromLine, fromDues, a.termsHash, a.settleBy);
+        emit GuaranteeOpened(
+            id, a.worker, a.clientId, group, amount, fromBacking, fromLine, fromDues, a.termsHash, a.settleBy
+        );
     }
 
     /// @notice The job did not go ahead: release everything, record nothing against anyone. A disputed guarantee is

@@ -592,12 +592,16 @@ contract GuaranteeTrustTest is Test {
         uint256 id0 = _openWith(_terms(n[0], keccak256("parent-co/branch-1"), parent, 20 * U));
         _openWith(_terms(n[1], keccak256("parent-co/branch-2"), parent, 10 * U));
         assertEq(gt.groupExposure(parent), 30 * U);
-        _expectOpenReverts(_terms(n[2], keccak256("parent-co/branch-3"), parent, 5 * U), GuaranteeTrust.GroupCap.selector);
+        _expectOpenReverts(
+            _terms(n[2], keccak256("parent-co/branch-3"), parent, 5 * U), GuaranteeTrust.GroupCap.selector
+        );
         // one branch defaults: no branch of the group gets a new guarantee, even once exposure falls
         vm.prank(adj);
         gt.claim(id0, keccak256("branch 1 did not pay"));
         assertTrue(gt.groupDefaulted(parent));
-        _expectOpenReverts(_terms(n[3], keccak256("parent-co/branch-4"), parent, 5 * U), GuaranteeTrust.ClientBlocked.selector);
+        _expectOpenReverts(
+            _terms(n[3], keccak256("parent-co/branch-4"), parent, 5 * U), GuaranteeTrust.ClientBlocked.selector
+        );
     }
 
     /// @dev The limit: client identity is bound off chain by whoever writes the terms. An alias presented under a
@@ -611,7 +615,9 @@ contract GuaranteeTrustTest is Test {
         uint256 id = _openWith(_terms(nia, keccak256("acme"), keccak256("acme-group"), 10 * U));
         vm.prank(adj);
         gt.cancelGuarantee(id, bytes32(0));
-        _expectOpenReverts(_terms(omar, keccak256("acme"), keccak256("other-group"), 10 * U), GuaranteeTrust.GroupMismatch.selector);
+        _expectOpenReverts(
+            _terms(omar, keccak256("acme"), keccak256("other-group"), 10 * U), GuaranteeTrust.GroupMismatch.selector
+        );
         _expectOpenReverts(_terms(omar, keccak256("acme"), 0, 10 * U), GuaranteeTrust.GroupMismatch.selector);
         _openWith(_terms(omar, keccak256("acme"), keccak256("acme-group"), 10 * U));
     }

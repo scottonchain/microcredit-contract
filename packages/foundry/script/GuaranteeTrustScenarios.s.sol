@@ -81,7 +81,9 @@ contract GuaranteeTrustScenarios is Script {
         require(address(gt) == vm.envAddress("EXPECT_GT"), "GT is not the pinned deployment");
         require(address(usdc) == vm.envAddress("EXPECT_TOKEN"), "token is not the pinned deployment");
         require(address(usdc) != BASE_SEPOLIA_TEST_USDC, "this runner mints: it refuses Circle's test USDC");
-        require(_isBuild(address(gt), "out/GuaranteeTrust.sol/GuaranteeTrust.json"), "GT runtime is not the reviewed build");
+        require(
+            _isBuild(address(gt), "out/GuaranteeTrust.sol/GuaranteeTrust.json"), "GT runtime is not the reviewed build"
+        );
         require(_isBuild(address(usdc), "out/MockUSDC.sol/MockUSDC.json"), "token runtime is not this build's MockUSDC");
     }
 
@@ -204,7 +206,10 @@ contract GuaranteeTrustScenarios is Script {
     }
 
     /// @dev Persona i signs its acceptance of exactly these terms; the broadcaster, as adjudicator, submits it.
-    function _openG(uint32 i, bytes32 client, bytes32 group, uint256 amount, bytes32 terms) internal returns (uint256 id) {
+    function _openG(uint32 i, bytes32 client, bytes32 group, uint256 amount, bytes32 terms)
+        internal
+        returns (uint256 id)
+    {
         GuaranteeTrust.Acceptance memory a = GuaranteeTrust.Acceptance({
             worker: _who(i),
             clientId: client,
@@ -386,8 +391,11 @@ contract GuaranteeTrustScenarios is Script {
             }
         }
         console.log("S5 parent's open exposure", gt.groupExposure(parent));
-        if (_canOpen(_who(54), _client(5, 0), 0, 1 * U)) console.log("S5 UNEXPECTED: a second guarantee on one client");
-        else console.log("S5 one client could not carry a second open guarantee");
+        if (_canOpen(_who(54), _client(5, 0), 0, 1 * U)) {
+            console.log("S5 UNEXPECTED: a second guarantee on one client");
+        } else {
+            console.log("S5 one client could not carry a second open guarantee");
+        }
         _asAdj();
         for (uint256 j; j < opened; j++) {
             gt.claim(ids[j], keccak256("S5 the parent did not pay"));

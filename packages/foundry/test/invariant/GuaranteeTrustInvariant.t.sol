@@ -92,7 +92,9 @@ contract GuaranteeTrustHandler is Test {
     }
 
     /// @dev The worker signs real terms; clients are fresh or reused and fall in one of three groups.
-    function open(uint256 who, uint256 amt, bool reuseClient, uint256 groupSeed, uint256 pledge, uint256 hold) external {
+    function open(uint256 who, uint256 amt, bool reuseClient, uint256 groupSeed, uint256 pledge, uint256 hold)
+        external
+    {
         address w = _a(who);
         amt = bound(amt, 1, 20 * U);
         bytes32 client = keccak256(abi.encode(reuseClient ? clientNonce : ++clientNonce));
