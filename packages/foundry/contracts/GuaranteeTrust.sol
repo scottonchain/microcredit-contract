@@ -36,7 +36,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     uint256 public constant MIN_TERM = 1 days; // shortest settle-by a worker may accept
 
     bytes32 public constant ACCEPTANCE_TYPEHASH = keccak256(
-        "Acceptance(address worker,bytes32 clientId,bytes32 groupId,uint256 amount,uint256 maxFromDues,bytes32 termsHash,uint256 contributionBps,uint256 contributionCap,uint256 remitWindow,uint64 settleBy,uint256 nonce,uint256 deadline)"
+        "Acceptance(address worker,bytes32 clientId,bytes32 groupId,uint256 amount,uint256 maxFromDues,bytes32 termsHash,uint256 contributionBps,uint256 contributionCap,uint256 remitWindow,uint64 settleBy,uint64 holdUntil,uint256 nonce,uint256 deadline)"
     );
     bytes32 public constant CONSENT_TYPEHASH =
         keccak256("Consent(address member,address attester,bool allowed,uint256 nonce,uint256 deadline)");
@@ -61,7 +61,8 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         uint256 contributionBps; // must equal the policy in force; fixed for this guarantee
         uint256 contributionCap;
         uint256 remitWindow; // must equal the window in force; fixed for this guarantee
-        uint64 settleBy; // after this, the adjudicator can no longer settle and anyone may expire the guarantee
+        uint64 settleBy; // after this, an undisputed guarantee can no longer be settled and anyone may expire it
+        uint64 holdUntil; // the latest a dispute opened by settleBy keeps it settleable; settleBy <= holdUntil
         uint256 nonce; // any unused number of the worker's; revocable before use
         uint256 deadline; // the signature's own expiry
     }
@@ -105,9 +106,11 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         State state;
         bool remitted;
         bool lapsed;
+        bool disputed;
         uint64 openedAt;
         uint64 paidAt;
         uint64 settleBy;
+        uint64 holdUntil;
         uint128 wage;
         uint128 contributionDue;
         uint128 contributionBps;
@@ -223,12 +226,15 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         uint64 settleBy
     );
     event ShareLocked(uint256 indexed id, address indexed attester, uint256 amount);
-    event GuaranteeCancelled(uint256 indexed id);
+    event GuaranteeCancelled(uint256 indexed id, bytes32 resolutionHash);
+    event DisputeOpened(uint256 indexed id, address by, uint64 holdUntil, bytes32 reasonHash);
     event GuaranteeExpired(uint256 indexed id, address by);
     event GuaranteePaid(uint256 indexed id, uint256 wage, uint256 contributionDue);
     event ContributionRemitted(uint256 indexed id, address indexed payer, address indexed worker, uint256 amount);
     event ContributionLapsed(uint256 indexed id, address indexed worker);
-    event Claimed(uint256 indexed id, address indexed worker, bytes32 indexed clientId, uint256 amount, bytes32 evidenceHash);
+    event Claimed(
+        uint256 indexed id, address indexed worker, bytes32 indexed clientId, uint256 amount, bytes32 evidenceHash
+    );
     event BackingConsumed(
         uint256 indexed id, address indexed attester, address indexed member, uint256 amount, uint256 stakeSlashed
     );
@@ -271,6 +277,9 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     error ZeroClient();
     error SponsorCapital();
     error ReleaseWhileOpen();
+    error NotParty();
+    error NoResolution();
+    error NoReason();
 
     modifier onlyAdjudicator() {
         if (msg.sender != adjudicator) revert NotAdjudicator();
@@ -310,7 +319,10 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
         if (guardian == old) guardian = newOwner;
     }
 
-    function setRoles(address guardian_, address adjudicator_, address issuer_, uint256 issuerBudget_) external onlyOwner {
+    function setRoles(address guardian_, address adjudicator_, address issuer_, uint256 issuerBudget_)
+        external
+        onlyOwner
+    {
         if (issuerBudget_ < issuerHeld + issuerSpent) revert BudgetExceeded();
         guardian = guardian_;
         adjudicator = adjudicator_;
@@ -435,7 +447,9 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     function unstake(uint256 amount) external {
         Member storage m = members[msg.sender];
         if (amount == 0) revert ZeroAmount();
-        if (amount > m.stake || m.stake - amount + (m.dues - m.committedDues) < m.backingGiven) revert InsufficientTrust();
+        if (amount > m.stake || m.stake - amount + (m.dues - m.committedDues) < m.backingGiven) {
+            revert InsufficientTrust();
+        }
         m.stake -= amount;
         totalStake -= amount;
         token.safeTransfer(msg.sender, amount);
@@ -562,13 +576,24 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
 
     /// @notice Opens a guarantee on the worker's signed acceptance of its exact terms. The adjudicator submits it;
     ///         neither the adjudicator nor anyone else can open one the worker did not sign.
-    function openGuarantee(Acceptance calldata a, bytes calldata signature) external onlyAdjudicator returns (uint256 id) {
+    function openGuarantee(Acceptance calldata a, bytes calldata signature)
+        external
+        onlyAdjudicator
+        returns (uint256 id)
+    {
         if (paused) revert IsPaused();
         if (a.amount == 0) revert ZeroAmount();
         if (a.clientId == bytes32(0)) revert ZeroClient(); // zero is clientGroup's "unset"
         if (block.timestamp > a.deadline) revert SignatureExpired();
-        if (a.settleBy < block.timestamp + MIN_TERM || a.settleBy > block.timestamp + maxTerm) revert BadTerm();
-        if (a.contributionBps != contributionBps || a.contributionCap != contributionCap || a.remitWindow != remitWindow) {
+        if (
+            a.settleBy < block.timestamp + MIN_TERM || a.holdUntil < a.settleBy
+                || a.holdUntil > block.timestamp + maxTerm
+        ) {
+            revert BadTerm();
+        }
+        if (
+            a.contributionBps != contributionBps || a.contributionCap != contributionCap || a.remitWindow != remitWindow
+        ) {
             revert PolicyMismatch();
         }
         _useNonce(a.worker, a.nonce);
@@ -616,9 +641,11 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
                 state: State.Open,
                 remitted: false,
                 lapsed: false,
+                disputed: false,
                 openedAt: uint64(block.timestamp),
                 paidAt: 0,
                 settleBy: a.settleBy,
+                holdUntil: a.holdUntil,
                 wage: 0,
                 contributionDue: 0,
                 contributionBps: uint128(a.contributionBps),
@@ -627,24 +654,49 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
                 evidenceHash: bytes32(0)
             })
         );
-        emit GuaranteeOpened(id, a.worker, a.clientId, group, amount, fromBacking, fromLine, fromDues, a.termsHash, a.settleBy);
+        emit GuaranteeOpened(
+            id, a.worker, a.clientId, group, amount, fromBacking, fromLine, fromDues, a.termsHash, a.settleBy
+        );
     }
 
-    /// @notice The job did not go ahead: release everything, record nothing against anyone.
-    function cancelGuarantee(uint256 id) external onlyAdjudicator {
+    /// @notice The job did not go ahead: release everything, record nothing against anyone. A disputed guarantee is
+    ///         cancelled only with the hash of the resolution's evidence, so a dispute is never erased silently.
+    function cancelGuarantee(uint256 id, bytes32 resolutionHash) external onlyAdjudicator {
         Guarantee storage g = guarantees[id];
         if (g.state != State.Open) revert WrongState();
+        if (g.disputed && resolutionHash == bytes32(0)) revert NoResolution();
         g.state = State.Cancelled;
+        g.evidenceHash = resolutionHash;
         _release(id, g);
-        emit GuaranteeCancelled(id);
+        emit GuaranteeCancelled(id, resolutionHash);
     }
 
-    /// @notice Past its settle-by date an unsettled guarantee can be expired by anyone: everything is released, no
-    ///         claim is paid and no contribution falls due. This bounds how long a lost adjudicator can lock capacity.
+    /// @notice The worker or the adjudicator records a dispute, once, by the settle-by date, with a required nonzero
+    ///         opaque hash of its reason (no private data on chain). A disputed guarantee stays settleable until the hold-until date the
+    ///         worker signed (at most the longest term from opening), so a dispute still open at settle-by is not lost
+    ///         to expiry. Only a settlement carrying a resolution evidence hash closes it, or expiry at hold-until. The
+    ///         adjudicator is trusted to resolve it: there is no appeal on chain, and nothing extends the hold.
+    function openDispute(uint256 id, bytes32 reasonHash) external {
+        Guarantee storage g = guarantees[id];
+        if (msg.sender != g.worker && msg.sender != adjudicator) revert NotParty();
+        if (g.state != State.Open || g.disputed) revert WrongState();
+        if (block.timestamp > g.settleBy) revert PastSettleBy();
+        if (reasonHash == bytes32(0)) revert NoReason();
+        g.disputed = true;
+        emit DisputeOpened(id, msg.sender, g.holdUntil, reasonHash);
+    }
+
+    function _settleDeadline(Guarantee storage g) internal view returns (uint64) {
+        return g.disputed ? g.holdUntil : g.settleBy;
+    }
+
+    /// @notice Past its settle-by date (or, if disputed, its hold-until date) an unsettled guarantee can be expired by
+    ///         anyone: everything is released, no claim is paid and no contribution falls due. This bounds how long a
+    ///         lost adjudicator can lock capacity.
     function expireGuarantee(uint256 id) external {
         Guarantee storage g = guarantees[id];
         if (g.state != State.Open) revert WrongState();
-        if (block.timestamp <= g.settleBy) revert TooEarly();
+        if (block.timestamp <= _settleDeadline(g)) revert TooEarly();
         g.state = State.Expired;
         _release(id, g);
         emit GuaranteeExpired(id, msg.sender);
@@ -654,7 +706,8 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     function markPaid(uint256 id, uint256 wage, bytes32 evidenceHash) external onlyAdjudicator {
         Guarantee storage g = guarantees[id];
         if (g.state != State.Open) revert WrongState();
-        if (block.timestamp > g.settleBy) revert PastSettleBy();
+        if (block.timestamp > _settleDeadline(g)) revert PastSettleBy();
+        if (g.disputed && evidenceHash == bytes32(0)) revert NoResolution();
         g.state = State.Paid;
         g.wage = uint128(wage);
         g.paidAt = uint64(block.timestamp);
@@ -704,7 +757,8 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
     function claim(uint256 id, bytes32 evidenceHash) external onlyAdjudicator {
         Guarantee storage g = guarantees[id];
         if (g.state != State.Open) revert WrongState();
-        if (block.timestamp > g.settleBy) revert PastSettleBy();
+        if (block.timestamp > _settleDeadline(g)) revert PastSettleBy();
+        if (g.disputed && evidenceHash == bytes32(0)) revert NoResolution();
         g.state = State.Claimed;
         g.evidenceHash = evidenceHash;
         address worker = g.worker;
@@ -756,6 +810,7 @@ contract GuaranteeTrust is Ownable2Step, EIP712 {
                     a.contributionCap,
                     a.remitWindow,
                     a.settleBy,
+                    a.holdUntil,
                     a.nonce,
                     a.deadline
                 )

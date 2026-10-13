@@ -92,7 +92,9 @@ contract GuaranteeTrustHandler is Test {
     }
 
     /// @dev The worker signs real terms; clients are fresh or reused and fall in one of three groups.
-    function open(uint256 who, uint256 amt, bool reuseClient, uint256 groupSeed, uint256 pledge) external {
+    function open(uint256 who, uint256 amt, bool reuseClient, uint256 groupSeed, uint256 pledge, uint256 hold)
+        external
+    {
         address w = _a(who);
         amt = bound(amt, 1, 20 * U);
         bytes32 client = keccak256(abi.encode(reuseClient ? clientNonce : ++clientNonce));
@@ -107,6 +109,7 @@ contract GuaranteeTrustHandler is Test {
             contributionCap: gt.contributionCap(),
             remitWindow: gt.remitWindow(),
             settleBy: uint64(block.timestamp + 30 days),
+            holdUntil: uint64(block.timestamp + 30 days + bound(hold, 0, 30 days)),
             nonce: ++sigNonce,
             deadline: block.timestamp + 1 hours
         });
@@ -120,15 +123,25 @@ contract GuaranteeTrustHandler is Test {
         if (n == 0) return;
         uint256 id = idSeed % n;
         wage = bound(wage, 0, 100 * U);
+        bool late = block.timestamp > _deadline(id);
+        bool silent = gt.guarantee(id).disputed && how % 2 == 0;
+        bytes32 ev = how % 2 == 0 ? bytes32(0) : keccak256(abi.encode(id));
         vm.startPrank(adj);
         if (how % 3 == 0) {
-            try gt.markPaid(id, wage, bytes32(0)) { } catch { }
+            try gt.markPaid(id, wage, ev) {
+                if (late) settledLate += 1;
+                if (silent) closedSilently += 1;
+            } catch { }
         } else if (how % 3 == 1) {
-            try gt.claim(id, bytes32(0)) {
+            try gt.claim(id, ev) {
                 claimsPaid += 1;
+                if (late) settledLate += 1;
+                if (silent) closedSilently += 1;
             } catch { }
         } else {
-            try gt.cancelGuarantee(id) { } catch { }
+            try gt.cancelGuarantee(id, ev) {
+                if (silent) closedSilently += 1;
+            } catch { }
         }
         vm.stopPrank();
     }
@@ -169,7 +182,32 @@ contract GuaranteeTrustHandler is Test {
         uint256 n = gt.guaranteeCount();
         if (n == 0) return;
         vm.warp(block.timestamp + bound(dt, 0, 40 days));
-        try gt.expireGuarantee(idSeed % n) { } catch { }
+        uint256 id = idSeed % n;
+        bool early = block.timestamp <= _deadline(id);
+        try gt.expireGuarantee(id) {
+            if (early) expiredEarly += 1;
+        } catch { }
+    }
+
+    uint256 public settledLate;
+    uint256 public expiredEarly;
+    uint256 public disputes;
+    uint256 public closedSilently;
+
+    function _deadline(uint256 id) internal view returns (uint256) {
+        GuaranteeTrust.Guarantee memory g = gt.guarantee(id);
+        return g.disputed ? g.holdUntil : g.settleBy;
+    }
+
+    function dispute(uint256 idSeed, bool byWorker, uint256 dt) external {
+        uint256 n = gt.guaranteeCount();
+        if (n == 0) return;
+        vm.warp(block.timestamp + bound(dt, 0, 35 days));
+        uint256 id = idSeed % n;
+        vm.prank(byWorker ? gt.guarantee(id).worker : adj);
+        try gt.openDispute(id, keccak256(abi.encode(id, "reason"))) {
+            disputes += 1;
+        } catch { }
     }
 }
 
@@ -246,6 +284,13 @@ contract GuaranteeTrustInvariantTest is Test {
 
     /// @dev The reserve is exactly the sponsor capital plus members' dues, so no claim is ever paid from dues that
     ///      were not consumed by name; shares are fully held by funders; nothing is released while a guarantee is open.
+    /// @dev Nothing settles after its deadline (settle-by, or hold-until once disputed) and nothing expires before it.
+    function invariant_settleDeadlines() public view {
+        assertEq(h.settledLate(), 0, "settled after the deadline");
+        assertEq(h.expiredEarly(), 0, "expired before the deadline");
+        assertEq(h.closedSilently(), 0, "a dispute closed without a resolution hash");
+    }
+
     function invariant_reserveIdentity() public view {
         assertEq(gt.reserve(), gt.sponsorCapital() + gt.totalDues(), "reserve identity");
         uint256 held = gt.sponsorSharesOf(address(this));

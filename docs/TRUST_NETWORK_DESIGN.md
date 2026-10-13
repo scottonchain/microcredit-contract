@@ -1,7 +1,7 @@
 # Trust for new members: a conserved-trust design for the revolving first-job guarantee
 
-Status: **revision 5, after Codex's devil's-advocate reviews and the polling session's non-author
-review** (contract PR 28, reviews 5484296919 and 5484377736; board 15 `c-20261011-guaranteetrust-review-r1`;
+Status: **candidate revision 6 (bounded dispute hold, not deployed; the Base Sepolia deployment runs revision 5),
+after Codex's devil's-advocate reviews and the polling session's non-author review** (contract PR 28, reviews 5484296919 and 5484377736; board 15 `c-20261011-guaranteetrust-review-r1`;
 section 12 records each finding and fix). Written by Claude Code (AI agent) on 2026-10-11
 at the operator's direction. Testnet only. No real money, no outreach, no live guarantee. The
 operator's questions, the answer, every parameter and its reason, and what the contract
@@ -66,7 +66,8 @@ and only stake and dues can back others (section 4).
 
 **Opening a guarantee.** The worker signs an EIP-712 acceptance of the exact terms: client, client group,
 amount `G`, the most of its own dues it agrees may stand behind `G`, the terms hash, the contribution
-policy in force, a settle-by date (at most `maxTerm`, 60 days), a nonce and a signature deadline. The
+policy in force, a settle-by date, a hold-until date for a dispute (from settle-by to at most `maxTerm`, 60 days,
+after opening), a nonce and a signature deadline. The
 adjudicator submits it; a gasless relay may carry it, but no role can open a guarantee the worker did
 not sign, and the worker can revoke the nonce before use. The contract then requires:
 
@@ -91,9 +92,17 @@ commitment is released.
 **Worker does not remit.** After the window anyone may mark it lapsed. The worker cannot receive a
 new guarantee until it is paid. It is never pursued as a debt (`NORTH_STAR`: a pledge, not a loan).
 
-**Nobody settles.** After the settle-by date the adjudicator can no longer mark the job paid or pay a
-claim, and anyone may expire the guarantee: everything is released, no claim is paid and no
-contribution falls due. A lost adjudicator therefore locks capacity for at most `maxTerm`.
+**Disputes.** By the settle-by date the worker or the adjudicator (for a client, which is not an on-chain
+party) may open one dispute, recording a required nonzero opaque hash of its reason. A disputed guarantee stays settleable
+until the hold-until date the worker signed, so a dispute still open at settle-by is not lost to expiry.
+It closes only by a settlement or cancellation that records the hash of the resolution's evidence, or by
+expiry at hold-until; nothing re-opens or extends it. The adjudicator is trusted to resolve it: there is
+no appeal on chain, which is acceptable for synthetic testnet mechanics only (section 3).
+
+**Nobody settles.** After the settle-by date (or, once disputed, the hold-until date) the adjudicator can
+no longer mark the job paid or pay a claim, and anyone may expire the guarantee: everything is released,
+no claim is paid and no contribution falls due. A lost adjudicator therefore locks capacity for at most
+`maxTerm`, disputed or not.
 
 **Client does not pay** (claim). The adjudicator confirms with an evidence hash. The reserve pays the
 worker `G`, and the worker owes nothing. The capacity that underwrote `G` is consumed in the order it
@@ -141,6 +150,9 @@ raise by repetition cannot be allowed to create capacity.
 | One client failing many workers at once | one open guarantee per client; one group cap across a parent's branches; a default blocks the whole group; attester cap on open attestees |
 | A client returning under a new id | caught only if the signed terms bind it to its group: client identity is checked off chain by whoever writes the terms (tested as a stated limit) |
 | A lost or stalled adjudicator | settle-by date in the signed terms; anyone may expire an unsettled guarantee after it |
+| A dispute still open at settle-by expires with nothing paid | one dispute by settle-by keeps the guarantee settleable to the signed hold-until date, inside `maxTerm` |
+| A party holds capital by disputing | one dispute per guarantee, only by the worker or adjudicator, only by settle-by; the hold is the date the worker signed, within `maxTerm`, so no lock outlasts today's bound |
+| The adjudicator erases a dispute silently | a disputed guarantee is cancelled, paid or claimed only with a nonzero resolution evidence hash, which is recorded |
 | Compromised adjudicator approving false claims | bounded by committed capacity and the reserve; the main trust assumption, stated; a two-of-n adjudicator is the next step |
 | One address holding owner, issuer and adjudicator | held lines never exceed the sponsor capital (net of line-backed losses), so even a captured issuer and adjudicator together can pay claims only from sponsor capital and committed backing, never from members' dues; the simulations use three distinct keys (owner and sponsor, adjudicator, issuer) |
 | Releasing sponsor capital that stands behind issuer lines, or the loading behind open guarantees | nothing is released while any guarantee is open, and never the capital behind held lines |
@@ -262,3 +274,17 @@ earlier findings and the polling session's items are closed; two blockers and on
 | The scenario runner is not bound to the reviewed MockUSDC deployment, and the deploy script accepted Circle's test USDC although the scenarios mint | the deploy script always deploys a fresh MockUSDC and refuses `TOKEN`; before any broadcast the runner requires the contract and token at the addresses pinned from the deploy receipt (`EXPECT_GT`, `EXPECT_TOKEN`), refuses Circle's test USDC, and requires both runtimes to equal this build's artifacts byte for byte outside their immutables | refusals checked on a local chain: a set `TOKEN`, a wrong pinned address, and a runtime from another build (different metadata) |
 | `dropAttester` changed consent without a `ConsentSet` event | it emits `ConsentSet(member, attester, false, member)` | event emitted |
 
+**Outside review: disputes (candidate revision 6, not deployed).** An agent on Moltbook (relayed by Hermes,
+board 15 comment 6113336560) argued that a silent settle-by expiry during a live dispute releases a guarantee
+exactly when it should hold, and proposed a flag that pauses the clock. Assessed as AMEND (contract PR 28,
+comment 6113843683): the gap is real at `68a968f`, but an open-ended pause would let either side lock capital.
+Codex accepted the bounded shape and asked for two additions (board 15 `x-20261011-gt-resume-dispute-r1`):
+
+| Item | Change | Regression |
+| --- | --- | --- |
+| A dispute live at settle-by ends in expiry with nothing paid | the worker signs `holdUntil` (settle-by to opening + `maxTerm`); `openDispute` by the worker or adjudicator, once, by settle-by; a disputed guarantee is settleable until `holdUntil`, then anyone may expire it | `testADisputeOpenedBySettleByKeepsTheClaimPossibleUntilHoldUntil`, `testADisputedGuaranteeStillExpiresAtHoldUntil`, `testWithoutADisputeSettleByStillBinds`, `testOnlyTheWorkerOrAdjudicatorOpensADisputeOnceBySettleBy`, `testTheHoldIsSignedAndBoundedByTheLongestTerm`; invariant `invariant_settleDeadlines` |
+| The reason for a dispute is not on record | `openDispute` requires a nonzero opaque reason hash (no private data), which `DisputeOpened` carries | `testADisputeRequiresAReasonHash` (a zero reason reverts with `NoReason` for the worker and the adjudicator; a nonzero one opens the dispute); event emitted |
+| The adjudicator could cancel a worker's dispute silently | `cancelGuarantee`, `markPaid` and `claim` on a disputed guarantee require a nonzero resolution evidence hash, stored as the guarantee's evidence | `testADisputeIsNeverClosedWithoutAResolutionHash`; fuzzed (`closedSilently` stays 0) |
+
+Stated limit: the adjudicator is trusted to resolve a dispute and there is no appeal on chain. A guarantee
+signed with `holdUntil = settleBy` behaves exactly as in revision 5.

@@ -79,6 +79,7 @@ contract GuaranteeTrustTest is Test {
             contributionCap: gt.contributionCap(),
             remitWindow: gt.remitWindow(),
             settleBy: uint64(block.timestamp + 30 days),
+            holdUntil: uint64(block.timestamp + 30 days),
             nonce: ++nonce,
             deadline: block.timestamp + 1 days
         });
@@ -372,6 +373,7 @@ contract GuaranteeTrustTest is Test {
         _attest(avery, nia, 10 * U);
         GuaranteeTrust.Acceptance memory a = _terms(nia, keccak256("c"), 0, 10 * U);
         a.settleBy = uint64(block.timestamp + 61 days);
+        a.holdUntil = a.settleBy;
         _expectOpenReverts(a, GuaranteeTrust.BadTerm.selector);
         a = _terms(nia, keccak256("c"), 0, 10 * U);
         a.settleBy = uint64(block.timestamp + 1 days - 1); // shorter than the minimum term
@@ -394,6 +396,151 @@ contract GuaranteeTrustTest is Test {
         assertEq(usdc.balanceOf(nia), 0, "no claim paid");
         assertEq(gt.memberOf(nia).unpaidContributions, 0, "no contribution due");
         assertFalse(gt.clientOpen(keccak256("c")));
+    }
+
+    // -------------------------------------------------------------- disputes
+
+    function _openHeld(address worker, string memory client, uint256 amt, uint256 hold) internal returns (uint256) {
+        GuaranteeTrust.Acceptance memory a = _terms(worker, keccak256(bytes(client)), bytes32(0), amt);
+        a.holdUntil = uint64(a.settleBy + hold);
+        return _openWith(a);
+    }
+
+    /// @dev Outside review (an agent on Moltbook): a dispute still open at settle-by must not end in a silent expiry.
+    function testADisputeOpenedBySettleByKeepsTheClaimPossibleUntilHoldUntil() public {
+        vm.prank(issuer);
+        gt.setLine(nia, 20 * U);
+        uint256 id = _openHeld(nia, "c", 10 * U, 20 days); // settle by day 30, hold until day 50
+        vm.prank(nia);
+        gt.openDispute(id, keccak256("reason"));
+        vm.warp(block.timestamp + 30 days + 1); // past settle-by
+        vm.expectRevert(GuaranteeTrust.TooEarly.selector);
+        gt.expireGuarantee(id);
+        vm.prank(adj);
+        gt.claim(id, keccak256("unpaid; ruled for the worker"));
+        assertEq(usdc.balanceOf(nia), 10 * U, "paid after settle-by because the dispute was open");
+    }
+
+    function testADisputedGuaranteeStillExpiresAtHoldUntil() public {
+        _stake(avery, 20 * U);
+        _attest(avery, nia, 10 * U);
+        uint256 id = _openHeld(nia, "c", 10 * U, 20 days);
+        vm.prank(adj);
+        gt.openDispute(id, keccak256("reason"));
+        vm.warp(block.timestamp + 50 days);
+        vm.expectRevert(GuaranteeTrust.TooEarly.selector);
+        gt.expireGuarantee(id);
+        vm.warp(block.timestamp + 1);
+        vm.prank(adj);
+        vm.expectRevert(GuaranteeTrust.PastSettleBy.selector);
+        gt.claim(id, bytes32(0));
+        gt.expireGuarantee(id); // anyone
+        assertEq(uint8(gt.guarantee(id).state), uint8(GuaranteeTrust.State.Expired));
+        assertEq(usdc.balanceOf(nia), 0, "no claim paid");
+        assertEq(gt.withdrawableBacking(avery, nia), 10 * U, "the hold ends; nothing stays locked");
+    }
+
+    function testWithoutADisputeSettleByStillBinds() public {
+        vm.prank(issuer);
+        gt.setLine(nia, 20 * U);
+        uint256 id = _openHeld(nia, "c", 10 * U, 20 days);
+        vm.warp(block.timestamp + 30 days + 1);
+        vm.prank(adj);
+        vm.expectRevert(GuaranteeTrust.PastSettleBy.selector);
+        gt.claim(id, bytes32(0));
+        gt.expireGuarantee(id);
+        assertEq(uint8(gt.guarantee(id).state), uint8(GuaranteeTrust.State.Expired));
+    }
+
+    function testOnlyTheWorkerOrAdjudicatorOpensADisputeOnceBySettleBy() public {
+        vm.startPrank(issuer);
+        gt.setLine(nia, 20 * U);
+        gt.setLine(omar, 20 * U);
+        vm.stopPrank();
+        uint256 id = _openHeld(nia, "c1", 10 * U, 20 days);
+        uint256 late = _openHeld(omar, "c2", 10 * U, 20 days);
+        vm.prank(makeAddr("stranger"));
+        vm.expectRevert(GuaranteeTrust.NotParty.selector);
+        gt.openDispute(id, keccak256("reason"));
+        vm.prank(issuer);
+        vm.expectRevert(GuaranteeTrust.NotParty.selector);
+        gt.openDispute(id, keccak256("reason"));
+        vm.prank(nia);
+        gt.openDispute(id, keccak256("reason"));
+        vm.prank(adj);
+        vm.expectRevert(GuaranteeTrust.WrongState.selector); // once: nothing re-opens or extends the hold
+        gt.openDispute(id, keccak256("reason"));
+        vm.warp(block.timestamp + 30 days + 1);
+        vm.prank(omar);
+        vm.expectRevert(GuaranteeTrust.PastSettleBy.selector); // too late to start one
+        gt.openDispute(late, keccak256("reason"));
+        vm.prank(adj);
+        gt.markPaid(id, 40 * U, keccak256("client paid; receipt")); // settling closes the dispute
+        vm.prank(nia);
+        vm.expectRevert(GuaranteeTrust.WrongState.selector);
+        gt.openDispute(id, keccak256("reason"));
+    }
+
+    function testADisputeRequiresAReasonHash() public {
+        vm.prank(issuer);
+        gt.setLine(nia, 20 * U);
+        uint256 id = _openHeld(nia, "c", 10 * U, 20 days);
+        vm.prank(nia);
+        vm.expectRevert(GuaranteeTrust.NoReason.selector);
+        gt.openDispute(id, bytes32(0));
+        vm.prank(adj);
+        vm.expectRevert(GuaranteeTrust.NoReason.selector);
+        gt.openDispute(id, bytes32(0));
+        vm.prank(nia);
+        gt.openDispute(id, keccak256("client refuses to pay"));
+        assertTrue(gt.guarantee(id).disputed, "nonzero reason opens the dispute");
+    }
+
+    function testTheHoldIsSignedAndBoundedByTheLongestTerm() public {
+        vm.prank(issuer);
+        gt.setLine(nia, 20 * U);
+        GuaranteeTrust.Acceptance memory a = _terms(nia, keccak256("c"), 0, 10 * U);
+        a.holdUntil = a.settleBy - 1;
+        _expectOpenReverts(a, GuaranteeTrust.BadTerm.selector);
+        a = _terms(nia, keccak256("c"), 0, 10 * U);
+        a.holdUntil = uint64(block.timestamp + 60 days + 1); // the hold counts against the longest term
+        _expectOpenReverts(a, GuaranteeTrust.BadTerm.selector);
+        // the adjudicator cannot lengthen the hold the worker signed
+        a = _terms(nia, keccak256("c"), 0, 10 * U);
+        bytes memory sig = _sign(keyOf[nia], a);
+        a.holdUntil = uint64(block.timestamp + 60 days);
+        vm.prank(adj);
+        vm.expectRevert(GuaranteeTrust.BadSignature.selector);
+        gt.openGuarantee(a, sig);
+    }
+
+    /// @dev Codex review of the dispute candidate: a disputed guarantee is never closed silently, by cancellation
+    ///      or by settlement; each needs the hash of the resolution's evidence, which is recorded.
+    function testADisputeIsNeverClosedWithoutAResolutionHash() public {
+        vm.startPrank(issuer);
+        gt.setLine(nia, 20 * U);
+        gt.setLine(omar, 20 * U);
+        vm.stopPrank();
+        uint256 id = _openHeld(nia, "c1", 10 * U, 20 days);
+        uint256 other = _openHeld(omar, "c2", 10 * U, 20 days);
+        vm.prank(nia);
+        gt.openDispute(id, keccak256("client refuses to pay"));
+        vm.prank(omar);
+        gt.openDispute(other, keccak256("client refuses to pay"));
+        vm.startPrank(adj);
+        vm.expectRevert(GuaranteeTrust.NoResolution.selector);
+        gt.cancelGuarantee(id, bytes32(0));
+        vm.expectRevert(GuaranteeTrust.NoResolution.selector);
+        gt.claim(id, bytes32(0));
+        vm.expectRevert(GuaranteeTrust.NoResolution.selector);
+        gt.markPaid(id, 40 * U, bytes32(0));
+        bytes32 ruling = keccak256("both parties agree the job was withdrawn");
+        gt.cancelGuarantee(id, ruling);
+        gt.claim(other, keccak256("ruled for the worker"));
+        vm.stopPrank();
+        assertEq(uint8(gt.guarantee(id).state), uint8(GuaranteeTrust.State.Cancelled));
+        assertEq(gt.guarantee(id).evidenceHash, ruling, "the resolution is on record");
+        assertEq(usdc.balanceOf(omar), 10 * U);
     }
 
     // -------------------------------------------------------------- exposure rules
@@ -445,12 +592,16 @@ contract GuaranteeTrustTest is Test {
         uint256 id0 = _openWith(_terms(n[0], keccak256("parent-co/branch-1"), parent, 20 * U));
         _openWith(_terms(n[1], keccak256("parent-co/branch-2"), parent, 10 * U));
         assertEq(gt.groupExposure(parent), 30 * U);
-        _expectOpenReverts(_terms(n[2], keccak256("parent-co/branch-3"), parent, 5 * U), GuaranteeTrust.GroupCap.selector);
+        _expectOpenReverts(
+            _terms(n[2], keccak256("parent-co/branch-3"), parent, 5 * U), GuaranteeTrust.GroupCap.selector
+        );
         // one branch defaults: no branch of the group gets a new guarantee, even once exposure falls
         vm.prank(adj);
         gt.claim(id0, keccak256("branch 1 did not pay"));
         assertTrue(gt.groupDefaulted(parent));
-        _expectOpenReverts(_terms(n[3], keccak256("parent-co/branch-4"), parent, 5 * U), GuaranteeTrust.ClientBlocked.selector);
+        _expectOpenReverts(
+            _terms(n[3], keccak256("parent-co/branch-4"), parent, 5 * U), GuaranteeTrust.ClientBlocked.selector
+        );
     }
 
     /// @dev The limit: client identity is bound off chain by whoever writes the terms. An alias presented under a
@@ -463,8 +614,10 @@ contract GuaranteeTrustTest is Test {
         vm.stopPrank();
         uint256 id = _openWith(_terms(nia, keccak256("acme"), keccak256("acme-group"), 10 * U));
         vm.prank(adj);
-        gt.cancelGuarantee(id);
-        _expectOpenReverts(_terms(omar, keccak256("acme"), keccak256("other-group"), 10 * U), GuaranteeTrust.GroupMismatch.selector);
+        gt.cancelGuarantee(id, bytes32(0));
+        _expectOpenReverts(
+            _terms(omar, keccak256("acme"), keccak256("other-group"), 10 * U), GuaranteeTrust.GroupMismatch.selector
+        );
         _expectOpenReverts(_terms(omar, keccak256("acme"), 0, 10 * U), GuaranteeTrust.GroupMismatch.selector);
         _openWith(_terms(omar, keccak256("acme"), keccak256("acme-group"), 10 * U));
     }
