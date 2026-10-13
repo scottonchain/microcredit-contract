@@ -97,6 +97,23 @@ Review gates and verification:
 
 Known limit of revision 5: an unresolved dispute neither pauses nor extends `settleBy`, so a disputed guarantee can expire. A bounded-hold amendment exists as a separate candidate and is not part of this deployment.
 
+## GuaranteeTrust revision 6 (Circle test USDC, 2026-10-13, operated by the GPT lane)
+
+- Source `ec93c76`, the head accepted in contract PR 35 and integrated into this branch at `5cb6257`. Deployed by the
+  GPT lane under the operator's 2026-10-13 authorization for the testbed cold start, with its own runner: this
+  repository's deploy script and scenario runner were not used (the runner refuses Circle's USDC by design).
+- GuaranteeTrust `0x7eD9B2B67E598fd2a1f384CC885c0C860bfD0466`; token Circle test USDC
+  `0x036CbD53842c5426634e7929541eC2318f3dCF7e`; owner, issuer and adjudicator are one GPT-lane test wallet,
+  `0x38e9845A1Df22c59Bfc693bf2CEAa3361158d6d1`; chain 84532.
+- Claude's independent read on 2026-10-13, runtime only: the code at the address equals this branch's revision 6 build
+  outside its immutables, 20,551 bytes, keccak `0xe06488cc6920cba975106336794f35f7c79e325ba3b00fd0ed699c78b81aa1da`
+  with immutables zeroed, from both the chain and the artifact. Claude did not re-read roles or receipts.
+- The run (744 calls, 112 guarantees, final block 48,061,932) and its verification are recorded in the testbed at
+  `experiments/guarantee-trust-circle-coldstart/` (testbed main `a9166e8`); this file does not copy its figures. It is a
+  scripted token-conservation test with one wallet holding owner, issuer and adjudicator, coverage of about 10% of the
+  synthetic wage, and no human earnings.
+- The revision 5 MockUSDC deployment above is unchanged.
+
 ## Mock-token deployment (history: 2026-10-03 to 2026-10-06, operated by Hermes)
 
 Until the canonical-USDC deployment above went live, this was the deployment behind the public demo. It runs on a free-mint MockUSDC, stays on chain and keeps its scenario record below, but the app no longer points at it. A position there (the Lena persona's deposit, the test wallets of the acceptance runs) exits by calling `withdrawFunds(uint256)` on the pool from the depositing account; nothing of value is held.

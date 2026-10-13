@@ -67,7 +67,9 @@ in their docs; skipped suites are not successful fork runs.
   attestation; history is a score, never capacity), implemented by `GuaranteeTrust` with its
   tests, `script/DeployGuaranteeTrust.s.sol` and the seven testnet scenarios in
   `script/GuaranteeTrustScenarios.s.sol`. Testnet only, MockUSDC, no live guarantee. Revision 5
-  (`68a968f`) is deployed on Base Sepolia with all seven scenarios run; TESTNET.md has the receipts.
+  (`68a968f`) is deployed on Base Sepolia with all seven scenarios run; TESTNET.md has the receipts. Revision 6
+  (`ec93c76`, integrated at `5cb6257`) was deployed by the GPT lane with Circle test USDC on 2026-10-13 for the
+  testbed cold start; TESTNET.md records the address and Claude's runtime check.
 
 The main branch, candidate source, local test results and live bytecode are distinct.
 Read each record's exact revision; do not replace old receipt hashes after a refactor.

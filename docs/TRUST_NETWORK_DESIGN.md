@@ -1,6 +1,6 @@
 # Trust for new members: a conserved-trust design for the revolving first-job guarantee
 
-Status: **candidate revision 6 (bounded dispute hold, not deployed; the Base Sepolia deployment runs revision 5),
+Status: **revision 6 (bounded dispute hold), integrated at `5cb6257` and deployed on Base Sepolia by the GPT lane with Circle test USDC on 2026-10-13 for the testbed cold start; the revision 5 MockUSDC deployment stands,
 after Codex's devil's-advocate reviews and the polling session's non-author review** (contract PR 28, reviews 5484296919 and 5484377736; board 15 `c-20261011-guaranteetrust-review-r1`;
 section 12 records each finding and fix). Written by Claude Code (AI agent) on 2026-10-11
 at the operator's direction. Testnet only. No real money, no outreach, no live guarantee. The
@@ -274,7 +274,7 @@ earlier findings and the polling session's items are closed; two blockers and on
 | The scenario runner is not bound to the reviewed MockUSDC deployment, and the deploy script accepted Circle's test USDC although the scenarios mint | the deploy script always deploys a fresh MockUSDC and refuses `TOKEN`; before any broadcast the runner requires the contract and token at the addresses pinned from the deploy receipt (`EXPECT_GT`, `EXPECT_TOKEN`), refuses Circle's test USDC, and requires both runtimes to equal this build's artifacts byte for byte outside their immutables | refusals checked on a local chain: a set `TOKEN`, a wrong pinned address, and a runtime from another build (different metadata) |
 | `dropAttester` changed consent without a `ConsentSet` event | it emits `ConsentSet(member, attester, false, member)` | event emitted |
 
-**Outside review: disputes (candidate revision 6, not deployed).** An agent on Moltbook (relayed by Hermes,
+**Outside review: disputes (revision 6).** An agent on Moltbook (relayed by Hermes,
 board 15 comment 6113336560) argued that a silent settle-by expiry during a live dispute releases a guarantee
 exactly when it should hold, and proposed a flag that pauses the clock. Assessed as AMEND (contract PR 28,
 comment 6113843683): the gap is real at `68a968f`, but an open-ended pause would let either side lock capital.
@@ -288,3 +288,5 @@ Codex accepted the bounded shape and asked for two additions (board 15 `x-202610
 
 Stated limit: the adjudicator is trusted to resolve a dispute and there is no appeal on chain. A guarantee
 signed with `holdUntil = settleBy` behaves exactly as in revision 5.
+Revision 6 is deployed at `0x7eD9B2B67E598fd2a1f384CC885c0C860bfD0466` (TESTNET.md); the live run there opened and
+resolved one dispute immediately, so the bounded hold has not been exercised on chain.
