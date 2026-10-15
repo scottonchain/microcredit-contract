@@ -84,6 +84,83 @@ contract LoanAccountingTest is MicrocreditTestBase {
         assertEq(usdc.balanceOf(borrower), 0);
     }
 
+    // Direct zero is rejected; it is not the signed paths' repay-all sentinel.
+    function testDirectZeroRepaymentByBorrowerRevertsWithoutAccountingChanges() public {
+        _assertDirectZeroRepaymentUnchanged(borrower);
+    }
+
+    function testDirectZeroRepaymentByThirdPartyRevertsWithoutAccountingChanges() public {
+        _assertDirectZeroRepaymentUnchanged(stranger);
+    }
+
+    function _assertDirectZeroRepaymentUnchanged(address payer) internal {
+        uint256 loanId = _openLoan(PRINCIPAL);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        assertGt(owed, PRINCIPAL, "exercise an interest-bearing active loan");
+        usdc.mint(payer, owed);
+        vm.prank(payer);
+        usdc.approve(address(credit), owed);
+        uint256 payerBefore = usdc.balanceOf(payer);
+        uint256 poolBefore = usdc.balanceOf(address(credit));
+        uint256 cashBefore = credit.lenderCash();
+        uint256 assetsBefore = credit.totalAssets();
+        uint256 lenderBefore = credit.lenderBalance(makeAddr("poolLender"));
+        uint256 sharesBefore = credit.totalShares();
+
+        vm.prank(payer);
+        vm.expectRevert(DecentralizedMicrocredit.ZeroAmount.selector);
+        credit.repayLoan(loanId, 0);
+
+        assertEq(usdc.balanceOf(payer), payerBefore, "no payer transfer");
+        assertEq(usdc.balanceOf(address(credit)), poolBefore, "no pool transfer");
+        assertEq(credit.lenderCash(), cashBefore, "no lender cash change");
+        assertEq(credit.totalAssets(), assetsBefore, "no lender asset change");
+        assertEq(credit.lenderBalance(makeAddr("poolLender")), lenderBefore, "no lender value change");
+        assertEq(credit.totalShares(), sharesBefore, "no shares change");
+        assertEq(credit.getCurrentOutstandingAmount(loanId), owed, "no loan payment");
+        assertEq(credit.totalLentOut(), PRINCIPAL);
+        assertEq(credit.completedLoans(borrower), 0);
+        assertEq(credit.duesPaid(borrower), 0);
+        assertEq(credit.protocolFees(), 0);
+        assertEq(credit.firstLossReserve(), 0);
+        (,,,, bool active) = credit.getLoan(loanId);
+        assertTrue(active, "zero did not close the loan");
+    }
+
+    function testZeroPermitRepayAllCreditsLenderCashAndNetInterest() public {
+        uint256 loanId = _openLoan(PRINCIPAL);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        uint256 interest = owed - PRINCIPAL;
+        uint256 fee = interest * credit.protocolFeeBps() / 10_000;
+        uint256 reserve = interest * credit.reserveBps() / 10_000;
+        uint256 cashBefore = credit.lenderCash();
+        uint256 assetsBefore = credit.totalAssets();
+        uint256 lenderBefore = credit.lenderBalance(makeAddr("poolLender"));
+        usdc.mint(borrower, interest);
+        DecentralizedMicrocredit.PermitData memory p = _signPermit(borrowerPk, owed, _deadline());
+
+        vm.prank(relayer);
+        credit.repayWithPermit(borrower, loanId, 0, p.value, p.deadline, p.v, p.r, p.s);
+
+        assertEq(usdc.balanceOf(borrower), 0, "zero means repay all, not transfer zero");
+        assertEq(credit.lenderCash(), cashBefore + owed - fee);
+        assertEq(credit.totalAssets(), assetsBefore + interest - fee - reserve);
+        assertApproxEqAbs(
+            credit.lenderBalance(makeAddr("poolLender")) - lenderBefore,
+            interest - fee - reserve,
+            1,
+            "lender value earns interest net of fee and reserve"
+        );
+        assertEq(credit.protocolFees(), fee);
+        assertEq(credit.firstLossReserve(), reserve);
+        assertEq(credit.getCurrentOutstandingAmount(loanId), 0);
+        assertEq(credit.totalLentOut(), 0);
+        (,,,, bool active) = credit.getLoan(loanId);
+        assertFalse(active);
+    }
+
     function testPartialRepaymentReducesOutstanding() public {
         uint256 loanId = _openLoan(PRINCIPAL);
         vm.warp(vm.getBlockTimestamp() + 30 days);
