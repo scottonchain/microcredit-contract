@@ -619,6 +619,12 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         uint256 owed = credit.getCurrentOutstandingAmount(loanId);
         assertGt(owed, 40e6, "interest accrued after grace period");
         usdc.mint(borrower, owed - 40e6);
+        uint256 cashBefore = credit.lenderCash();
+        uint256 assetsBefore = credit.totalAssets();
+        uint256 lenderBefore = credit.lenderBalance(poolLender);
+        uint256 interest = owed - 40e6;
+        uint256 fee = interest * credit.protocolFeeBps() / 10_000;
+        uint256 reserve = interest * credit.reserveBps() / 10_000;
 
         DecentralizedMicrocredit.RepayRequest memory req = _repayRequest(loanId, 0);
         bytes memory sig = _signRepayRequest(borrowerPk, req);
@@ -633,6 +639,9 @@ contract MetaTransactionFlowsTest is MicrocreditTestBase {
         assertFalse(active);
         assertEq(usdc.balanceOf(borrower), 0);
         assertEq(credit.totalLentOut(), 0);
+        assertEq(credit.lenderCash(), cashBefore + owed - fee);
+        assertEq(credit.totalAssets(), assetsBefore + interest - fee - reserve);
+        assertApproxEqAbs(credit.lenderBalance(poolLender) - lenderBefore, interest - fee - reserve, 1);
     }
 
     function testRepayLoanMetaAfterPartialRepaymentPullsRemainder() public {
