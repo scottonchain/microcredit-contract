@@ -1,6 +1,7 @@
 """Offline synthetic guard diagnostics; no real secrets, remotes or identity probes."""
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -76,7 +77,9 @@ class PublicContentDiagnosticsTests(unittest.TestCase):
     def fixture(self, directory, *, base_text="safe base\n", text="safe head\n",
                 message="synthetic head", author=None, committer=None):
         repo = Path(directory)
-        environment = dict(os.environ, GIT_AUTHOR_NAME="Synthetic guard fixture",
+        environment = dict(PATH=os.defpath, GIT_CONFIG_NOSYSTEM="1",
+                           GIT_CONFIG_GLOBAL=os.devnull,
+                           GIT_AUTHOR_NAME="Synthetic guard fixture",
                            GIT_COMMITTER_NAME="Synthetic guard fixture",
                            GIT_AUTHOR_EMAIL="noreply@example.invalid",
                            GIT_COMMITTER_EMAIL="noreply@example.invalid")
@@ -101,6 +104,109 @@ class PublicContentDiagnosticsTests(unittest.TestCase):
             environment["GIT_COMMITTER_EMAIL"] = committer
         git("-c", "commit.gpgsign=false", "commit", "--quiet", "-m", message)
         return repo, base + ".." + git("rev-parse", "HEAD")
+
+    def extend_history(self, repo, *, text, merge=False):
+        environment = dict(PATH=os.defpath, GIT_CONFIG_NOSYSTEM="1",
+                           GIT_CONFIG_GLOBAL=os.devnull,
+                           GIT_AUTHOR_NAME="Synthetic guard fixture",
+                           GIT_COMMITTER_NAME="Synthetic guard fixture",
+                           GIT_AUTHOR_EMAIL="noreply@example.invalid",
+                           GIT_COMMITTER_EMAIL="noreply@example.invalid")
+
+        def git(*args):
+            result = subprocess.run(["git", *args], cwd=repo, env=environment,
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, "offline synthetic Git setup failed")
+            return result.stdout.strip()
+
+        if merge:
+            branch = git("branch", "--show-current")
+            git("checkout", "--quiet", "-b", "synthetic-side", "HEAD^")
+            (repo / "side.txt").write_text("safe side\n")
+            git("add", "side.txt")
+            git("-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "safe side")
+            git("checkout", "--quiet", branch)
+            git("merge", "--quiet", "--no-ff", "--no-commit", "synthetic-side")
+        (repo / "transient.txt").write_text(text)
+        git("add", "transient.txt")
+        git("-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "synthetic intermediate")
+        (repo / "transient.txt").write_text("safe final\n")
+        git("add", "transient.txt")
+        git("-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "synthetic final")
+        return git("rev-parse", "HEAD"), environment
+
+    def test_transient_line_and_merge_resolution_are_checked_without_echo(self):
+        finding = "ghp" + "_" + "Z" * 24
+        for merge in (False, True):
+            with self.subTest(merge=merge), tempfile.TemporaryDirectory(prefix=SENTINEL) as directory:
+                repo, span = self.fixture(directory)
+                head, environment = self.extend_history(repo, text=SENTINEL + finding, merge=merge)
+                span = span.split("..", 1)[0] + ".." + head
+                result = self.run_guard("--range", span, cwd=repo, env=environment)
+                self.assertEqual(result.returncode, 1)
+                self.assert_private(result, finding, span, str(repo))
+
+    def test_transient_labelled_key_preserves_base_fixture_exception(self):
+        key = "0x" + "ab" * 32
+        line = "private" + "_key = " + key + "\n"
+        for known in (False, True):
+            with self.subTest(known=known), tempfile.TemporaryDirectory(prefix=SENTINEL) as directory:
+                repo, span = self.fixture(directory, base_text=line if known else "safe base\n")
+                head, environment = self.extend_history(repo, text=line)
+                span = span.split("..", 1)[0] + ".." + head
+                result = self.run_guard("--range", span, cwd=repo, env=environment)
+                self.assertEqual(result.returncode, 0 if known else 1)
+                self.assert_private(result, key, key[:10], span, str(repo))
+                if known:
+                    self.assertEqual(result.stdout + result.stderr, "")
+
+    def test_clean_transient_history_remains_silent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo, span = self.fixture(directory)
+            head, environment = self.extend_history(repo, text="safe intermediate\n", merge=True)
+            result = self.run_guard("--range", span.split("..", 1)[0] + ".." + head,
+                                    cwd=repo, env=environment)
+            self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
+
+    def test_history_patch_read_error_is_static_and_private(self):
+        with tempfile.TemporaryDirectory(prefix=SENTINEL) as directory:
+            repo, span = self.fixture(directory)
+            bindir = repo / "bin"
+            bindir.mkdir()
+            wrapper = bindir / "git"
+            wrapper.write_text('#!/bin/sh\ncase "$*" in *--patch*) '
+                               'printf "%s\\n" "$SYNTHETIC_PRIVATE_CONTEXT" >&2; exit 7;; esac\n'
+                               'exec "$SYNTHETIC_REAL_GIT" "$@"\n')
+            wrapper.chmod(0o755)
+            environment = dict(PATH=str(bindir) + os.pathsep + os.defpath,
+                               GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
+                               SYNTHETIC_REAL_GIT=shutil.which("git"),
+                               SYNTHETIC_PRIVATE_CONTEXT=SENTINEL)
+            result = self.run_guard("--range", span, cwd=repo, env=environment)
+            self.assertEqual((result.returncode, result.stdout, result.stderr), (2, "", INPUT_ERROR))
+            self.assert_private(result, span, str(repo))
+
+    def test_raw_patch_format_ignores_color_indicators_and_external_helpers(self):
+        finding = "ghp" + "_" + "Z" * 24
+        with tempfile.TemporaryDirectory(prefix=SENTINEL) as directory:
+            repo, span = self.fixture(directory, text=SENTINEL + finding)
+            marker = repo / "helper-executed"
+            helper = repo / "synthetic-helper"
+            helper.write_text('#!/bin/sh\ntouch "' + str(marker) + '"\nprintf "%s\\n" safe\n')
+            helper.chmod(0o755)
+            (repo / ".gitattributes").write_text("fixture.txt diff=synthetic\n")
+            environment = dict(PATH=os.defpath, GIT_CONFIG_NOSYSTEM="1",
+                               GIT_CONFIG_GLOBAL=os.devnull)
+            for name, value in (("color.ui", "always"), ("diff.outputIndicatorNew", "!"),
+                                ("diff.external", str(helper)),
+                                ("diff.synthetic.textconv", str(helper))):
+                result = subprocess.run(["git", "config", name, value], cwd=repo,
+                                        env=environment, capture_output=True, timeout=10)
+                self.assertEqual(result.returncode, 0, "offline fixture configuration failed")
+            result = self.run_guard("--range", span, cwd=repo, env=environment)
+            self.assertEqual(result.returncode, 1)
+            self.assertFalse(marker.exists())
+            self.assert_private(result, finding, span, str(repo))
 
     def test_clean_and_equal_ranges_remain_silent(self):
         with tempfile.TemporaryDirectory() as directory:

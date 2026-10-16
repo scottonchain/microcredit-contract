@@ -195,7 +195,7 @@ def experiment():
         for base in ("zero", "missing"):
             row = run_case(executable, proposed, history + "_" + base,
                            history=history, base=base, fallback=fallback)
-            full_expected = 0 if history in ("clean", "removed_line") else 1
+            full_expected = 0 if history == "clean" else 1
             last_expected = 1 if history == "final_line" else 0
             if (row["caller_exit"], row["strict_caller_exit"], row["direct_guard_exit"],
                 row["proposed_caller_exit"], row["strict_proposed_caller_exit"],
@@ -205,10 +205,13 @@ def experiment():
                                                  last_expected, full_expected, 2, 1):
                 raise AssertionError("fallback coverage mismatch: " + row["case"])
             fallback_rows.append(row)
-    return dict(schema="ci-privacy-caller-experiment/v2", workflow_sha256=digest(workflow),
+    return dict(schema="ci-privacy-caller-experiment/v3", workflow_sha256=digest(workflow),
                 guard_sha256=digest(GUARD.read_bytes()), source_block_sha256=digest(source.encode()),
                 cases=rows, conclusion="CALLER_FALSE_GREEN_WITH_UNAVAILABLE_BASE",
                 fallback_cases=fallback_rows,
+                fallback_full_range_misses=sum(row["fallback_caller_exit"] == 0 and
+                                               row["known_full_range_exit"] == 1
+                                               for row in fallback_rows),
                 fallback_conclusion="LAST_PARENT_FALLBACK_MISSES_EARLIER_FINDINGS",
                 classification="synthetic offline reproduction; not production exposure or fixed CI",
                 transformations=["resolve repository expression to synthetic/fixture",

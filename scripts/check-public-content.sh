@@ -53,7 +53,13 @@ case "${1:-}" in
     if ! base_oid=$(git rev-parse --verify --quiet --end-of-options "$base^{commit}" 2>/dev/null); then input_error; fi
     if ! head_oid=$(git rev-parse --verify --quiet --end-of-options "$head^{commit}" 2>/dev/null); then input_error; fi
     if ! messages=$(git log --format='%H %an <%ae> %cn <%ce>%n%B' "$base_oid..$head_oid" 2>/dev/null); then input_error; fi
-    if ! changes=$(git diff "$base_oid...$head_oid" 2>/dev/null); then input_error; fi
+    if ! changes=$(git diff --no-ext-diff --no-textconv --no-color --output-indicator-new=+ --output-indicator-old=- '--output-indicator-context= ' "$base_oid...$head_oid" 2>/dev/null); then input_error; fi
+    # A net endpoint diff loses lines introduced and then removed in the range.
+    # Keep it AND scan selected commits, including first-parent merge patches.
+    # This changes diff formatting, not traversal (--first-parent is not used).
+    # Never execute repository-configured diff/text-conversion helpers.
+    if ! patches=$(git log --format= --patch --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --output-indicator-new=+ --output-indicator-old=- '--output-indicator-context= ' "$base_oid..$head_oid" 2>/dev/null); then input_error; fi
+    changes+=$'\n'"$patches"
     # scan runs in this shell (no pipe), so its verdict reaches the exit code below. Authorship is
     # scanned too: a merge made on GitHub carries the account's email unless it is set to private.
     if ! scan <<< "$messages" 2>/dev/null; then input_error; fi

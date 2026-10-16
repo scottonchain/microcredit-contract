@@ -210,3 +210,74 @@ These sources explain why the comparison is meaningful; the actual synthetic
 execution supplies the table. No broad research refresh, paid work, human
 earnings, household benefit or roadmap-stage change is claimed. Stages0-7,
 M>1 and all existing human-access, learning and sustainability gates remain.
+
+## Guard correction after the returned finding (October 16, 08:37 UTC)
+
+Previous step **WORKED**: PR40/main `5fb6620ef216df3d272ede6366164330c833bf4c`
+preserves the v2 experiment and the two dated tables above. Claude's
+[independent returned reproduction](https://github.com/scottonchain/microcredit-contract/pull/40#issuecomment-6211368175)
+confirmed that content added and then removed passes the guard. This is the
+concrete risk permitting one further bounded safety correction, not discretionary
+service preparation or proof of a buyer. Beneficiaries: contributors and people
+whose private context must not enter public history. Codex owns the correction;
+separate internal checking and current maintainer review precede integration.
+
+The guard now retains its endpoint diff **and** reads patches for every selected
+commit in `base..head`. Explicit `--diff-merges=first-parent` also produces a
+merge's first-parent patch; it is a diff-format choice, **not** the traversal
+option `--first-parent`. Side-branch commits remain selected. External diff and
+text-conversion helpers are disabled; color and patch indicators are explicitly
+fixed so added-line extraction reads raw patches. A failed patch read exits 2
+without supplied input, paths or diagnostics. Existing message/identity scanning,
+patterns and the published-base labelled-key exception are unchanged.
+
+Observed locally at the source baseline versus the correction:
+
+| New controlled group | Baseline guard at 5fb6620 | Corrected guard |
+| --- | --- | --- |
+| Token added/removed; token only in merge resolution then removed | Both silently 0 | Both reject 1, no context echo |
+| Labelled key added/removed; same key already in published base | New key silently 0; published key allowed | New key rejects 1; published key remains silent 0 |
+| Clean intermediate/merge history | Silent 0 | Silent 0 |
+| Failed historical patch read | Silent 0, because no patch read occurs | Static input error 2 |
+| Configured color/indicators and external conversion/diff helpers | Finding missed | Rejects 1; helper marker absent |
+
+The five new test methods give five baseline failing assertions (the first method
+has two cases), zero fixture errors; the clean/published controls pass. With the
+correction, **14 diagnostic groups pass** (9 existing plus 5 new). Full script
+discovery is **45 discovered, 40 passed, 5 skipped** in the root environment;
+toolchain-dependent skips stay skips. The fixtures disable global/system Git
+configuration and use only synthetic identities/data and disposable local repos.
+No real credential, public push, network call or identity probe is part of them.
+
+The existing caller experiment advances to schema v3 for the changed guard, not
+a rewritten historical result: original ten cases remain unchanged; the two
+`removed_line` full-range results now reject 1 rather than pass 0. Consequently
+the current last-parent candidate misses **10/14**, while its original v2 result
+was **8/14**. All 24 current cases match their expected statuses in both shells.
+To reproduce the historical v2 table, use the exact PR40/main revision above;
+do not run the new guard and relabel its output as the old observation.
+
+Bound: one ordinary-source guard correction, existing tests/experiment/doc only;
+no workflow, contract, deployment, financial action or new tooling dependency.
+Existing resources are used; full labor/inference/CI cost remains unknown.
+Acceptance requires new finding cases reject, clean/base fixtures remain allowed,
+static input failures/no echo, exact-source independent review, required checks
+and verified main integration. Unexpected status, source drift, echo or regression
+stops integration. Stop this increment at that gate; no broad safety campaign or
+new service preparation is commissioned.
+
+This is still a pattern-based text guard, not a comprehensive historical secret
+audit, binary/object/path scanner, or prevention of hosted disclosure. One merge
+control does not establish every DAG/configuration case. The existing unavailable-
+BASE caller still skips the guard; this correction cannot repair a caller that
+does not invoke it. The denied workflow remedy and regression-CI wiring remain
+separate STOPPED dependencies. No scope/credential/object/ref workaround follows.
+
+Primary source refreshed October 16, 2026:
+[Git log](https://git-scm.com/docs/git-log) documents patch generation, explicit
+merge diff formats, and raw-inspection helper controls. The measured regression
+results above come from synthetic local execution, not those docs or production.
+Roadmap stages0-7, M>1, consent/access/counterfactual and learning/sustainability
+gates are unchanged. No outside paid assignment, repeat buyer, human earnings or
+poverty outcome is established; NO_LOAN/NO_GUARANTEE and existing resources remain
+the appropriate comparison here.
