@@ -18,40 +18,62 @@ KEY_LINE='(private[_ -]?key|PRIVATE_KEY|secret)[^\n]{0,40}0x[0-9a-fA-F]{64}'
 
 fail=0
 scan() {
-  local label=$1 hits
-  # Line numbers with the match masked: a finding must not copy the content into a public CI log.
-  hits=$(grep -nE "$PATTERNS" | sed -E "s#$PATTERNS#[redacted]#g" || true)
-  if [ -n "$hits" ]; then
-    echo "$label: forbidden content"
-    echo "$hits" | head -20
+  local hits status
+  # Never print matched lines: their surrounding text may also be private.
+  if hits=$(grep -nE "$PATTERNS"); then
+    echo "forbidden public content at input line(s):"
+    printf '%s\n' "$hits" | cut -d: -f1 | head -20
     fail=1
+  else
+    status=$?
+    [ "$status" -eq 1 ] || return 2
   fi
+  return 0
+}
+
+input_error() {
+  echo "Public-content check input unavailable or invalid; inspect it privately." >&2
+  exit 2
 }
 
 case "${1:-}" in
   --message | --text)
-    scan "$2" < "$2"
+    [ "$#" -eq 2 ] || input_error
+    [ -f "$2" ] && [ -r "$2" ] || input_error
+    if ! { scan < "$2"; } 2>/dev/null; then input_error; fi
     ;;
   --range)
+    [ "$#" -eq 2 ] || input_error
     range=$2
     base=${range%%..*}
     head=${range##*..}
+    [ -n "$base" ] && [ -n "$head" ] && [ "$range" = "$base..$head" ] || input_error
+    # Resolve each endpoint once, treating it as data, not a Git option. Failed
+    # reads must not become a successful empty scan or echo a supplied revision.
+    if ! base_oid=$(git rev-parse --verify --quiet --end-of-options "$base^{commit}" 2>/dev/null); then input_error; fi
+    if ! head_oid=$(git rev-parse --verify --quiet --end-of-options "$head^{commit}" 2>/dev/null); then input_error; fi
+    if ! messages=$(git log --format='%H %an <%ae> %cn <%ce>%n%B' "$base_oid..$head_oid" 2>/dev/null); then input_error; fi
+    if ! changes=$(git diff "$base_oid...$head_oid" 2>/dev/null); then input_error; fi
     # scan runs in this shell (no pipe), so its verdict reaches the exit code below. Authorship is
     # scanned too: a merge made on GitHub carries the account's email unless it is set to private.
-    scan "commit messages and authorship in $base..$head" < <(git log --format='%H %an <%ae> %cn <%ce>%n%B' "$base..$head")
-    added=$(git diff "$base...$head" | grep -E '^\+[^+]' | cut -c2- || true)
-    scan "lines added in $base...$head" <<< "$added"
+    if ! scan <<< "$messages" 2>/dev/null; then input_error; fi
+    added=$(printf '%s\n' "$changes" | grep -E '^\+[^+]' | cut -c2- || true)
+    if ! scan <<< "$added" 2>/dev/null; then input_error; fi
     while read -r line; do
       [ -n "$line" ] || continue
       key=$(printf '%s' "$line" | grep -oE '0x[0-9a-fA-F]{64}' | head -1)
-      if ! git grep -q -- "$key" "$base" 2>/dev/null; then
-        echo "lines added in $base...$head: a private key the base does not contain: ${key:0:10}..."
+      if git grep -q -- "$key" "$base_oid" 2>/dev/null; then
+        : # Existing published fixture exception is unchanged.
+      else
+        status=$?
+        [ "$status" -eq 1 ] || input_error
+        echo "lines added: a new labelled private key was detected"
         fail=1
       fi
     done < <(printf '%s\n' "$added" | grep -E "$KEY_LINE" || true)
     ;;
   *)
-    echo "usage: $0 --message <file> | --text <file> | --range <base>..<head>" >&2
+    echo "usage: check-public-content.sh --message <file> | --text <file> | --range <base>..<head>" >&2
     exit 2
     ;;
 esac
