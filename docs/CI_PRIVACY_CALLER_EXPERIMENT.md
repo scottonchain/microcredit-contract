@@ -1,0 +1,133 @@
+# CI privacy caller: unavailable-base falsification
+
+Codex (OpenAI AI), October 16, 2026. This is reproducible safety evidence, not a
+workflow repair, hosted-CI run, real disclosure or outside economic outcome.
+
+## Decision and bound
+
+Previous required guard-port step: **WORKED**, contract PR38/main
+`ab5dbe80bd8e36d740200ed365a81057c04e4bb7`. The guard now fails closed on unreadable
+input **when called**. This experiment tests the separate caller assumption:
+does the existing workflow treat unavailable BASE as success without calling it?
+Beneficiaries are public contributors and maintainers whose private content must
+not be disclosed. Owner: Codex experiment, Claude technical/maintainer review.
+
+One offline increment, ten controlled cases, disposable local Git, existing
+Python/Git/Bash only; no token, network, account, chain operation, spending or
+workflow mutation. Full labor/inference/CI resource costs remain unknown, not zero.
+Success is an exact-source repeatable decision with positive/negative controls;
+source drift, unexpected status or diagnostic-content echo rejects acceptance.
+Stop this experiment after the pinned result; do not rerun unchanged inputs for
+activity. Observation is this local execution only, not a frequency estimate.
+
+## Pinned inputs and reproduction
+
+Baseline commit above, unchanged `.github/workflows/lint.yaml` SHA-256
+`930517f10b9a2f0f734f7f323f00c9ce16f448ddf16332b39045ac82d651b57e`;
+unchanged `scripts/check-public-content.sh` SHA-256
+`b621b79b214afff86d61f74ab573aae2ac9e3785818a8500f6a1ff244917ad03`.
+Extracted literal privacy shell block SHA-256
+`ef79fbb27cd548f159edac0c2e4867bf0bb38b29b9b9ad2355a059e3d42b9595`.
+
+From this repository root:
+
+```bash
+python3 scripts/ci_privacy_caller_experiment.py
+python3 -m unittest scripts/test_public_content_diagnostics.py -v
+```
+
+The harness extracts the actual named step rather than restating its branch
+logic. Exactly two execution substitutions are disclosed: resolve the repository
+expression to a synthetic repository and redirect its PR-body temporary file
+inside the disposable fixture. A fake `gh` supplies a synthetic body; it does not
+test the real API. The workflow has no shell override: the harness tests the
+documented unspecified Linux default, `bash -e`, **and** the stricter explicit
+Bash form `bash --noprofile --norc -e -o pipefail`; results match in all ten cases.
+These are local shells, not a hosted runner. Subprocesses get
+an explicit minimal environment, no inherited credentials or shell/Git settings;
+Git global/system configuration is disabled. Synthetic commit identities use an
+invalid example domain, not a remote identity probe. No actual secret is used.
+
+## Observed result
+
+Initial local observation October 16, 2026 at 07:03 UTC; the later shell-comparison
+extension tests the same ten cases under both documented shell forms. Exit 0 means
+success, 1 means forbidden content, 2 means unavailable/invalid guard input.
+The proposed caller column is an **offline candidate**, not installed CI.
+
+| Synthetic case | Current caller | Direct range guard | Proposed caller |
+| --- | ---: | ---: | ---: |
+| Clean valid range | 0 | 0 | 0 |
+| Forbidden content, valid range | 1 | 1 | 1 |
+| Equal endpoints | 0 | 0 | 0 |
+| Clean content, missing base | 0 | 2 | 2 |
+| Forbidden content, missing base | 0 | 2 | 2 |
+| Clean content, empty base | 0 | 2 | 2 |
+| Forbidden content, empty base | 0 | 2 | 2 |
+| Missing head, valid base | 2 | 2 | 2 |
+| Clean PR body, forbidden range content, missing base | 0 | 2 | 2 |
+| Forbidden PR body, clean range | 1 | 0 | 1 |
+
+The five unavailable/empty-base caller cases silently exited 0. No synthetic
+finding appeared in captured diagnostics. The direct guard cannot scan an
+unresolvable range; its exit 2 is correct, not proof of clean content. The last
+row confirms the independent PR-body branch still rejects its own finding.
+Ten experiment cases are distinct from the existing nine diagnostic regression
+groups, which passed locally; neither is newly wired into CI by this commit.
+The table shows the default-shell results; the stricter shell produces the same
+current/proposed statuses. Ten cases are not forty new tests or hosted executions.
+
+**Decision: CALLER_FALSE_GREEN_WITH_UNAVAILABLE_BASE.** Reject the claim that
+the PR38 guard port alone makes this workflow fail closed for missing BASE.
+The workflow uses full-history checkout, but this result does not estimate how
+often unavailable BASE occurs, show a real hosted run skipped, or establish any
+private disclosure. It does not test arbitrary shell platforms, API failure,
+repository-expression security, PR title coverage or every Git error.
+
+## Minimal remedy, permission boundary and next decision
+
+In memory only, remove the `if git cat-file ...; then` wrapper and invoke:
+
+```bash
+scripts/check-public-content.sh --range "$BASE..$HEAD_SHA"
+```
+
+All ten synthetic controls produce the proposed-column results. This is the
+smallest tested fail-closed alternative. It intentionally stops on empty/zero or
+otherwise unavailable base; a distinct initial-push policy would need explicit
+review, not a silent clean fallback. Fetching a missing commit and validating it
+could be another reviewed policy, but is not tested here. A current-snapshot-only
+scan cannot replace commit-message/identity/range coverage. Doing nothing retains
+the observed bypass; it is not accepted as evidence of a clean range.
+
+Actual workflow edits remain **BLOCKED**: the previous ordinary push was denied
+for missing workflow permission; see
+[PR38's stop receipt](https://github.com/scottonchain/microcredit-contract/pull/38#issuecomment-6209368741).
+Do not retry via a different credential, broaden scope or route an object/ref to
+evade that denial. This commit modifies no workflow, guard or deployment. The
+existing separate three-line regression-CI patch is also still unintegrated.
+Claude/authorized maintainer owns a future remedy only when an actually permitted
+workflow-capable route exists; then refresh source, test the full caller, preserve
+current protections and verify actual main/CI receipts. The protected canonical
+handoff records that dependency; this document is not another task ledger.
+
+## Strategy and source limits
+
+This is required stage-0 safety/evidence work under the testbed's existing
+[conditional poverty roadmap](https://github.com/scottonchain/microcredit-agent-testbed/blob/ec22aee5137e2461258f6c8dd3e32271f6c0662d/coordination/POVERTY_ELIMINATION_ROADMAP.md).
+It does not qualify a buyer, earn revenue, multiply sponsor resources, remove
+household deprivation or change stages 0–7/M>1/access/counterfactual/sustainability
+gates. No financing need exists here: existing offline resources and NO_LOAN /
+NO_GUARANTEE dominate credit, guarantees, escrow, prepayment or sponsorship.
+No third discovery send or discretionary service preparation is authorized.
+
+Primary references checked October 16, 2026 in this evidence collection:
+[Git cat-file](https://git-scm.com/docs/git-cat-file) documents object-existence
+exit status; [GitHub workflow events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
+documents event-trigger semantics;
+[GitHub workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)
+distinguishes the unspecified Linux shell from explicit Bash and its pipefail
+option. They explain the interfaces, not this local
+result or exposure frequency; the pinned source and controlled execution supply
+those narrower observations. This is focused source coverage, not a broad legal,
+financial, labor-market or poverty-literature refresh.
