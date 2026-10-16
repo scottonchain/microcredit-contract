@@ -48,7 +48,8 @@ def execute(args, cwd, env):
                           text=True, timeout=15)
 
 
-def run_case(block, proposed, name, *, content=False, base="present", head="present", body=None):
+def run_case(block, proposed, name, *, content=False, base="present", head="present", body=None,
+             history=None, fallback=None):
     with tempfile.TemporaryDirectory(prefix="ci-caller-synthetic-") as directory:
         repo = Path(directory)
         (repo / "scripts").mkdir()
@@ -78,12 +79,36 @@ def run_case(block, proposed, name, *, content=False, base="present", head="pres
         git("-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "synthetic base")
         base_oid = git("rev-parse", "HEAD")
         synthetic_finding = "ghp" + "_" + "Z" * 24
-        path.write_text("safe base\n" + (synthetic_finding if content else "safe head") + "\n")
+        if history is not None:
+            # Two new commits, not just one. Only the earlier commit carries
+            # the selected finding; the final commit is independently clean
+            # except for the explicit final-line positive control.
+            path.write_text("safe base\n" + (synthetic_finding if history in
+                            ("earlier_line", "removed_line") else "safe earlier") + "\n")
+            git("add", "fixture.txt")
+            identity_field = {"earlier_author": "GIT_AUTHOR_EMAIL",
+                              "earlier_committer": "GIT_COMMITTER_EMAIL"}.get(history)
+            original_identity = env.get(identity_field) if identity_field else None
+            synthetic_email = "fixture" + "@" + "gmail" + ".com"
+            if identity_field:
+                env[identity_field] = synthetic_email
+            git("-c", "commit.gpgsign=false", "commit", "--quiet", "-m",
+                synthetic_finding if history == "earlier_message" else "synthetic earlier")
+            if identity_field:
+                env[identity_field] = original_identity
+            if history == "removed_line":
+                path.write_text("safe base\nsafe final\n")
+            elif history == "final_line":
+                path.write_text("safe base\n" + synthetic_finding + "\n")
+            else:
+                path.write_text(path.read_text() + "safe final\n")
+        else:
+            path.write_text("safe base\n" + (synthetic_finding if content else "safe head") + "\n")
         git("add", "fixture.txt")
         git("-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "synthetic head")
         head_oid = git("rev-parse", "HEAD")
         env.update(BASE={"present": base_oid, "missing": "unavailable-synthetic-base",
-                         "empty": ""}[base],
+                         "empty": "", "zero": "0" * 40}[base],
                    HEAD_SHA={"present": head_oid, "missing": "unavailable-synthetic-head",
                              "equal": base_oid}[head],
                    PR_NUMBER="1" if body is not None else "",
@@ -102,15 +127,28 @@ def run_case(block, proposed, name, *, content=False, base="present", head="pres
         strict_candidate = execute([*strict_shell, proposed_runnable], repo, env)
         guard = execute(["bash", str(GUARD), "--range", env["BASE"] + ".." + env["HEAD_SHA"]], repo, env)
         results = (caller, strict_caller, candidate, strict_candidate, guard)
+        extra = {}
+        if history is not None:
+            fallback_runnable = fallback.replace("/tmp/pr-body.txt", str(repo / "pr-body.txt"))
+            last = execute([*default_shell, fallback_runnable], repo, env)
+            strict_last = execute([*strict_shell, fallback_runnable], repo, env)
+            full = execute(["bash", str(GUARD), "--range", base_oid + ".." + head_oid], repo, env)
+            results += (last, strict_last, full)
+            extra = dict(fallback_caller_exit=last.returncode,
+                         strict_fallback_caller_exit=strict_last.returncode,
+                         fallback_output_empty=not (last.stdout + last.stderr),
+                         known_full_range_exit=full.returncode,
+                         full_commit_count=int(git("rev-list", "--count", base_oid + ".." + head_oid)),
+                         fallback_commit_count=int(git("rev-list", "--count", head_oid + "^.." + head_oid)))
         combined = "".join(result.stdout + result.stderr for result in results)
-        if synthetic_finding in combined:
+        if synthetic_finding in combined or (history is not None and synthetic_email in combined):
             raise AssertionError("captured diagnostics echoed a synthetic finding")
         return dict(case=name, caller_exit=caller.returncode, direct_guard_exit=guard.returncode,
                     proposed_caller_exit=candidate.returncode,
                     strict_caller_exit=strict_caller.returncode,
                     strict_proposed_caller_exit=strict_candidate.returncode,
                     caller_output_empty=not (caller.stdout + caller.stderr),
-                    synthetic_finding_echoed=False)
+                    synthetic_finding_echoed=False, **extra)
 
 
 def experiment():
@@ -145,9 +183,33 @@ def experiment():
         if (row["strict_caller_exit"], row["strict_proposed_caller_exit"]) != (expected[0], expected_proposed):
             raise AssertionError("shell comparison mismatch: " + name)
         rows.append(row)
-    return dict(schema="ci-privacy-caller-experiment/v1", workflow_sha256=digest(workflow),
+    # This is an explicitly modelled suggestion from PR39 review, not extracted
+    # deployed behavior. Retain the actual caller and fail-closed comparisons.
+    fallback = executable.replace(conditional,
+        'if git cat-file -e "$BASE" 2>/dev/null; then\n'
+        '  scripts/check-public-content.sh --range "$BASE..$HEAD_SHA"\nelse\n'
+        '  scripts/check-public-content.sh --range "$HEAD_SHA^..$HEAD_SHA"\nfi\n')
+    fallback_rows = []
+    for history in ("clean", "earlier_line", "earlier_message", "earlier_author",
+                    "earlier_committer", "final_line", "removed_line"):
+        for base in ("zero", "missing"):
+            row = run_case(executable, proposed, history + "_" + base,
+                           history=history, base=base, fallback=fallback)
+            full_expected = 0 if history in ("clean", "removed_line") else 1
+            last_expected = 1 if history == "final_line" else 0
+            if (row["caller_exit"], row["strict_caller_exit"], row["direct_guard_exit"],
+                row["proposed_caller_exit"], row["strict_proposed_caller_exit"],
+                row["fallback_caller_exit"], row["strict_fallback_caller_exit"],
+                row["known_full_range_exit"], row["full_commit_count"],
+                row["fallback_commit_count"]) != (0, 0, 2, 2, 2, last_expected,
+                                                 last_expected, full_expected, 2, 1):
+                raise AssertionError("fallback coverage mismatch: " + row["case"])
+            fallback_rows.append(row)
+    return dict(schema="ci-privacy-caller-experiment/v2", workflow_sha256=digest(workflow),
                 guard_sha256=digest(GUARD.read_bytes()), source_block_sha256=digest(source.encode()),
                 cases=rows, conclusion="CALLER_FALSE_GREEN_WITH_UNAVAILABLE_BASE",
+                fallback_cases=fallback_rows,
+                fallback_conclusion="LAST_PARENT_FALLBACK_MISSES_EARLIER_FINDINGS",
                 classification="synthetic offline reproduction; not production exposure or fixed CI",
                 transformations=["resolve repository expression to synthetic/fixture",
                                  "redirect PR body temporary file inside disposable fixture"],

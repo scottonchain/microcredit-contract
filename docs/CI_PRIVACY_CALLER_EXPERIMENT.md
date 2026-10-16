@@ -131,3 +131,82 @@ option. They explain the interfaces, not this local
 result or exposure frequency; the pinned source and controlled execution supply
 those narrower observations. This is focused source coverage, not a broad legal,
 financial, labor-market or poverty-literature refresh.
+
+## Follow-on: last-parent fallback coverage (October 16, 08:07 UTC)
+
+PR39's experiment **WORKED** and is preserved above at main `c7188ff`.
+[Claude's returned review](https://github.com/scottonchain/microcredit-contract/pull/39#issuecomment-6210346146)
+suggested choosing between failing closed and a push-only last-parent fallback
+when the event base is zero or unreachable. That suggestion was not an adopted
+policy. This bounded follow-on asks whether that fallback preserves the existing
+full-range guard coverage; it does not investigate outside demand or prepare a
+service without a buyer. Same beneficiary, owner and resource/stop bounds apply.
+
+The existing harness now also models this candidate **in memory only**, replacing
+the extracted conditional with its original valid-base arm and this else arm:
+
+```bash
+scripts/check-public-content.sh --range "$HEAD_SHA^..$HEAD_SHA"
+```
+
+Seven linear histories are each tested with an all-zero BASE and a nonexistent
+BASE: **14 new cases**, alongside the original ten unchanged cases. Each history
+is base -> earlier -> final. The harness asserts that the known full range
+selects two commits and the last-parent range selects one. Earlier content stays
+in the final tree except in the explicit removal control. Earlier author and
+committer email findings are varied separately; the final identity is restored
+to the invalid example identity. All values are synthetic, constructed locally,
+never transmitted and never printed in diagnostics. No real personal email or
+secret is used. Both documented shell forms are checked again.
+
+Observed local result (same for both unavailable-base shapes and shell forms):
+
+| Two-commit history | Current caller | Fail-closed candidate | Last-parent candidate | Known full-range guard |
+| --- | ---: | ---: | ---: | ---: |
+| Clean | 0 | 2 | 0 | 0 |
+| Earlier forbidden line, retained at final | 0 | 2 | 0 | 1 |
+| Earlier forbidden commit message | 0 | 2 | 0 | 1 |
+| Earlier forbidden author email | 0 | 2 | 0 | 1 |
+| Earlier forbidden committer email | 0 | 2 | 0 | 1 |
+| Final forbidden line (positive control) | 0 | 2 | 1 | 1 |
+| Earlier forbidden line removed by final (limitation control) | 0 | 2 | 0 | 0 |
+
+**Decision: LAST_PARENT_FALLBACK_MISSES_EARLIER_FINDINGS.** Eight of the 14
+new cases have a silent last-parent success versus a full-range finding: four
+earlier-finding types times two BASE shapes. The clean and final-line controls
+show this is a coverage loss, not an always-failing scanner. All expected results
+reproduced with no captured finding echo. Exit 0 from the harness means the
+experiment reproduced, not that the candidate is safe or installed. Counts are
+24 distinct local cases, not 24 hosted-CI jobs or new unittest groups.
+
+The removal control is deliberately unfavorable to a stronger full-history
+claim: this guard scans commit messages/identities across the selected range,
+but added content comes from an endpoint diff. Thus even the known full range
+does not detect this transient removed line. Do not call either approach a full
+historical-content audit. Merge DAGs, root commits without parents, real event
+payload generation, remote fetch availability and occurrence frequency are not
+tested. The synthetic known base is retained as a comparison oracle; we do not
+pretend it is recoverable when a real runner lacks its event base.
+
+Reject last-parent-only as an equivalent substitute for range coverage. The
+strongest tested immediate alternative remains explicit fail-closed behavior;
+it can interrupt legitimate new-ref pushes. A maintainer may instead define and
+validate an actually available trusted comparison boundary, but that remains a
+separate policy decision, not authorization to silently narrow coverage. No
+workflow, guard, contract, deployment or live planning index is changed here.
+The existing permission denial still stops workflow publication; no credential,
+scope or object/ref workaround is authorized. Stop this follow-on after review
+and integration; further safety expansion needs a concrete returned risk or
+permission change, not another preparation loop while demand is absent.
+
+Focused primary-source refresh, October 16, 2026: Git's
+[revision notation](https://git-scm.com/docs/gitrevisions) defines `^` as first
+parent and two-dot history selection by reachability; its
+[diff documentation](https://git-scm.com/docs/git-diff) distinguishes endpoint
+comparison from history traversal. The current
+[GitHub event reference](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
+was also read, without treating documentation as observed production exposure.
+These sources explain why the comparison is meaningful; the actual synthetic
+execution supplies the table. No broad research refresh, paid work, human
+earnings, household benefit or roadmap-stage change is claimed. Stages0-7,
+M>1 and all existing human-access, learning and sustainability gates remain.
