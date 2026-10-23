@@ -43,6 +43,9 @@ jobs:
             scripts/check-public-content.sh --range "$BASE..$HEAD_SHA"
           fi
 
+      - name: Test public-content diagnostic privacy and read errors
+        run: python3 -m unittest scripts/test_public_content_diagnostics.py -v
+
       - name: Setup node env
         uses: actions/setup-node@v4
         with:
