@@ -35,14 +35,18 @@ export const payoffHeadroom = (quote: bigint): bigint => {
 export const payoffAmount = (quote: bigint): bigint => (quote === 0n ? 0n : quote + payoffHeadroom(quote));
 
 /**
- * Amount to approve, permit or pass for a repayment of `requested` USDC against a loan whose cent-rounded quote is
- * `quote`. A request below the quote is a partial payment and is used as typed. A request at or above the quote is
- * a payoff and gets headroom, so typing the whole balance cannot leave a sliver owed.
+ * What the pool says once a payoff is mined. A mined success, and the `LoanRepaid` event with its `amountUsed`, prove a
+ * payment and the amount actually pulled; the event also fires for partial repayments, so neither proves the loan
+ * closed. Only the loan's own state does: closed means not active with nothing owed; open means still active with a
+ * balance left, shown in base units; anything else (a missing or inconsistent read) is unknown and never reported as
+ * closed. A caller's entered amount for a partial payment is a cap and is never raised by this module.
  */
-export const repaymentAmount = (requested: bigint, quote: bigint): { amount: bigint; isPayoff: boolean } => {
-  if (requested <= 0n) throw new Error("requested amount must be positive");
-  const isPayoff = quote > 0n && requested >= quote;
-  return { amount: isPayoff ? requested + payoffHeadroom(requested) : requested, isPayoff };
+export type PayoffOutcome = { kind: "closed" } | { kind: "open"; owed: bigint } | { kind: "unknown" };
+
+export const payoffOutcome = (active: boolean | undefined, owed: bigint | undefined): PayoffOutcome => {
+  if (active === undefined || owed === undefined) return { kind: "unknown" };
+  if (!active) return owed === 0n ? { kind: "closed" } : { kind: "unknown" };
+  return owed > 0n ? { kind: "open", owed } : { kind: "unknown" };
 };
 
 /**

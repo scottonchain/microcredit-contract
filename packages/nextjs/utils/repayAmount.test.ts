@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CENT, SECONDS_PER_YEAR, isResidualDebt, payoffAmount, payoffHeadroom, repaymentAmount } from "./repayAmount.ts";
+import { CENT, SECONDS_PER_YEAR, isResidualDebt, payoffAmount, payoffHeadroom, payoffOutcome } from "./repayAmount.ts";
 import { formatUSDCExact } from "./format.ts";
 
 const usdc = (whole: bigint) => whole * 1_000_000n;
@@ -45,15 +45,26 @@ test("a zero quote needs nothing", () => {
   assert.equal(payoffAmount(0n), 0n);
 });
 
-test("repaymentAmount: partial amounts are used as typed, a typed balance becomes a payoff", () => {
-  const quote = 12_340_000n;
-  assert.deepEqual(repaymentAmount(5_000_000n, quote), { amount: 5_000_000n, isPayoff: false });
-  assert.deepEqual(repaymentAmount(quote - 1n, quote), { amount: quote - 1n, isPayoff: false });
-  const atQuote = repaymentAmount(quote, quote);
-  assert.equal(atQuote.isPayoff, true);
-  assert.equal(atQuote.amount, quote + payoffHeadroom(quote));
-  assert.equal(repaymentAmount(quote + 1_000_000n, quote).isPayoff, true);
-  assert.throws(() => repaymentAmount(0n, quote));
+test("the exact-cent quote with zero rounding slack still falls short after accrual without headroom", () => {
+  // 1000 USDC at 10% APR: the quote at time zero is an exact cent multiple, so the cent rounding gives no slack at all.
+  const principal = usdc(1_000n);
+  const quote = ceilToCent(owedAfter(principal, 1_000n, 0n));
+  assert.equal(quote, principal, "no rounding slack");
+  assert.ok(owedAfter(principal, 1_000n, 12n) > quote, "twelve seconds of accrual already exceeds the bare quote");
+  assert.ok(payoffAmount(quote) >= owedAfter(principal, 1_000n, 12n), "the payoff amount covers a normal mining delay");
+  // Delay beyond the chosen buffer: ten minutes of headroom does not cover an hour, so the caller must re-quote.
+  assert.ok(payoffAmount(quote) < owedAfter(principal, 10_000n, 3_600n), "an hour at 100% APR exceeds the buffer: stale beyond it");
+});
+
+test("payoffOutcome: a mined payment is not closure; only the loan's own state is", () => {
+  assert.deepEqual(payoffOutcome(false, 0n), { kind: "closed" });
+  assert.deepEqual(payoffOutcome(true, 11n), { kind: "open", owed: 11n }, "a sliver is reported in base units, not rounded to $0.00");
+  assert.deepEqual(payoffOutcome(true, 883n), { kind: "open", owed: 883n });
+  assert.deepEqual(payoffOutcome(true, 12_340_000n), { kind: "open", owed: 12_340_000n }, "a larger residual is open too");
+  assert.deepEqual(payoffOutcome(undefined, 0n), { kind: "unknown" }, "a failed read is never closed");
+  assert.deepEqual(payoffOutcome(false, undefined), { kind: "unknown" });
+  assert.deepEqual(payoffOutcome(true, 0n), { kind: "unknown" }, "active with nothing owed is inconsistent: unknown");
+  assert.deepEqual(payoffOutcome(false, 5n), { kind: "unknown" }, "closed with a balance is inconsistent: unknown");
 });
 
 test("isResidualDebt flags an active loan with under a cent owed, and nothing else", () => {

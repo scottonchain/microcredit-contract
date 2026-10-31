@@ -12,7 +12,8 @@ import { getParsedError } from "~~/utils/scaffold-eth";
 import { TestnetMint } from "~~/components/TestnetMint";
 import { toast } from "react-hot-toast";
 import { formatUSDC, formatUSDCExact } from "~~/utils/format";
-import { isResidualDebt, payoffAmount, repaymentAmount } from "~~/utils/repayAmount";
+import { type PayoffOutcome, isResidualDebt, payoffAmount, payoffOutcome } from "~~/utils/repayAmount";
+import { waitForStable } from "~~/utils/stableRead";
 import {
   type OriginationIntent,
   type ReconcileFacts,
@@ -68,6 +69,8 @@ const BorrowPage: NextPage = () => {
   const [reconcileNote, setReconcileNote] = useState("");
   // The last wallet-direct step that stopped, kept on the page: a toast is gone before anyone can read it.
   const [stepError, setStepError] = useState("");
+  // What the pool says after a full payoff: a mined success proves a payment, not that the loan closed.
+  const [payoffNotice, setPayoffNotice] = useState("");
   const [mayDismiss, setMayDismiss] = useState(false);
   const [offeredLoanId, setOfferedLoanId] = useState<bigint | undefined>(undefined);
   // The term requestLoan applies when the loan is not relayed (seconds, from the deployed pool).
@@ -258,6 +261,36 @@ const BorrowPage: NextPage = () => {
       functionName: "getCurrentOutstandingAmount",
       args: [loanId],
     })) as bigint;
+  };
+
+  // After a full payoff is mined, ask the pool whether the loan closed. A mined success (and the LoanRepaid event, which
+  // also fires for partial repayments) proves a payment, not closure. Reads can lag a node behind the receipt, so a
+  // closed state must hold on two consecutive reads; otherwise report what was last seen, in base units, or that it
+  // could not be confirmed. Returns "" when the loan is closed.
+  const confirmPayoff = async (loanId: bigint): Promise<string> => {
+    // `as` keeps TypeScript from narrowing `last` to its initial value: it is assigned inside the read closure below.
+    let last = { kind: "unknown" } as PayoffOutcome;
+    const read = async (): Promise<PayoffOutcome> => {
+      if (!publicClient) throw new Error("Missing contracts");
+      const loan = (await publicClient.readContract({
+        address: MICROCREDIT_ADDRESS,
+        abi: MICROCREDIT_ABI,
+        functionName: "getLoan",
+        args: [loanId],
+      })) as readonly unknown[];
+      last = payoffOutcome(Boolean(loan[4]), await readExactOwed(loanId));
+      return last;
+    };
+    try {
+      await waitForStable(read, o => o.kind === "closed", { what: "The loan status", timeoutMs: 9_000, intervalMs: 1_500 });
+    } catch {
+      // keep what was last seen; a failed or stale read is reported below, never as a closed loan
+    }
+    if (last.kind === "closed") return "";
+    if (last.kind === "open") {
+      return `The payment went through, but the loan is still open: ${formatUSDCExact(last.owed)} is still owed. Interest accrued while the payment was being mined. Pay the full balance again to close it.`;
+    }
+    return "The payment went through, but I could not confirm that the loan is closed. Check the balance shown below before relying on it.";
   };
 
   // Helper function to handle transfer errors
@@ -936,6 +969,12 @@ const BorrowPage: NextPage = () => {
         </div>
       )}
 
+      {payoffNotice && (
+        <div className="alert alert-warning mb-6" role="status">
+          {payoffNotice}
+        </div>
+      )}
+
       {/* An origination intent whose outcome is not settled: reconciliation, never a new request */}
       {decision.kind === "reconcile" && (
         <div className="bg-base-100 rounded-lg p-6 shadow-lg mb-8 border border-warning">
@@ -1153,6 +1192,12 @@ const BorrowPage: NextPage = () => {
               <div className="bg-success-surface border border-outline rounded-lg p-4">
                 <h4 className="font-medium text-success mb-2">Full Repayment</h4>
                 <p className="text-sm text-success mb-3">Pay off your entire outstanding balance</p>
+                {displayOutstanding > 0n && (
+                  <p className="text-xs text-success mb-3">
+                    You authorize up to {formatUSDCExact(payoffAmount(displayOutstanding))}: the balance plus a margin for interest that
+                    accrues before the payment is mined. Only what is owed is taken, and the page checks afterwards that the loan closed.
+                  </p>
+                )}
                 <button
                   disabled={
                     isLoading ||
@@ -1167,6 +1212,7 @@ const BorrowPage: NextPage = () => {
                     signingRef.current = true;
                     setIsLoading(true);
                     setStepError("");
+                    setPayoffNotice("");
                     try {
                       setPermitError(null);
                       console.log("Starting full repayment process (gasless meta)...");
@@ -1199,6 +1245,7 @@ const BorrowPage: NextPage = () => {
                           "The repayment",
                         );
                         await refreshAfterMutation();
+                        setPayoffNotice(await confirmPayoff(activeLoanId as bigint));
                         return;
                       }
 
@@ -1260,8 +1307,10 @@ const BorrowPage: NextPage = () => {
                       const result = await resp.json();
                       console.log("Repayment submitted (gasless, single approval)", { txHash: result.txHash, amountUsed: result.amountUsed });
 
-                      // Transaction is mined. Refetch state in parallel.
+                      // Transaction is mined. Refetch state in parallel, then ask the pool whether the loan closed:
+                      // amountUsed is the amount actually pulled, not proof of closure.
                       await refreshAfterMutation();
+                      setPayoffNotice(await confirmPayoff(activeLoanId as bigint));
                     } catch (error) {
                       setStepError(stopMessage("The repayment stopped", getParsedError(error), String((error as any)?.message ?? error)));
                       const errorType = handleTransferError(error);
@@ -1296,6 +1345,15 @@ const BorrowPage: NextPage = () => {
               <div className="bg-info-surface border border-outline rounded-lg p-4">
                 <h4 className="font-medium text-info mb-2">Partial Repayment</h4>
                 <p className="text-sm text-info mb-3">Make a partial payment to reduce your balance</p>
+                {(() => {
+                  const entered = parseLoanAmount(repayAmount);
+                  return entered !== null && displayOutstanding > 0n && entered >= displayOutstanding ? (
+                    <p className="text-xs text-warning mb-3">
+                      This amount is at or above your balance. It is the most this payment can take, and interest keeps accruing until it
+                      is mined, so it can leave a few millionths of a dollar owed. Use Full Repayment to close the loan.
+                    </p>
+                  ) : null;
+                })()}
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -1326,24 +1384,19 @@ const BorrowPage: NextPage = () => {
                       try {
                         console.log("Starting partial repayment process (gasless meta)...");
 
-                        // An amount at or above the balance shown is a payoff: give it the same headroom, so typing
-                        // the whole balance cannot leave a sliver owed. Smaller amounts are used as typed.
-                        const { amount: amountToPay, isPayoff } = repaymentAmount(repayAmountBigInt, displayOutstanding);
-
-                        // Check USDC balance first: a payoff needs the exact balance owed, a part payment its amount
-                        if (isPayoff) await checkUSDCBalance(await readExactOwed(activeLoanId as bigint), true);
-                        else await checkUSDCBalance(repayAmountBigInt);
+                        // Check USDC balance first
+                        await checkUSDCBalance(repayAmountBigInt);
 
                         if (!RELAYER_ENABLED) {
                           // Wallet-direct: approve the pool for the amount, then repay; two transactions, each required
                           // to have been sent and mined before the next step, by the same account on the same chain.
                           const signer = captureSigner("The repayment");
-                          await writeUsdc("approve", [MICROCREDIT_ADDRESS, amountToPay]);
+                          await writeUsdc("approve", [MICROCREDIT_ADDRESS, repayAmountBigInt]);
                           if (!publicClient) throw new Error("Contract not available");
-                          await waitForAllowance(publicClient, signer.address, MICROCREDIT_ADDRESS, amountToPay);
+                          await waitForAllowance(publicClient, signer.address, MICROCREDIT_ADDRESS, repayAmountBigInt);
                           assertSameSigner(signer);
                           requireHash(
-                            await writeCreditAsync({ functionName: "repayLoan", args: [activeLoanId as bigint, amountToPay] }),
+                            await writeCreditAsync({ functionName: "repayLoan", args: [activeLoanId as bigint, repayAmountBigInt] }),
                             "The repayment",
                           );
                           setRepayAmount("");
@@ -1366,7 +1419,7 @@ const BorrowPage: NextPage = () => {
                           const permitMsg = {
                             owner: connectedAddress,
                             spender: MICROCREDIT_ADDRESS,
-                            value: amountToPay,
+                            value: repayAmountBigInt,
                             nonce: usdcNonce,
                             deadline: permitDeadline,
                           } as const;
@@ -1400,7 +1453,7 @@ const BorrowPage: NextPage = () => {
                             contractAddress: MICROCREDIT_ADDRESS,
                             borrower: connectedAddress,
                             loanId: (activeLoanId as bigint).toString(),
-                            amount: isPayoff ? "0" : repayAmountBigInt.toString(), // "0": the balance, capped at the permit
+                            amount: repayAmountBigInt.toString(),
                             permit: permitPayload,
                           }),
                         });
