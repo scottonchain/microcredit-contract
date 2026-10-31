@@ -690,9 +690,11 @@ contract DecentralizedMicrocredit is EIP712 {
     /**
      * @notice Repay with a single EIP-2612 permit signature; anyone (e.g. a relayer) may submit.
      * @param amount Amount to repay; 0 repays the outstanding balance. The amount pulled never
-     *        exceeds the permit `value`; the UI permits the balance rounded up to the cent
-     *        (`MicrocreditLens.getOutstandingRoundedToCent`), so interest accrued since the
-     *        signature is at most a sub-cent shortfall, forgiven at closing.
+     *        exceeds the permit `value`. Nothing is forgiven: if interest accrues after the
+     *        signature past what the permit covers, the loan stays open and the shortfall stays
+     *        owed. Callers should permit the balance rounded up to the cent
+     *        (`MicrocreditLens.getOutstandingRoundedToCent`) plus a cent or more of headroom;
+     *        only the exact balance is pulled.
      */
     function repayWithPermit(
         address borrower,
@@ -1074,8 +1076,9 @@ contract DecentralizedMicrocredit is EIP712 {
     /**
      * @notice Principal plus simple interest accrued since origination, less repayments; 0 once
      *         the loan is closed (repaid, defaulted or cancelled).
-     * @dev No interest accrues during the first day. Interest keeps accruing on the original
-     *      principal until the loan closes; partial repayments reduce the balance, not the base.
+     * @dev Interest accrues from disbursement, with no grace period. Interest keeps accruing on
+     *      the original principal until the loan closes; partial repayments reduce the balance,
+     *      not the base.
      */
     function getCurrentOutstandingAmount(uint256 loanId) public view returns (uint256) {
         Loan storage loan = loans[loanId];

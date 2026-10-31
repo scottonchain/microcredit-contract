@@ -101,10 +101,11 @@ contract HermesPR16Test is MicrocreditTestBase {
         reserve = credit.firstLossReserve();
     }
 
-    /// A stranger can close a loan up to 1 cent short of its interest; the forgiven sub-cent is
-    /// interest that is never booked (no dues on it, no reserve debit), never principal. Measures
-    /// what the pool gains from the repayment net of that forgiveness.
-    function testStrangerCanTriggerSubCentForgivenessOnly() public {
+    /// A stranger paying a loan up to 9,999 base units (under a cent) short of its full balance cannot close
+    /// it: interest is paid first, the shortfall stays as principal, and the loan stays open and keeps using
+    /// the borrower's limit until it is paid. Nothing is forgiven, so the pool gains the interest it was paid
+    /// and never loses principal; the remainder closes the loan.
+    function testStrangerShortPaymentLeavesTheLoanOpenAndForgivesNothing() public {
         _stake(x, 20e6);
         vm.prank(x);
         credit.back(borrower, 20e6);
@@ -116,13 +117,24 @@ contract HermesPR16Test is MicrocreditTestBase {
         vm.prank(stranger);
         credit.repayLoan(id, owed - 9_999); // leaves 0.009999 USDC
         (,,,, bool active) = credit.getLoan(id);
-        assertFalse(active, "loan closed with under a cent left");
-        uint256 gain = credit.totalAssets() + 0 - assetsBefore;
+        assertTrue(active, "a payment short of the balance never closes the loan");
+        assertEq(credit.getCurrentOutstandingAmount(id), 9_999, "exactly the shortfall is still owed");
+        assertEq(credit.totalLentOut(), 9_999, "interest was paid first, so the shortfall is principal");
+        assertEq(credit.activeLoanCount(borrower), 1, "and the loan keeps using the limit");
+        uint256 gain = credit.totalAssets() - assetsBefore;
         emit log_named_uint("pool totalAssets change", gain);
         emit log_named_uint("stranger paid", owed - 9_999);
-        // the pool's accounting is the interest due minus what was forgiven (<1 cent), never a loss on principal
+        // the pool's accounting is the interest paid (net of fee and reserve share), never a loss on principal
+        assertGt(gain, 0, "the pool earned the interest it was paid");
+
+        _fund(stranger, 9_999);
+        vm.prank(stranger);
+        credit.repayLoan(id, 9_999);
+        (,,,, active) = credit.getLoan(id);
+        assertFalse(active, "the remainder closes it");
         assertEq(credit.totalLentOut(), 0);
-        assertGe(credit.totalAssets(), assetsBefore, "the pool never loses on a close short of interest");
+        assertEq(credit.activeLoanCount(borrower), 0);
+        assertGe(credit.totalAssets(), assetsBefore + gain, "paying the shortfall never lowers the pool");
     }
 
     // ───────────── 2. early release ─────────────

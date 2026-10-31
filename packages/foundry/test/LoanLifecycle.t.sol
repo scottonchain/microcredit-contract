@@ -523,10 +523,10 @@ contract LoanLifecycleTest is MicrocreditTestBase {
 
     /// @dev Found by invariant fuzzing (CI-23): with the reserve larger than the pool, a forgiven
     ///      sub-cent balance took the pool below the reserve and totalAssets underflowed, blocking
-    ///      deposits and loans. Since the CI-30 fix a loan closes short only on interest, so a
-    ///      repaid close writes nothing off and never debits the reserve; the pool keeps working
-    ///      with lenders fully exited and the reserve as the only cash.
-    function testForgivenSubCentCannotBrickThePool() public {
+    ///      deposits and loans. Nothing is forgiven now: a loan closes only when its whole balance is
+    ///      paid, so a repaid close writes nothing off and never debits the reserve; the pool keeps
+    ///      working with lenders fully exited and the reserve as the only cash.
+    function testSubCentRepaidCloseCannotBrickThePool() public {
         address institution = makeAddr("institution");
         usdc.mint(institution, 2_000e6);
         vm.startPrank(institution);
@@ -545,7 +545,11 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         usdc.mint(brighton, owed);
         vm.startPrank(brighton);
         usdc.approve(address(credit), owed - 1);
-        credit.repayLoan(loanId, owed - 1); // a unit of interest short: closes, the unit is forgiven
+        credit.repayLoan(loanId, owed - 1); // a unit short: nothing is forgiven, so the loan stays open
+        assertEq(uint256(_status(loanId)), uint256(DecentralizedMicrocredit.LoanStatus.Active));
+        assertEq(credit.getCurrentOutstandingAmount(loanId), 1, "one unit is still owed");
+        usdc.approve(address(credit), 1);
+        credit.repayLoan(loanId, 1);
         vm.stopPrank();
         assertEq(uint256(_status(loanId)), uint256(DecentralizedMicrocredit.LoanStatus.Repaid));
         assertEq(credit.totalLentOut(), 0, "every unit of principal was paid");
@@ -562,7 +566,7 @@ contract LoanLifecycleTest is MicrocreditTestBase {
         usdc.mint(brighton, LOAN);
         vm.startPrank(brighton);
         usdc.approve(address(credit), LOAN - 1);
-        credit.repayLoan(loanId, LOAN - 1); // inside the first day: no interest, so the unit short is principal
+        credit.repayLoan(loanId, LOAN - 1); // at disbursement time: no interest has accrued, so the unit short is principal
         vm.stopPrank();
         assertEq(uint256(_status(loanId)), uint256(DecentralizedMicrocredit.LoanStatus.Active));
         assertEq(credit.getCurrentOutstandingAmount(loanId), 1);
