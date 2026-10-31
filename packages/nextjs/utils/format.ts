@@ -30,3 +30,10 @@ export const getCreditScoreColor = (score: number): string => {
 
 export const formatPercent = (value: number, decimals: number = 2): string =>
   `${value.toFixed(decimals)}%`; 
+
+/** Exact USDC with up to six decimals and no rounding, for sub-cent balances that `formatUSDC` would show as $0.00. */
+export const formatUSDCExact = (amount: bigint): string => {
+  const whole = amount / 1_000_000n;
+  const frac = (amount % 1_000_000n).toString().padStart(6, "0").replace(/0+$/, "");
+  return `$${whole.toString()}.${frac.padEnd(2, "0")}`;
+};

@@ -11,7 +11,8 @@ import { useUsdcWrite } from "~~/hooks/useUsdc";
 import { getParsedError } from "~~/utils/scaffold-eth";
 import { TestnetMint } from "~~/components/TestnetMint";
 import { toast } from "react-hot-toast";
-import { formatUSDC } from "~~/utils/format";
+import { formatUSDC, formatUSDCExact } from "~~/utils/format";
+import { isResidualDebt, payoffAmount, repaymentAmount } from "~~/utils/repayAmount";
 import {
   type OriginationIntent,
   type ReconcileFacts,
@@ -213,7 +214,9 @@ const BorrowPage: NextPage = () => {
   // Note: No approval fallback. Repayments require ERC-2612 permit. Dev escape hatch is intentionally disabled by default.
 
   // Helper function to check USDC balance
-  const checkUSDCBalance = async (amount: bigint) => {
+  // `exact`: a payoff must be funded to the unit, because the pool forgives nothing and a loan closes only when its
+  // whole balance is paid. Other amounts keep the cent rounding.
+  const checkUSDCBalance = async (amount: bigint, exact = false) => {
     if (!connectedAddress || !USDC_ADDRESS || !USDC_ABI || !publicClient) {
       throw new Error("Missing required addresses");
     }
@@ -228,7 +231,7 @@ const BorrowPage: NextPage = () => {
 
       console.log("USDC Balance:", balance.toString());
       // Always compare with the required amount rounded down to the nearest penny
-      const required = roundDownToNearestPenny(amount);
+      const required = exact ? amount : roundDownToNearestPenny(amount);
       console.log("Required amount (rounded to cent):", required.toString());
       console.log("Balance as number:", Number(balance));
       console.log("Amount as number:", Number(required));
@@ -244,6 +247,17 @@ const BorrowPage: NextPage = () => {
       console.error("Error checking USDC balance:", error);
       throw error;
     }
+  };
+
+  // Exact balance owed on a loan right now, from the pool (not the cent-rounded quote).
+  const readExactOwed = async (loanId: bigint): Promise<bigint> => {
+    if (!publicClient) throw new Error("Missing contracts");
+    return (await publicClient.readContract({
+      address: MICROCREDIT_ADDRESS,
+      abi: MICROCREDIT_ABI,
+      functionName: "getCurrentOutstandingAmount",
+      args: [loanId],
+    })) as bigint;
   };
 
   // Helper function to handle transfer errors
@@ -1119,6 +1133,17 @@ const BorrowPage: NextPage = () => {
             </div>
           </div>
 
+          {/* A short payoff leaves the loan open with a sliver owed: say so, with the exact amount */}
+          {isResidualDebt(loanIsActive, activeOutstanding) && activeOutstanding !== undefined && (
+            <div className="alert alert-warning mt-6" role="status">
+              <span>
+                This loan is still active: {formatUSDCExact(activeOutstanding)} is still owed. The pool forgives nothing,
+                so a payment that is a little short leaves the loan open, holds your limit and earns no completed-loan
+                credit. Pay the full balance below to close it.
+              </span>
+            </div>
+          )}
+
           {/* Repayment Actions */}
           <div className="mt-6 pt-4 border-t border-outline">
             <h3 className="font-medium mb-3">Make a Payment</h3>
@@ -1153,10 +1178,13 @@ const BorrowPage: NextPage = () => {
                         functionName: "getOutstandingRoundedToCent",
                         args: [activeLoanId as bigint],
                       })) as bigint;
-                      const amountToRepay = out;
+                      // Interest keeps accruing until the payment is mined and the pool forgives nothing, so a payoff
+                      // approved or permitted for exactly the quote can leave the loan open with a sliver owed. Add
+                      // headroom: the pool pulls only what is owed (min(amount, owed)).
+                      const amountToRepay = payoffAmount(out);
 
-                      // Check USDC balance first
-                      await checkUSDCBalance(amountToRepay);
+                      // The wallet must hold the exact balance now owed, not the headroom.
+                      await checkUSDCBalance(await readExactOwed(activeLoanId as bigint), true);
 
                       if (!RELAYER_ENABLED) {
                         // Wallet-direct: approve the pool for the amount, then repay; two transactions, each required
@@ -1298,19 +1326,24 @@ const BorrowPage: NextPage = () => {
                       try {
                         console.log("Starting partial repayment process (gasless meta)...");
 
-                        // Check USDC balance first
-                        await checkUSDCBalance(repayAmountBigInt);
+                        // An amount at or above the balance shown is a payoff: give it the same headroom, so typing
+                        // the whole balance cannot leave a sliver owed. Smaller amounts are used as typed.
+                        const { amount: amountToPay, isPayoff } = repaymentAmount(repayAmountBigInt, displayOutstanding);
+
+                        // Check USDC balance first: a payoff needs the exact balance owed, a part payment its amount
+                        if (isPayoff) await checkUSDCBalance(await readExactOwed(activeLoanId as bigint), true);
+                        else await checkUSDCBalance(repayAmountBigInt);
 
                         if (!RELAYER_ENABLED) {
                           // Wallet-direct: approve the pool for the amount, then repay; two transactions, each required
                           // to have been sent and mined before the next step, by the same account on the same chain.
                           const signer = captureSigner("The repayment");
-                          await writeUsdc("approve", [MICROCREDIT_ADDRESS, repayAmountBigInt]);
+                          await writeUsdc("approve", [MICROCREDIT_ADDRESS, amountToPay]);
                           if (!publicClient) throw new Error("Contract not available");
-                          await waitForAllowance(publicClient, signer.address, MICROCREDIT_ADDRESS, repayAmountBigInt);
+                          await waitForAllowance(publicClient, signer.address, MICROCREDIT_ADDRESS, amountToPay);
                           assertSameSigner(signer);
                           requireHash(
-                            await writeCreditAsync({ functionName: "repayLoan", args: [activeLoanId as bigint, repayAmountBigInt] }),
+                            await writeCreditAsync({ functionName: "repayLoan", args: [activeLoanId as bigint, amountToPay] }),
                             "The repayment",
                           );
                           setRepayAmount("");
@@ -1333,7 +1366,7 @@ const BorrowPage: NextPage = () => {
                           const permitMsg = {
                             owner: connectedAddress,
                             spender: MICROCREDIT_ADDRESS,
-                            value: repayAmountBigInt,
+                            value: amountToPay,
                             nonce: usdcNonce,
                             deadline: permitDeadline,
                           } as const;
@@ -1367,7 +1400,7 @@ const BorrowPage: NextPage = () => {
                             contractAddress: MICROCREDIT_ADDRESS,
                             borrower: connectedAddress,
                             loanId: (activeLoanId as bigint).toString(),
-                            amount: repayAmountBigInt.toString(),
+                            amount: isPayoff ? "0" : repayAmountBigInt.toString(), // "0": the balance, capped at the permit
                             permit: permitPayload,
                           }),
                         });
