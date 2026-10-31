@@ -35,7 +35,6 @@ DAYS_PER_YEAR = 365  # SECONDS_PER_YEAR = 365 days
 DEFAULT_TERM_DAYS = 30  # DEFAULT_LOAN_TERM
 MIN_TERM_DAYS, MAX_TERM_DAYS = 1, 365  # MIN_LOAN_TERM, MAX_LOAN_TERM
 LATE_PERIOD_DAYS = 30  # LATE_PERIOD: markDefaulted allowed this long after the due date
-GRACE_PERIOD_DAYS = 1  # GRACE_PERIOD: a loan repaid within a day pays no interest
 UTILISATION_CAP = 0.90  # lendingUtilizationCap = 9000 bps
 LIQUIDITY_BUFFER = 0.05  # liquidityBuffer = 500 bps
 PROTOCOL_FEE = 0.0  # protocolFeeBps default

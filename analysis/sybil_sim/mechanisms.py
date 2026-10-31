@@ -1,8 +1,9 @@
 """Credit mechanisms for a collateral-free lending pool, as small state machines.
 
 Each mechanism is a subclass of `Protocol`, which holds what every design shares: one lending
-pool with ERC4626-style shares, fixed-APR simple-interest loans with a one-day interest-free
-grace period, interest-first repayment, and default after `LATE_PERIOD`. The subclasses differ
+pool with ERC4626-style shares, fixed-APR simple-interest loans accruing from disbursement (no
+grace period), interest-first repayment that closes a loan only when its whole balance is paid,
+and default after `LATE_PERIOD`. The subclasses differ
 only in where a borrower's limit comes from and what a default charges:
 
     M0   PageRankVouch            the vouching + PageRank design up to commit 21b838d
@@ -33,11 +34,9 @@ import networkx as nx
 USDC = 10**6  # one USDC in micro-USDC
 SCALE = 10**6  # credit scores and attestation weights (1e6 = 100%)
 BASIS_POINTS = 10_000
-CENT = 10_000  # interest under one cent is forgiven at closing; a principal shortfall keeps the loan open
 HOUR = 3_600
 DAY = 86_400
 SECONDS_PER_YEAR = 365 * DAY
-GRACE_PERIOD = DAY  # no interest during the first day after disbursement
 DEFAULT_LOAN_TERM = 30 * DAY
 MIN_LOAN_TERM = DAY
 MAX_LOAN_TERM = 365 * DAY
@@ -324,10 +323,8 @@ class Protocol:
         return loan.id
 
     def interest_accrued(self, loan: Loan) -> int:
-        """Simple interest on the original principal since disbursement; none in the first day."""
+        """Simple interest on the original principal since disbursement, including the first day."""
         elapsed = self.now - loan.disbursed_at
-        if elapsed < GRACE_PERIOD:
-            return 0
         return loan.principal * loan.rate_bps // BASIS_POINTS * elapsed // SECONDS_PER_YEAR
 
     def amount_owed(self, loan_id: int) -> int:
@@ -339,9 +336,9 @@ class Protocol:
         return owed - loan.repaid if owed > loan.repaid else 0
 
     def repay(self, loan_id: int, amount: int | None = None) -> int:
-        """`_repay`: settle interest first, then principal. The loan closes once under a cent is left
-        and that rest is interest (the payment covered every unit of principal); the forgiven interest
-        is never booked. A payment short of the principal keeps the loan open. Returns USDC paid."""
+        """`_repay`: settle interest first, then principal. The loan closes only when the whole balance
+        is paid; nothing is forgiven, so a payment short of the balance, however small the shortfall,
+        keeps the loan open. Returns USDC paid."""
         loan = self.loans[loan_id]
         if loan.status is not Status.ACTIVE:
             raise Revert("LoanNotActive")
@@ -349,10 +346,10 @@ class Protocol:
         paid = owed if amount is None else min(amount, owed)
         interest_due = self.interest_accrued(loan) - (loan.repaid - loan.principal_repaid)
         rest = owed - paid
-        closes = rest < CENT and rest <= interest_due
+        closes = rest == 0
         if paid > 0:
             self._pull(loan.borrower, paid)
-            interest = interest_due - rest if closes else min(paid, interest_due)
+            interest = min(paid, interest_due)
             principal = paid - interest
             fee = interest * self.p.protocol_fee_bps // BASIS_POINTS
             to_reserve = interest * self.p.reserve_bps // BASIS_POINTS

@@ -20,15 +20,15 @@ Protocol fee 10%, reserve share 30% of interest (the deploy script sets fee 0, r
 | A2 stranger lift | - | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | A3 deposit roots | ring + beneficiary | 180.40 | 1,853.23 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | A3 deposit roots | pure ring | 0.00 | 5,818.18 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| A4 wash farm | stake seed, grace repayment | n/a | n/a | 25.00 | 1,600.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| A4 wash farm | stake seed, 23 h repayment | n/a | n/a | 24.98 | 1,598.43 | -0.02 | -1.57 | -0.00 | -0.16 | -0.02 | -1.10 | -0.02 | -1.57 |
 | A4 wash farm | stake seed, 30-day repayment | n/a | n/a | 24.23 | 1,550.92 | -0.77 | -49.08 | -0.08 | -4.91 | -0.54 | -34.35 | -0.77 | -49.08 |
-| A4 wash farm | line seed, grace repayment | 100.00 | 100.00 | 125.00 | 1,700.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 |
+| A4 wash farm | line seed, 23 h repayment | 99.98 | 98.60 | 124.98 | 1,698.43 | 99.98 | 98.43 | 100.00 | 99.84 | 99.98 | 98.90 | 99.98 | 98.43 |
 | A4 wash farm | line seed, 30-day repayment | 99.31 | 56.09 | 124.23 | 1,650.92 | 99.23 | 50.92 | 99.92 | 95.09 | 99.46 | 65.65 | 99.23 | 50.92 |
-| A4 wash farm | stake seed, grace repayment, 4 cycles | n/a | n/a | 100.00 | 6,400.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| A4 wash farm | stake seed, 23 h repayment, 4 cycles | n/a | n/a | 99.86 | 6,390.96 | -0.10 | -6.27 | -0.01 | -0.63 | -0.07 | -4.39 | -0.10 | -6.27 |
 | A4 wash farm | stake seed, 30-day repayment, 4 cycles | n/a | n/a | 95.58 | 6,117.03 | -3.07 | -196.31 | -0.31 | -19.84 | -2.15 | -137.89 | -3.07 | -196.31 |
 | A5 collusive backer | - | 189.50 | 885.96 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 |
 | A6 exit scam | 30-day repayments | 88.80 | 45.57 | 93.17 | 77.67 | 74.42 | 38.19 | 74.94 | 70.39 | 74.60 | 47.27 | 74.42 | 38.19 |
-| A6 exit scam | grace repayments | 89.48 | 89.48 | 93.75 | 150.00 | 75.00 | 75.00 | 75.00 | 75.00 | 75.00 | 75.00 | 75.00 | 75.00 |
+| A6 exit scam | 23 h repayments | 89.46 | 88.08 | 93.73 | 147.69 | 74.98 | 73.82 | 75.00 | 74.88 | 74.99 | 74.18 | 74.98 | 73.82 |
 | A7 self-lending dues | lender share 50% | n/a | n/a | 18.47 | 1,182.02 | -6.53 | -417.98 | 1.87 | 119.42 | -3.73 | -238.85 | -6.53 | -417.98 |
 
 ## Marginal profit per extra attacker account, (p(64) - p(32)) / 32
@@ -40,15 +40,15 @@ Protocol fee 10%, reserve share 30% of interest (the deploy script sets fee 0, r
 | A2 stranger lift | - | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | A3 deposit roots | ring + beneficiary | 13.21 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | A3 deposit roots | pure ring | 90.91 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| A4 wash farm | stake seed, grace repayment | n/a | 25.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| A4 wash farm | stake seed, 23 h repayment | n/a | 24.98 | -0.02 | -0.00 | -0.02 | -0.02 |
 | A4 wash farm | stake seed, 30-day repayment | n/a | 24.23 | -0.77 | -0.08 | -0.54 | -0.77 |
-| A4 wash farm | line seed, grace repayment | 0.00 | 25.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| A4 wash farm | line seed, 23 h repayment | -0.02 | 24.98 | -0.02 | -0.00 | -0.02 | -0.02 |
 | A4 wash farm | line seed, 30-day repayment | -0.69 | 24.23 | -0.77 | -0.08 | -0.54 | -0.77 |
-| A4 wash farm | stake seed, grace repayment, 4 cycles | n/a | 100.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| A4 wash farm | stake seed, 23 h repayment, 4 cycles | n/a | 99.86 | -0.10 | -0.01 | -0.07 | -0.10 |
 | A4 wash farm | stake seed, 30-day repayment, 4 cycles | n/a | 95.58 | -3.07 | -0.31 | -2.15 | -3.07 |
 | A5 collusive backer | - | 3.30 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | A6 exit scam | 30-day repayments | -0.69 | -1.15 | -0.58 | -0.08 | -0.45 | -0.58 |
-| A6 exit scam | grace repayments | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| A6 exit scam | 23 h repayments | -0.02 | -0.04 | -0.02 | -0.00 | -0.01 | -0.02 |
 | A7 self-lending dues | lender share 50% | n/a | 18.47 | -6.53 | 1.87 | -3.73 | -6.53 |
 
 ## M0 by honest world (attacker net profit at n = 1 / 8 / 64)

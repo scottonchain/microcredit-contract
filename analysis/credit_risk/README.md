@@ -58,7 +58,7 @@ every table below, plus a few more.
 | Item | Value | Source in the contract | Used as |
 |---|---|---|---|
 | APR | `effrRate + riskPremium` = 433 + 500 bps = 9.33%, fixed at origination | `_originateLoan`, `Deploy.s.sol` | funding cost EFFR passed through; premium s = APR − EFFR |
-| Interest | simple, on original principal, `principal × APR × elapsed / 365 days`; 0 if repaid within 24 h, otherwise the full elapsed time | `_interestAccrued`, `GRACE_PERIOD` | income u·APR per year (non-compounded) |
+| Interest | simple, on original principal, `principal × APR × elapsed / 365 days`, from disbursement (the 24-hour grace period was removed in this source; deployed pools still waive the first day, which this model never used) | `_interestAccrued` | income u·APR per year (non-compounded) |
 | Recognition | cash basis: interest settles first on repayment, and unpaid interest is never booked | `_repay` | a write-off removes principal only |
 | Term | `DEFAULT_LOAN_TERM` 30 days; 1–365 days via `borrowAndDisburseMeta` | constants | n = 365/30 = 12.17 loans per exposure-year |
 | Default | `markDefaulted` once `disbursedAt + term + LATE_PERIOD` (30 days) has passed; the loan can never be repaid after that (`_repayableLoan` requires `Active`) | `markDefaulted` | LGD 100% on the unsecured principal; ~60-day lag from disbursement to loss |

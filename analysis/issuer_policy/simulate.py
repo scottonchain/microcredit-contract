@@ -20,7 +20,7 @@ Agents:
   repay on time each month to build evidence, then in their bust-out month draw their whole limit
   (line plus dues) and never repay.
 - a recycled-seed farm: unverified accounts that a staked seed backs in turn; half repay four
-  times a month inside the 24-hour window, half hold 30-day loans. One bought identity runs the
+  times a month for 23 hours each, half hold 30-day loans. One bought identity runs the
   same farm on itself.
 """
 
@@ -70,7 +70,7 @@ class SimConfig:
     increase_lines: float = 40.0  # maxIncreasePerReport, in full lines
     attacks: tuple[AttackSpec, ...] = ()
     n_farm: int = 8  # unverified accounts in the recycled-seed farm
-    farm_grace_cycles: int = 4
+    farm_short_cycles: int = 4
     last_minute_share: float = 0.25  # on-time repayments that land between plan and report
     front_run: bool = True
     seed: int = 0
@@ -365,9 +365,9 @@ class Simulation:
             if self._open(addr):
                 continue
             self.pool.back(self.seed_addr, addr, usdc(100))
-            if k % 2 == 0:  # inside the 24-hour interest-free window, several times
+            if k % 2 == 0:  # held 23 hours, several times (the interest accrued is paid)
                 t = start
-                for _ in range(self.cfg.farm_grace_cycles):
+                for _ in range(self.cfg.farm_short_cycles):
                     loan = self.pool.borrow(addr, usdc(100), t)
                     self.pool.repay(loan, t + 23 * HOUR)
                     t += DAY
@@ -396,7 +396,7 @@ class Simulation:
                     "kyc_verified": view.kyc_verified,
                     "tier": view.tier or "",
                     "completed_loans": self.pool.account(addr).completed_loans,
-                    "grace_closes": sum(1 for x in repaid if x.closed_at - x.disbursed_at < DAY),
+                    "short_closes": sum(1 for x in repaid if x.closed_at - x.disbursed_at < DAY),
                     "repaid_principal_usdc": sum(x.principal for x in repaid) / USDC,
                     "dues_usdc": self.pool.account(addr).dues_paid / USDC,
                     "evidence_good": good,

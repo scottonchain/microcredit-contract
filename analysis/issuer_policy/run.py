@@ -134,12 +134,12 @@ def evidence_routes() -> list[dict]:
         disbursed = closed - int(held_days * DAY)
         p = usdc(principal)
         elapsed = int(held_days * DAY)
-        interest = 0 if elapsed < DAY else p * 1233 // 10_000 * elapsed // (365 * DAY)
+        interest = p * 1233 // 10_000 * elapsed // (365 * DAY)
         return Loan(0, "0x", p, int(term_days * DAY), disbursed, 1233, LoanStatus.REPAID, p + interest, p, closed, usdc(secured))
 
     routes = [
         ("reference: 100 unsecured, 30 days", loan(100, 30), "a full trial"),
-        ("100 repaid inside the 24-hour window", loan(100, 23 / 24), "free and recyclable (Theorem 3)"),
+        ("100 repaid after 23 hours", loan(100, 23 / 24), "cheap (a day of interest) and recyclable (Theorem 3)"),
         ("100 fully stake-secured, 30 days", loan(100, 30, secured=100), "lenders bore no risk; stake is recyclable"),
         ("100 with 95 stake-secured, 30 days", loan(100, 30, secured=95), "only 5 at risk"),
         ("1 unsecured, 30 days", loan(1, 30), "dust loans"),
@@ -543,7 +543,7 @@ def main() -> None:
         r["profit_violated"] = r["gross_usdc"] - r["identity_cost_usdc"] / VIOLATION
     farm_rows = base.farm
     farm_show = [farm_rows[0], farm_rows[1], [r for r in farm_rows if r["account"] == "verified farm"][0], [r for r in farm_rows if r["account"] == "control"][0]]
-    farm_show[0] = {**farm_show[0], "account": "unverified farm, grace window"}
+    farm_show[0] = {**farm_show[0], "account": "unverified farm, 23 h loops"}
     farm_show[1] = {**farm_show[1], "account": "unverified farm, 30-day"}
     attack_show = [r for r in attack if r["identities"] in (1, 8, 64)]
 
@@ -589,7 +589,7 @@ def main() -> None:
             [
                 ("account", "Account", ""),
                 ("completed_loans", "completedLoans", "d"),
-                ("grace_closes", "closed in 24 h", "d"),
+                ("short_closes", "closed within 24 h", "d"),
                 ("repaid_principal_usdc", "principal repaid", ".0f"),
                 ("dues_usdc", "dues (contract)", ".2f"),
                 ("evidence_good", "evidence", ".2f"),

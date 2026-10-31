@@ -7,8 +7,10 @@ The policy has four steps, each a pure function of what the issuer reads:
    k_t. One address per identity; a default on any address of an identity ends the identity.
 2. Evidence (risk lenders bore). Each closed loan of the account itself is a fractional
    Bernoulli trial. It weighs by its unsecured principal (up to `ref_principal`), by the time it
-   was outstanding (up to `trial_days`), and by its age (half-life). A loan closed inside the
-   24-hour interest-free window weighs 0, and stake-secured principal weighs 0. Loans of other
+   was outstanding (up to `trial_days`), and by its age (half-life). A loan closed within a day
+   weighs 0 (the issuer's own rule: the contract no longer waives that day's interest, but a
+   day of interest is a few hundredths of a percent of principal), and stake-secured principal
+   weighs 0. Loans of other
    accounts, including accounts this one backed, are never read.
 3. PD (Beta-Binomial). A trial is "bad" when the loan was repaid after its due date. The bad-event
    rate theta has a Beta prior per tier, and the posterior after weighted evidence is
@@ -35,7 +37,6 @@ import numpy as np
 import allocate as alloc
 from model import (
     DAY,
-    GRACE_PERIOD,
     MAX_BATCH,
     SCALE,
     USDC,
@@ -204,11 +205,14 @@ def read_account(pool: Pool, registry: IdentityRegistry, address: str) -> Accoun
 # ───────────────────────────── evidence and PD ─────────────────────────────
 
 
+MIN_EVIDENCE_HOLD = DAY  # issuer rule, not a contract rule: a loan closed within a day weighs 0
+
+
 def loan_evidence(loan: Loan, now: int, params: PolicyParams) -> tuple[float, float]:
     """(good, bad) trial weight of one loan of the account itself.
 
     good = recency * min(1, unsecured / ref_principal) * min(1, time outstanding / trial_days),
-    and 0 inside the interest-free window or when no interest was paid.
+    and 0 when the loan closed within `MIN_EVIDENCE_HOLD` or when no interest was paid.
     bad (repaid after the due date) = recency * min(1, principal / ref_principal) *
     min(1, term / trial_days): lateness is not discounted for stake, so stake cannot hide it.
     Open and defaulted loans carry no trial: a default ends the identity.
@@ -222,7 +226,7 @@ def loan_evidence(loan: Loan, now: int, params: PolicyParams) -> tuple[float, fl
         size = min(1.0, loan.principal / params.ref_principal)
         return 0.0, recency * size * min(1.0, loan.term / trial)
     elapsed = loan.closed_at - loan.disbursed_at
-    if elapsed < GRACE_PERIOD or loan.interest_paid == 0:
+    if elapsed < MIN_EVIDENCE_HOLD or loan.interest_paid == 0:
         return 0.0, 0.0
     unsecured = max(0, loan.principal - loan.secured)
     size = min(1.0, unsecured / params.ref_principal)
