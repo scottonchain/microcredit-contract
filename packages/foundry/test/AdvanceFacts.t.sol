@@ -44,123 +44,192 @@ contract AdvanceFactsTest is MicrocreditTestBase {
         vm.stopPrank();
     }
 
-    // ───────────── the first day: no interest, no dues, no history credit ─────────────
+    // ───────────── the first day: interest accrues from disbursement, with no grace ─────────────
 
-    /// A fast cycle pays lenders and the reserve nothing and earns no credit (the recycled-seed farm, one loan).
-    function testRepaymentInsideTheFirstDayPaysNothingAndEarnsNothing() public {
+    /// A fast cycle pays the interest it accrued, split between lenders, the reserve and the protocol. It earns
+    /// dues only on that cash interest, so the recycled-seed farm (one loan) now has a cost per cycle.
+    function testRepaymentInsideTheFirstDayPaysItsAccruedInterest() public {
         uint256 assetsBefore = credit.totalAssets();
         uint256 grantedBefore = credit.grantedCredit(borrower);
         uint256 loanId = _open(10e6);
         vm.warp(vm.getBlockTimestamp() + 1 days - 1);
+        uint256 interest = credit.getCurrentOutstandingAmount(loanId) - 10e6;
+        uint256 held = 1 days - 1;
+        uint256 yearly = (uint256(10e6) * 933) / 10_000;
+        assertEq(interest, (yearly * held) / 365 days, "continuous simple interest, no waiver");
+        assertEq(interest, 2_556, "933 bps on 10 USDC, one second short of a day");
+        uint256 fee = (interest * credit.protocolFeeBps()) / 10_000;
+        uint256 toReserve = (interest * RESERVE_BPS) / 10_000;
 
+        usdc.mint(borrower, interest);
         vm.prank(borrower);
-        usdc.approve(address(credit), 10e6);
+        usdc.approve(address(credit), 10e6 + interest);
         vm.expectEmit(address(credit));
-        emit RepaymentApplied(loanId, 0, 10e6, 0);
+        emit RepaymentApplied(loanId, interest, 10e6, fee);
         vm.prank(borrower);
-        credit.repayLoan(loanId, 10e6);
+        credit.repayLoan(loanId, 10e6 + interest);
 
         (,,,, bool active) = credit.getLoan(loanId);
         assertFalse(active);
         assertEq(credit.completedLoans(borrower), 1, "the loan is on the record");
-        assertEq(credit.duesPaid(borrower), 0, "but it paid no dues");
-        assertEq(credit.firstLossReserve(), 0, "the reserve received nothing");
-        assertEq(credit.totalAssets(), assetsBefore, "lenders earned nothing");
-        assertEq(credit.grantedCredit(borrower), grantedBefore, "and the line did not grow");
+        assertEq(credit.duesPaid(borrower), toReserve, "dues are the reserve share of the cash interest paid");
+        assertEq(credit.firstLossReserve(), toReserve, "the reserve received its share");
+        assertEq(credit.totalAssets(), assetsBefore + interest - fee - toReserve, "lenders earned the rest");
+        assertEq(
+            credit.grantedCredit(borrower), grantedBefore + toReserve, "the line grew by the dues paid in cash only"
+        );
     }
 
-    /// The grace is a cliff: at one day the interest for the whole day appears, counted from disbursement.
-    function testInterestAppearsInFullAtTheEndOfTheFirstDay() public {
+    /// There is no first-day cliff: interest is continuous from disbursement, the same simple interest at one
+    /// hour, one second short of a day and exactly one day.
+    function testInterestAccruesFromDisbursementWithoutAFirstDayCliff() public {
         uint256 loanId = _open(10e6);
-        vm.warp(vm.getBlockTimestamp() + 1 days - 1);
-        assertEq(credit.getCurrentOutstandingAmount(loanId), 10e6);
-        vm.warp(vm.getBlockTimestamp() + 1);
+        uint256 start = vm.getBlockTimestamp();
+        vm.warp(start + 1 hours);
+        assertEq(credit.getCurrentOutstandingAmount(loanId) - 10e6, 106, "933 bps on 10 USDC for one hour");
+        vm.warp(start + 1 days - 1);
+        assertEq(credit.getCurrentOutstandingAmount(loanId) - 10e6, 2_556);
+        vm.warp(start + 1 days);
         uint256 owed = credit.getCurrentOutstandingAmount(loanId);
         emit log_named_uint("10 USDC, owed at exactly one day, interest (base units)", owed - 10e6);
         assertEq(owed - 10e6, 2_556, "933 bps on 10 USDC for one day");
     }
 
-    // ───────────── the cent: interest under it is forgiven at closing, principal never is ─────────────
+    // ───────────── the cent: no interest and no principal is forgiven at closing ─────────────
 
-    /// A 1 USDC advance held a week owes less than a cent of interest, so repaying only its principal closes it:
-    /// the interest is forgiven, never booked, and earns no dues. Repaying the full balance instead collects it.
-    function testShortSmallAdvanceIsClosedByRepayingItsPrincipalOnly() public {
+    /// A 1 USDC advance held a week owes under a cent of interest, and repaying only its principal does not
+    /// close it: interest is paid first, the loan stays open owing exactly the interest left, and that interest
+    /// earns dues when it is paid. Paying the remainder closes it.
+    function testShortSmallAdvanceIsNotClosedByItsPrincipalAlone() public {
         uint256 assetsBefore = credit.totalAssets();
         uint256 loanId = _open(1e6);
         vm.warp(vm.getBlockTimestamp() + 7 days);
-        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
-        emit log_named_uint("1 USDC, 7 days: interest accrued (base units)", owed - 1e6);
-        assertLt(owed - 1e6, CENT, "under a cent of interest");
+        uint256 interest = credit.getCurrentOutstandingAmount(loanId) - 1e6;
+        emit log_named_uint("1 USDC, 7 days: interest accrued (base units)", interest);
+        assertEq(interest, 1_789, "933 bps on 1 USDC for 7 days, rounded down");
+        assertLt(interest, CENT, "under a cent of interest");
+        uint256 fee = (interest * credit.protocolFeeBps()) / 10_000;
+        uint256 toReserve = (interest * RESERVE_BPS) / 10_000;
 
         vm.prank(borrower);
         usdc.approve(address(credit), 1e6);
         vm.expectEmit(address(credit));
-        emit RepaymentApplied(loanId, 0, 1e6, 0); // the payment is all principal; the interest is forgiven
+        emit RepaymentApplied(loanId, interest, 1e6 - interest, fee); // interest first, then principal
         vm.prank(borrower);
         credit.repayLoan(loanId, 1e6);
 
         (,,,, bool active) = credit.getLoan(loanId);
-        assertFalse(active, "closed as repaid");
+        assertTrue(active, "still open: the interest-first payment left a sliver of principal");
+        assertEq(
+            credit.getCurrentOutstandingAmount(loanId),
+            interest,
+            "owes exactly what the interest took from the principal"
+        );
+        assertEq(credit.totalLentOut(), interest);
+        assertEq(credit.activeLoanCount(borrower), 1, "and it keeps using the limit");
+        assertEq(credit.completedLoans(borrower), 0);
+        assertEq(credit.duesPaid(borrower), toReserve, "dues on the interest that was paid in cash");
+
+        usdc.mint(borrower, interest);
+        _repay(borrower, loanId, interest);
+        (,,,, active) = credit.getLoan(loanId);
+        assertFalse(active, "closed once the whole balance is paid");
         assertEq(credit.totalLentOut(), 0);
-        assertEq(credit.duesPaid(borrower), 0, "no dues on interest never paid");
-        assertEq(credit.firstLossReserve(), 0, "the reserve received nothing and paid nothing");
-        assertEq(credit.totalAssets(), assetsBefore, "lenders got their principal back and earned nothing");
+        assertEq(credit.completedLoans(borrower), 1);
+        assertEq(credit.duesPaid(borrower), toReserve, "the remainder was principal and added no dues");
+        assertEq(credit.firstLossReserve(), toReserve);
+        assertEq(
+            credit.totalAssets(),
+            assetsBefore + interest - fee - toReserve,
+            "lenders got the principal back and the interest"
+        );
 
         uint256 second = _open(1e6);
         vm.warp(vm.getBlockTimestamp() + 7 days);
-        uint256 interest = credit.getCurrentOutstandingAmount(second) - 1e6;
-        usdc.mint(borrower, interest);
-        _repay(borrower, second, 1e6 + interest); // in full: the sub-cent interest is collected
+        uint256 interest2 = credit.getCurrentOutstandingAmount(second) - 1e6;
+        usdc.mint(borrower, interest2);
+        _repay(borrower, second, 1e6 + interest2); // in full: closes in one payment
         emit log_named_uint("the same advance repaid in full: dues credited (base units)", credit.duesPaid(borrower));
-        assertEq(credit.duesPaid(borrower), interest * RESERVE_BPS / 10_000, "dues on the interest paid in cash");
+        assertEq(
+            credit.duesPaid(borrower),
+            toReserve + (interest2 * RESERVE_BPS) / 10_000,
+            "dues on every cent of cash interest"
+        );
         assertEq(credit.firstLossReserve(), credit.duesPaid(borrower), "and the reserve holds them");
     }
 
-    /// Ten daily cycles of a 38 USDC advance, each repaid with its principal only (the interest of one day on 38
-    /// USDC is just under a cent): the borrower pays no cash interest and earns no dues for it. Before the CI-30
-    /// fix it was credited dues on every cycle (docs/CREDIT_INTEGRITY_ISSUES.md).
-    function testDailyCyclesOfSubCentInterestRepaidAtPrincipalEarnNoDues() public {
+    /// Ten daily cycles of a 38 USDC advance, each repaid in full (the interest of one day on 38 USDC is just
+    /// under a cent): the borrower pays the sub-cent interest in cash and earns dues on it, every cycle. Before
+    /// the interest policy change it was forgiven and earned nothing (docs/CREDIT_INTEGRITY_ISSUES.md, CI-30).
+    function testDailyCyclesOfSubCentInterestArePaidInCashAndEarnDues() public {
         uint256 assetsBefore = credit.totalAssets();
+        uint256 grantedBefore = credit.grantedCredit(borrower);
         uint256 cycles = 10;
+        uint256 interestPaid = 0;
+        uint256 duesExpected = 0;
+        uint256 feeExpected = 0;
         for (uint256 i = 0; i < cycles; i++) {
             uint256 loanId = _open(38e6);
             vm.warp(vm.getBlockTimestamp() + 1 days);
-            assertLt(credit.getCurrentOutstandingAmount(loanId) - 38e6, CENT, "under a cent of interest");
-            _repay(borrower, loanId, 38e6);
+            uint256 interest = credit.getCurrentOutstandingAmount(loanId) - 38e6;
+            assertGt(interest, 0, "the day is charged");
+            assertLt(interest, CENT, "under a cent of interest");
+            usdc.mint(borrower, interest);
+            _repay(borrower, loanId, 38e6 + interest);
+            interestPaid += interest;
+            duesExpected += (interest * RESERVE_BPS) / 10_000;
+            feeExpected += (interest * credit.protocolFeeBps()) / 10_000;
         }
         emit log_named_uint("daily cycles", cycles);
-        emit log_named_uint("cash interest the borrower paid (base units)", usdc.balanceOf(borrower));
-        assertEq(credit.duesPaid(borrower), 0, "no dues: the interest was forgiven, not booked");
-        assertEq(credit.totalDuesPaid(), 0);
-        assertEq(credit.firstLossReserve(), 0);
+        emit log_named_uint("cash interest the borrower paid (base units)", interestPaid);
+        assertEq(interestPaid, cycles * 9_713, "933 bps on 38 USDC for a day, rounded down, ten times");
+        assertEq(credit.duesPaid(borrower), duesExpected, "dues on the interest paid in cash");
+        assertEq(credit.totalDuesPaid(), duesExpected);
+        assertEq(credit.firstLossReserve(), duesExpected);
         assertEq(credit.completedLoans(borrower), cycles, "the loans are on the record as repaid");
-        assertEq(usdc.balanceOf(borrower), 0, "no cash interest: the borrower repaid exactly what it received");
-        assertEq(credit.totalAssets(), assetsBefore, "lenders earned nothing and lost nothing");
+        assertEq(usdc.balanceOf(borrower), 0, "the borrower repaid what it received plus exactly the interest");
+        assertEq(
+            credit.totalAssets(), assetsBefore + interestPaid - feeExpected - duesExpected, "lenders earned the rest"
+        );
+        assertEq(
+            credit.grantedCredit(borrower), grantedBefore + duesExpected, "credit grew only by the dues paid in cash"
+        );
     }
 
-    /// The candidate sheet's size and term (testbed #17, 2026-10-07): 1 USDC held the full 30 days still owes
-    /// under a cent, so repaying the principal alone closes it. The payment is booked as principal; the interest
-    /// is forgiven, so no dues are credited and the reserve is untouched (the CI-30 fix).
-    function testThirtyDayOneUsdcAdvanceIsClosedByItsPrincipal() public {
+    /// The candidate sheet's size and term (testbed #17, 2026-10-07): 1 USDC held the full 30 days owes under a
+    /// cent. Repaying the principal alone does not close it; interest goes first and the loan stays open owing
+    /// the sliver, and the full balance closes it with dues credited on every unit of interest paid.
+    function testThirtyDayOneUsdcAdvanceOwesItsInterestAndIsNotClosedByItsPrincipal() public {
         uint256 assetsBefore = credit.totalAssets();
         uint256 loanId = _open(1e6);
         vm.warp(vm.getBlockTimestamp() + 30 days);
         uint256 interest = credit.getCurrentOutstandingAmount(loanId) - 1e6;
         emit log_named_uint("1 USDC, 30 days: interest accrued (base units)", interest);
         assertEq(interest, 7_668, "933 bps on 1 USDC for 30 days, rounded down");
+        uint256 fee = (interest * credit.protocolFeeBps()) / 10_000;
+        uint256 toReserve = (interest * RESERVE_BPS) / 10_000;
 
         vm.prank(borrower);
         usdc.approve(address(credit), 1e6);
         vm.expectEmit(address(credit));
-        emit RepaymentApplied(loanId, 0, 1e6, 0);
+        emit RepaymentApplied(loanId, interest, 1e6 - interest, fee);
         vm.prank(borrower);
-        credit.repayLoan(loanId, 1e6); // principal only
+        credit.repayLoan(loanId, 1e6); // principal-sized payment
 
         (,,,, bool active) = credit.getLoan(loanId);
-        assertFalse(active, "closed as repaid");
-        assertEq(credit.duesPaid(borrower), 0, "no dues on the forgiven interest");
-        assertEq(credit.firstLossReserve(), 0, "the reserve is untouched");
-        assertEq(credit.totalAssets(), assetsBefore, "lenders got 1 USDC back and earned nothing");
+        assertTrue(active, "open: interest is paid before principal");
+        assertEq(credit.getCurrentOutstandingAmount(loanId), interest);
+        assertEq(credit.duesPaid(borrower), toReserve, "dues on the interest paid");
+        assertEq(credit.firstLossReserve(), toReserve);
+
+        usdc.mint(borrower, interest);
+        _repay(borrower, loanId, interest);
+        (,,,, active) = credit.getLoan(loanId);
+        assertFalse(active, "closed once the whole balance is paid");
+        assertEq(credit.duesPaid(borrower), toReserve);
+        assertEq(
+            credit.totalAssets(), assetsBefore + interest - fee - toReserve, "lenders got 1 USDC back plus their share"
+        );
     }
 
     /// The same advance in default, once with unsecured backing (issued credit) and once with secured (stake):

@@ -166,12 +166,15 @@ class LoanLifecycleCrossCheck(unittest.TestCase):
         self.m.advance(365 * DAY)
         self.assertEqual(self.m.amount_owed(loan_id), 40 * U + 40 * U * 933 // 10_000)
 
-    def test_no_interest_inside_the_grace_period(self):
+    def test_interest_accrues_inside_the_first_day(self):
+        """No grace period: interest counts from disbursement, with no cliff at one day."""
         loan_id = self.m.borrow("brighton", 40 * U)
+        yearly = 40 * U * 933 // 10_000
         self.m.advance(DAY - 1)
-        self.assertEqual(self.m.amount_owed(loan_id), 40 * U)
-        self.m.advance(1)  # from the first day on, interest counts from disbursement
-        self.assertEqual(self.m.amount_owed(loan_id), 40 * U + 40 * U * 933 // 10_000 * DAY // (365 * DAY))
+        self.assertEqual(self.m.amount_owed(loan_id), 40 * U + yearly * (DAY - 1) // (365 * DAY))
+        self.assertGreater(self.m.amount_owed(loan_id), 40 * U)
+        self.m.advance(1)
+        self.assertEqual(self.m.amount_owed(loan_id), 40 * U + yearly * DAY // (365 * DAY))
 
     def test_loan_cannot_default_before_late_period_ends(self):
         loan_id = self.m.borrow("brighton", 40 * U)
@@ -304,14 +307,17 @@ class HistoryAndDues(unittest.TestCase):
             _, available = m.borrow_limit("b")
             loan_id = m.borrow("b", available)
             m.advance(23 * 3_600)
+            m.mint("b", 1 * U)  # the interest accrued while held is paid in cash
             m.repay(loan_id)
             self.assertEqual(m.granted_credit("b"), round(expected * U))
 
-    def test_m1_four_free_cycles_give_a_fresh_account_the_ceiling(self):
-        """CREDIT_MODEL.md, Theorem 3: stake 100, four grace-period cycles, 100 of own credit."""
-        outcome = atk.wash_farm(HermesHistory, 1, seed="stake", timing="grace", cycles=4)
-        self.assertEqual(outcome.net_profit, 100.0)
-        self.assertEqual(outcome.interest_paid, 0.0)
+    def test_m1_four_short_cycles_give_a_fresh_account_the_ceiling_for_a_few_cents(self):
+        """CREDIT_MODEL.md, Theorem 3: stake 100, four 23-hour cycles, 100 of own credit. Interest now
+        accrues from disbursement, so the cycles are no longer free, but they cost cents, not the credit."""
+        outcome = atk.wash_farm(HermesHistory, 1, seed="stake", timing="short", cycles=4)
+        self.assertGreater(outcome.interest_paid, 0.0)
+        self.assertLess(outcome.interest_paid, 0.25)
+        self.assertAlmostEqual(outcome.net_profit, 100.0 - outcome.interest_paid, places=6)
 
     def test_m3_dues_are_interest_net_of_fee(self):
         m = pool(ConservationDues)
@@ -324,13 +330,17 @@ class HistoryAndDues(unittest.TestCase):
         self.assertEqual(m.dues_paid["b"], interest - interest // 10)
         self.assertEqual(m.granted_credit("b"), 50 * U + interest - interest // 10)
 
-    def test_m3_grace_repayments_earn_nothing(self):
+    def test_m3_short_repayments_earn_dues_only_on_the_interest_they_pay(self):
         m = pool(ConservationDues)
         m.grant_line("b", 50 * U)
         loan_id = m.borrow("b", 50 * U)
         m.advance(23 * 3_600)
+        m.mint("b", 1 * U)
         m.repay(loan_id)
-        self.assertEqual(m.granted_credit("b"), 50 * U)
+        interest = 50 * U * 933 // 10_000 * (23 * 3_600) // (365 * DAY)
+        self.assertGreater(interest, 0)
+        self.assertEqual(m.dues_paid["b"], interest - interest // 10)
+        self.assertEqual(m.granted_credit("b"), 50 * U + interest - interest // 10)
 
     def test_m3_extra_credit_never_exceeds_interest_paid(self):
         for outcome in (
@@ -488,18 +498,21 @@ class AttackProperties(unittest.TestCase):
                 (atk.wash_farm, {"seed": "stake"}),
                 (atk.wash_farm, {"seed": "line", "cycles": 4}),
                 (atk.collusive_backer, {}),
-                (atk.exit_scam, {"timing": "grace"}),
+                (atk.exit_scam, {"timing": "short"}),
             ]:
                 with self.subTest(mechanism=mechanism.key, attack=attack.__name__, **kwargs):
                     small, large = attack(mechanism, 1, **kwargs), attack(mechanism, 64, **kwargs)
                     self.assertLessEqual(large.net_profit, small.net_profit + 1e-6)
                     self.assertLessEqual(large.net_profit, 100.0)
 
-    def test_m1_wash_farm_is_linear_and_free(self):
+    def test_m1_wash_farm_is_linear_and_nearly_free(self):
+        """Linear in the number of accounts; each pays the interest of 23 hours, a fraction of a cent per USDC."""
         for n in atk.ATTACK_SIZES:
-            outcome = atk.wash_farm(HermesHistory, n, seed="stake", timing="grace")
-            self.assertEqual(outcome.net_profit, 25.0 * n)
-            self.assertEqual(outcome.honest_lender_loss, 25.0 * n)
+            outcome = atk.wash_farm(HermesHistory, n, seed="stake", timing="short")
+            self.assertGreater(outcome.interest_paid, 0.0)
+            self.assertAlmostEqual(outcome.net_profit, 25.0 * n - outcome.interest_paid, places=6)
+            self.assertAlmostEqual(outcome.net_profit / n, 25.0, delta=0.05)
+            self.assertAlmostEqual(outcome.honest_lender_loss, 25.0 * n - outcome.interest_paid, delta=0.05 * n)
 
     def test_m3_self_lending_matches_the_closed_form(self):
         """M3 (superseded): profit per account = interest x (share x (1 - fee - reserve) - fee)."""

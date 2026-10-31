@@ -43,7 +43,7 @@ this model are tracked in [`CREDIT_INTEGRITY_ISSUES.md`](CREDIT_INTEGRITY_ISSUES
 | --- | --- | --- |
 | Vouching + on-chain PageRank (up to `21b838d`) | A symmetric function of the attestation graph, personalised by deposits | No symmetric reputation function is sybilproof (Cheng and Friedman 2005), and PageRank in particular is manipulable by Sybil strategies (Cheng and Friedman 2006). Concretely: a uniform fallback made every node a root when no deposits existed, $100 deposits were withdrawable roots, and scores were relative, so a ring of fakes scored about 0.9 and out-borrowed honest users (Hermes, PR #3, rounds 1 to 3). |
 | Stake per vouch + first-loan cap | The same graph, made more expensive | Topology still turned vouches into credit; costs only scaled the attack. |
-| Reviewer proposal: capacity rises 25% of each repaid principal | On-chain repayment history | Theorem 3: a repayment inside the 24-hour interest-free window costs nothing and earns 25, so one recycled seed farms unbounded capacity. |
+| Reviewer proposal: capacity rises 25% of each repaid principal | On-chain repayment history | Theorem 3: a repayment after a few hours costs only the interest of those hours (about 0.03% of principal for 23 hours at 10% APR; nothing while the contract waived the first day) and earns 25, so one recycled seed farms unbounded capacity. |
 
 ## 2. Model
 
@@ -138,7 +138,7 @@ Sybil influence in credit networks and in SybilLimit-style defences, where it is
 interest. Let $R$ be the reserve on hand, $\Lambda_L$ the part of $\Lambda$ the reserve did not pay,
 $F$ the capital added with `fundReserve`, $D$ what was released to lenders and $\varphi$ the
 principal written off at repaid closings that the reserve absorbed (identically zero since the
-CI-30 fix: a loan closes short only on interest, which is never booked), so
+CI-30 fix, and still zero when nothing is forgiven: a loan closes only when its whole balance is paid), so
 $R=\sum_a d(a)+F-(\Lambda-\Lambda_L)-D-\varphi$. Then
 $$\Lambda_L + \max(0,\ U-R) \;\le\; \sum_a \ell(a) + D + \varphi.$$
 
@@ -250,9 +250,12 @@ person by a trusted party), which is exactly the identity-cost route of 4.2. Res
 their sense must sometimes refuse transactions that are profitable in expectation.
 
 *The reviewer's rule, concretely.* Under "capacity rises by 25% of repaid principal, up to 100",
-seed $K=100$ of stake and four borrow-and-repay cycles inside the 24-hour interest-free window give
-a fresh account 100 of its own capacity at a cost of gas. With $n$ accounts the attacker extracts
-$100n$ and the seed is never at risk (`analysis/sybil_sim`, attack A4: 6,400 USDC at $n=64$).
+seed $K=100$ of stake and four 23-hour borrow-and-repay cycles give a fresh account 100 of its own
+capacity at a cost of gas and the interest of those hours (about 0.02 USDC per 25 of capacity at
+9.33% APR; the contract waived that interest until its grace period was removed in source on
+2026-10-31, so before that the cost was gas alone). With $n$ accounts the attacker extracts about
+$100n$ and the seed is never at risk (`analysis/sybil_sim`, attack A4: 6,391 USDC net at $n=64$,
+9.04 of it paid as interest; 6,400 with the first day waived).
 Thirty-day cycles cost about 0.77 each and change nothing. The same holds if an oracle reads
 `completedLoans` and grants credit for it: the policy, not the venue, is what is farmable.
 
@@ -449,13 +452,16 @@ What the theorems do not say:
   CI-17 lands, by its capital. Owner overrides are not budgeted (CI-6).
 - **Lines fixed, or Theorem 2'.** With lines that change, the bound is on each account's highest
   line in its current cycle; the oracle budget is charged that way, owner overrides are not.
-- **Rounding.** Pro-rata charging leaves at most a few wei per edge per default on lenders, and
-  under a cent of interest is forgiven at closing: never booked, so it earns no dues and costs
-  lenders nothing but that interest; a payment short of the principal keeps the loan open. Until
-  the CI-30 fix (2026-10-08) the forgiven rest could be principal, charged to the reserve, and a
-  borrower could repeat it and be credited dues on interest it never paid; `test/AdvanceFacts.t.sol`
-  pins the fixed behaviour, and the invariant suite checks that no principal is written off at a
-  repaid close (I9).
+- **Rounding.** Pro-rata charging leaves at most a few wei per edge per default on lenders. Nothing
+  is forgiven at closing: a loan closes only when its whole balance is paid, every unit of
+  interest paid is booked and earns dues, and a payment short by even one unit keeps the loan open
+  (source change of 2026-10-31, not deployed). Source between the CI-30 fix (2026-10-08) and this
+  change forgave a sub-cent interest rest after the principal was paid: never booked, so it earned
+  no dues and cost lenders nothing but that interest. Before the CI-30 fix, and in every pool
+  deployed so far (the live Base Sepolia pool is `1812e7d` of 2026-10-06), the forgiven rest could
+  be principal, charged to the reserve, and a borrower could repeat it and be credited dues on
+  interest it never paid; `test/AdvanceFacts.t.sol` pins the current behaviour, and the invariant
+  suite checks that no principal is written off at a repaid close (I9).
 - **The token.** USDC is assumed to transfer as specified. A blocklisted lender or borrower cannot
   move funds; a depeg moves every figure together. Neither creates credit.
 - **Ordering.** A backer cutting a backing and a borrower drawing on it can race in one block;

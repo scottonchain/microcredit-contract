@@ -50,7 +50,7 @@ All user actions in the demo are meta-transactions: EIP-712 signed messages (or 
 
 - **Step 3: Brighton borrows 40 USDC for 28 days.** As Brighton, the script opens `/borrower`, where his credit limit is 75 USDC. It picks the 28-day repayment period, enters 40 and clicks *One-Click Borrow*. One signed message lets the relayer call `borrowAndDisburseMeta`, which creates and pays out the loan from the pool in a single transaction.
 
-- **Step 4: Brighton repays in full.** The script reloads `/borrower` and clicks the full-repayment button (*Pay $40.00*). Brighton signs a USDC permit, and the relayer calls `repayWithPermit`, which pulls exactly the outstanding balance and closes the loan. The *Loan Request* form reappears. No interest accrues in the first 24 hours, so he pays none, and his own credit stays at 25 USDC: on-chain history only adds the share of interest a borrower has paid into the first-loss reserve.
+- **Step 4: Brighton repays in full.** The script reloads `/borrower` and clicks the full-repayment button (*Pay $40.00*). Brighton signs a USDC permit, and the relayer calls `repayWithPermit`, which pulls exactly the outstanding balance and closes the loan. The *Loan Request* form reappears. Interest accrues from disbursement, so he pays a few millionths of a dollar of it (the deploy script gives him 1 USDC for that, and the button may read *Pay $40.01* because the quote rounds up to the cent), and his own credit rises by only the reserve share of that interest, a few millionths of a USDC: on-chain history only adds the share of interest a borrower has paid into the first-loss reserve.
 
 ---
 

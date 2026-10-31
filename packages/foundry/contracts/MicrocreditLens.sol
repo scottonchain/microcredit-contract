@@ -89,8 +89,10 @@ contract MicrocreditLens {
 
     /// @notice Outstanding balance rounded up to the cent: what the UI shows and approves for a
     ///         repayment in full. The pool pulls only what is owed, so rounding up never
-    ///         overpays, while rounding down could leave sub-cent principal owed and the loan open
-    ///         (a loan closes short only on interest since the CI-30 fix).
+    ///         overpays, while rounding down could leave sub-cent principal owed and the loan open.
+    ///         A loan closes only when its whole balance is paid and interest keeps accruing between
+    ///         this quote and the payment mining, so callers add a cent or more of headroom to the
+    ///         amount they approve, permit or pass; the pool still pulls only what is owed.
     function getOutstandingRoundedToCent(uint256 loanId) external view returns (uint256) {
         return ((credit.getCurrentOutstandingAmount(loanId) + CENT - 1) / CENT) * CENT;
     }

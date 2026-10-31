@@ -63,7 +63,6 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
     uint256 internal constant SCALE = 1e6;
     uint256 internal constant BASIS_POINTS = 10_000;
     uint256 internal constant CENT = 10_000;
-    uint256 internal constant GRACE_PERIOD = 1 days;
     uint256 internal constant SECONDS_PER_YEAR = 365 days;
     uint256 internal constant MAX_WARP = 90 days;
     uint256 internal constant MAX_STAKE = 300e6;
@@ -709,7 +708,6 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
         LoanModel storage m = _loans[idx];
         if (m.disbursedAt == 0) return 0;
         uint256 elapsed = vm.getBlockTimestamp() - m.disbursedAt;
-        if (elapsed < GRACE_PERIOD) return 0;
         return (((m.principal * m.rate) / BASIS_POINTS) * elapsed) / SECONDS_PER_YEAR;
     }
 
@@ -836,8 +834,8 @@ contract CreditHandler is CommonBase, StdCheats, StdUtils {
         if (paid != Math.min(amount, owed)) _mismatch("repay: pulled other than min(amount, outstanding)");
         uint256 interestDue = accrued - (m.repaid - m.principalRepaid);
         uint256 rest = owed - paid;
-        bool closes = rest < CENT && rest <= interestDue;
-        uint256 interest = closes ? interestDue - rest : Math.min(paid, interestDue);
+        bool closes = rest == 0;
+        uint256 interest = Math.min(paid, interestDue);
         uint256 fee = (interest * feeBps) / BASIS_POINTS;
         uint256 toReserve = (interest * reserveBps) / BASIS_POINTS;
         m.repaid += paid;

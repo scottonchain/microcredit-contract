@@ -24,11 +24,9 @@ USDC = 10**6  # one USDC in micro-USDC
 SCALE = 10**6  # OracleScoreProvider.SCALE: one full line of maxLoanAmount
 MAX_BATCH = 500  # OracleScoreProvider.MAX_BATCH
 BASIS_POINTS = 10_000
-CENT = 10_000  # interest under a cent is forgiven at closing; a principal shortfall keeps the loan open
 HOUR = 3_600
 DAY = 86_400
 SECONDS_PER_YEAR = 365 * DAY
-GRACE_PERIOD = DAY  # no interest during the first day after disbursement
 DEFAULT_LOAN_TERM = 30 * DAY
 MIN_LOAN_TERM = DAY
 MAX_LOAN_TERM = 365 * DAY
@@ -374,8 +372,6 @@ class Pool:
 
     def interest_accrued(self, loan: Loan, now: int) -> int:
         elapsed = now - loan.disbursed_at
-        if elapsed < GRACE_PERIOD:
-            return 0
         return ((loan.principal * loan.interest_rate_bps) // BASIS_POINTS * elapsed) // SECONDS_PER_YEAR
 
     def outstanding(self, loan: Loan, now: int) -> int:
@@ -384,9 +380,9 @@ class Pool:
         return max(0, loan.principal + self.interest_accrued(loan, now) - loan.repaid)
 
     def repay(self, loan: Loan, now: int, amount: int | None = None) -> int:
-        """`_repay`: interest first; closes once under a cent is left and that rest is interest (the
-        payment covered every unit of principal), which is forgiven and never booked. A payment short
-        of the principal keeps the loan open. Returns the amount paid."""
+        """`_repay`: interest first; closes only when the whole balance is paid. Nothing is forgiven,
+        so a payment short of the balance, however small the shortfall, keeps the loan open. Returns
+        the amount paid."""
         if loan.status != LoanStatus.ACTIVE:
             raise Revert("LoanNotActive")
         owed = self.outstanding(loan, now)
@@ -394,9 +390,9 @@ class Pool:
         acct = self.account(loan.borrower)
         interest_due = self.interest_accrued(loan, now) - loan.interest_paid
         rest = owed - paid
-        closes = rest < CENT and rest <= interest_due
+        closes = rest == 0
         if paid > 0:
-            interest = interest_due - rest if closes else min(paid, interest_due)
+            interest = min(paid, interest_due)
             principal = paid - interest
             loan.repaid += paid
             loan.principal_repaid += principal

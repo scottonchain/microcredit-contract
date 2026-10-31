@@ -52,7 +52,7 @@ the identity. Anything else gets line 0.
 
 $$w_{\text{good}} = \underbrace{2^{-\text{age}/h}}_{\text{recency}}\cdot\underbrace{\min\Big(1,\ \frac{\text{principal}-\text{secured}}{P_{\text{ref}}}\Big)}_{\text{unsecured size}}\cdot\underbrace{\min\Big(1,\ \frac{\min(\text{elapsed},\ \text{term})}{30\ \text{days}}\Big)}_{\text{time at risk}}$$
 
-and $w_{\text{good}}=0$ if the loan closed inside the 24-hour interest-free window or paid no
+and $w_{\text{good}}=0$ if the loan closed within 24 hours (the issuer's own rule; the contract source no longer waives that day's interest) or paid no
 interest. A loan repaid after its due date is a bad trial with weight
 $2^{-\text{age}/h}\min(1,\text{principal}/P_{\text{ref}})\min(1,\text{term}/30\ \text{days})$.
 Stake does not discount a bad trial, so stake cannot hide lateness. Open loans are not evidence
@@ -99,14 +99,16 @@ earns only dues, which the contract adds itself.
 **Proof.** Step 1 returns 0 before any history is read, so the history rule is $f(h)=0\le\pi(h)$
 for every h. Theorem 3's farming profit $n(f(h)-\pi(h))$ is then at most 0. This is the on-chain form of
 "pay your dues" for cheap pseudonyms (Friedman and Resnick 2001). With a costly
-identity, a history that costs nothing (grace-window loans, stake-secured loans, a guarantor
+identity, a history that costs almost nothing (loans closed within a day, stake-secured loans, a guarantor
 record) has weight 0 by step 2, so it earns exactly what the identity alone earns.
 
 **Checked.** A perfect 48-loan unsecured history without the KYC flag gets 0. The flag without a
 registry tier, or a tier without the flag, gets 0. Theorem 3's construction (one 100 USDC stake
-recycled through 16 fresh accounts, four loans each, inside the window or over 30 days) gets 0
-for every account, and its 30-day variant earns only its on-chain dues. In the simulation an
-unverified farm account repays 96 loans and 9,600 USDC inside the window. The reviewer's "25% of
+recycled through 16 fresh accounts, four loans each, closed within 24 hours or over 30 days) gets 0
+for every account, and both variants earn only their on-chain dues (the 23-hour loops now pay the
+interest of their hours; the contract no longer waives the first day). In the simulation an
+unverified farm account repays 96 loans and 9,600 USDC within 24 hours each, paying 2.02 USDC in
+dues-earning interest. The reviewer's "25% of
 repaid principal" rule would give it 100 USDC; this policy gives 0. The same farm run on a bought
 basic identity gets 6.10 USDC, exactly the line of a fresh basic identity with no history.
 
@@ -165,7 +167,7 @@ Why each weight closes a farming route (`results/evidence_routes.csv`):
 
 | Weight | Route it closes |
 | --- | --- |
-| 0 inside the 24-hour window | Grace-window loans pay no interest, and the capital comes back within a day. One seed would buy unlimited trials at gas cost (Theorem 3; `sybil_sim` attack A4). |
+| 0 within 24 hours | A loan closed within a day pays only that day's interest (0.03 USDC on 100 USDC at 12.33%; it was free while the contract waived the first day), and the capital comes back within a day. One seed would buy unlimited trials for cents (Theorem 3; `sybil_sim` attack A4). |
 | unsecured share only | Stake is slashed back to lenders at a default, so a stake-secured loan puts nothing at risk, and the stake can be recycled through account after account. Fully secured weighs 0; 95 of 100 secured weighs 0.5. |
 | own loans only | A guarantor record is farmable: back your own fresh account with 1 USDC of stake and let it borrow and repay. Loans of accounts it backed are never read. |
 | size up to `ref_principal` | There is no minimum loan, so many dust loans would give many trials for almost no interest. |

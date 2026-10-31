@@ -95,8 +95,11 @@ contract TestnetScenariosScript is Script {
         vm.startBroadcast(brightonPk);
         uint256 loanId = credit.requestLoan(40e6);
         credit.disburseLoan(loanId);
+        usdc.mint(brighton, 10_000); // covers the interest accrued before the payoff is mined
         usdc.approve(address(credit), type(uint256).max);
-        credit.repayLoan(loanId, 40e6); // inside the first day: no interest
+        // Interest accrues from disbursement, so the payoff passes a cent of headroom over the principal: the
+        // pool pulls only what is owed, and a few seconds of interest between blocks cannot leave the loan open.
+        credit.repayLoan(loanId, 40e6 + 10_000);
         vm.stopBroadcast();
         require(credit.getCurrentOutstandingAmount(loanId) == 0, "repaid");
         console.log("[credit moves] Brighton borrowed 40 against the backing and repaid; loan id", loanId);

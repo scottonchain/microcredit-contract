@@ -32,10 +32,34 @@ contract LoanAccountingTest is MicrocreditTestBase {
 
     // ───────────────────────────── interest ─────────────────────────────
 
-    function testNoInterestDuringGracePeriod() public {
+    /// There is no grace period: interest accrues from disbursement, so a loan held one second short of a day
+    /// already owes that time's simple interest.
+    function testInterestAccruesInTheFirstDay() public {
         uint256 loanId = _openLoan(PRINCIPAL);
-        vm.warp(vm.getBlockTimestamp() + 1 days - 1);
-        assertEq(credit.getCurrentOutstandingAmount(loanId), PRINCIPAL);
+        uint256 held = 1 days - 1;
+        vm.warp(vm.getBlockTimestamp() + held);
+        uint256 yearly = (PRINCIPAL * RATE) / 10_000;
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        assertGt(owed, PRINCIPAL, "the first day is charged");
+        assertEq(owed, PRINCIPAL + (yearly * held) / 365 days);
+    }
+
+    /// Interest keeps accruing on the original principal after a partial repayment, so a heavily repaid loan grows at
+    /// the rate of the whole principal, not of what is left. The app sizes its payoff headroom from the original
+    /// principal for this reason (packages/nextjs/utils/repayAmount.ts).
+    function testInterestKeepsAccruingOnTheOriginalPrincipalAfterAPartialRepayment() public {
+        uint256 loanId = _openLoan(PRINCIPAL);
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), PRINCIPAL - 1e6);
+        credit.repayLoan(loanId, PRINCIPAL - 1e6); // 999 USDC of 1,000 repaid at origination
+        vm.stopPrank();
+        assertEq(credit.getCurrentOutstandingAmount(loanId), 1e6, "one USDC left, no interest accrued yet");
+
+        vm.warp(vm.getBlockTimestamp() + 600);
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        uint256 growth = owed - 1e6;
+        assertEq(growth, ((PRINCIPAL * RATE) / 10_000 * 600) / 365 days, "growth is that of the original principal");
+        assertGt(growth, ((1e6 * RATE) / 10_000 * 600) / 365 days * 100, "and not that of the remaining balance");
     }
 
     function testSimpleInterestAccruesFromOrigination() public {
@@ -242,9 +266,10 @@ contract LoanAccountingTest is MicrocreditTestBase {
         assertEq(credit.totalLentOut(), 0);
     }
 
-    /// A permit signed a moment before more interest accrued still closes the loan: the pull is
-    /// capped at the permit value, and the shortfall is interest under a cent, forgiven at closing.
-    function testRepayWithPermitStalePermitClosesWhenShortfallIsInterest() public {
+    /// A permit signed a moment before more interest accrued does not close the loan: the pull is capped at the
+    /// permit value, interest is paid first, and the shortfall (the interest accrued since the signature) stays
+    /// owed as principal. Nothing is forgiven, so the loan stays open and uses the limit until it is paid.
+    function testRepayWithPermitStalePermitLeavesTheShortfallOwed() public {
         uint256 loanId = _openLoan(PRINCIPAL);
         vm.warp(vm.getBlockTimestamp() + 10 days);
         uint256 value = credit.getCurrentOutstandingAmount(loanId);
@@ -259,9 +284,44 @@ contract LoanAccountingTest is MicrocreditTestBase {
         credit.repayWithPermit(borrower, loanId, 0, p.value, p.deadline, p.v, p.r, p.s);
 
         (,,,, bool active) = credit.getLoan(loanId);
-        assertFalse(active, "closed: the shortfall was interest");
+        assertTrue(active, "open: the stale permit did not cover the interest accrued since the signature");
         assertEq(usdc.balanceOf(borrower), 0);
+        assertEq(credit.getCurrentOutstandingAmount(loanId), owed - value, "exactly the shortfall is owed");
+        assertEq(credit.totalLentOut(), owed - value, "and it is principal, because interest is paid first");
+        assertEq(credit.activeLoanCount(borrower), 1);
+        assertEq(credit.completedLoans(borrower), 0, "with no completed-loan credit yet");
+
+        usdc.mint(borrower, owed - value);
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), owed - value);
+        credit.repayLoan(loanId, owed - value);
+        vm.stopPrank();
+        (,,,, active) = credit.getLoan(loanId);
+        assertFalse(active, "the remainder closes it");
+        assertEq(credit.completedLoans(borrower), 1);
+    }
+
+    /// The caller-side fix for the stale quote: a permit signed for the cent-rounded quote plus one cent of
+    /// headroom still closes the loan after a minute of accrual, and only the exact balance is pulled.
+    function testRepayWithPermitCentHeadroomClosesTheLoanDespiteAccrual() public {
+        uint256 loanId = _openLoan(PRINCIPAL);
+        vm.warp(vm.getBlockTimestamp() + 10 days);
+        uint256 exactAtSignature = credit.getCurrentOutstandingAmount(loanId);
+        uint256 headroom = lens.getOutstandingRoundedToCent(loanId) + 10_000;
+        DecentralizedMicrocredit.PermitData memory p = _signPermit(borrowerPk, headroom, _deadline());
+        vm.warp(vm.getBlockTimestamp() + 1 minutes);
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        assertGt(owed, exactAtSignature, "interest kept accruing after the signature");
+        assertLe(owed, headroom, "the headroom covers a minute of accrual");
+        usdc.mint(borrower, headroom - PRINCIPAL);
+
+        vm.prank(relayer);
+        credit.repayWithPermit(borrower, loanId, 0, p.value, p.deadline, p.v, p.r, p.s);
+
+        (,,,, bool active) = credit.getLoan(loanId);
+        assertFalse(active, "closed in one payment");
         assertEq(credit.totalLentOut(), 0);
+        assertEq(usdc.balanceOf(borrower), headroom - owed, "only the exact balance was pulled");
     }
 
     function testRequestLoanEnforcesLiquidityBuffer() public {

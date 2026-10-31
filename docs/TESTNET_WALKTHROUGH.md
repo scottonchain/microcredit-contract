@@ -48,7 +48,7 @@ The app shows "Loan requested, not yet disbursed" whenever a loan of yours is re
 
 ## 7. Repay
 
-On **Borrow**, the active loan shows what is owed. Repay in full or in part: two prompts, `approve` and `repayLoan`. Interest is settled before principal; once the principal is paid in full, interest under one cent is forgiven and the loan closes, while a payment short of the principal leaves it open. You need enough USDC for the interest as well as the principal; the faucet covers it.
+On **Borrow**, the active loan shows what is owed. Repay in full or in part: two prompts, `approve` and `repayLoan`. Interest is settled before principal, and the loan closes only when the whole balance is paid: nothing is forgiven, so a payment short by even one unit leaves it open and the page tells you the exact amount still owed. You need enough USDC for the interest as well as the principal; the faucet covers it. (The Base Sepolia pools deployed so far, the live one of 2026-10-06 included, predate this change and the CI-30 fix: they close a loan with under a cent left and forgive that rest, even when it is principal. The source after this change does not.)
 
 ## 8. If something goes wrong
 

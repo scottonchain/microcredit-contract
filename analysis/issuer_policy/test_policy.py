@@ -177,7 +177,7 @@ class TheoremThreeCompliance(unittest.TestCase):
         reg.bind("x", "enhanced", addr(9))
         self.assertEqual(pol.target(pol.read_account(pool, reg, addr(9)), NOW, P).score, 0)
 
-    def _seed_farm(self, pool, n, grace: bool, start=NOW - 60 * DAY):
+    def _seed_farm(self, pool, n, short: bool, start=NOW - 60 * DAY):
         """Theorem 3's construction: one stake, recycled through fresh accounts."""
         seed = addr(0, 0x5E)
         pool.stake(seed, usdc(100))
@@ -187,26 +187,27 @@ class TheoremThreeCompliance(unittest.TestCase):
             pool.back(seed, a, usdc(100))
             for _ in range(4):
                 loan = pool.borrow(a, usdc(100), t)
-                pool.repay(loan, t + (23 * 3_600 if grace else 30 * DAY))
-                t += DAY if grace else 31 * DAY
+                pool.repay(loan, t + (23 * 3_600 if short else 30 * DAY))
+                t += DAY if short else 31 * DAY
             pool.back(seed, a, 0)
         pool.unstake(seed, usdc(100))  # the seed is never at risk
         return farm
 
     def test_recycled_seed_farm_earns_zero_lines(self):
-        for grace in (True, False):
+        for short in (True, False):
             provider, pool, reg = world()
-            farm = self._seed_farm(pool, 16, grace)
+            farm = self._seed_farm(pool, 16, short)
             self.assertTrue(all(pool.account(a).completed_loans == 4 for a in farm))
             plan = plan_for(pool, reg, provider, farm, now=NOW + 200 * DAY)
             self.assertEqual(plan.reports, [])
             self.assertTrue(all(s == 0 for s in plan.new_scores.values()))
-            if not grace:  # history earned dues on-chain, which the contract adds, and nothing more
-                self.assertTrue(all(pool.granted(a) == pool.account(a).dues_paid > 0 for a in farm))
+            # history earned dues on-chain, which the contract adds, and nothing more: the 23-hour loops
+            # now pay the interest of their hours, so they earn dues too
+            self.assertTrue(all(pool.granted(a) == pool.account(a).dues_paid > 0 for a in farm))
 
-    def test_grace_period_farm_earns_zero_even_on_a_bought_identity(self):
+    def test_short_hold_farm_earns_zero_even_on_a_bought_identity(self):
         provider, pool, reg = world()
-        farm = self._seed_farm(pool, 4, grace=True)
+        farm = self._seed_farm(pool, 4, short=True)
         for a in farm:
             verify(pool, reg, a, "basic")
         fresh = addr(7)
@@ -319,7 +320,7 @@ class Evidence(unittest.TestCase):
             t = P.tiers[name]
             self.assertAlmostEqual(t.prior_alpha / (t.prior_alpha + t.prior_beta), w @ theta, places=12)
 
-    def test_grace_window_loans_weigh_nothing(self):
+    def test_loans_closed_within_a_day_weigh_nothing(self):
         self.assertEqual(pol.loan_evidence(closed_loan(100, 23 / 24), NOW, P), (0.0, 0.0))
         self.assertGreater(pol.loan_evidence(closed_loan(100, 25 / 24), NOW, P)[0], 0)
 

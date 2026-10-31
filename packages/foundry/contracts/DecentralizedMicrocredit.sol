@@ -36,7 +36,6 @@ contract DecentralizedMicrocredit is EIP712 {
     uint256 public constant BASIS_POINTS = 10000; // interest rates and pool ratios (1e4 = 100%)
     uint256 public constant SECONDS_PER_YEAR = 365 days;
     uint256 private constant CENT = 10_000; // 0.01 USDC (6 decimals)
-    uint256 private constant GRACE_PERIOD = 1 days; // no interest accrues during the first day
     /// @notice Queued withdrawals paid at most per deposit, repayment or withdrawal, so a long
     ///         queue cannot push those calls past the block gas limit. {processWithdrawalQueue}
     ///         drains the rest.
@@ -691,9 +690,11 @@ contract DecentralizedMicrocredit is EIP712 {
     /**
      * @notice Repay with a single EIP-2612 permit signature; anyone (e.g. a relayer) may submit.
      * @param amount Amount to repay; 0 repays the outstanding balance. The amount pulled never
-     *        exceeds the permit `value`; the UI permits the balance rounded up to the cent
-     *        (`MicrocreditLens.getOutstandingRoundedToCent`), so interest accrued since the
-     *        signature is at most a sub-cent shortfall, forgiven at closing.
+     *        exceeds the permit `value`. Nothing is forgiven: if interest accrues after the
+     *        signature past what the permit covers, the loan stays open and the shortfall stays
+     *        owed. Callers should permit the balance rounded up to the cent
+     *        (`MicrocreditLens.getOutstandingRoundedToCent`) plus a cent or more of headroom;
+     *        only the exact balance is pulled.
      */
     function repayWithPermit(
         address borrower,
@@ -1075,8 +1076,9 @@ contract DecentralizedMicrocredit is EIP712 {
     /**
      * @notice Principal plus simple interest accrued since origination, less repayments; 0 once
      *         the loan is closed (repaid, defaulted or cancelled).
-     * @dev No interest accrues during the first day. Interest keeps accruing on the original
-     *      principal until the loan closes; partial repayments reduce the balance, not the base.
+     * @dev Interest accrues from disbursement, with no grace period. Interest keeps accruing on
+     *      the original principal until the loan closes; partial repayments reduce the balance,
+     *      not the base.
      */
     function getCurrentOutstandingAmount(uint256 loanId) public view returns (uint256) {
         Loan storage loan = loans[loanId];
@@ -1290,9 +1292,9 @@ contract DecentralizedMicrocredit is EIP712 {
     }
 
     /**
-     * @dev Pulls `min(amount, outstanding)` from `payer` and closes the loan once less than a
-     *      cent remains and that rest is unpaid interest: the sub-cent balance forgiven is never
-     *      principal, and the interest it forgives is never booked, so it earns no dues (CI-30).
+     * @dev Pulls `min(amount, outstanding)` from `payer`, applies interest before principal,
+     *      and closes only when the entire outstanding balance has been paid. No sub-cent
+     *      principal or interest is forgiven (CI-30 and agent-loan interest policy).
      *      Returns the amount pulled.
      */
     function _repay(uint256 loanId, Loan storage loan, address payer, uint256 amount) internal returns (uint256 paid) {
@@ -1300,11 +1302,11 @@ contract DecentralizedMicrocredit is EIP712 {
         paid = amount < owed ? amount : owed;
         uint256 interestDue = _interestAccrued(loan) - (loan.repaid - loan.principalRepaid);
         uint256 rest = owed - paid;
-        bool closes = rest < CENT && rest <= interestDue;
+        bool closes = rest == 0;
         if (paid > 0) {
             _pullUsdc(payer, paid);
 
-            uint256 interest = closes ? interestDue - rest : Math.min(paid, interestDue);
+            uint256 interest = Math.min(paid, interestDue);
             uint256 principal = paid - interest;
             uint256 fee = (interest * protocolFeeBps) / BASIS_POINTS;
             uint256 toReserve = (interest * reserveBps) / BASIS_POINTS;
@@ -1330,8 +1332,8 @@ contract DecentralizedMicrocredit is EIP712 {
     }
 
     /**
-     * @dev Closes a repaid or cancelled loan. A repaid loan has no principal unpaid ({_repay}
-     *      closes short only on interest), so nothing is written off; a cancelled loan was never
+     * @dev Closes a repaid or cancelled loan. A repaid loan has no principal or interest unpaid,
+     *      so nothing is written off; a cancelled loan was never
      *      lent out and releases the principal it reserved.
      */
     function _closeLoan(Loan storage loan, LoanStatus status) internal {
@@ -1406,11 +1408,10 @@ contract DecentralizedMicrocredit is EIP712 {
         }
     }
 
-    /// @dev Simple interest on the original principal since disbursement; none in the first day.
+    /// @dev Simple interest on the original principal since disbursement, including the first day.
     function _interestAccrued(Loan storage loan) internal view returns (uint256) {
         if (loan.disbursedAt == 0) return 0;
         uint256 elapsed = block.timestamp - loan.disbursedAt;
-        if (elapsed < GRACE_PERIOD) return 0;
         return (((loan.principal * loan.interestRate) / BASIS_POINTS) * elapsed) / SECONDS_PER_YEAR;
     }
 

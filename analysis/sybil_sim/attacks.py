@@ -52,7 +52,7 @@ AVERY_BACKS_BRIGHTON = 50 * USDC
 
 SEED = 100 * USDC  # A4's seed: a stake K or a granted line of this size
 COLLUSIVE_LINE = 100 * USDC  # A5's legitimately granted line
-GRACE_REPAYMENT = 23 * HOUR  # inside the 24-hour interest-free window
+SHORT_REPAYMENT = 23 * HOUR  # a loan held just under a day: interest accrues from disbursement, so it is paid, not waived
 MONTH = 30 * DAY
 YEAR_TERM = 365 * DAY
 COMMUNITY_SEED = 20261003  # fixed seed for the random honest community (M0 sensitivity)
@@ -332,14 +332,14 @@ def wash_farm(
     mechanism: type[Protocol],
     n: int,
     seed: str = "stake",
-    timing: str = "grace",
+    timing: str = "short",
     cycles: int = 1,
     world: str = "demo",
     params: Params = Params(),
 ) -> Outcome | None:
     """A4: one seed (a 100 USDC stake, or an account with a 100 USDC line) backs fresh account i,
-    which borrows its maximum and repays inside the 24-hour grace period (or after 30 days, with
-    interest); the backing is withdrawn and reused for account i + 1. Each account runs `cycles`
+    which borrows its maximum and repays after 23 hours (or after 30 days), paying the interest
+    accrued from disbursement either way; the backing is withdrawn and reused for account i + 1. Each account runs `cycles`
     such loans (4 is what M1 needs to reach its ceiling of 100). Finally every account borrows
     its own credit and defaults, and a stake seed is unstaked. Returns None for M0 with a stake
     seed: M0 had no stake."""
@@ -353,7 +353,7 @@ def wash_farm(
         m.stake(seed_account, SEED)
     else:
         m.grant_line(seed_account, SEED)
-    hold = GRACE_REPAYMENT if timing == "grace" else MONTH
+    hold = SHORT_REPAYMENT if timing == "short" else MONTH
 
     for account in farmed:
         for _ in range(cycles):
@@ -367,7 +367,7 @@ def wash_farm(
 
     h.extract_all(farmed + [seed_account])
     h.default_all()
-    variant = f"{seed} seed, {'grace' if timing == 'grace' else '30-day'} repayment"
+    variant = f"{seed} seed, {'23 h' if timing == 'short' else '30-day'} repayment"
     return h.outcome("A4 wash farm", variant + (f", {cycles} cycles" if cycles > 1 else ""), n)
 
 
@@ -390,10 +390,10 @@ def exit_scam(
     mechanism: type[Protocol], n: int, timing: str = "30d", world: str = "demo", params: Params = Params()
 ) -> Outcome:
     """A6: Brighton (25 USDC of his own, 50 from Avery) repays n loans of his full available
-    amount, each after 30 days with interest (or inside the grace period), then borrows
+    amount, each after 30 days (or after 23 hours), paying the interest accrued, then borrows
     everything he can and defaults."""
     h = _harness(mechanism, world, params, [BRIGHTON])
-    hold = GRACE_REPAYMENT if timing == "grace" else MONTH
+    hold = SHORT_REPAYMENT if timing == "short" else MONTH
     for _ in range(n):
         _, available = h.m.borrow_limit(BRIGHTON)
         loan_id = h.borrow(BRIGHTON, available)
@@ -401,7 +401,7 @@ def exit_scam(
         h.repay_in_full(loan_id)
     h.extract_all([BRIGHTON])
     h.default_all()
-    variant = "grace repayments" if timing == "grace" else "30-day repayments"
+    variant = "23 h repayments" if timing == "short" else "30-day repayments"
     return h.outcome("A6 exit scam", variant, n)
 
 

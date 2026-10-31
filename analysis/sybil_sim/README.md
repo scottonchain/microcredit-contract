@@ -31,9 +31,10 @@ randomness is the M0 "community" world, which uses a fixed seed.
 All six share one pool:
 
 - ERC4626-style shares with the contract's virtual offset;
-- APR 9.33% (EFFR 433 bps + premium 500 bps), simple interest on the original principal, nothing
-  in the first 24 hours;
-- repayment pays interest first and closes the loan below one cent;
+- APR 9.33% (EFFR 433 bps + premium 500 bps), simple interest on the original principal from
+  disbursement (the contract source no longer has its 24-hour grace period; deployed pools still do);
+- repayment pays interest first and closes the loan only when the whole balance is paid, with no
+  sub-cent forgiveness;
 - of each interest payment, a **10% protocol fee** and a **30% reserve share**. The deploy script
   sets 30% and a fee of 0; A7 and the residual case vary both;
 - default allowed 30 days after the due date;
@@ -96,9 +97,9 @@ par.
 | A1 | n fresh accounts back each other in a ring and all back one beneficiary; everyone borrows the maximum and defaults. Variant **pure ring**: no beneficiary |
 | A2 | two fresh, unrooted accounts back each of n fresh strangers; all borrow the maximum and default |
 | A3 | n accounts deposit 100 USDC each as lenders (M0 roots), then ring and beneficiary as in A1, then withdraw the deposits, borrow and default. M0 borrows on scores computed while the deposits were in. Variant **pure ring** |
-| A4 | one seed, either a 100 USDC **stake** or an account with a 100 USDC **line**. For i = 1..n: the seed backs fresh account i with everything it has, i borrows its maximum and repays inside the grace period (23 h) or after **30 days**, and the backing is withdrawn and reused. Finally every account borrows its own credit and defaults, and a stake seed is unstaked. Variant **4 cycles**: four loans per account, which is what M1 needs to reach its ceiling. (M0 has no stake, so the stake seed is n/a) |
+| A4 | one seed, either a 100 USDC **stake** or an account with a 100 USDC **line**. For i = 1..n: the seed backs fresh account i with everything it has, i borrows its maximum and repays after **23 hours** or after **30 days**, paying the interest accrued, and the backing is withdrawn and reused. Finally every account borrows its own credit and defaults, and a stake seed is unstaked. Variant **4 cycles**: four loans per account, which is what M1 needs to reach its ceiling. (M0 has no stake, so the stake seed is n/a) |
 | A5 | an account with a legitimate 100 USDC line splits its backing over n of its own accounts; everyone borrows and defaults |
-| A6 | Brighton turns: he repays **m = n** loans of his full available amount (30-day, or grace), then borrows everything and defaults. Avery is the honest backer at risk |
+| A6 | Brighton turns: he repays **m = n** loans of his full available amount (30-day, or 23 h), then borrows everything and defaults. Avery is the honest backer at risk |
 | A7 | the attacker also owns 50% of the lending pool. A stake backs n fresh accounts with 100 USDC each; each borrows it for a year and repays 9.33 interest; each then borrows the credit its history earned. The attacker withdraws its lender position while those loans are current, and they default |
 | A7 drain | the residual case for M3r: A7, but between the dues and the attacker's exit the reserve shrinks by a factor `drain` of the farm's contribution, through other borrowers' defaults or `releaseReserve`. It runs against a counterfactual of the same lender without the farm |
 
@@ -125,15 +126,15 @@ reserve 30%). M3 is superseded; M3r is the implemented rule.
 | A2 stranger lift | - | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | A3 deposit roots | ring + beneficiary | 180.40 | 1,853.23 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | A3 deposit roots | pure ring | 0.00 | 5,818.18 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| A4 wash farm | stake seed, grace repayment | n/a | n/a | 25.00 | 1,600.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| A4 wash farm | stake seed, 23 h repayment | n/a | n/a | 24.98 | 1,598.43 | -0.02 | -1.57 | -0.00 | -0.16 | -0.02 | -1.10 | -0.02 | -1.57 |
 | A4 wash farm | stake seed, 30-day repayment | n/a | n/a | 24.23 | 1,550.92 | -0.77 | -49.08 | -0.08 | -4.91 | -0.54 | -34.35 | -0.77 | -49.08 |
-| A4 wash farm | line seed, grace repayment | 100.00 | 100.00 | 125.00 | 1,700.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 |
+| A4 wash farm | line seed, 23 h repayment | 99.98 | 98.60 | 124.98 | 1,698.43 | 99.98 | 98.43 | 100.00 | 99.84 | 99.98 | 98.90 | 99.98 | 98.43 |
 | A4 wash farm | line seed, 30-day repayment | 99.31 | 56.09 | 124.23 | 1,650.92 | 99.23 | 50.92 | 99.92 | 95.09 | 99.46 | 65.65 | 99.23 | 50.92 |
-| A4 wash farm | stake seed, grace repayment, 4 cycles | n/a | n/a | 100.00 | 6,400.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| A4 wash farm | stake seed, 23 h repayment, 4 cycles | n/a | n/a | 99.86 | 6,390.96 | -0.10 | -6.27 | -0.01 | -0.63 | -0.07 | -4.39 | -0.10 | -6.27 |
 | A4 wash farm | stake seed, 30-day repayment, 4 cycles | n/a | n/a | 95.58 | 6,117.03 | -3.07 | -196.31 | -0.31 | -19.84 | -2.15 | -137.89 | -3.07 | -196.31 |
 | A5 collusive backer | - | 189.50 | 885.96 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 | 100.00 |
 | A6 exit scam (n = m loans) | 30-day repayments | 88.80 | 45.57 | 93.17 | 77.67 | 74.42 | 38.19 | 74.94 | 70.39 | 74.60 | 47.27 | 74.42 | 38.19 |
-| A6 exit scam (n = m loans) | grace repayments | 89.48 | 89.48 | 93.75 | 150.00 | 75.00 | 75.00 | 75.00 | 75.00 | 75.00 | 75.00 | 75.00 | 75.00 |
+| A6 exit scam (n = m loans) | 23 h repayments | 89.46 | 88.08 | 93.73 | 147.69 | 74.98 | 73.82 | 75.00 | 74.88 | 74.99 | 74.18 | 74.98 | 73.82 |
 | A7 self-lending dues | lender share 50% | n/a | n/a | 18.47 | 1,182.02 | -6.53 | -417.98 | **1.87** | **119.42** | -3.73 | -238.85 | -6.53 | -417.98 |
 
 The marginal profit per extra account, (p(64) − p(32))/32, is in `results/summary.md`:
@@ -269,9 +270,11 @@ dues-funded principal is open.
 
 ### 4. M1 is as broken as expected
 
-One recyclable 100 USDC stake yields exactly 25.00 per fresh account at zero cost (1,600 at
-n = 64), and 100.00 per account with four grace-period cycles (6,400 at n = 64). This reproduces
-Theorem 3 of `docs/CREDIT_MODEL.md`.
+One recyclable 100 USDC stake yields 24.98 per fresh account (1,598.43 at n = 64) and 99.86 per
+account with four 23-hour cycles (6,390.96 at n = 64). Before the contract source dropped its
+grace period these were exactly 25.00 and 100.00 at zero cost; now each cycle pays the interest
+accrued while the loan is held (1.57 and 9.04 in total at n = 64), which changes the cost, not the
+shape: profit stays linear in n. This reproduces Theorem 3 of `docs/CREDIT_MODEL.md`.
 
 ### 5. M2, M3r and M4 are bounded independently of n in every attack, A7 included
 
@@ -300,8 +303,9 @@ attacker nodes hold. That mass costs nothing to obtain:
 Lenders absorb every loss, and honest limits can be wiped out (A3: Brighton 89.48 → 0).
 
 **M1 `hermes_history`.** It keeps M2's protection against rings, strangers, deposit roots and
-collusion. Its history rule, though, mints unsecured credit from free grace-period repayments: 25%
-of every repaid principal, up to 100 per account, so 1,600 to 6,400 at n = 64, at zero cost, with
+collusion. Its history rule, though, mints unsecured credit from 23-hour repayments: 25%
+of every repaid principal, up to 100 per account, so 1,598 to 6,391 at n = 64, for the interest of
+23 hours (1.57 to 9.04 in total; they were free while the contract waived the first day), with
 the seed never at risk. Profit is linear in n, and lenders lose all of it.
 
 **M2 `conservation`.** No attack's profit grows with n. Fresh accounts can neither back nor borrow.
