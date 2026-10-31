@@ -52,7 +52,7 @@ the identity. Anything else gets line 0.
 
 $$w_{\text{good}} = \underbrace{2^{-\text{age}/h}}_{\text{recency}}\cdot\underbrace{\min\Big(1,\ \frac{\text{principal}-\text{secured}}{P_{\text{ref}}}\Big)}_{\text{unsecured size}}\cdot\underbrace{\min\Big(1,\ \frac{\min(\text{elapsed},\ \text{term})}{30\ \text{days}}\Big)}_{\text{time at risk}}$$
 
-and $w_{\text{good}}=0$ if the loan closed within 24 hours (the issuer's own rule; the contract no longer waives that day's interest) or paid no
+and $w_{\text{good}}=0$ if the loan closed within 24 hours (the issuer's own rule; the contract source no longer waives that day's interest) or paid no
 interest. A loan repaid after its due date is a bad trial with weight
 $2^{-\text{age}/h}\min(1,\text{principal}/P_{\text{ref}})\min(1,\text{term}/30\ \text{days})$.
 Stake does not discount a bad trial, so stake cannot hide lateness. Open loans are not evidence

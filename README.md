@@ -135,7 +135,7 @@ The contract stores two basis-point values:
 - `effrRate`: Effective Federal Funds Rate, intended to come from the Pyth Network oracle in production (set manually during local testing).
 - `riskPremium`: additional spread to cover platform risk.
 
-The borrower's APR is `effrRate + riskPremium`, fixed when the loan is created. Simple interest accrues on the principal from disbursement, with none during the first 24 hours. Partial repayments reduce the outstanding balance, a repayment never pulls more than is owed, and once every unit of principal is paid any interest under one cent is forgiven and the loan closes; a payment short of the principal leaves it open.
+The borrower's APR is `effrRate + riskPremium`, fixed when the loan is created. Simple interest accrues on the principal from disbursement (this source has no grace period and forgives nothing; pools deployed earlier, the live Base Sepolia pool included, waive the first 24 hours and forgive a rest under a cent). Partial repayments reduce the outstanding balance, interest is paid before principal, a repayment never pulls more than is owed, and the loan closes only when its whole balance is paid: nothing is forgiven, so a payment short by even one unit leaves it open. Because interest keeps accruing until a payment is mined, pay the quoted balance plus a little headroom; the pool takes only what is owed.
 
 ## User Guides
 

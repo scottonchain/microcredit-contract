@@ -73,6 +73,9 @@ contract DeployScript is Script {
         credit.setScoreOverride(alexis, 950_000); // 95 USDC
         credit.setScoreOverride(vm.addr(AVERY_PK), 920_000); // 92 USDC
         credit.setScoreOverride(vm.addr(BRIGHTON_PK), 250_000); // 25 USDC
+        // Interest accrues from disbursement and nothing is forgiven, so the demo borrower needs a little USDC beyond
+        // his loan to pay it off: 1 USDC covers the interest of any demo that finishes in a day.
+        MockUSDC(usdc).mint(vm.addr(BRIGHTON_PK), 1e6);
 
         _setDisplayName(AVERY_PK, "Avery");
         _setDisplayName(BRIGHTON_PK, "Brighton");

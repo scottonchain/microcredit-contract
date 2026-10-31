@@ -6,9 +6,9 @@ the credit rules are in [`CREDIT_MODEL.md`](CREDIT_MODEL.md); the numbers come f
 
 ## Flows
 
-Every loan's APR is fixed at origination: `effrRate` + `riskPremium`. Interest is simple, starts
-24 hours after disbursement, and is settled before principal on every repayment. Each interest
-payment `I` splits three ways:
+Every loan's APR is fixed at origination: `effrRate` + `riskPremium`. Interest is simple, accrues
+from disbursement, and is settled before principal on every repayment; a loan closes only when its
+whole balance is paid. Each interest payment `I` splits three ways:
 
 | Share | Goes to | Purpose |
 | --- | --- | --- |
