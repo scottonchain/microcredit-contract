@@ -13,7 +13,8 @@ import {
  * `amount: "0"` repays the outstanding balance, capped at the permit value. A loan closes only when its whole balance is
  * paid and interest keeps accruing until the transaction is mined, so a permit for exactly the quoted balance can leave
  * a sliver owed and the loan open. Callers permit the cent-rounded quote plus headroom (`payoffAmount` in
- * `utils/repayAmount.ts`); the pool pulls only what is owed, so the headroom is never taken.
+ * `utils/repayAmount.ts`, sized from the loan's original principal because interest accrues on it even after partial
+ * repayments); the pool pulls only what is owed, so the headroom is never taken.
  *
  * `amountUsed` is the amount the pool actually pulled, read from `LoanRepaid`. That event also fires for a partial
  * repayment, and a mined success is not proof of closure: read `getLoan` and `getCurrentOutstandingAmount` afterwards

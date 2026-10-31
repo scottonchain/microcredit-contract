@@ -7,6 +7,10 @@
  * leaves the loan open with a sliver owed, its credit usage held and no completed-loan credit. The pool pulls
  * `min(amount, owed)`, so a little headroom over the quote costs nothing: it is never taken, only allowed.
  *
+ * Interest accrues on the loan's ORIGINAL principal until it closes, and a partial repayment reduces the balance, not
+ * that base. So the headroom is sized from the original principal (`getLoan` tuple[0]), never from the remaining quote:
+ * a loan of 1,000 USDC with 999 repaid at origination has a 1 USDC quote and still grows at the rate of 1,000 USDC.
+ *
  * Every approved, permitted or passed payoff amount in the app, the relayer callers and any agent script comes from
  * `payoffAmount`.
  */
@@ -20,19 +24,24 @@ export const MAX_RATE_BPS = 10_000n;
 const ceilToCent = (amount: bigint): bigint => ((amount + CENT - 1n) / CENT) * CENT;
 
 /**
- * Headroom over a payoff quote: at least one cent, and enough to cover `PAYOFF_HEADROOM_SECONDS` of interest at the
- * highest rate the pool allows, so it is sufficient for any loan whose quote is `quote`. For a 100 USDC loan that is
- * one cent; for a 10,000 USDC loan it is about 1.9 cents at a 10% APR and about 19 cents at the 100% ceiling.
+ * Headroom over a payoff quote: at least one cent, and enough to cover `PAYOFF_HEADROOM_SECONDS` of interest on
+ * `originalPrincipal` at the highest rate the pool allows. For a 100 USDC loan that is one cent; for a 10,000 USDC loan
+ * it is about 1.9 cents at a 10% APR and about 19 cents at the 100% ceiling. It does not depend on how much is left to
+ * pay.
  */
-export const payoffHeadroom = (quote: bigint): bigint => {
-  if (quote < 0n) throw new Error("quote must not be negative");
-  const accruing = (quote * MAX_RATE_BPS * PAYOFF_HEADROOM_SECONDS) / (10_000n * SECONDS_PER_YEAR);
+export const payoffHeadroom = (originalPrincipal: bigint): bigint => {
+  if (originalPrincipal < 0n) throw new Error("principal must not be negative");
+  const accruing = (originalPrincipal * MAX_RATE_BPS * PAYOFF_HEADROOM_SECONDS) / (10_000n * SECONDS_PER_YEAR);
   const bound = ceilToCent(accruing + 1n);
   return bound > CENT ? bound : CENT;
 };
 
-/** The amount to approve, permit or pass to pay a loan off: the cent-rounded quote plus headroom. */
-export const payoffAmount = (quote: bigint): bigint => (quote === 0n ? 0n : quote + payoffHeadroom(quote));
+/**
+ * The amount to approve, permit or pass to pay a loan off: the cent-rounded quote plus headroom sized from the loan's
+ * original principal (`getLoan` tuple[0]). A zero quote needs nothing.
+ */
+export const payoffAmount = (quote: bigint, originalPrincipal: bigint): bigint =>
+  quote === 0n ? 0n : quote + payoffHeadroom(originalPrincipal);
 
 /**
  * What the pool says once a payoff is mined. A mined success, and the `LoanRepaid` event with its `amountUsed`, prove a

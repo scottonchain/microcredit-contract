@@ -44,6 +44,24 @@ contract LoanAccountingTest is MicrocreditTestBase {
         assertEq(owed, PRINCIPAL + (yearly * held) / 365 days);
     }
 
+    /// Interest keeps accruing on the original principal after a partial repayment, so a heavily repaid loan grows at
+    /// the rate of the whole principal, not of what is left. The app sizes its payoff headroom from the original
+    /// principal for this reason (packages/nextjs/utils/repayAmount.ts).
+    function testInterestKeepsAccruingOnTheOriginalPrincipalAfterAPartialRepayment() public {
+        uint256 loanId = _openLoan(PRINCIPAL);
+        vm.startPrank(borrower);
+        usdc.approve(address(credit), PRINCIPAL - 1e6);
+        credit.repayLoan(loanId, PRINCIPAL - 1e6); // 999 USDC of 1,000 repaid at origination
+        vm.stopPrank();
+        assertEq(credit.getCurrentOutstandingAmount(loanId), 1e6, "one USDC left, no interest accrued yet");
+
+        vm.warp(vm.getBlockTimestamp() + 600);
+        uint256 owed = credit.getCurrentOutstandingAmount(loanId);
+        uint256 growth = owed - 1e6;
+        assertEq(growth, ((PRINCIPAL * RATE) / 10_000 * 600) / 365 days, "growth is that of the original principal");
+        assertGt(growth, ((1e6 * RATE) / 10_000 * 600) / 365 days * 100, "and not that of the remaining balance");
+    }
+
     function testSimpleInterestAccruesFromOrigination() public {
         uint256 loanId = _openLoan(PRINCIPAL);
         vm.warp(vm.getBlockTimestamp() + 365 days);

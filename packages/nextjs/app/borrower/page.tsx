@@ -12,7 +12,8 @@ import { getParsedError } from "~~/utils/scaffold-eth";
 import { TestnetMint } from "~~/components/TestnetMint";
 import { toast } from "react-hot-toast";
 import { formatUSDC, formatUSDCExact } from "~~/utils/format";
-import { type PayoffOutcome, isResidualDebt, payoffAmount, payoffOutcome } from "~~/utils/repayAmount";
+import { confirmPayoffOutcome, payoffNotice as payoffNoticeText } from "~~/utils/payoffCheck";
+import { isResidualDebt, payoffAmount, payoffOutcome } from "~~/utils/repayAmount";
 import { waitForStable } from "~~/utils/stableRead";
 import {
   type OriginationIntent,
@@ -263,35 +264,37 @@ const BorrowPage: NextPage = () => {
     })) as bigint;
   };
 
-  // After a full payoff is mined, ask the pool whether the loan closed. A mined success (and the LoanRepaid event, which
-  // also fires for partial repayments) proves a payment, not closure. Reads can lag a node behind the receipt, so a
-  // closed state must hold on two consecutive reads; otherwise report what was last seen, in base units, or that it
-  // could not be confirmed. Returns "" when the loan is closed.
-  const confirmPayoff = async (loanId: bigint): Promise<string> => {
-    // `as` keeps TypeScript from narrowing `last` to its initial value: it is assigned inside the read closure below.
-    let last = { kind: "unknown" } as PayoffOutcome;
-    const read = async (): Promise<PayoffOutcome> => {
-      if (!publicClient) throw new Error("Missing contracts");
-      const loan = (await publicClient.readContract({
-        address: MICROCREDIT_ADDRESS,
-        abi: MICROCREDIT_ABI,
-        functionName: "getLoan",
-        args: [loanId],
-      })) as readonly unknown[];
-      last = payoffOutcome(Boolean(loan[4]), await readExactOwed(loanId));
-      return last;
-    };
-    try {
-      await waitForStable(read, o => o.kind === "closed", { what: "The loan status", timeoutMs: 9_000, intervalMs: 1_500 });
-    } catch {
-      // keep what was last seen; a failed or stale read is reported below, never as a closed loan
-    }
-    if (last.kind === "closed") return "";
-    if (last.kind === "open") {
-      return `The payment went through, but the loan is still open: ${formatUSDCExact(last.owed)} is still owed. Interest accrued while the payment was being mined. Pay the full balance again to close it.`;
-    }
-    return "The payment went through, but I could not confirm that the loan is closed. Check the balance shown below before relying on it.";
+  // Original principal of a loan, `getLoan` tuple[0]. Interest accrues on it until the loan closes, whatever has been
+  // repaid, so the payoff headroom is sized from it and not from the remaining quote.
+  const readOriginalPrincipal = async (loanId: bigint): Promise<bigint> => {
+    if (!publicClient) throw new Error("Missing contracts");
+    const loan = (await publicClient.readContract({
+      address: MICROCREDIT_ADDRESS,
+      abi: MICROCREDIT_ABI,
+      functionName: "getLoan",
+      args: [loanId],
+    })) as readonly unknown[];
+    return loan[0] as bigint;
   };
+
+  // After a full payoff is mined, ask the pool whether the loan closed. A mined success (and the LoanRepaid event, which
+  // also fires for partial repayments) proves a payment, not closure. The orchestration lives in utils/payoffCheck.ts
+  // and is tested there: closure is reported only when the stability check resolves (consecutive successful closed
+  // reads), never from a single closed read. Returns "" only when the loan is confirmed closed.
+  const confirmPayoff = async (loanId: bigint): Promise<string> =>
+    payoffNoticeText(
+      await confirmPayoffOutcome(async () => {
+        if (!publicClient) throw new Error("Missing contracts");
+        const loan = (await publicClient.readContract({
+          address: MICROCREDIT_ADDRESS,
+          abi: MICROCREDIT_ABI,
+          functionName: "getLoan",
+          args: [loanId],
+        })) as readonly unknown[];
+        return payoffOutcome(Boolean(loan[4]), await readExactOwed(loanId));
+      }, waitForStable),
+      formatUSDCExact,
+    );
 
   // Helper function to handle transfer errors
   const handleTransferError = (error: any) => {
@@ -1192,9 +1195,9 @@ const BorrowPage: NextPage = () => {
               <div className="bg-success-surface border border-outline rounded-lg p-4">
                 <h4 className="font-medium text-success mb-2">Full Repayment</h4>
                 <p className="text-sm text-success mb-3">Pay off your entire outstanding balance</p>
-                {displayOutstanding > 0n && (
+                {displayOutstanding > 0n && activePrincipal !== undefined && (
                   <p className="text-xs text-success mb-3">
-                    You authorize up to {formatUSDCExact(payoffAmount(displayOutstanding))}: the balance plus a margin for interest that
+                    You authorize up to {formatUSDCExact(payoffAmount(displayOutstanding, activePrincipal))}: the balance plus a margin for interest that
                     accrues before the payment is mined. Only what is owed is taken, and the page checks afterwards that the loan closed.
                   </p>
                 )}
@@ -1227,7 +1230,7 @@ const BorrowPage: NextPage = () => {
                       // Interest keeps accruing until the payment is mined and the pool forgives nothing, so a payoff
                       // approved or permitted for exactly the quote can leave the loan open with a sliver owed. Add
                       // headroom: the pool pulls only what is owed (min(amount, owed)).
-                      const amountToRepay = payoffAmount(out);
+                      const amountToRepay = payoffAmount(out, await readOriginalPrincipal(activeLoanId as bigint));
 
                       // The wallet must hold the exact balance now owed, not the headroom.
                       await checkUSDCBalance(await readExactOwed(activeLoanId as bigint), true);

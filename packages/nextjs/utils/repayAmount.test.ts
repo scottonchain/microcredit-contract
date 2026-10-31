@@ -26,7 +26,7 @@ test("the stale-quote regression: a cent-rounded quote alone falls short after a
   const owedWhenMined = owedAfter(principal, rate, 600n);
   assert.ok(owedWhenMined > quote, "interest accrued since the quote exceeds the cent rounding");
   assert.ok(quote < owedWhenMined, "paying the bare quote leaves the loan open");
-  assert.ok(payoffAmount(quote) >= owedWhenMined, "the payoff amount covers the same delay and closes it");
+  assert.ok(payoffAmount(quote, principal) >= owedWhenMined, "the payoff amount covers the same delay and closes it");
 });
 
 test("headroom covers ten minutes of interest at the highest rate the pool allows, at any size", () => {
@@ -34,7 +34,7 @@ test("headroom covers ten minutes of interest at the highest rate the pool allow
     for (const rate of [250n, 1_000n, 2_500n, 10_000n]) {
       const quote = ceilToCent(owedAfter(principal, rate, 0n));
       assert.ok(
-        payoffAmount(quote) >= owedAfter(principal, rate, 600n),
+        payoffAmount(quote, principal) >= owedAfter(principal, rate, 600n),
         `principal ${principal} at ${rate} bps stays covered for 600 s`,
       );
     }
@@ -42,7 +42,7 @@ test("headroom covers ten minutes of interest at the highest rate the pool allow
 });
 
 test("a zero quote needs nothing", () => {
-  assert.equal(payoffAmount(0n), 0n);
+  assert.equal(payoffAmount(0n, usdc(1_000n)), 0n);
 });
 
 test("the exact-cent quote with zero rounding slack still falls short after accrual without headroom", () => {
@@ -51,9 +51,9 @@ test("the exact-cent quote with zero rounding slack still falls short after accr
   const quote = ceilToCent(owedAfter(principal, 1_000n, 0n));
   assert.equal(quote, principal, "no rounding slack");
   assert.ok(owedAfter(principal, 1_000n, 12n) > quote, "twelve seconds of accrual already exceeds the bare quote");
-  assert.ok(payoffAmount(quote) >= owedAfter(principal, 1_000n, 12n), "the payoff amount covers a normal mining delay");
+  assert.ok(payoffAmount(quote, principal) >= owedAfter(principal, 1_000n, 12n), "the payoff amount covers a normal mining delay");
   // Delay beyond the chosen buffer: ten minutes of headroom does not cover an hour, so the caller must re-quote.
-  assert.ok(payoffAmount(quote) < owedAfter(principal, 10_000n, 3_600n), "an hour at 100% APR exceeds the buffer: stale beyond it");
+  assert.ok(payoffAmount(quote, principal) < owedAfter(principal, 10_000n, 3_600n), "an hour at 100% APR exceeds the buffer: stale beyond it");
 });
 
 test("payoffOutcome: a mined payment is not closure; only the loan's own state is", () => {
@@ -82,4 +82,44 @@ test("formatUSDCExact shows sub-cent balances that formatUSDC rounds to $0.00", 
   assert.equal(formatUSDCExact(10_000n), "$0.01");
   assert.equal(formatUSDCExact(1_000_000n), "$1.00");
   assert.equal(formatUSDCExact(12_345_600n), "$12.3456");
+});
+
+// The contract: owed = principal + simple interest on the ORIGINAL principal since disbursement - repaid.
+const owedAfterRepaid = (principal: bigint, rateBps: bigint, seconds: bigint, repaid: bigint): bigint =>
+  owedAfter(principal, rateBps, seconds) - repaid;
+
+test("a heavily repaid loan still grows at the rate of its original principal: headroom is sized from the principal", () => {
+  // Codex's reproduction on PR 45: 1,000 USDC originally borrowed, 999 USDC repaid at origination, quote 1 USDC,
+  // 100% APR, payment mined 600 s later. Sizing the headroom from the 1 USDC quote left 9,025 units unpaid.
+  const principal = usdc(1_000n);
+  const repaid = usdc(999n);
+  const quote = ceilToCent(owedAfterRepaid(principal, 10_000n, 0n, repaid));
+  assert.equal(quote, usdc(1n));
+  const owedWhenMined = owedAfterRepaid(principal, 10_000n, 600n, repaid);
+  assert.equal(owedWhenMined, 1_019_025n, "the exact figure from the review");
+  assert.equal(payoffAmount(quote, quote), 1_010_000n, "sized from the quote it would be one cent: the defect");
+  assert.ok(payoffAmount(quote, quote) < owedWhenMined, "and that falls short, so the loan would stay open");
+  assert.ok(payoffAmount(quote, principal) >= owedWhenMined, "sized from the original principal it covers the delay");
+});
+
+test("headroom depends on the original principal, not on how much is left to pay", () => {
+  const principal = usdc(1_000n);
+  const heads = [usdc(1n), usdc(10n), usdc(500n), usdc(1_000n)].map(() => payoffHeadroom(principal));
+  assert.ok(heads.every(h => h === heads[0]), "same loan, same headroom, whatever the remaining quote");
+  assert.ok(payoffHeadroom(usdc(100_000n)) > payoffHeadroom(principal), "and it grows with the principal");
+});
+
+test("headroom covers ten minutes for every split of one loan between repaid and remaining", () => {
+  for (const principal of [usdc(40n), usdc(1_000n), usdc(25_000n)]) {
+    for (const repaidShare of [0n, 50n, 90n, 99n]) {
+      for (const rate of [250n, 1_000n, 10_000n]) {
+        const repaid = (principal * repaidShare) / 100n;
+        const quote = ceilToCent(owedAfterRepaid(principal, rate, 0n, repaid));
+        assert.ok(
+          payoffAmount(quote, principal) >= owedAfterRepaid(principal, rate, 600n, repaid),
+          `principal ${principal}, ${repaidShare}% repaid, ${rate} bps stays covered for 600 s`,
+        );
+      }
+    }
+  }
 });
