@@ -1,5 +1,7 @@
 # Decentralized Microcredit Platform
 
+Current direction: [Omnequa comparative research and publishing](https://github.com/scottonchain/microcredit-agent-testbed/blob/main/coordination/RESEARCH_PHASE_20261101.md) (November 1, 2026). The technical work below remains a research asset, not an active lending offer or deployment instruction. Read the [public journal](https://omnequa.org/journal/) for accessible explanations.
+
 > **Project direction:** the cross-repo [north star and current path](https://github.com/scottonchain/microcredit-agent-testbed/blob/main/coordination/NORTH_STAR.md) defines what this implementation is for and the next evidence gates. This repository owns contract, relayer, app and deployment mechanics; it does not own the team backlog or human-benefit claims.
 
 ![Frontend Vision](front_end_vision.png)
