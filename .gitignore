@@ -42,3 +42,24 @@ packages/foundry/deployment.production.json
 # Python
 __pycache__/
 *.pyc
+
+# Local AI-agent approvals, credentials and session data must not be published.
+# Keep reviewed shared .claude/settings.json and instructions tracked.
+**/.claude/settings.local.json*
+**/.claude/.credentials.json*
+**/.claude/history.jsonl
+**/.claude/projects/
+**/.claude/sessions/
+**/.claude/debug/
+**/.claude/todos/
+**/.claude.json
+**/.claude.json.*
+# Local dotenv values; explicitly sanitized templates remain shareable.
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+!.env.*.example
+!.env.*.sample
+!.env.*.template
